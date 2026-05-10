@@ -3783,6 +3783,8 @@ function mainapi:CreateCategory(categorysettings)
 		modulechildren.BorderSizePixel = 0
 		modulechildren.Visible = false
 		modulechildren.Parent = children
+		local moduleExpanded = false
+		local moduleExpandAnim = 0
 		moduleapi.Children = modulechildren
 		local windowlist = Instance.new('UIListLayout')
 		windowlist.SortOrder = Enum.SortOrder.LayoutOrder
@@ -3888,12 +3890,26 @@ function mainapi:CreateCategory(categorysettings)
 				dots.ImageColor3 = color.Light(uipallet.Main, 0.37)
 			end
 		end)
-		dotsbutton.MouseButton1Click:Connect(function()
-			modulechildren.Visible = not modulechildren.Visible
-		end)
-		dotsbutton.MouseButton2Click:Connect(function()
-			modulechildren.Visible = not modulechildren.Visible
-		end)
+		local function toggleModuleChildren()
+			moduleExpanded = not moduleExpanded
+			moduleExpandAnim += 1
+			local thisAnim = moduleExpandAnim
+			if moduleExpanded then
+				modulechildren.Visible = true
+			end
+			tween:Tween(modulechildren, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+				Size = UDim2.new(1, 0, 0, moduleExpanded and (windowlist.AbsoluteContentSize.Y / scale.Scale) or 0)
+			})
+			if not moduleExpanded then
+				task.delay(0.2, function()
+					if moduleExpandAnim == thisAnim and not moduleExpanded then
+						modulechildren.Visible = false
+					end
+				end)
+			end
+		end
+		dotsbutton.MouseButton1Click:Connect(toggleModuleChildren)
+		dotsbutton.MouseButton2Click:Connect(toggleModuleChildren)
 		local hovered = false
 		modulebutton.MouseEnter:Connect(function()
 			hovered = true
@@ -3914,9 +3930,7 @@ function mainapi:CreateCategory(categorysettings)
 		modulebutton.MouseButton1Click:Connect(function()
 			moduleapi:Toggle()
 		end)
-		modulebutton.MouseButton2Click:Connect(function()
-			modulechildren.Visible = not modulechildren.Visible
-		end)
+		modulebutton.MouseButton2Click:Connect(toggleModuleChildren)
 		if inputService.TouchEnabled then
 			local heldbutton = false
 			modulebutton.MouseButton1Down:Connect(function()
@@ -3966,7 +3980,7 @@ function mainapi:CreateCategory(categorysettings)
 			if mainapi.ThreadFix then
 				setthreadidentity(8)
 			end
-			modulechildren.Size = UDim2.new(1, 0, 0, windowlist.AbsoluteContentSize.Y / scale.Scale)
+			modulechildren.Size = UDim2.new(1, 0, 0, moduleExpanded and (windowlist.AbsoluteContentSize.Y / scale.Scale) or 0)
 		end)
 
 		moduleapi.Object = modulebutton
@@ -3992,9 +4006,22 @@ function mainapi:CreateCategory(categorysettings)
 
 	function categoryapi:Expand()
 		self.Expanded = not self.Expanded
-		children.Visible = self.Expanded
-		arrow.Rotation = self.Expanded and 0 or 180
-		window.Size = UDim2.fromOffset(220, self.Expanded and math.min(41 + windowlist.AbsoluteContentSize.Y / scale.Scale, 601) or 41)
+		if self.Expanded then
+			children.Visible = true
+		end
+		tween:Tween(arrow, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+			Rotation = self.Expanded and 0 or 180
+		})
+		tween:Tween(window, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+			Size = UDim2.fromOffset(220, self.Expanded and math.min(41 + windowlist.AbsoluteContentSize.Y / scale.Scale, 601) or 41)
+		})
+		if not self.Expanded then
+			task.delay(0.2, function()
+				if not self.Expanded then
+					children.Visible = false
+				end
+			end)
+		end
 		divider.Visible = children.CanvasPosition.Y > 10 and children.Visible
 	end
 
@@ -4154,12 +4181,19 @@ function mainapi:CreateOverlay(categorysettings)
 	function categoryapi:Expand(check)
 		if check and not blur.Visible then return end
 		self.Expanded = not self.Expanded
-		children.Visible = self.Expanded
-		dots.ImageColor3 = self.Expanded and uipallet.Text or color.Light(uipallet.Main, 0.37)
 		if self.Expanded then
-			window.Size = UDim2.fromOffset(window.Size.X.Offset, math.min(41 + windowlist.AbsoluteContentSize.Y / scale.Scale, 601))
-		else
-			window.Size = UDim2.fromOffset(window.Size.X.Offset, 41)
+			children.Visible = true
+		end
+		dots.ImageColor3 = self.Expanded and uipallet.Text or color.Light(uipallet.Main, 0.37)
+		tween:Tween(window, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+			Size = UDim2.fromOffset(window.Size.X.Offset, self.Expanded and math.min(41 + windowlist.AbsoluteContentSize.Y / scale.Scale, 601) or 41)
+		})
+		if not self.Expanded then
+			task.delay(0.2, function()
+				if not self.Expanded then
+					children.Visible = false
+				end
+			end)
 		end
 	end
 
@@ -4690,9 +4724,22 @@ function mainapi:CreateCategoryList(categorysettings)
 
 	function categoryapi:Expand()
 		self.Expanded = not self.Expanded
-		children.Visible = self.Expanded
-		arrow.Rotation = self.Expanded and 0 or 180
-		window.Size = UDim2.fromOffset(220, self.Expanded and math.min(51 + windowlist.AbsoluteContentSize.Y / scale.Scale, 611) or 45)
+		if self.Expanded then
+			children.Visible = true
+		end
+		tween:Tween(arrow, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+			Rotation = self.Expanded and 0 or 180
+		})
+		tween:Tween(window, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+			Size = UDim2.fromOffset(220, self.Expanded and math.min(51 + windowlist.AbsoluteContentSize.Y / scale.Scale, 611) or 45)
+		})
+		if not self.Expanded then
+			task.delay(0.2, function()
+				if not self.Expanded then
+					children.Visible = false
+				end
+			end)
+		end
 		divider.Visible = children.CanvasPosition.Y > 10 and children.Visible
 	end
 
