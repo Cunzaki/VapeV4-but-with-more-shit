@@ -11,7 +11,11 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
+<<<<<<< HEAD
 			return game:HttpGet('https://raw.githubusercontent.com/7GrandDadPGN/VapeV4ForRoblox/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
+=======
+			return game:HttpGet('https://raw.githubusercontent.com/Cunzaki/VapeV4-but-with-more-shit/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
+>>>>>>> c383d41 (Initial fork changes)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -42,7 +46,11 @@ end
 
 if not shared.VapeDeveloper then
 	local _, subbed = pcall(function()
+<<<<<<< HEAD
 		return game:HttpGet('https://github.com/7GrandDadPGN/VapeV4ForRoblox')
+=======
+		return game:HttpGet('https://github.com/Cunzaki/VapeV4-but-with-more-shit')
+>>>>>>> c383d41 (Initial fork changes)
 	end)
 	local commit = subbed:find('currentOid')
 	commit = commit and subbed:sub(commit + 13, commit + 52) or nil
