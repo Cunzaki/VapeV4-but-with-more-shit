@@ -110,7 +110,14 @@ local function tryAddFromDescendant(obj)
 	end
 end
 
+local function healthCheckEnabled()
+	return shared.VapeHealthCheck ~= false
+end
+
 entitylib.targetCheck = function(ent)
+	if healthCheckEnabled() and ent.Health <= 0 then
+		return false
+	end
 	if ent.TeamCheck then
 		return ent:TeamCheck()
 	end
@@ -160,7 +167,7 @@ local function hasInvincibility(ent)
 end
 
 entitylib.isVulnerable = function(ent, forcefieldCheck)
-	if ent.Health <= 0 then
+	if healthCheckEnabled() and ent.Health <= 0 then
 		return false
 	end
 	if forcefieldCheck == false then
@@ -343,6 +350,7 @@ entitylib.addEntity = function(char, plr, teamfunc)
 					table.insert(entity.Connections, v:Connect(function()
 						entity.Health = hum.Health
 						entity.MaxHealth = hum.MaxHealth
+						entity.Targetable = entitylib.targetCheck(entity)
 						entitylib.Events.EntityUpdated:Fire(entity)
 					end))
 				end
