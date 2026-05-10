@@ -2150,7 +2150,21 @@ run(function()
 	local Invisible
 	local clone, oldroot, hip, valid
 	local animtrack
+	local Method
+	local UseAnimation
+	local RespawnReinject
+	local UpdateRate
 	local proper = true
+	local success = false
+
+	local function setLocalInvisible(state)
+		if not (entitylib.isAlive and entitylib.character and entitylib.character.Character) then return end
+		for _, v in entitylib.character.Character:GetDescendants() do
+			if v:IsA('BasePart') then
+				v.LocalTransparencyModifier = state and 1 or 0
+			end
+		end
+	end
 	
 	local function doClone()
 		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
@@ -2250,49 +2264,65 @@ run(function()
 		Name = 'Invisible',
 		Function = function(callback)
 			if callback then
-				if not proper then
-					notif('Invisible', 'Broken state detected', 3, 'alert')
-					Invisible:Toggle()
-					return
-				end
-	
-				success = doClone()
-				if not success then
-					Invisible:Toggle()
-					return
-				end
-	
-				animationTrickery()
-				Invisible:Clean(runService.PreSimulation:Connect(function(dt)
-					if entitylib.isAlive and oldroot then
-						local root = entitylib.character.RootPart
-						local cf = root.CFrame - Vector3.new(0, entitylib.character.Humanoid.HipHeight + (root.Size.Y / 2) - 1, 0)
-	
-						if not isnetworkowner(oldroot) then
-							root.CFrame = oldroot.CFrame
-							root.Velocity = oldroot.Velocity
-							return
+				if Method.Value == 'Clone' then
+					if not proper then
+						notif('Invisible', 'Broken state detected', 3, 'alert')
+						Invisible:Toggle()
+						return
+					end
+		
+					success = doClone()
+					if not success then
+						Invisible:Toggle()
+						return
+					end
+		
+					if UseAnimation.Enabled then
+						animationTrickery()
+					end
+					local elapsed = 0
+					Invisible:Clean(runService.PreSimulation:Connect(function(dt)
+						elapsed += dt
+						if UpdateRate.Value > 0 and elapsed < UpdateRate.Value then return end
+						elapsed = 0
+						if entitylib.isAlive and oldroot then
+							local root = entitylib.character.RootPart
+							local cf = root.CFrame - Vector3.new(0, entitylib.character.Humanoid.HipHeight + (root.Size.Y / 2) - 1, 0)
+		
+							if not isnetworkowner(oldroot) then
+								root.CFrame = oldroot.CFrame
+								root.Velocity = oldroot.Velocity
+								return
+							end
+		
+							oldroot.CFrame = cf * CFrame.Angles(math.rad(180), 0, 0)
+							oldroot.Velocity = root.Velocity
+							oldroot.CanCollide = false
 						end
-	
-						oldroot.CFrame = cf * CFrame.Angles(math.rad(180), 0, 0)
-						oldroot.Velocity = root.Velocity
-						oldroot.CanCollide = false
-					end
-				end))
-	
-				Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
-					local animator = char.Humanoid:WaitForChild('Animator', 1)
-					if animator and Invisible.Enabled then
-						oldroot = nil
-						Invisible:Toggle()
-						Invisible:Toggle()
-					end
-				end))
+					end))
+		
+					Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
+						local animator = char.Humanoid:WaitForChild('Animator', 1)
+						if animator and Invisible.Enabled and RespawnReinject.Enabled then
+							oldroot = nil
+							Invisible:Toggle()
+							Invisible:Toggle()
+						end
+					end))
+				else
+					setLocalInvisible(true)
+					Invisible:Clean(entitylib.Events.LocalAdded:Connect(function()
+						if Invisible.Enabled then
+							task.defer(setLocalInvisible, true)
+						end
+					end))
+				end
 			else
 				if animtrack then
 					animtrack:Stop()
 					animtrack:Destroy()
 				end
+				setLocalInvisible(false)
 	
 				if success and clone and oldroot and proper then
 					proper = true
@@ -2302,7 +2332,48 @@ run(function()
 				end
 			end
 		end,
-		Tooltip = 'Turns you invisible.'
+		Tooltip = 'Turns you invisible.\nClone - server-visible invisibility (game dependent)\nLocal - invisible to your client only'
+	})
+	UseAnimation = Invisible:CreateToggle({
+		Name = 'Use Animation',
+		Default = true,
+		Darker = true
+	})
+	RespawnReinject = Invisible:CreateToggle({
+		Name = 'Auto Reinject',
+		Default = true,
+		Darker = true
+	})
+	UpdateRate = Invisible:CreateSlider({
+		Name = 'Update Delay',
+		Min = 0,
+		Max = 0.2,
+		Decimal = 100,
+		Default = 0,
+		Darker = true,
+		Suffix = function(val)
+			return tostring(val)..'s'
+		end
+	})
+	Method = Invisible:CreateDropdown({
+		Name = 'Method',
+		List = {'Clone', 'Local'},
+		Function = function(val)
+			local cloneMethod = val == 'Clone'
+			if UseAnimation and UseAnimation.Object then
+				UseAnimation.Object.Visible = cloneMethod
+			end
+			if RespawnReinject and RespawnReinject.Object then
+				RespawnReinject.Object.Visible = cloneMethod
+			end
+			if UpdateRate and UpdateRate.Object then
+				UpdateRate.Object.Visible = cloneMethod
+			end
+			if Invisible.Enabled then
+				Invisible:Toggle()
+				Invisible:Toggle()
+			end
+		end
 	})
 end)
 	
