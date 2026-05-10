@@ -65,6 +65,18 @@ local function waitForChildOfType(obj, name, timeout, prop)
 	return returned
 end
 
+local function resolveRootPart(char, hum, timeout)
+	local root = (hum and hum.RootPart) or char:FindFirstChild('HumanoidRootPart') or char.PrimaryPart or char:FindFirstChild('UpperTorso') or char:FindFirstChild('Torso')
+	if root then return root end
+	local checktick = tick() + timeout
+	repeat
+		root = (hum and hum.RootPart) or char:FindFirstChild('HumanoidRootPart') or char.PrimaryPart or char:FindFirstChild('UpperTorso') or char:FindFirstChild('Torso')
+		if root or checktick < tick() then break end
+		task.wait()
+	until false
+	return root
+end
+
 entitylib.targetCheck = function(ent)
 	if ent.TeamCheck then
 		return ent:TeamCheck()
@@ -266,10 +278,11 @@ entitylib.addEntity = function(char, plr, teamfunc)
 	if not char then return end
 	entitylib.EntityThreads[char] = task.spawn(function()
 		local hum = waitForChildOfType(char, 'Humanoid', 10)
-		local humrootpart = hum and waitForChildOfType(hum, 'RootPart', workspace.StreamingEnabled and 9e9 or 10, true)
+		local humrootpart = hum and resolveRootPart(char, hum, workspace.StreamingEnabled and 9e9 or 10)
 		local head = char:WaitForChild('Head', 10) or humrootpart
 
 		if hum and humrootpart then
+			local owner = plr or playersService:GetPlayerFromCharacter(char)
 			local entity = {
 				Connections = {},
 				Character = char,
@@ -279,13 +292,13 @@ entitylib.addEntity = function(char, plr, teamfunc)
 				HumanoidRootPart = humrootpart,
 				HipHeight = hum.HipHeight + (humrootpart.Size.Y / 2) + (hum.RigType == Enum.HumanoidRigType.R6 and 2 or 0),
 				MaxHealth = hum.MaxHealth,
-				NPC = plr == nil,
-				Player = plr,
+				NPC = owner == nil,
+				Player = owner,
 				RootPart = humrootpart,
 				TeamCheck = teamfunc
 			}
 
-			if plr == lplr then
+			if owner == lplr then
 				entitylib.character = entity
 				entitylib.isAlive = true
 				entitylib.Events.LocalAdded:Fire(entity)
