@@ -2150,22 +2150,14 @@ run(function()
 	local Invisible
 	local clone, oldroot, hip, valid
 	local animtrack
-	local Method
-	local UseAnimation
-	local RespawnReinject
-	local UpdateRate
 	local proper = true
-	local success = false
+	local success
+	local activeMethod
+	local invisParts = {}
+	local noclipLoop
+	local descripLoop
+	local networkLoop
 
-	local function setLocalInvisible(state)
-		if not (entitylib.isAlive and entitylib.character and entitylib.character.Character) then return end
-		for _, v in entitylib.character.Character:GetDescendants() do
-			if v:IsA('BasePart') then
-				v.LocalTransparencyModifier = state and 1 or 0
-			end
-		end
-	end
-	
 	local function doClone()
 		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
 			hip = entitylib.character.Humanoid.HipHeight
@@ -2173,18 +2165,18 @@ run(function()
 			if not lplr.Character.Parent then
 				return false
 			end
-	
+
 			lplr.Character.Parent = game
 			clone = oldroot:Clone()
 			clone.Parent = lplr.Character
 			oldroot.Parent = gameCamera
 			clone.CFrame = oldroot.CFrame
-	
+
 			lplr.Character.PrimaryPart = clone
 			entitylib.character.HumanoidRootPart = clone
 			entitylib.character.RootPart = clone
 			lplr.Character.Parent = workspace
-	
+
 			for _, v in lplr.Character:GetDescendants() do
 				if v:IsA('Weld') or v:IsA('Motor6D') then
 					if v.Part0 == oldroot then
@@ -2195,18 +2187,18 @@ run(function()
 					end
 				end
 			end
-	
+
 			return true
 		end
-	
+
 		return false
 	end
-	
+
 	local function revertClone()
 		if not oldroot or not oldroot:IsDescendantOf(workspace) or not entitylib.isAlive then
 			return false
 		end
-	
+
 		lplr.Character.Parent = game
 		oldroot.Parent = lplr.Character
 		lplr.Character.PrimaryPart = oldroot
@@ -2214,7 +2206,7 @@ run(function()
 		entitylib.character.RootPart = oldroot
 		lplr.Character.Parent = workspace
 		oldroot.CanCollide = true
-	
+
 		for _, v in lplr.Character:GetDescendants() do
 			if v:IsA('Weld') or v:IsA('Motor6D') then
 				if v.Part0 == clone then
@@ -2225,18 +2217,143 @@ run(function()
 				end
 			end
 		end
-	
+
 		local oldpos = clone.CFrame
 		if clone then
 			clone:Destroy()
 			clone = nil
 		end
-	
+
 		oldroot.CFrame = oldpos
 		oldroot = nil
 		entitylib.character.Humanoid.HipHeight = hip or 2
 	end
-	
+
+	local function setAllPartsTransparent(char, transparency, skipForceField)
+		for _, v in char:GetDescendants() do
+			if v:IsA('BasePart') then
+				if skipForceField and v:FindFirstChildOfClass('ForceField') then continue end
+				v.LocalTransparencyModifier = transparency
+			elseif v:IsA('Decal') or v:IsA('Texture') then
+				v.Transparency = transparency
+			end
+		end
+	end
+
+	local function setAllPartsCanCollide(char, collidable)
+		for _, v in char:GetDescendants() do
+			if v:IsA('BasePart') then
+				v.CanCollide = collidable
+			end
+		end
+	end
+
+	local function setNetworkOwner(char, targetPlayer, recursive)
+		for _, v in char:GetDescendants() do
+			if v:IsA('BasePart') then
+				v:SetNetworkOwner(targetPlayer)
+			end
+		end
+	end
+
+	local function startNoclipMethod()
+		setAllPartsCanCollide(lplr.Character, false)
+		noclipLoop = runService.Stepped:Connect(function()
+			if entitylib.isAlive then
+				setAllPartsCanCollide(lplr.Character, false)
+			end
+		end)
+	end
+
+	local function stopNoclipMethod()
+		if noclipLoop then
+			noclipLoop:Disconnect()
+			noclipLoop = nil
+		end
+		if entitylib.isAlive then
+			setAllPartsCanCollide(lplr.Character, true)
+		end
+	end
+
+	local function startHumanoidDescMethod()
+		local blankDesc = Instance.new('HumanoidDescription')
+		blankDesc:ApplyToCharactersAsync(lplr)
+		setAllPartsTransparent(lplr.Character, 1, true)
+		descripLoop = runService.Heartbeat:Connect(function()
+			if entitylib.isAlive and lplr.Character then
+				setAllPartsTransparent(lplr.Character, 1, true)
+			end
+		end)
+	end
+
+	local function stopHumanoidDescMethod()
+		if descripLoop then
+			descripLoop:Disconnect()
+			descripLoop = nil
+		end
+		if lplr.Character then
+			setAllPartsTransparent(lplr.Character, 0, true)
+			pcall(function()
+				lplr.Character.Humanoid:ApplyDescription(lplr.Character.Humanoid:GetAppliedDescription())
+			end)
+		end
+	end
+
+	local function startAntiLocalMethod()
+		for _, v in (lplr.Character and lplr.Character:GetDescendants() or {}) do
+			if v:IsA('BasePart') then
+				table.insert(invisParts, v)
+				v.LocalTransparencyModifier = 1
+			end
+		end
+		networkLoop = runService.Heartbeat:Connect(function()
+			if entitylib.isAlive and lplr.Character then
+				for _, v in invisParts do
+					if v and v.Parent then
+						v.LocalTransparencyModifier = 1
+					end
+				end
+			end
+		end)
+	end
+
+	local function stopAntiLocalMethod()
+		if networkLoop then
+			networkLoop:Disconnect()
+			networkLoop = nil
+		end
+		for _, v in invisParts do
+			pcall(function()
+				v.LocalTransparencyModifier = 0
+			end)
+		end
+		invisParts = {}
+	end
+
+	local function stopCurrentMethod()
+		local method = activeMethod
+		if method == 'Clone' then
+			if animtrack then
+				animtrack:Stop()
+				animtrack:Destroy()
+				animtrack = nil
+			end
+			if success and clone and oldroot and proper then
+				proper = true
+				if oldroot and clone then
+					revertClone()
+				end
+			end
+		elseif method == 'Noclip' then
+			stopNoclipMethod()
+		elseif method == 'HumanoidDescription' then
+			stopHumanoidDescMethod()
+		elseif method == 'AntiLocal' then
+			stopAntiLocalMethod()
+		end
+		activeMethod = nil
+	end
+
 	local function animationTrickery()
 		if entitylib.isAlive then
 			local anim = Instance.new('Animation')
@@ -2250,7 +2367,7 @@ run(function()
 					animationTrickery()
 				end
 			end)
-	
+
 			task.delay(0, function()
 				animtrack.TimePosition = 0.77
 				task.delay(1, function()
@@ -2259,119 +2376,93 @@ run(function()
 			end)
 		end
 	end
-	
+
+	local function enableMethod(method)
+		activeMethod = method
+		if method == 'Clone' then
+			success = doClone()
+			if not success then
+				notif('Invisible', 'Clone method failed, try again', 3, 'alert')
+				activeMethod = nil
+				return false
+			end
+			animationTrickery()
+			Invisible:Clean(runService.PreSimulation:Connect(function(dt)
+				if entitylib.isAlive and oldroot then
+					local root = entitylib.character.RootPart
+					local cf = root.CFrame - Vector3.new(0, entitylib.character.Humanoid.HipHeight + (root.Size.Y / 2) - 1, 0)
+
+					if not isnetworkowner(oldroot) then
+						root.CFrame = oldroot.CFrame
+						root.Velocity = oldroot.Velocity
+						return
+					end
+
+					oldroot.CFrame = cf * CFrame.Angles(math.rad(180), 0, 0)
+					oldroot.Velocity = root.Velocity
+					oldroot.CanCollide = false
+				end
+			end))
+		elseif method == 'Noclip' then
+			startNoclipMethod()
+		elseif method == 'HumanoidDescription' then
+			startHumanoidDescMethod()
+		elseif method == 'AntiLocal' then
+			startAntiLocalMethod()
+		end
+		return true
+	end
+
+	local function disableMethod()
+		stopCurrentMethod()
+	end
+
+	local function onRespawn(char)
+		local animator = char.Humanoid:WaitForChild('Animator', 1)
+		if animator and Invisible.Enabled then
+			oldroot = nil
+			Invisible:Toggle()
+			Invisible:Toggle()
+		end
+	end
+
 	Invisible = vape.Categories.Blatant:CreateModule({
 		Name = 'Invisible',
 		Function = function(callback)
 			if callback then
-				if Method.Value == 'Clone' then
-					if not proper then
-						notif('Invisible', 'Broken state detected', 3, 'alert')
-						Invisible:Toggle()
-						return
-					end
-		
-					success = doClone()
-					if not success then
-						Invisible:Toggle()
-						return
-					end
-		
-					if UseAnimation.Enabled then
-						animationTrickery()
-					end
-					local elapsed = 0
-					Invisible:Clean(runService.PreSimulation:Connect(function(dt)
-						elapsed += dt
-						if UpdateRate.Value > 0 and elapsed < UpdateRate.Value then return end
-						elapsed = 0
-						if entitylib.isAlive and oldroot then
-							local root = entitylib.character.RootPart
-							local cf = root.CFrame - Vector3.new(0, entitylib.character.Humanoid.HipHeight + (root.Size.Y / 2) - 1, 0)
-		
-							if not isnetworkowner(oldroot) then
-								root.CFrame = oldroot.CFrame
-								root.Velocity = oldroot.Velocity
-								return
-							end
-		
-							oldroot.CFrame = cf * CFrame.Angles(math.rad(180), 0, 0)
-							oldroot.Velocity = root.Velocity
-							oldroot.CanCollide = false
-						end
-					end))
-		
-					Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
-						local animator = char.Humanoid:WaitForChild('Animator', 1)
-						if animator and Invisible.Enabled and RespawnReinject.Enabled then
-							oldroot = nil
-							Invisible:Toggle()
-							Invisible:Toggle()
-						end
-					end))
-				else
-					setLocalInvisible(true)
-					Invisible:Clean(entitylib.Events.LocalAdded:Connect(function()
-						if Invisible.Enabled then
-							task.defer(setLocalInvisible, true)
-						end
-					end))
+				if Mode.Value == 'Clone' and not proper then
+					notif('Invisible', 'Broken state detected', 3, 'alert')
+					Invisible:Toggle()
+					return
 				end
+
+				local ok = enableMethod(Mode.Value)
+				if not ok then
+					Invisible:Toggle()
+					return
+				end
+
+				Invisible:Clean(entitylib.Events.LocalAdded:Connect(onRespawn))
 			else
-				if animtrack then
-					animtrack:Stop()
-					animtrack:Destroy()
-				end
-				setLocalInvisible(false)
-	
-				if success and clone and oldroot and proper then
-					proper = true
-					if oldroot and clone then
-						revertClone()
-					end
-				end
+				disableMethod()
 			end
 		end,
-		Tooltip = 'Turns you invisible.\nClone - server-visible invisibility (game dependent)\nLocal - invisible to your client only'
+		ExtraText = function()
+			return Mode.Value
+		end,
+		Tooltip = 'Makes you invisible to other players.'
 	})
-	UseAnimation = Invisible:CreateToggle({
-		Name = 'Use Animation',
-		Default = true,
-		Darker = true
-	})
-	RespawnReinject = Invisible:CreateToggle({
-		Name = 'Auto Reinject',
-		Default = true,
-		Darker = true
-	})
-	UpdateRate = Invisible:CreateSlider({
-		Name = 'Update Delay',
-		Min = 0,
-		Max = 0.2,
-		Decimal = 100,
-		Default = 0,
-		Darker = true,
-		Suffix = function(val)
-			return tostring(val)..'s'
-		end
-	})
-	Method = Invisible:CreateDropdown({
+	Mode = Invisible:CreateDropdown({
 		Name = 'Method',
-		List = {'Clone', 'Local'},
+		List = {'Clone', 'Noclip', 'HumanoidDescription', 'AntiLocal'},
+		Default = 'Clone',
 		Function = function(val)
-			local cloneMethod = val == 'Clone'
-			if UseAnimation and UseAnimation.Object then
-				UseAnimation.Object.Visible = cloneMethod
-			end
-			if RespawnReinject and RespawnReinject.Object then
-				RespawnReinject.Object.Visible = cloneMethod
-			end
-			if UpdateRate and UpdateRate.Object then
-				UpdateRate.Object.Visible = cloneMethod
-			end
 			if Invisible.Enabled then
-				Invisible:Toggle()
-				Invisible:Toggle()
+				disableMethod()
+				local ok = enableMethod(val)
+				if not ok then
+					Invisible:Toggle()
+				end
 			end
 		end
 	})
