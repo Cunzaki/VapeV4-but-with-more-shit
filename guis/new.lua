@@ -5965,6 +5965,15 @@ modules:CreateToggle({
 	end
 })
 modules:CreateToggle({
+	Name = 'Teams by torso color',
+	Tooltip = 'Treats players with matching torso colors as teammates',
+	Function = function()
+		if mainapi.Libraries.entity and mainapi.Libraries.entity.Running then
+			mainapi.Libraries.entity.refresh()
+		end
+	end
+})
+modules:CreateToggle({
 	Name = 'Health check',
 	Tooltip = 'Prevents targeting/rendering entities with 0 HP',
 	Default = true,
