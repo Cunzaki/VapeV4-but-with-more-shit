@@ -1150,6 +1150,13 @@ run(function()
 		return mainColor, mainColor:Lerp(Color3.new(1, 1, 1), 0.45)
 	end
 
+	local function getLocalTracerOrigin()
+		if entitylib.isAlive and entitylib.character then
+			return (entitylib.character.Head and entitylib.character.Head.Position) or entitylib.character.RootPart.Position
+		end
+		return gameCamera.CFrame.Position
+	end
+
 	local function clearBulletTracers()
 		for _, record in bulletTracerActive do
 			pcall(function()
@@ -1174,7 +1181,7 @@ run(function()
 		bulletTracerPending[ent] = {
 			Entity = ent,
 			Health = ent.Health,
-			Origin = origin,
+			Origin = getLocalTracerOrigin(),
 			TargetPosition = targetPart.Position,
 			Time = now
 		}
