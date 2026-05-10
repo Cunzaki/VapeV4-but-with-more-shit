@@ -5,6 +5,7 @@ local entitylib = {
 	Connections = {},
 	PlayerConnections = {},
 	EntityThreads = {},
+	FakeScanThread = nil,
 	Running = false,
 	Events = setmetatable({}, {
 		__index = function(self, ind)
@@ -100,6 +101,13 @@ entitylib.tryAddFakePlayer = function(model)
 	if not isFakePlayerModel(model) then return end
 	if entitylib.getEntity(model) then return end
 	entitylib.addEntity(model, nil)
+end
+
+local function tryAddFromDescendant(obj)
+	local model = obj:IsA('Model') and obj or obj:FindFirstAncestorOfClass('Model')
+	if model then
+		task.defer(entitylib.tryAddFakePlayer, model)
+	end
 end
 
 entitylib.targetCheck = function(ent)
@@ -459,17 +467,23 @@ entitylib.start = function()
 		end
 	end
 	table.insert(entitylib.Connections, workspace.DescendantAdded:Connect(function(obj)
-		if obj:IsA('Model') then
-			task.defer(entitylib.tryAddFakePlayer, obj)
-		elseif obj:IsA('Humanoid') and obj.Parent and obj.Parent:IsA('Model') then
-			task.defer(entitylib.tryAddFakePlayer, obj.Parent)
-		end
+		tryAddFromDescendant(obj)
 	end))
 	table.insert(entitylib.Connections, workspace.DescendantRemoving:Connect(function(obj)
 		if obj:IsA('Model') and not playersService:GetPlayerFromCharacter(obj) then
 			entitylib.removeEntity(obj)
 		end
 	end))
+	entitylib.FakeScanThread = task.spawn(function()
+		while entitylib.Running do
+			for _, v in workspace:GetDescendants() do
+				if v:IsA('Model') then
+					entitylib.tryAddFakePlayer(v)
+				end
+			end
+			task.wait(2)
+		end
+	end)
 	table.insert(entitylib.Connections, workspace:GetPropertyChangedSignal('CurrentCamera'):Connect(function()
 		gameCamera = workspace.CurrentCamera or workspace:FindFirstChildWhichIsA('Camera')
 	end))
@@ -493,6 +507,10 @@ entitylib.stop = function()
 	end
 	for _, v in entitylib.EntityThreads do
 		task.cancel(v)
+	end
+	if entitylib.FakeScanThread then
+		task.cancel(entitylib.FakeScanThread)
+		entitylib.FakeScanThread = nil
 	end
 	table.clear(entitylib.PlayerConnections)
 	table.clear(entitylib.EntityThreads)
