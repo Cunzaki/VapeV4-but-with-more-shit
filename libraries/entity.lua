@@ -6,6 +6,7 @@ local entitylib = {
 	PlayerConnections = {},
 	EntityThreads = {},
 	FakeScanThread = nil,
+	EntityStateThread = nil,
 	Running = false,
 	Events = setmetatable({}, {
 		__index = function(self, ind)
@@ -492,6 +493,33 @@ entitylib.start = function()
 			task.wait(2)
 		end
 	end)
+	entitylib.EntityStateThread = task.spawn(function()
+		while entitylib.Running do
+			for _, ent in entitylib.List do
+				local hum = ent.Humanoid
+				if hum and hum.Parent then
+					local changed = false
+					if ent.Health ~= hum.Health then
+						ent.Health = hum.Health
+						changed = true
+					end
+					if ent.MaxHealth ~= hum.MaxHealth then
+						ent.MaxHealth = hum.MaxHealth
+						changed = true
+					end
+					local targetable = entitylib.targetCheck(ent)
+					if ent.Targetable ~= targetable then
+						ent.Targetable = targetable
+						changed = true
+					end
+					if changed then
+						entitylib.Events.EntityUpdated:Fire(ent)
+					end
+				end
+			end
+			task.wait(0.2)
+		end
+	end)
 	table.insert(entitylib.Connections, workspace:GetPropertyChangedSignal('CurrentCamera'):Connect(function()
 		gameCamera = workspace.CurrentCamera or workspace:FindFirstChildWhichIsA('Camera')
 	end))
@@ -519,6 +547,10 @@ entitylib.stop = function()
 	if entitylib.FakeScanThread then
 		task.cancel(entitylib.FakeScanThread)
 		entitylib.FakeScanThread = nil
+	end
+	if entitylib.EntityStateThread then
+		task.cancel(entitylib.EntityStateThread)
+		entitylib.EntityStateThread = nil
 	end
 	table.clear(entitylib.PlayerConnections)
 	table.clear(entitylib.EntityThreads)
