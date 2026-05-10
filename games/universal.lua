@@ -1131,89 +1131,84 @@ run(function()
 	local ProjectileGravity
 	local BulletTracers
 	local BulletTracerColor
+	local BulletTracerTime
 	local BulletTracerThickness
-	local BulletTracerLifetime
-	local pendingTracers = {}
-	local activeTracers = {}
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
 	local ProjectileRaycast = RaycastParams.new()
 	ProjectileRaycast.RespectCanCollide = true
 	local fireoffset, rand, delayCheck = CFrame.identity, Random.new(), tick()
 	local oldnamecall, oldray
+	local pendingTracerShots = {}
+	local tracerHealthCache = {}
 
-	local function clearBulletTracers()
-		for i = #activeTracers, 1, -1 do
+	local function drawBulletTracer(origin, destination)
+		local originPart = Instance.new('Part')
+		originPart.Transparency = 1
+		originPart.CanCollide = false
+		originPart.CanTouch = false
+		originPart.CanQuery = false
+		originPart.Anchored = true
+		originPart.Size = Vector3.new(0.05, 0.05, 0.05)
+		originPart.CFrame = CFrame.new(origin)
+		originPart.Parent = workspace
+
+		local destinationPart = originPart:Clone()
+		destinationPart.CFrame = CFrame.new(destination)
+		destinationPart.Parent = workspace
+
+		local a0 = Instance.new('Attachment')
+		a0.Parent = originPart
+		local a1 = Instance.new('Attachment')
+		a1.Parent = destinationPart
+
+		local beam = Instance.new('Beam')
+		beam.Attachment0 = a0
+		beam.Attachment1 = a1
+		beam.FaceCamera = true
+		beam.Width0 = BulletTracerThickness.Value
+		beam.Width1 = BulletTracerThickness.Value
+		beam.LightEmission = 1
+		beam.Transparency = NumberSequence.new(0)
+		beam.Color = ColorSequence.new(Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value))
+		beam.Parent = originPart
+
+		task.delay(BulletTracerTime.Value, function()
 			pcall(function()
-				activeTracers[i].Object.Visible = false
-				activeTracers[i].Object:Remove()
+				originPart:Destroy()
+				destinationPart:Destroy()
 			end)
-			table.remove(activeTracers, i)
+		end)
+	end
+
+	local function queueBulletTracer(ent, origin, destination)
+		if not (Projectile.Enabled and BulletTracers.Enabled and ent and origin and destination) then return end
+		pendingTracerShots[ent] = {
+			Origin = origin,
+			Destination = destination,
+			Expire = tick() + math.max(BulletTracerTime.Value + 0.4, 0.6)
+		}
+		tracerHealthCache[ent] = ent.Health
+	end
+
+	local function processBulletTracers()
+		if not BulletTracers.Enabled then
+			table.clear(pendingTracerShots)
+			table.clear(tracerHealthCache)
+			return
 		end
-		table.clear(pendingTracers)
-	end
-
-	local function queueBulletTracer(ent, origin, hitpos)
-		if not (Projectile.Enabled and BulletTracers and BulletTracers.Enabled) then return end
-		if not (ent and origin and hitpos) then return end
-		table.insert(pendingTracers, {
-			Entity = ent,
-			Health = ent.Health or 0,
-			Origin = origin,
-			HitPos = hitpos,
-			Expire = tick() + 0.45
-		})
-	end
-
-	local function spawnBulletTracer(origin, hitpos)
-		local line = Drawing.new('Line')
-		line.Visible = false
-		line.ZIndex = 2
-		line.Transparency = 1
-		line.Thickness = BulletTracerThickness.Value
-		line.Color = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
-		table.insert(activeTracers, {
-			Object = line,
-			Origin = origin,
-			HitPos = hitpos,
-			Start = tick(),
-			Expire = tick() + BulletTracerLifetime.Value
-		})
-	end
-
-	local function updateBulletTracers()
 		local now = tick()
-		for i = #pendingTracers, 1, -1 do
-			local tracer = pendingTracers[i]
-			local ent = tracer.Entity
-			if now > tracer.Expire or not ent or ent.Health <= 0 then
-				table.remove(pendingTracers, i)
-			elseif ent.Health < tracer.Health then
-				spawnBulletTracer(tracer.Origin, tracer.HitPos)
-				table.remove(pendingTracers, i)
-			end
-		end
-
-		local tracerColor = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
-		for i = #activeTracers, 1, -1 do
-			local tracer = activeTracers[i]
-			local line = tracer.Object
-			if now > tracer.Expire then
-				pcall(function()
-					line.Visible = false
-					line:Remove()
-				end)
-				table.remove(activeTracers, i)
+		for ent, shot in pendingTracerShots do
+			if (not ent.Character) or ent.Health <= 0 or now > shot.Expire then
+				pendingTracerShots[ent] = nil
+				tracerHealthCache[ent] = ent.Health
 			else
-				local point1, vis1 = gameCamera:WorldToViewportPoint(tracer.Origin)
-				local point2, vis2 = gameCamera:WorldToViewportPoint(tracer.HitPos)
-				local alpha = 1 - math.clamp((now - tracer.Start) / math.max(BulletTracerLifetime.Value, 0.01), 0, 1)
-				line.Visible = vis1 and vis2 and SilentAim.Enabled and Projectile.Enabled and BulletTracers.Enabled
-				line.From = Vector2.new(point1.X, point1.Y)
-				line.To = Vector2.new(point2.X, point2.Y)
-				line.Transparency = alpha
-				line.Color = tracerColor
-				line.Thickness = BulletTracerThickness.Value
+				local oldHealth = tracerHealthCache[ent] or ent.Health
+				if ent.Health < oldHealth then
+					drawBulletTracer(shot.Origin, shot.Destination)
+					pendingTracerShots[ent] = nil
+				end
+				tracerHealthCache[ent] = ent.Health
 			end
 		end
 	end
@@ -1251,7 +1246,7 @@ run(function()
 				return {targetPart, targetPart.Position, targetPart.GetClosestPointOnSurface(targetPart, origin), targetPart.Material} 
 			end
 			args[1] = Ray.new(origin, CFrame.lookAt(origin, targetPart.Position).LookVector * args[1].Direction.Magnitude)
-			queueBulletTracer(ent, args[1].Origin, args[1].Origin + args[1].Direction)
+			queueBulletTracer(ent, origin, origin + args[1].Direction)
 		end,
 		Raycast = function(args)
 			if MethodRay.Value ~= 'All' and args[3] and args[3].FilterType ~= Enum.RaycastFilterType[MethodRay.Value] then return end
@@ -1262,22 +1257,21 @@ run(function()
 				RaycastWhitelist.FilterDescendantsInstances = {targetPart}
 				args[3] = RaycastWhitelist
 			end
-			queueBulletTracer(ent, args[1], args[1] + args[2])
+			queueBulletTracer(ent, origin, args[1] + args[2])
 		end,
 		ScreenPointToRay = function(args)
 			local ent, targetPart, origin = getTarget(gameCamera.CFrame.Position)
 			if not ent then return end
 			local direction = CFrame.lookAt(origin, targetPart.Position)
-			local hitpos = targetPart.Position
 			if Projectile.Enabled then
 				local calc = prediction.SolveTrajectory(origin, ProjectileSpeed.Value, ProjectileGravity.Value, targetPart.Position, targetPart.Velocity, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
 				if not calc then return end
-				hitpos = calc
 				direction = CFrame.lookAt(origin, calc)
+				queueBulletTracer(ent, origin, calc)
+			else
+				queueBulletTracer(ent, origin, targetPart.Position)
 			end
-			local rayOrigin = origin + (args[3] and direction.LookVector * args[3] or Vector3.zero)
-			queueBulletTracer(ent, rayOrigin, hitpos)
-			return {Ray.new(rayOrigin, direction.LookVector)}
+			return {Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)}
 		end,
 		Ray = function(args)
 			local ent, targetPart, origin = getTarget(args[1])
@@ -1286,10 +1280,11 @@ run(function()
 				local calc = prediction.SolveTrajectory(origin, ProjectileSpeed.Value, ProjectileGravity.Value, targetPart.Position, targetPart.Velocity, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
 				if not calc then return end
 				args[2] = CFrame.lookAt(origin, calc).LookVector * args[2].Magnitude
+				queueBulletTracer(ent, origin, calc)
 			else
 				args[2] = CFrame.lookAt(origin, targetPart.Position).LookVector * args[2].Magnitude
+				queueBulletTracer(ent, origin, origin + args[2])
 			end
-			queueBulletTracer(ent, args[1], args[1] + args[2])
 		end
 	}
 	Hooks.FindPartOnRayWithWhitelist = Hooks.FindPartOnRayWithIgnoreList
@@ -1348,10 +1343,10 @@ run(function()
 				end
 
 				repeat
+					processBulletTracers()
 					if CircleObject then
 						CircleObject.Position = inputService:GetMouseLocation()
 					end
-					updateBulletTracers()
 					if AutoFire.Enabled then
 						local origin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
 						local ent = entitylib['Entity'..Mode.Value]({
@@ -1392,8 +1387,9 @@ run(function()
 				if oldray then
 					hookfunction(Ray.new, oldray)
 				end
+				table.clear(pendingTracerShots)
+				table.clear(tracerHealthCache)
 				oldnamecall, oldray = nil, nil
-				clearBulletTracers()
 			end
 		end,
 		ExtraText = function()
@@ -1561,12 +1557,10 @@ run(function()
 			ProjectileSpeed.Object.Visible = callback
 			ProjectileGravity.Object.Visible = callback
 			BulletTracers.Object.Visible = callback
-			BulletTracerColor.Object.Visible = callback and BulletTracers.Enabled
-			BulletTracerThickness.Object.Visible = callback and BulletTracers.Enabled
-			BulletTracerLifetime.Object.Visible = callback and BulletTracers.Enabled
-			if not callback and BulletTracers.Enabled then
-				BulletTracers:Toggle()
-			end
+			local tracerVisible = callback and BulletTracers.Enabled
+			BulletTracerColor.Object.Visible = tracerVisible
+			BulletTracerTime.Object.Visible = tracerVisible
+			BulletTracerThickness.Object.Visible = tracerVisible
 		end
 	})
 	ProjectileSpeed = SilentAim:CreateSlider({
@@ -1590,41 +1584,40 @@ run(function()
 	})
 	BulletTracers = SilentAim:CreateToggle({
 		Name = 'Bullet Tracers',
-		Darker = true,
-		Visible = false,
 		Function = function(callback)
-			BulletTracerColor.Object.Visible = callback and Projectile.Enabled
-			BulletTracerThickness.Object.Visible = callback and Projectile.Enabled
-			BulletTracerLifetime.Object.Visible = callback and Projectile.Enabled
-			if not callback then
-				clearBulletTracers()
-			end
-		end
+			local visible = Projectile.Enabled and callback
+			BulletTracerColor.Object.Visible = visible
+			BulletTracerTime.Object.Visible = visible
+			BulletTracerThickness.Object.Visible = visible
+		end,
+		Darker = true,
+		Visible = false
 	})
 	BulletTracerColor = SilentAim:CreateColorSlider({
-		Name = 'Bullet Tracer Color',
+		Name = 'Tracer Color',
 		Darker = true,
 		Visible = false
 	})
-	BulletTracerThickness = SilentAim:CreateSlider({
-		Name = 'Bullet Tracer Thickness',
-		Min = 1,
-		Max = 5,
-		Default = 2,
-		Darker = true,
-		Visible = false
-	})
-	BulletTracerLifetime = SilentAim:CreateSlider({
-		Name = 'Bullet Tracer Duration',
-		Min = 0.1,
-		Max = 3,
-		Decimal = 10,
-		Default = 0.6,
+	BulletTracerTime = SilentAim:CreateSlider({
+		Name = 'Tracer Time',
+		Min = 0.05,
+		Max = 2,
+		Default = 0.35,
+		Decimal = 100,
 		Darker = true,
 		Visible = false,
 		Suffix = function(val)
 			return val == 1 and 'second' or 'seconds'
 		end
+	})
+	BulletTracerThickness = SilentAim:CreateSlider({
+		Name = 'Tracer Thickness',
+		Min = 0.01,
+		Max = 0.3,
+		Default = 0.05,
+		Decimal = 100,
+		Darker = true,
+		Visible = false
 	})
 end)
 	
