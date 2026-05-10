@@ -2257,10 +2257,21 @@ run(function()
 	end
 
 	local function startNoclipMethod()
+		if not entitylib.isAlive or not lplr.Character then return end
 		setAllPartsCanCollide(lplr.Character, false)
+		local humanoid = lplr.Character:FindFirstChildOfClass('Humanoid')
+		if humanoid then
+			Invisible:Clean(humanoid.Died:Connect(function()
+				stopNoclipMethod()
+			end))
+		end
 		noclipLoop = runService.Stepped:Connect(function()
-			if entitylib.isAlive then
+			if entitylib.isAlive and lplr.Character then
 				setAllPartsCanCollide(lplr.Character, false)
+			else
+				pcall(function()
+					noclipLoop:Disconnect()
+				end)
 			end
 		end)
 	end
@@ -2270,18 +2281,27 @@ run(function()
 			noclipLoop:Disconnect()
 			noclipLoop = nil
 		end
-		if entitylib.isAlive then
+		if lplr.Character then
 			setAllPartsCanCollide(lplr.Character, true)
 		end
 	end
 
 	local function startHumanoidDescMethod()
-		local blankDesc = Instance.new('HumanoidDescription')
-		blankDesc:ApplyToCharactersAsync(lplr)
+		if not entitylib.isAlive or not lplr.Character then return end
 		setAllPartsTransparent(lplr.Character, 1, true)
+		local humanoid = lplr.Character:FindFirstChildOfClass('Humanoid')
+		if humanoid then
+			Invisible:Clean(humanoid.Died:Connect(function()
+				stopHumanoidDescMethod()
+			end))
+		end
 		descripLoop = runService.Heartbeat:Connect(function()
 			if entitylib.isAlive and lplr.Character then
 				setAllPartsTransparent(lplr.Character, 1, true)
+			else
+				pcall(function()
+					descripLoop:Disconnect()
+				end)
 			end
 		end)
 	end
@@ -2293,26 +2313,44 @@ run(function()
 		end
 		if lplr.Character then
 			setAllPartsTransparent(lplr.Character, 0, true)
-			pcall(function()
-				lplr.Character.Humanoid:ApplyDescription(lplr.Character.Humanoid:GetAppliedDescription())
-			end)
 		end
 	end
 
 	local function startAntiLocalMethod()
-		for _, v in (lplr.Character and lplr.Character:GetDescendants() or {}) do
+		if not entitylib.isAlive or not lplr.Character then return end
+		invisParts = {}
+		for _, v in lplr.Character:GetDescendants() do
 			if v:IsA('BasePart') then
 				table.insert(invisParts, v)
 				v.LocalTransparencyModifier = 1
 			end
 		end
+		local humanoid = lplr.Character:FindFirstChildOfClass('Humanoid')
+		if humanoid then
+			Invisible:Clean(humanoid.Died:Connect(function()
+				stopAntiLocalMethod()
+			end))
+		end
+		Invisible:Clean(lplr.Character.DescendantAdded:Connect(function(v)
+			if entitylib.isAlive and v:IsA('BasePart') then
+				table.insert(invisParts, v)
+				v.LocalTransparencyModifier = 1
+			end
+		end))
 		networkLoop = runService.Heartbeat:Connect(function()
 			if entitylib.isAlive and lplr.Character then
-				for _, v in invisParts do
+				for i = #invisParts, 1, -1 do
+					local v = invisParts[i]
 					if v and v.Parent then
 						v.LocalTransparencyModifier = 1
+					else
+						table.remove(invisParts, i)
 					end
 				end
+			else
+				pcall(function()
+					networkLoop:Disconnect()
+				end)
 			end
 		end)
 	end
