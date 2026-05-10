@@ -1202,6 +1202,16 @@ run(function()
 				if (now - pending.Time) > 1 or not ent.Character then
 					bulletTracerPending[ent] = nil
 				elseif currentHealth < lastHealth and currentHealth < pending.Health and ((now - (tracerCooldown[ent] or 0)) > 0.08) then
+					local allowTracer = true
+					if Target.Walls.Enabled then
+						BulletTracerWallcheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
+						local ray = workspace:Raycast(pending.Origin, pending.TargetPosition - pending.Origin, BulletTracerWallcheck)
+						allowTracer = ray == nil or ray.Instance:IsDescendantOf(ent.Character)
+					end
+					if not allowTracer then
+						bulletTracerPending[ent] = nil
+						continue
+					end
 					if vape.ThreadFix then
 						setthreadidentity(8)
 					end
@@ -1246,7 +1256,7 @@ run(function()
 			local fromPos, fromVis = gameCamera:WorldToViewportPoint(tracer.Origin)
 			local toPos, toVis = gameCamera:WorldToViewportPoint(tracer.TargetPosition)
 			local wallVisible = true
-			if not Target.Walls.Enabled then
+			if Target.Walls.Enabled then
 				BulletTracerWallcheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
 				local ray = workspace:Raycast(tracer.Origin, tracer.TargetPosition - tracer.Origin, BulletTracerWallcheck)
 				wallVisible = ray == nil or (tracer.Entity and tracer.Entity.Character and ray.Instance:IsDescendantOf(tracer.Entity.Character))
