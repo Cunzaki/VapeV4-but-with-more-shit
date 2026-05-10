@@ -1182,7 +1182,7 @@ run(function()
 	end
 
 	local function queueBulletTracer(ent, origin, destination)
-		if not (Projectile.Enabled and BulletTracers.Enabled and ent and origin and destination) then return end
+		if not Projectile.Enabled or not BulletTracers.Enabled or not ent or origin == nil or destination == nil then return end
 		pendingTracerShots[ent] = {
 			Origin = origin,
 			Destination = destination,
@@ -1271,7 +1271,8 @@ run(function()
 			else
 				queueBulletTracer(ent, origin, targetPart.Position)
 			end
-			return {Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)}
+			local depth = type(args[3]) == 'number' and args[3] or 0
+			return {Ray.new(origin + (direction.LookVector * depth), direction.LookVector)}
 		end,
 		Ray = function(args)
 			local ent, targetPart, origin = getTarget(args[1])
