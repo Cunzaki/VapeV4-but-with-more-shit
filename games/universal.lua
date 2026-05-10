@@ -3826,7 +3826,6 @@ run(function()
 	local HeldItem
 	local DistanceText
 	local HealthText
-	local Tracer
 	local TextSize
 	local Teammates
 	local Distance
@@ -3901,33 +3900,46 @@ run(function()
 				EntityESP.Drop.Text = ent.Player and whitelist:tag(ent.Player, true)..(DisplayName.Enabled and ent.Player.DisplayName or ent.Player.Name) or ent.Character.Name
 				EntityESP.Drop.ZIndex = 1
 				EntityESP.Drop.Center = true
-				EntityESP.Drop.Size = 20
+				EntityESP.Drop.Size = TextSize.Value
+				EntityESP.Drop.Font = 2
+				EntityESP.Drop.Outline = true
+				EntityESP.Drop.OutlineColor = Color3.new()
 				EntityESP.Text = Drawing.new('Text')
 				EntityESP.Text.Text = EntityESP.Drop.Text
 				EntityESP.Text.ZIndex = 2
 				EntityESP.Text.Color = EntityESP.Main.Color
 				EntityESP.Text.Center = true
-				EntityESP.Text.Size = 20
+				EntityESP.Text.Size = TextSize.Value
+				EntityESP.Text.Font = 2
+				EntityESP.Text.Outline = true
+				EntityESP.Text.OutlineColor = Color3.new()
 			end
 
 			if HeldItem.Enabled or DistanceText.Enabled or HealthText.Enabled then
+				if Background.Enabled then
+					EntityESP.InfoBKG = Drawing.new('Square')
+					EntityESP.InfoBKG.Transparency = 0.35
+					EntityESP.InfoBKG.ZIndex = 0
+					EntityESP.InfoBKG.Thickness = 1
+					EntityESP.InfoBKG.Filled = true
+					EntityESP.InfoBKG.Color = Color3.new()
+				end
 				EntityESP.InfoDrop = Drawing.new('Text')
 				EntityESP.InfoDrop.Color = Color3.new()
 				EntityESP.InfoDrop.ZIndex = 1
 				EntityESP.InfoDrop.Center = true
 				EntityESP.InfoDrop.Size = TextSize.Value
+				EntityESP.InfoDrop.Font = 2
+				EntityESP.InfoDrop.Outline = true
+				EntityESP.InfoDrop.OutlineColor = Color3.new()
 				EntityESP.Info = Drawing.new('Text')
 				EntityESP.Info.ZIndex = 2
 				EntityESP.Info.Color = EntityESP.Main.Color
 				EntityESP.Info.Center = true
 				EntityESP.Info.Size = TextSize.Value
-			end
-
-			if Tracer.Enabled then
-				EntityESP.Tracer = Drawing.new('Line')
-				EntityESP.Tracer.Thickness = 1
-				EntityESP.Tracer.ZIndex = 1
-				EntityESP.Tracer.Color = EntityESP.Main.Color
+				EntityESP.Info.Font = 2
+				EntityESP.Info.Outline = true
+				EntityESP.Info.OutlineColor = Color3.new()
 			end
 			Reference[ent] = EntityESP
 		end,
@@ -4053,8 +4065,8 @@ run(function()
 				if v.Info then
 					v.Info.Color = v.Main.Color
 				end
-				if v.Tracer then
-					v.Tracer.Color = v.Main.Color
+				if v.Border2 and v.Border2.Filled then
+					v.Border2.Color = v.Main.Color
 				end
 			end
 		end,
@@ -4092,44 +4104,64 @@ run(function()
 				local topPos = gameCamera:WorldToViewportPoint((CFrame.lookAlong(ent.RootPart.Position, gameCamera.CFrame.LookVector) * CFrame.new(2, ent.HipHeight, 0)).p)
 				local bottomPos = gameCamera:WorldToViewportPoint((CFrame.lookAlong(ent.RootPart.Position, gameCamera.CFrame.LookVector) * CFrame.new(-2, -ent.HipHeight - 1, 0)).p)
 				local sizex, sizey = topPos.X - bottomPos.X, topPos.Y - bottomPos.Y
+				local dist = entitylib.isAlive and (entitylib.character.RootPart.Position - ent.RootPart.Position).Magnitude or math.huge
 				local posx, posy = (rootPos.X - sizex / 2),  ((rootPos.Y - sizey / 2))
 				EntityESP.Main.Position = Vector2.new(posx, posy) // 1
 				EntityESP.Main.Size = Vector2.new(sizex, sizey) // 1
 				if EntityESP.Border then
-					EntityESP.Border.Position = Vector2.new(posx - 1, posy + 1) // 1
-					EntityESP.Border.Size = Vector2.new(sizex + 2, sizey - 2) // 1
-					EntityESP.Border2.Position = Vector2.new(posx + 1, posy - 1) // 1
-					EntityESP.Border2.Size = Vector2.new(sizex - 2, sizey + 2) // 1
+					EntityESP.Border.Position = Vector2.new(posx - 1, posy - 1) // 1
+					EntityESP.Border.Size = Vector2.new(sizex + 2, sizey + 2) // 1
+					EntityESP.Border2.Position = Vector2.new(posx + 1, posy + 1) // 1
+					EntityESP.Border2.Size = Vector2.new(math.max(sizex - 2, 1), math.max(sizey - 2, 1)) // 1
+					EntityESP.Border2.Filled = Filled.Enabled
+					EntityESP.Border2.Transparency = Filled.Enabled and 0.12 or 0.35
+					EntityESP.Border2.Color = Filled.Enabled and EntityESP.Main.Color or Color3.new()
 				end
 	
 				if EntityESP.HealthLine then
-					local healthposy = sizey * math.clamp(ent.Health / ent.MaxHealth, 0, 1)
+					local healthScale = math.clamp(ent.Health / ent.MaxHealth, 0, 1)
+					local healthTop = posy + (sizey - (sizey * healthScale))
+					local healthBottom = posy + sizey
 					EntityESP.HealthLine.Visible = ent.Health > 0
-					EntityESP.HealthLine.From = Vector2.new(posx - 6, posy + (sizey - (sizey - healthposy))) // 1
-					EntityESP.HealthLine.To = Vector2.new(posx - 6, posy) // 1
-					EntityESP.HealthBorder.From = Vector2.new(posx - 6, posy + 1) // 1
-					EntityESP.HealthBorder.To = Vector2.new(posx - 6, (posy + sizey) - 1) // 1
+					EntityESP.HealthLine.From = Vector2.new(posx - 6, healthBottom - 1) // 1
+					EntityESP.HealthLine.To = Vector2.new(posx - 6, healthTop + 1) // 1
+					EntityESP.HealthBorder.From = Vector2.new(posx - 6, posy) // 1
+					EntityESP.HealthBorder.To = Vector2.new(posx - 6, posy + sizey) // 1
 				end
 	
 				if EntityESP.Text then
-					EntityESP.Text.Position = Vector2.new(posx + (sizex / 2), posy + (sizey - 28)) // 1
+					EntityESP.Text.Size = TextSize.Value
+					EntityESP.Drop.Size = TextSize.Value
+					EntityESP.Text.Position = Vector2.new(posx + (sizex / 2), posy - (EntityESP.Text.TextBounds.Y + 3)) // 1
 					EntityESP.Drop.Position = EntityESP.Text.Position + Vector2.new(1, 1)
 					if EntityESP.TextBKG then
 						EntityESP.TextBKG.Size = EntityESP.Text.TextBounds + Vector2.new(8, 4)
-						EntityESP.TextBKG.Position = EntityESP.Text.Position - Vector2.new(4 + (EntityESP.Text.TextBounds.X / 2), 0)
+						EntityESP.TextBKG.Position = EntityESP.Text.Position - Vector2.new(4 + (EntityESP.Text.TextBounds.X / 2), 2)
 					end
 				end
 
 				if EntityESP.Info then
+					local info = {}
+					if HeldItem.Enabled then
+						table.insert(info, 'Item: '..getHeldItem(ent))
+					end
+					if DistanceText.Enabled and dist < math.huge then
+						table.insert(info, 'Dist: '..math.floor(dist))
+					end
+					if HealthText.Enabled then
+						table.insert(info, 'HP: '..math.floor(ent.Health)..'/'..math.floor(ent.MaxHealth))
+					end
+					EntityESP.Info.Text = table.concat(info, ' | ')
+					EntityESP.InfoDrop.Text = EntityESP.Info.Text
 					EntityESP.Info.Size = TextSize.Value
 					EntityESP.InfoDrop.Size = TextSize.Value
-					EntityESP.Info.Position = Vector2.new(posx + (sizex / 2), posy + sizey + 2) // 1
+					EntityESP.Info.Position = Vector2.new(posx + (sizex / 2), posy + sizey + 3) // 1
 					EntityESP.InfoDrop.Position = EntityESP.Info.Position + Vector2.new(1, 1)
-				end
-
-				if EntityESP.Tracer then
-					EntityESP.Tracer.From = Vector2.new(viewportSize.X / 2, viewportSize.Y)
-					EntityESP.Tracer.To = Vector2.new(rootPos.X, posy + sizey) // 1
+					if EntityESP.InfoBKG then
+						EntityESP.InfoBKG.Visible = EntityESP.Info.Text ~= ''
+						EntityESP.InfoBKG.Size = EntityESP.Info.TextBounds + Vector2.new(8, 4)
+						EntityESP.InfoBKG.Position = EntityESP.Info.Position - Vector2.new(4 + (EntityESP.Info.TextBounds.X / 2), 2)
+					end
 				end
 			end
 		end,
@@ -4313,7 +4345,6 @@ run(function()
 			HeldItem.Object.Visible = (val == '2D')
 			DistanceText.Object.Visible = (val == '2D')
 			HealthText.Object.Visible = (val == '2D')
-			Tracer.Object.Visible = (val == '2D')
 			TextSize.Object.Visible = (val == '2D')
 		end,
 	})
@@ -4419,21 +4450,11 @@ run(function()
 		end,
 		Darker = true
 	})
-	Tracer = ESP:CreateToggle({
-		Name = 'Bottom Tracer',
-		Function = function()
-			if ESP.Enabled then
-				ESP:Toggle()
-				ESP:Toggle()
-			end
-		end,
-		Darker = true
-	})
 	TextSize = ESP:CreateSlider({
 		Name = 'Text Size',
 		Min = 12,
 		Max = 28,
-		Default = 16,
+		Default = 14,
 		Function = function(val)
 			for _, v in Reference do
 				if v.Text then
