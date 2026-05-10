@@ -1144,7 +1144,6 @@ run(function()
 	local bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	local healthCache = setmetatable({}, {__mode = 'k'})
 	local tracerCooldown = setmetatable({}, {__mode = 'k'})
-	local currentSilentTarget
 
 	local function getTracerColors()
 		local mainColor = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
@@ -1171,20 +1170,9 @@ run(function()
 		bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	end
 
-	local function setCurrentSilentTarget(ent)
-		if currentSilentTarget == ent then return end
-		currentSilentTarget = ent
-		for pendingEnt in bulletTracerPending do
-			if pendingEnt ~= ent then
-				bulletTracerPending[pendingEnt] = nil
-			end
-		end
-	end
-
 	local function registerShot(ent, targetPart, origin)
 		if not BulletTracers.Enabled then return end
 		if not (ent and targetPart and origin) then return end
-		if ent ~= currentSilentTarget then return end
 		local now = tick()
 		local pending = bulletTracerPending[ent]
 		if pending and (now - pending.Time) < 0.12 then
@@ -1210,8 +1198,6 @@ run(function()
 			if pending then
 				if (now - pending.Time) > 1 or not ent.Character then
 					bulletTracerPending[ent] = nil
-				elseif ent ~= currentSilentTarget then
-					bulletTracerPending[ent] = nil
 				elseif currentHealth < lastHealth and currentHealth < pending.Health and ((now - (tracerCooldown[ent] or 0)) > 0.08) then
 					if vape.ThreadFix then
 						setthreadidentity(8)
@@ -1224,7 +1210,6 @@ run(function()
 					main.Color = mainColor
 					glow.Color = glowColor
 					table.insert(bulletTracerActive, {
-						Entity = ent,
 						Main = main,
 						Glow = glow,
 						Origin = pending.Origin,
@@ -1241,7 +1226,7 @@ run(function()
 
 		for i = #bulletTracerActive, 1, -1 do
 			local tracer = bulletTracerActive[i]
-			if now >= tracer.DieAt or tracer.Entity ~= currentSilentTarget then
+			if now >= tracer.DieAt then
 				pcall(function()
 					tracer.Main.Visible = false
 					tracer.Glow.Visible = false
@@ -1282,15 +1267,12 @@ run(function()
 		})
 
 		if ent then
-			setCurrentSilentTarget(ent)
 			targetinfo.Targets[ent] = tick() + 1
 			if Projectile.Enabled then
 				ProjectileRaycast.FilterDescendantsInstances = {gameCamera, ent.Character}
 				ProjectileRaycast.CollisionGroup = ent[targetPart].CollisionGroup
 			end
 			registerShot(ent, ent[targetPart], origin)
-		else
-			setCurrentSilentTarget(nil)
 		end
 		
 		return ent, ent and ent[targetPart], origin
