@@ -312,6 +312,12 @@ end
 
 run(function()
 	if not entitylib then return end
+	local function getTorsoColor(char)
+		if not char then return nil end
+		local torso = char:FindFirstChild('UpperTorso') or char:FindFirstChild('Torso') or char:FindFirstChild('LowerTorso') or char:FindFirstChild('HumanoidRootPart')
+		return torso and torso.Color or nil
+	end
+
 	entitylib.getUpdateConnections = function(ent)
 		local hum = ent.Humanoid
 		return {
@@ -331,12 +337,22 @@ run(function()
 	entitylib.getupdatedconnections = entitylib.getUpdateConnections
 
 	entitylib.targetCheck = function(ent)
+		if vape.Categories.Main.Options['Health check'].Enabled and ent.Health <= 0 then
+			return false
+		end
 		if ent.TeamCheck then
 			return ent:TeamCheck()
 		end
 		if ent.NPC then return true end
 		if isFriend(ent.Player) then return false end
 		if not select(2, whitelist:get(ent.Player)) then return false end
+		if vape.Categories.Main.Options['Teams by torso color'].Enabled then
+			local localColor = getTorsoColor(entitylib.character and entitylib.character.Character or lplr.Character)
+			local entColor = getTorsoColor(ent.Character)
+			if localColor and entColor then
+				return localColor ~= entColor
+			end
+		end
 		if vape.Categories.Main.Options['Teams by server'].Enabled then
 			if not lplr.Team then return true end
 			if not ent.Player.Team then return true end
