@@ -3823,6 +3823,11 @@ run(function()
 	local Name
 	local DisplayName
 	local Background
+	local HeldItem
+	local DistanceText
+	local HealthText
+	local Tracer
+	local TextSize
 	local Teammates
 	local Distance
 	local DistanceLimit
@@ -3832,6 +3837,11 @@ run(function()
 	local function ESPWorldToViewport(pos)
 		local newpos = gameCamera:WorldToViewportPoint(gameCamera.CFrame:pointToWorldSpace(gameCamera.CFrame:PointToObjectSpace(pos)))
 		return Vector2.new(newpos.X, newpos.Y)
+	end
+
+	local function getHeldItem(ent)
+		local tool = ent.Character and ent.Character:FindFirstChildOfClass('Tool')
+		return tool and tool.Name or 'None'
 	end
 	
 	local ESPAdded = {
@@ -3898,6 +3908,26 @@ run(function()
 				EntityESP.Text.Color = EntityESP.Main.Color
 				EntityESP.Text.Center = true
 				EntityESP.Text.Size = 20
+			end
+
+			if HeldItem.Enabled or DistanceText.Enabled or HealthText.Enabled then
+				EntityESP.InfoDrop = Drawing.new('Text')
+				EntityESP.InfoDrop.Color = Color3.new()
+				EntityESP.InfoDrop.ZIndex = 1
+				EntityESP.InfoDrop.Center = true
+				EntityESP.InfoDrop.Size = TextSize.Value
+				EntityESP.Info = Drawing.new('Text')
+				EntityESP.Info.ZIndex = 2
+				EntityESP.Info.Color = EntityESP.Main.Color
+				EntityESP.Info.Center = true
+				EntityESP.Info.Size = TextSize.Value
+			end
+
+			if Tracer.Enabled then
+				EntityESP.Tracer = Drawing.new('Line')
+				EntityESP.Tracer.Thickness = 1
+				EntityESP.Tracer.ZIndex = 1
+				EntityESP.Tracer.Color = EntityESP.Main.Color
 			end
 			Reference[ent] = EntityESP
 		end,
@@ -3994,6 +4024,20 @@ run(function()
 					EntityESP.Text.Text = ent.Player and whitelist:tag(ent.Player, true)..(DisplayName.Enabled and ent.Player.DisplayName or ent.Player.Name) or ent.Character.Name
 					EntityESP.Drop.Text = EntityESP.Text.Text
 				end
+				if EntityESP.Info then
+					local info = {}
+					if HeldItem.Enabled then
+						table.insert(info, 'Item: '..getHeldItem(ent))
+					end
+					if DistanceText.Enabled and entitylib.isAlive then
+						table.insert(info, 'Dist: '..math.floor((entitylib.character.RootPart.Position - ent.RootPart.Position).Magnitude))
+					end
+					if HealthText.Enabled then
+						table.insert(info, 'HP: '..math.floor(ent.Health)..'/'..math.floor(ent.MaxHealth))
+					end
+					EntityESP.Info.Text = table.concat(info, ' | ')
+					EntityESP.InfoDrop.Text = EntityESP.Info.Text
+				end
 			end
 		end
 	}
@@ -4005,6 +4049,12 @@ run(function()
 				v.Main.Color = entitylib.getEntityColor(i) or color
 				if v.Text then
 					v.Text.Color = v.Main.Color
+				end
+				if v.Info then
+					v.Info.Color = v.Main.Color
+				end
+				if v.Tracer then
+					v.Tracer.Color = v.Main.Color
 				end
 			end
 		end,
@@ -4068,6 +4118,18 @@ run(function()
 						EntityESP.TextBKG.Size = EntityESP.Text.TextBounds + Vector2.new(8, 4)
 						EntityESP.TextBKG.Position = EntityESP.Text.Position - Vector2.new(4 + (EntityESP.Text.TextBounds.X / 2), 0)
 					end
+				end
+
+				if EntityESP.Info then
+					EntityESP.Info.Size = TextSize.Value
+					EntityESP.InfoDrop.Size = TextSize.Value
+					EntityESP.Info.Position = Vector2.new(posx + (sizex / 2), posy + sizey + 2) // 1
+					EntityESP.InfoDrop.Position = EntityESP.Info.Position + Vector2.new(1, 1)
+				end
+
+				if EntityESP.Tracer then
+					EntityESP.Tracer.From = Vector2.new(viewportSize.X / 2, viewportSize.Y)
+					EntityESP.Tracer.To = Vector2.new(rootPos.X, posy + sizey) // 1
 				end
 			end
 		end,
@@ -4248,6 +4310,11 @@ run(function()
 			Name.Object.Visible = (val == '2D')
 			DisplayName.Object.Visible = Name.Object.Visible and Name.Enabled
 			Background.Object.Visible = Name.Object.Visible and Name.Enabled
+			HeldItem.Object.Visible = (val == '2D')
+			DistanceText.Object.Visible = (val == '2D')
+			HealthText.Object.Visible = (val == '2D')
+			Tracer.Object.Visible = (val == '2D')
+			TextSize.Object.Visible = (val == '2D')
 		end,
 	})
 	Color = ESP:CreateColorSlider({
@@ -4318,6 +4385,65 @@ run(function()
 			if ESP.Enabled then
 				ESP:Toggle()
 				ESP:Toggle()
+			end
+		end,
+		Darker = true
+	})
+	HeldItem = ESP:CreateToggle({
+		Name = 'Held Item',
+		Function = function()
+			if ESP.Enabled then
+				ESP:Toggle()
+				ESP:Toggle()
+			end
+		end,
+		Darker = true
+	})
+	DistanceText = ESP:CreateToggle({
+		Name = 'Distance Text',
+		Function = function()
+			if ESP.Enabled then
+				ESP:Toggle()
+				ESP:Toggle()
+			end
+		end,
+		Darker = true
+	})
+	HealthText = ESP:CreateToggle({
+		Name = 'Health Text',
+		Function = function()
+			if ESP.Enabled then
+				ESP:Toggle()
+				ESP:Toggle()
+			end
+		end,
+		Darker = true
+	})
+	Tracer = ESP:CreateToggle({
+		Name = 'Bottom Tracer',
+		Function = function()
+			if ESP.Enabled then
+				ESP:Toggle()
+				ESP:Toggle()
+			end
+		end,
+		Darker = true
+	})
+	TextSize = ESP:CreateSlider({
+		Name = 'Text Size',
+		Min = 12,
+		Max = 28,
+		Default = 16,
+		Function = function(val)
+			for _, v in Reference do
+				if v.Text then
+					v.Text.Size = val
+					v.Drop.Size = val
+				end
+				if v.Info then
+					v.Info.Size = val
+					v.InfoDrop.Size = val
+				end
 			end
 		end,
 		Darker = true
