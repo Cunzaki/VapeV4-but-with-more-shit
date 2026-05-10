@@ -77,6 +77,31 @@ local function resolveRootPart(char, hum, timeout)
 	return root
 end
 
+local function isFakePlayerModel(model)
+	if not (model and model:IsA('Model') and model.Parent) then return false end
+	if playersService:GetPlayerFromCharacter(model) then return false end
+	local hum = model:FindFirstChildOfClass('Humanoid')
+	if not hum then return false end
+	if hum.MaxHealth <= 0 then return false end
+	local partCount = 0
+	for _, v in model:GetChildren() do
+		if v:IsA('BasePart') then
+			partCount += 1
+			if partCount >= 2 then break end
+		end
+	end
+	if partCount < 2 then return false end
+	if not resolveRootPart(model, hum, 0) then return false end
+	return true
+end
+
+entitylib.tryAddFakePlayer = function(model)
+	if not entitylib.Running then return end
+	if not isFakePlayerModel(model) then return end
+	if entitylib.getEntity(model) then return end
+	entitylib.addEntity(model, nil)
+end
+
 entitylib.targetCheck = function(ent)
 	if ent.TeamCheck then
 		return ent:TeamCheck()
@@ -428,6 +453,23 @@ entitylib.start = function()
 	for _, v in playersService:GetPlayers() do
 		entitylib.addPlayer(v)
 	end
+	for _, v in workspace:GetDescendants() do
+		if v:IsA('Model') then
+			entitylib.tryAddFakePlayer(v)
+		end
+	end
+	table.insert(entitylib.Connections, workspace.DescendantAdded:Connect(function(obj)
+		if obj:IsA('Model') then
+			task.defer(entitylib.tryAddFakePlayer, obj)
+		elseif obj:IsA('Humanoid') and obj.Parent and obj.Parent:IsA('Model') then
+			task.defer(entitylib.tryAddFakePlayer, obj.Parent)
+		end
+	end))
+	table.insert(entitylib.Connections, workspace.DescendantRemoving:Connect(function(obj)
+		if obj:IsA('Model') and not playersService:GetPlayerFromCharacter(obj) then
+			entitylib.removeEntity(obj)
+		end
+	end))
 	table.insert(entitylib.Connections, workspace:GetPropertyChangedSignal('CurrentCamera'):Connect(function()
 		gameCamera = workspace.CurrentCamera or workspace:FindFirstChildWhichIsA('Camera')
 	end))
