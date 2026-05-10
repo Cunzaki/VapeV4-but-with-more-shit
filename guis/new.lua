@@ -5943,6 +5943,7 @@ general:CreateButton({
 ]]
 
 local modules = mainapi.Categories.Main:CreateSettingsPane({Name = 'Modules'})
+shared.VapeHealthCheck = shared.VapeHealthCheck ~= false
 modules:CreateToggle({
 	Name = 'Teams by server',
 	Tooltip = 'Ignore players on your team designated by the server',
@@ -5958,6 +5959,17 @@ modules:CreateToggle({
 	Tooltip = 'Uses the TeamColor property on players for render modules',
 	Default = true,
 	Function = function()
+		if mainapi.Libraries.entity and mainapi.Libraries.entity.Running then
+			mainapi.Libraries.entity.refresh()
+		end
+	end
+})
+modules:CreateToggle({
+	Name = 'Health check',
+	Tooltip = 'Prevents targeting/rendering entities with 0 HP',
+	Default = true,
+	Function = function(enabled)
+		shared.VapeHealthCheck = enabled
 		if mainapi.Libraries.entity and mainapi.Libraries.entity.Running then
 			mainapi.Libraries.entity.refresh()
 		end
