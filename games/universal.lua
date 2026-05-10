@@ -14,7 +14,7 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/7GrandDadPGN/VapeV4ForRoblox/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/Cunzaki/VapeV4-but-with-more-shit/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -210,6 +210,12 @@ end
 local hash = loadstring(downloadFile('newvape/libraries/hash.lua'), 'hash')()
 local prediction = loadstring(downloadFile('newvape/libraries/prediction.lua'), 'prediction')()
 entitylib = loadstring(downloadFile('newvape/libraries/entity.lua'), 'entitylibrary')()
+if not entitylib then
+	entitylib = vape.Libraries.entity
+end
+if not entitylib then
+	error('Failed to load entity library')
+end
 local whitelist = {
 	alreadychecked = {},
 	customtags = {},
@@ -305,6 +311,7 @@ for name in SpeedMethods do
 end
 
 run(function()
+	if not entitylib then return end
 	entitylib.getUpdateConnections = function(ent)
 		local hum = ent.Humanoid
 		return {
@@ -321,6 +328,7 @@ run(function()
 			}
 		}
 	end
+	entitylib.getupdatedconnections = entitylib.getUpdateConnections
 
 	entitylib.targetCheck = function(ent)
 		if ent.TeamCheck then
