@@ -1129,12 +1129,94 @@ run(function()
 	local Projectile
 	local ProjectileSpeed
 	local ProjectileGravity
+	local BulletTracers
+	local BulletTracerColor
+	local BulletTracerThickness
+	local BulletTracerLifetime
+	local pendingTracers = {}
+	local activeTracers = {}
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
 	local ProjectileRaycast = RaycastParams.new()
 	ProjectileRaycast.RespectCanCollide = true
 	local fireoffset, rand, delayCheck = CFrame.identity, Random.new(), tick()
 	local oldnamecall, oldray
+
+	local function clearBulletTracers()
+		for i = #activeTracers, 1, -1 do
+			pcall(function()
+				activeTracers[i].Object.Visible = false
+				activeTracers[i].Object:Remove()
+			end)
+			table.remove(activeTracers, i)
+		end
+		table.clear(pendingTracers)
+	end
+
+	local function queueBulletTracer(ent, origin, hitpos)
+		if not (Projectile.Enabled and BulletTracers and BulletTracers.Enabled) then return end
+		if not (ent and origin and hitpos) then return end
+		table.insert(pendingTracers, {
+			Entity = ent,
+			Health = ent.Health or 0,
+			Origin = origin,
+			HitPos = hitpos,
+			Expire = tick() + 0.45
+		})
+	end
+
+	local function spawnBulletTracer(origin, hitpos)
+		local line = Drawing.new('Line')
+		line.Visible = false
+		line.ZIndex = 2
+		line.Transparency = 1
+		line.Thickness = BulletTracerThickness.Value
+		line.Color = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
+		table.insert(activeTracers, {
+			Object = line,
+			Origin = origin,
+			HitPos = hitpos,
+			Start = tick(),
+			Expire = tick() + BulletTracerLifetime.Value
+		})
+	end
+
+	local function updateBulletTracers()
+		local now = tick()
+		for i = #pendingTracers, 1, -1 do
+			local tracer = pendingTracers[i]
+			local ent = tracer.Entity
+			if now > tracer.Expire or not ent or ent.Health <= 0 then
+				table.remove(pendingTracers, i)
+			elseif ent.Health < tracer.Health then
+				spawnBulletTracer(tracer.Origin, tracer.HitPos)
+				table.remove(pendingTracers, i)
+			end
+		end
+
+		local tracerColor = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
+		for i = #activeTracers, 1, -1 do
+			local tracer = activeTracers[i]
+			local line = tracer.Object
+			if now > tracer.Expire then
+				pcall(function()
+					line.Visible = false
+					line:Remove()
+				end)
+				table.remove(activeTracers, i)
+			else
+				local point1, vis1 = gameCamera:WorldToViewportPoint(tracer.Origin)
+				local point2, vis2 = gameCamera:WorldToViewportPoint(tracer.HitPos)
+				local alpha = 1 - math.clamp((now - tracer.Start) / math.max(BulletTracerLifetime.Value, 0.01), 0, 1)
+				line.Visible = vis1 and vis2 and SilentAim.Enabled and Projectile.Enabled and BulletTracers.Enabled
+				line.From = Vector2.new(point1.X, point1.Y)
+				line.To = Vector2.new(point2.X, point2.Y)
+				line.Transparency = alpha
+				line.Color = tracerColor
+				line.Thickness = BulletTracerThickness.Value
+			end
+		end
+	end
 
 	local function getTarget(origin, obj)
 		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then return end
@@ -1165,9 +1247,11 @@ run(function()
 			local ent, targetPart, origin = getTarget(args[1].Origin, {args[2]})
 			if not ent then return end
 			if Wallbang.Enabled then 
+				queueBulletTracer(ent, origin, targetPart.Position)
 				return {targetPart, targetPart.Position, targetPart.GetClosestPointOnSurface(targetPart, origin), targetPart.Material} 
 			end
 			args[1] = Ray.new(origin, CFrame.lookAt(origin, targetPart.Position).LookVector * args[1].Direction.Magnitude)
+			queueBulletTracer(ent, args[1].Origin, args[1].Origin + args[1].Direction)
 		end,
 		Raycast = function(args)
 			if MethodRay.Value ~= 'All' and args[3] and args[3].FilterType ~= Enum.RaycastFilterType[MethodRay.Value] then return end
@@ -1178,17 +1262,22 @@ run(function()
 				RaycastWhitelist.FilterDescendantsInstances = {targetPart}
 				args[3] = RaycastWhitelist
 			end
+			queueBulletTracer(ent, args[1], args[1] + args[2])
 		end,
 		ScreenPointToRay = function(args)
 			local ent, targetPart, origin = getTarget(gameCamera.CFrame.Position)
 			if not ent then return end
 			local direction = CFrame.lookAt(origin, targetPart.Position)
+			local hitpos = targetPart.Position
 			if Projectile.Enabled then
 				local calc = prediction.SolveTrajectory(origin, ProjectileSpeed.Value, ProjectileGravity.Value, targetPart.Position, targetPart.Velocity, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
 				if not calc then return end
+				hitpos = calc
 				direction = CFrame.lookAt(origin, calc)
 			end
-			return {Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)}
+			local rayOrigin = origin + (args[3] and direction.LookVector * args[3] or Vector3.zero)
+			queueBulletTracer(ent, rayOrigin, hitpos)
+			return {Ray.new(rayOrigin, direction.LookVector)}
 		end,
 		Ray = function(args)
 			local ent, targetPart, origin = getTarget(args[1])
@@ -1200,6 +1289,7 @@ run(function()
 			else
 				args[2] = CFrame.lookAt(origin, targetPart.Position).LookVector * args[2].Magnitude
 			end
+			queueBulletTracer(ent, args[1], args[1] + args[2])
 		end
 	}
 	Hooks.FindPartOnRayWithWhitelist = Hooks.FindPartOnRayWithIgnoreList
@@ -1261,6 +1351,7 @@ run(function()
 					if CircleObject then
 						CircleObject.Position = inputService:GetMouseLocation()
 					end
+					updateBulletTracers()
 					if AutoFire.Enabled then
 						local origin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
 						local ent = entitylib['Entity'..Mode.Value]({
@@ -1302,6 +1393,7 @@ run(function()
 					hookfunction(Ray.new, oldray)
 				end
 				oldnamecall, oldray = nil, nil
+				clearBulletTracers()
 			end
 		end,
 		ExtraText = function()
@@ -1468,6 +1560,13 @@ run(function()
 		Function = function(callback)
 			ProjectileSpeed.Object.Visible = callback
 			ProjectileGravity.Object.Visible = callback
+			BulletTracers.Object.Visible = callback
+			BulletTracerColor.Object.Visible = callback and BulletTracers.Enabled
+			BulletTracerThickness.Object.Visible = callback and BulletTracers.Enabled
+			BulletTracerLifetime.Object.Visible = callback and BulletTracers.Enabled
+			if not callback and BulletTracers.Enabled then
+				BulletTracers:Toggle()
+			end
 		end
 	})
 	ProjectileSpeed = SilentAim:CreateSlider({
@@ -1488,6 +1587,44 @@ run(function()
 		Default = 192.6,
 		Darker = true,
 		Visible = false
+	})
+	BulletTracers = SilentAim:CreateToggle({
+		Name = 'Bullet Tracers',
+		Darker = true,
+		Visible = false,
+		Function = function(callback)
+			BulletTracerColor.Object.Visible = callback and Projectile.Enabled
+			BulletTracerThickness.Object.Visible = callback and Projectile.Enabled
+			BulletTracerLifetime.Object.Visible = callback and Projectile.Enabled
+			if not callback then
+				clearBulletTracers()
+			end
+		end
+	})
+	BulletTracerColor = SilentAim:CreateColorSlider({
+		Name = 'Bullet Tracer Color',
+		Darker = true,
+		Visible = false
+	})
+	BulletTracerThickness = SilentAim:CreateSlider({
+		Name = 'Bullet Tracer Thickness',
+		Min = 1,
+		Max = 5,
+		Default = 2,
+		Darker = true,
+		Visible = false
+	})
+	BulletTracerLifetime = SilentAim:CreateSlider({
+		Name = 'Bullet Tracer Duration',
+		Min = 0.1,
+		Max = 3,
+		Decimal = 10,
+		Default = 0.6,
+		Darker = true,
+		Visible = false,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end
 	})
 end)
 	
@@ -2151,13 +2288,7 @@ run(function()
 	local clone, oldroot, hip, valid
 	local animtrack
 	local proper = true
-	local success
-	local activeMethod
-	local invisParts = {}
-	local noclipLoop
-	local descripLoop
-	local networkLoop
-
+	
 	local function doClone()
 		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
 			hip = entitylib.character.Humanoid.HipHeight
@@ -2165,18 +2296,18 @@ run(function()
 			if not lplr.Character.Parent then
 				return false
 			end
-
+	
 			lplr.Character.Parent = game
 			clone = oldroot:Clone()
 			clone.Parent = lplr.Character
 			oldroot.Parent = gameCamera
 			clone.CFrame = oldroot.CFrame
-
+	
 			lplr.Character.PrimaryPart = clone
 			entitylib.character.HumanoidRootPart = clone
 			entitylib.character.RootPart = clone
 			lplr.Character.Parent = workspace
-
+	
 			for _, v in lplr.Character:GetDescendants() do
 				if v:IsA('Weld') or v:IsA('Motor6D') then
 					if v.Part0 == oldroot then
@@ -2187,18 +2318,18 @@ run(function()
 					end
 				end
 			end
-
+	
 			return true
 		end
-
+	
 		return false
 	end
-
+	
 	local function revertClone()
 		if not oldroot or not oldroot:IsDescendantOf(workspace) or not entitylib.isAlive then
 			return false
 		end
-
+	
 		lplr.Character.Parent = game
 		oldroot.Parent = lplr.Character
 		lplr.Character.PrimaryPart = oldroot
@@ -2206,7 +2337,7 @@ run(function()
 		entitylib.character.RootPart = oldroot
 		lplr.Character.Parent = workspace
 		oldroot.CanCollide = true
-
+	
 		for _, v in lplr.Character:GetDescendants() do
 			if v:IsA('Weld') or v:IsA('Motor6D') then
 				if v.Part0 == clone then
@@ -2217,181 +2348,18 @@ run(function()
 				end
 			end
 		end
-
+	
 		local oldpos = clone.CFrame
 		if clone then
 			clone:Destroy()
 			clone = nil
 		end
-
+	
 		oldroot.CFrame = oldpos
 		oldroot = nil
 		entitylib.character.Humanoid.HipHeight = hip or 2
 	end
-
-	local function setAllPartsTransparent(char, transparency, skipForceField)
-		for _, v in char:GetDescendants() do
-			if v:IsA('BasePart') then
-				if skipForceField and v:FindFirstChildOfClass('ForceField') then continue end
-				v.LocalTransparencyModifier = transparency
-			elseif v:IsA('Decal') or v:IsA('Texture') then
-				v.Transparency = transparency
-			end
-		end
-	end
-
-	local function setAllPartsCanCollide(char, collidable)
-		for _, v in char:GetDescendants() do
-			if v:IsA('BasePart') then
-				v.CanCollide = collidable
-			end
-		end
-	end
-
-	local function setNetworkOwner(char, targetPlayer, recursive)
-		for _, v in char:GetDescendants() do
-			if v:IsA('BasePart') then
-				v:SetNetworkOwner(targetPlayer)
-			end
-		end
-	end
-
-	local function startNoclipMethod()
-		if not entitylib.isAlive or not lplr.Character then return end
-		setAllPartsCanCollide(lplr.Character, false)
-		local humanoid = lplr.Character:FindFirstChildOfClass('Humanoid')
-		if humanoid then
-			Invisible:Clean(humanoid.Died:Connect(function()
-				stopNoclipMethod()
-			end))
-		end
-		noclipLoop = runService.Stepped:Connect(function()
-			if entitylib.isAlive and lplr.Character then
-				setAllPartsCanCollide(lplr.Character, false)
-			else
-				pcall(function()
-					noclipLoop:Disconnect()
-				end)
-			end
-		end)
-	end
-
-	local function stopNoclipMethod()
-		if noclipLoop then
-			noclipLoop:Disconnect()
-			noclipLoop = nil
-		end
-		if lplr.Character then
-			setAllPartsCanCollide(lplr.Character, true)
-		end
-	end
-
-	local function startHumanoidDescMethod()
-		if not entitylib.isAlive or not lplr.Character then return end
-		setAllPartsTransparent(lplr.Character, 1, true)
-		local humanoid = lplr.Character:FindFirstChildOfClass('Humanoid')
-		if humanoid then
-			Invisible:Clean(humanoid.Died:Connect(function()
-				stopHumanoidDescMethod()
-			end))
-		end
-		descripLoop = runService.Heartbeat:Connect(function()
-			if entitylib.isAlive and lplr.Character then
-				setAllPartsTransparent(lplr.Character, 1, true)
-			else
-				pcall(function()
-					descripLoop:Disconnect()
-				end)
-			end
-		end)
-	end
-
-	local function stopHumanoidDescMethod()
-		if descripLoop then
-			descripLoop:Disconnect()
-			descripLoop = nil
-		end
-		if lplr.Character then
-			setAllPartsTransparent(lplr.Character, 0, true)
-		end
-	end
-
-	local function startAntiLocalMethod()
-		if not entitylib.isAlive or not lplr.Character then return end
-		invisParts = {}
-		for _, v in lplr.Character:GetDescendants() do
-			if v:IsA('BasePart') then
-				table.insert(invisParts, v)
-				v.LocalTransparencyModifier = 1
-			end
-		end
-		local humanoid = lplr.Character:FindFirstChildOfClass('Humanoid')
-		if humanoid then
-			Invisible:Clean(humanoid.Died:Connect(function()
-				stopAntiLocalMethod()
-			end))
-		end
-		Invisible:Clean(lplr.Character.DescendantAdded:Connect(function(v)
-			if entitylib.isAlive and v:IsA('BasePart') then
-				table.insert(invisParts, v)
-				v.LocalTransparencyModifier = 1
-			end
-		end))
-		networkLoop = runService.Heartbeat:Connect(function()
-			if entitylib.isAlive and lplr.Character then
-				for i = #invisParts, 1, -1 do
-					local v = invisParts[i]
-					if v and v.Parent then
-						v.LocalTransparencyModifier = 1
-					else
-						table.remove(invisParts, i)
-					end
-				end
-			else
-				pcall(function()
-					networkLoop:Disconnect()
-				end)
-			end
-		end)
-	end
-
-	local function stopAntiLocalMethod()
-		if networkLoop then
-			networkLoop:Disconnect()
-			networkLoop = nil
-		end
-		for _, v in invisParts do
-			pcall(function()
-				v.LocalTransparencyModifier = 0
-			end)
-		end
-		invisParts = {}
-	end
-
-	local function stopCurrentMethod()
-		local method = activeMethod
-		if method == 'Clone' then
-			if animtrack then
-				animtrack:Stop()
-				animtrack:Destroy()
-				animtrack = nil
-			end
-			if success and clone and oldroot and proper then
-				proper = true
-				if oldroot and clone then
-					revertClone()
-				end
-			end
-		elseif method == 'Noclip' then
-			stopNoclipMethod()
-		elseif method == 'HumanoidDescription' then
-			stopHumanoidDescMethod()
-		elseif method == 'AntiLocal' then
-			stopAntiLocalMethod()
-		end
-		activeMethod = nil
-	end
-
+	
 	local function animationTrickery()
 		if entitylib.isAlive then
 			local anim = Instance.new('Animation')
@@ -2405,7 +2373,7 @@ run(function()
 					animationTrickery()
 				end
 			end)
-
+	
 			task.delay(0, function()
 				animtrack.TimePosition = 0.77
 				task.delay(1, function()
@@ -2414,95 +2382,64 @@ run(function()
 			end)
 		end
 	end
-
-	local function enableMethod(method)
-		activeMethod = method
-		if method == 'Clone' then
-			success = doClone()
-			if not success then
-				notif('Invisible', 'Clone method failed, try again', 3, 'alert')
-				activeMethod = nil
-				return false
-			end
-			animationTrickery()
-			Invisible:Clean(runService.PreSimulation:Connect(function(dt)
-				if entitylib.isAlive and oldroot then
-					local root = entitylib.character.RootPart
-					local cf = root.CFrame - Vector3.new(0, entitylib.character.Humanoid.HipHeight + (root.Size.Y / 2) - 1, 0)
-
-					if not isnetworkowner(oldroot) then
-						root.CFrame = oldroot.CFrame
-						root.Velocity = oldroot.Velocity
-						return
-					end
-
-					oldroot.CFrame = cf * CFrame.Angles(math.rad(180), 0, 0)
-					oldroot.Velocity = root.Velocity
-					oldroot.CanCollide = false
-				end
-			end))
-		elseif method == 'Noclip' then
-			startNoclipMethod()
-		elseif method == 'HumanoidDescription' then
-			startHumanoidDescMethod()
-		elseif method == 'AntiLocal' then
-			startAntiLocalMethod()
-		end
-		return true
-	end
-
-	local function disableMethod()
-		stopCurrentMethod()
-	end
-
-	local function onRespawn(char)
-		local animator = char.Humanoid:WaitForChild('Animator', 1)
-		if animator and Invisible.Enabled then
-			oldroot = nil
-			Invisible:Toggle()
-			Invisible:Toggle()
-		end
-	end
-
+	
 	Invisible = vape.Categories.Blatant:CreateModule({
 		Name = 'Invisible',
 		Function = function(callback)
 			if callback then
-				if Mode.Value == 'Clone' and not proper then
+				if not proper then
 					notif('Invisible', 'Broken state detected', 3, 'alert')
 					Invisible:Toggle()
 					return
 				end
-
-				local ok = enableMethod(Mode.Value)
-				if not ok then
+	
+				success = doClone()
+				if not success then
 					Invisible:Toggle()
 					return
 				end
-
-				Invisible:Clean(entitylib.Events.LocalAdded:Connect(onRespawn))
+	
+				animationTrickery()
+				Invisible:Clean(runService.PreSimulation:Connect(function(dt)
+					if entitylib.isAlive and oldroot then
+						local root = entitylib.character.RootPart
+						local cf = root.CFrame - Vector3.new(0, entitylib.character.Humanoid.HipHeight + (root.Size.Y / 2) - 1, 0)
+	
+						if not isnetworkowner(oldroot) then
+							root.CFrame = oldroot.CFrame
+							root.Velocity = oldroot.Velocity
+							return
+						end
+	
+						oldroot.CFrame = cf * CFrame.Angles(math.rad(180), 0, 0)
+						oldroot.Velocity = root.Velocity
+						oldroot.CanCollide = false
+					end
+				end))
+	
+				Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
+					local animator = char.Humanoid:WaitForChild('Animator', 1)
+					if animator and Invisible.Enabled then
+						oldroot = nil
+						Invisible:Toggle()
+						Invisible:Toggle()
+					end
+				end))
 			else
-				disableMethod()
-			end
-		end,
-		ExtraText = function()
-			return Mode.Value
-		end,
-		Tooltip = 'Makes you invisible to other players.'
-	})
-	Mode = Invisible:CreateDropdown({
-		Name = 'Method',
-		List = {'Clone', 'Noclip', 'HumanoidDescription', 'AntiLocal'},
-		Default = 'Clone',
-		Function = function(val)
-			if Invisible.Enabled then
-				disableMethod()
-				local ok = enableMethod(val)
-				if not ok then
-					Invisible:Toggle()
+				if animtrack then
+					animtrack:Stop()
+					animtrack:Destroy()
+				end
+	
+				if success and clone and oldroot and proper then
+					proper = true
+					if oldroot and clone then
+						revertClone()
+					end
 				end
 			end
-		end
+		end,
+		Tooltip = 'Turns you invisible.'
 	})
 end)
 	
