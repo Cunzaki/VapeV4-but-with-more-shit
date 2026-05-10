@@ -14,7 +14,7 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/7GrandDadPGN/VapeV4ForRoblox/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/Cunzaki/VapeV4-but-with-more-shit/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -210,6 +210,12 @@ end
 local hash = loadstring(downloadFile('newvape/libraries/hash.lua'), 'hash')()
 local prediction = loadstring(downloadFile('newvape/libraries/prediction.lua'), 'prediction')()
 entitylib = loadstring(downloadFile('newvape/libraries/entity.lua'), 'entitylibrary')()
+if not entitylib then
+	entitylib = vape.Libraries.entity
+end
+if not entitylib then
+	error('Failed to load entity library')
+end
 local whitelist = {
 	alreadychecked = {},
 	customtags = {},
@@ -305,6 +311,7 @@ for name in SpeedMethods do
 end
 
 run(function()
+	if not entitylib then return end
 	entitylib.getUpdateConnections = function(ent)
 		local hum = ent.Humanoid
 		return {
@@ -321,6 +328,7 @@ run(function()
 			}
 		}
 	end
+	entitylib.getupdatedconnections = entitylib.getUpdateConnections
 
 	entitylib.targetCheck = function(ent)
 		if ent.TeamCheck then
@@ -841,6 +849,7 @@ run(function()
 							Part = Part.Value,
 							Players = Targets.Players.Enabled,
 							NPCs = Targets.NPCs.Enabled,
+							Forcefield = not Targets.Forcefield or Targets.Forcefield.Enabled,
 							Wallcheck = Targets.Walls.Enabled,
 							Origin = gameCamera.CFrame.Position
 						})
@@ -1136,7 +1145,8 @@ run(function()
 			Part = targetPart,
 			Origin = origin,
 			Players = Target.Players.Enabled,
-			NPCs = Target.NPCs.Enabled
+			NPCs = Target.NPCs.Enabled,
+			Forcefield = not Target.Forcefield or Target.Forcefield.Enabled
 		})
 
 		if ent then
@@ -1259,7 +1269,8 @@ run(function()
 							Part = 'Head',
 							Origin = (origin * fireoffset).Position,
 							Players = Target.Players.Enabled,
-							NPCs = Target.NPCs.Enabled
+							NPCs = Target.NPCs.Enabled,
+							Forcefield = not Target.Forcefield or Target.Forcefield.Enabled
 						})
 
 						if mouse1click and (isrbxactive or iswindowactive)() then
@@ -1495,7 +1506,7 @@ run(function()
 			for _, v in entitylib.List do
 				if v.Targetable and v.Character and (Targets.Players.Enabled and v.Player or Targets.NPCs.Enabled and v.NPC) then
 					if ray.Instance:IsDescendantOf(v.Character) then
-						return entitylib.isVulnerable(v) and v
+						return entitylib.isVulnerable(v, not Targets.Forcefield or Targets.Forcefield.Enabled) and v
 					end
 				end
 			end
@@ -2339,6 +2350,7 @@ run(function()
 							Part = 'RootPart',
 							Players = Targets.Players.Enabled,
 							NPCs = Targets.NPCs.Enabled,
+							Forcefield = not Targets.Forcefield or Targets.Forcefield.Enabled,
 							Limit = Max.Value
 						})
 	
@@ -3277,7 +3289,8 @@ run(function()
 						Wallcheck = wallcheck,
 						Part = 'RootPart',
 						Players = Targets.Players.Enabled,
-						NPCs = Targets.NPCs.Enabled
+						NPCs = Targets.NPCs.Enabled,
+						Forcefield = not Targets.Forcefield or Targets.Forcefield.Enabled
 					})
 	
 					if ent then
@@ -3538,14 +3551,46 @@ run(function()
 	local Targets
 	local Mode
 	local FillColor
+	local VisibleColor
 	local OutlineColor
 	local FillTransparency
 	local OutlineTransparency
+	local VisibleOverride
 	local Teammates
 	local Walls
 	local Reference = {}
 	local Folder = Instance.new('Folder')
 	Folder.Parent = vape.gui
+	local VisibilityCheck = RaycastParams.new()
+	VisibilityCheck.FilterType = Enum.RaycastFilterType.Exclude
+	VisibilityCheck.RespectCanCollide = true
+
+	local function isVisible(ent)
+		local part = ent.Head or ent.RootPart
+		if not (part and part.Parent) then return false end
+		VisibilityCheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
+		local ray = workspace:Raycast(gameCamera.CFrame.Position, part.Position - gameCamera.CFrame.Position, VisibilityCheck)
+		return ray == nil or ray.Instance:IsDescendantOf(ent.Character)
+	end
+
+	local function getChamColor(ent, fallbackColor)
+		local color = fallbackColor
+		if VisibleOverride.Enabled and isVisible(ent) then
+			color = Color3.fromHSV(VisibleColor.Hue, VisibleColor.Sat, VisibleColor.Value)
+		end
+		return color
+	end
+
+	local function applyColor(ent, obj, fallbackColor)
+		local color = getChamColor(ent, fallbackColor)
+		if type(obj) == 'table' then
+			for _, v2 in obj do
+				v2.Color3 = color
+			end
+		else
+			obj.FillColor = color
+		end
+	end
 	
 	local function Added(ent)
 		if not Targets.Players.Enabled and ent.Player then return end
@@ -3558,7 +3603,7 @@ run(function()
 			local cham = Instance.new('Highlight')
 			cham.Adornee = ent.Character
 			cham.DepthMode = Enum.HighlightDepthMode[Walls.Enabled and 'AlwaysOnTop' or 'Occluded']
-			cham.FillColor = entitylib.getEntityColor(ent) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
+			cham.FillColor = getChamColor(ent, entitylib.getEntityColor(ent) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value))
 			cham.OutlineColor = Color3.fromHSV(OutlineColor.Hue, OutlineColor.Sat, OutlineColor.Value)
 			cham.FillTransparency = FillTransparency.Value
 			cham.OutlineTransparency = OutlineTransparency.Value
@@ -3578,7 +3623,7 @@ run(function()
 					box.Adornee = v
 					box.ZIndex = 0
 					box.Transparency = FillTransparency.Value
-					box.Color3 = entitylib.getEntityColor(ent) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
+					box.Color3 = getChamColor(ent, entitylib.getEntityColor(ent) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value))
 					box.Parent = Folder
 					table.insert(chams, box)
 				end
@@ -3618,11 +3663,14 @@ run(function()
 				Chams:Clean(vape.Categories.Friends.ColorUpdate.Event:Connect(function()
 					for i, v in Reference do
 						local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
-						if type(v) == 'table' then
-							for _, v2 in v do v2.Color3 = color end
-						else
-							v.FillColor = color
-						end
+						applyColor(i, v, color)
+					end
+				end))
+				Chams:Clean(runService.RenderStepped:Connect(function()
+					if not VisibleOverride.Enabled then return end
+					for i, v in Reference do
+						local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
+						applyColor(i, v, color)
 					end
 				end))
 				for _, v in entitylib.List do
@@ -3665,11 +3713,31 @@ run(function()
 		Function = function(hue, sat, val)
 			for i, v in Reference do
 				local color = entitylib.getEntityColor(i) or Color3.fromHSV(hue, sat, val)
-				if type(v) == 'table' then
-					for _, v2 in v do v2.Color3 = color end
-				else
-					v.FillColor = color
-				end
+				applyColor(i, v, color)
+			end
+		end
+	})
+	VisibleOverride = Chams:CreateToggle({
+		Name = 'Visible Color Override',
+		Function = function(callback)
+			if VisibleColor and VisibleColor.Object then
+				VisibleColor.Object.Visible = callback
+			end
+			for i, v in Reference do
+				local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
+				applyColor(i, v, color)
+			end
+		end
+	})
+	VisibleColor = Chams:CreateColorSlider({
+		Name = 'Visible Color',
+		Darker = true,
+		Visible = false,
+		Function = function(hue, sat, val)
+			if not VisibleOverride.Enabled then return end
+			for i, v in Reference do
+				local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
+				applyColor(i, v, color)
 			end
 		end
 	})
@@ -3679,7 +3747,7 @@ run(function()
 		Function = function(hue, sat, val)
 			for i, v in Reference do
 				if type(v) ~= 'table' then
-					v.OutlineColor = entitylib.getEntityColor(i) or Color3.fromHSV(hue, sat, val)
+					v.OutlineColor = Color3.fromHSV(hue, sat, val)
 				end
 			end
 		end,
@@ -6780,6 +6848,60 @@ run(function()
 	end
 end)
 	
+run(function()
+	local Fullbright
+	local oldLighting = {}
+	local syncTick = 0
+	local lightingValues = {
+		Brightness = 2,
+		ClockTime = 12,
+		Ambient = Color3.new(1, 1, 1),
+		OutdoorAmbient = Color3.new(1, 1, 1),
+		GlobalShadows = false,
+		FogEnd = 100000
+	}
+	local watchedProperties = {'Brightness', 'ClockTime', 'Ambient', 'OutdoorAmbient', 'GlobalShadows', 'FogEnd'}
+	local applying = false
+
+	local function applyFullbright()
+		if applying then return end
+		applying = true
+		for i, v in lightingValues do
+			if lightingService[i] ~= v then
+				lightingService[i] = v
+			end
+		end
+		applying = false
+	end
+
+	Fullbright = vape.Categories.Render:CreateModule({
+		Name = 'Fullbright',
+		Function = function(callback)
+			if callback then
+				for _, v in watchedProperties do
+					oldLighting[v] = lightingService[v]
+				end
+				applyFullbright()
+				for _, v in watchedProperties do
+					Fullbright:Clean(lightingService:GetPropertyChangedSignal(v):Connect(applyFullbright))
+				end
+				Fullbright:Clean(runService.Heartbeat:Connect(function()
+					if syncTick < tick() then
+						syncTick = tick() + 0.2
+						applyFullbright()
+					end
+				end))
+			else
+				for i, v in oldLighting do
+					lightingService[i] = v
+				end
+				table.clear(oldLighting)
+			end
+		end,
+		Tooltip = 'Forces bright lighting and keeps it from being changed by the game'
+	})
+end)
+
 run(function()
 	local Breadcrumbs
 	local Texture
