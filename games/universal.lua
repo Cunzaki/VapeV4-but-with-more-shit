@@ -6849,6 +6849,60 @@ run(function()
 end)
 	
 run(function()
+	local Fullbright
+	local oldLighting = {}
+	local syncTick = 0
+	local lightingValues = {
+		Brightness = 2,
+		ClockTime = 12,
+		Ambient = Color3.new(1, 1, 1),
+		OutdoorAmbient = Color3.new(1, 1, 1),
+		GlobalShadows = false,
+		FogEnd = 100000
+	}
+	local watchedProperties = {'Brightness', 'ClockTime', 'Ambient', 'OutdoorAmbient', 'GlobalShadows', 'FogEnd'}
+	local applying = false
+
+	local function applyFullbright()
+		if applying then return end
+		applying = true
+		for i, v in lightingValues do
+			if lightingService[i] ~= v then
+				lightingService[i] = v
+			end
+		end
+		applying = false
+	end
+
+	Fullbright = vape.Categories.Render:CreateModule({
+		Name = 'Fullbright',
+		Function = function(callback)
+			if callback then
+				for _, v in watchedProperties do
+					oldLighting[v] = lightingService[v]
+				end
+				applyFullbright()
+				for _, v in watchedProperties do
+					Fullbright:Clean(lightingService:GetPropertyChangedSignal(v):Connect(applyFullbright))
+				end
+				Fullbright:Clean(runService.Heartbeat:Connect(function()
+					if syncTick < tick() then
+						syncTick = tick() + 0.2
+						applyFullbright()
+					end
+				end))
+			else
+				for i, v in oldLighting do
+					lightingService[i] = v
+				end
+				table.clear(oldLighting)
+			end
+		end,
+		Tooltip = 'Forces bright lighting and keeps it from being changed by the game'
+	})
+end)
+
+run(function()
 	local Breadcrumbs
 	local Texture
 	local Lifetime
