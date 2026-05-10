@@ -1129,62 +1129,12 @@ run(function()
 	local Projectile
 	local ProjectileSpeed
 	local ProjectileGravity
-	local BulletTracer
-	local BulletTracerColor
-	local BulletTracerTransparency
-	local BulletTracerThickness
-	local BulletTracerDuration
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
 	local ProjectileRaycast = RaycastParams.new()
 	ProjectileRaycast.RespectCanCollide = true
 	local fireoffset, rand, delayCheck = CFrame.identity, Random.new(), tick()
 	local oldnamecall, oldray
-	local pendingTracer = {}
-	local trackedHealth = {}
-	local activeTracers = {}
-
-	local function queueBulletTracer(ent, origin, destination)
-		if not (Projectile.Enabled and BulletTracer and BulletTracer.Enabled and ent and origin and destination) then return end
-		pendingTracer[ent] = {
-			Origin = origin,
-			Destination = destination,
-			Expire = tick() + 1
-		}
-	end
-
-	local function spawnBulletTracer(origin, destination)
-		if not (BulletTracer and BulletTracer.Enabled and origin and destination) then return end
-		local line = Drawing.new('Line')
-		line.Visible = false
-		line.ZIndex = 2
-		line.Color = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
-		line.Transparency = 1 - BulletTracerTransparency.Value
-		line.Thickness = BulletTracerThickness.Value
-		table.insert(activeTracers, {
-			Line = line,
-			Origin = origin,
-			Destination = destination,
-			Expire = tick() + BulletTracerDuration.Value
-		})
-	end
-
-	local function clearBulletTracers()
-		for _, tracer in activeTracers do
-			pcall(function()
-				tracer.Line.Visible = false
-				tracer.Line:Remove()
-			end)
-		end
-		table.clear(activeTracers)
-	end
-
-	local function trackShot(ent, origin, targetPos, magnitude)
-		if not ent then return end
-		local direction = CFrame.lookAt(origin, targetPos).LookVector
-		local destination = origin + (direction * magnitude)
-		queueBulletTracer(ent, origin, destination)
-	end
 
 	local function getTarget(origin, obj)
 		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then return end
@@ -1214,7 +1164,6 @@ run(function()
 		FindPartOnRayWithIgnoreList = function(args)
 			local ent, targetPart, origin = getTarget(args[1].Origin, {args[2]})
 			if not ent then return end
-			trackShot(ent, origin, targetPart.Position, args[1].Direction.Magnitude)
 			if Wallbang.Enabled then 
 				return {targetPart, targetPart.Position, targetPart.GetClosestPointOnSurface(targetPart, origin), targetPart.Material} 
 			end
@@ -1224,7 +1173,6 @@ run(function()
 			if MethodRay.Value ~= 'All' and args[3] and args[3].FilterType ~= Enum.RaycastFilterType[MethodRay.Value] then return end
 			local ent, targetPart, origin = getTarget(args[1])
 			if not ent then return end
-			trackShot(ent, origin, targetPart.Position, args[2].Magnitude)
 			args[2] = CFrame.lookAt(origin, targetPart.Position).LookVector * args[2].Magnitude
 			if Wallbang.Enabled then
 				RaycastWhitelist.FilterDescendantsInstances = {targetPart}
@@ -1239,9 +1187,6 @@ run(function()
 				local calc = prediction.SolveTrajectory(origin, ProjectileSpeed.Value, ProjectileGravity.Value, targetPart.Position, targetPart.Velocity, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
 				if not calc then return end
 				direction = CFrame.lookAt(origin, calc)
-				queueBulletTracer(ent, origin, calc)
-			else
-				queueBulletTracer(ent, origin, targetPart.Position)
 			end
 			return {Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)}
 		end,
@@ -1251,10 +1196,8 @@ run(function()
 			if Projectile.Enabled then
 				local calc = prediction.SolveTrajectory(origin, ProjectileSpeed.Value, ProjectileGravity.Value, targetPart.Position, targetPart.Velocity, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
 				if not calc then return end
-				queueBulletTracer(ent, origin, calc)
 				args[2] = CFrame.lookAt(origin, calc).LookVector * args[2].Magnitude
 			else
-				trackShot(ent, origin, targetPart.Position, args[2].Magnitude)
 				args[2] = CFrame.lookAt(origin, targetPart.Position).LookVector * args[2].Magnitude
 			end
 		end
@@ -1315,40 +1258,6 @@ run(function()
 				end
 
 				repeat
-					local now = tick()
-					for i = #activeTracers, 1, -1 do
-						local tracer = activeTracers[i]
-						if tracer.Expire < now then
-							pcall(function()
-								tracer.Line.Visible = false
-								tracer.Line:Remove()
-							end)
-							table.remove(activeTracers, i)
-						else
-							local fromPos, fromVisible = gameCamera:WorldToViewportPoint(tracer.Origin)
-							local toPos, toVisible = gameCamera:WorldToViewportPoint(tracer.Destination)
-							tracer.Line.Visible = fromVisible and toVisible
-							if tracer.Line.Visible then
-								tracer.Line.From = Vector2.new(fromPos.X, fromPos.Y)
-								tracer.Line.To = Vector2.new(toPos.X, toPos.Y)
-								tracer.Line.Color = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
-								tracer.Line.Transparency = 1 - BulletTracerTransparency.Value
-								tracer.Line.Thickness = BulletTracerThickness.Value
-							end
-						end
-					end
-					for _, ent in entitylib.List do
-						local prev = trackedHealth[ent]
-						local current = ent.Health
-						if prev and current < prev then
-							local queued = pendingTracer[ent]
-							if queued and queued.Expire > now then
-								spawnBulletTracer(queued.Origin, queued.Destination)
-								pendingTracer[ent] = nil
-							end
-						end
-						trackedHealth[ent] = current
-					end
 					if CircleObject then
 						CircleObject.Position = inputService:GetMouseLocation()
 					end
@@ -1386,9 +1295,6 @@ run(function()
 					task.wait()
 				until not SilentAim.Enabled
 			else
-				clearBulletTracers()
-				table.clear(pendingTracer)
-				table.clear(trackedHealth)
 				if oldnamecall then
 					hookmetamethod(game, '__namecall', oldnamecall)
 				end
@@ -1562,16 +1468,6 @@ run(function()
 		Function = function(callback)
 			ProjectileSpeed.Object.Visible = callback
 			ProjectileGravity.Object.Visible = callback
-			BulletTracer.Object.Visible = callback
-			local tracerVisible = callback and BulletTracer.Enabled
-			BulletTracerColor.Object.Visible = tracerVisible
-			BulletTracerTransparency.Object.Visible = tracerVisible
-			BulletTracerThickness.Object.Visible = tracerVisible
-			BulletTracerDuration.Object.Visible = tracerVisible
-			if not callback then
-				clearBulletTracers()
-				table.clear(pendingTracer)
-			end
 		end
 	})
 	ProjectileSpeed = SilentAim:CreateSlider({
@@ -1590,56 +1486,6 @@ run(function()
 		Min = 0,
 		Max = 192.6,
 		Default = 192.6,
-		Darker = true,
-		Visible = false
-	})
-	BulletTracer = SilentAim:CreateToggle({
-		Name = 'Bullet Tracer',
-		Darker = true,
-		Visible = false,
-		Function = function(callback)
-			local tracerVisible = Projectile.Enabled and callback
-			BulletTracerColor.Object.Visible = tracerVisible
-			BulletTracerTransparency.Object.Visible = tracerVisible
-			BulletTracerThickness.Object.Visible = tracerVisible
-			BulletTracerDuration.Object.Visible = tracerVisible
-			if not callback then
-				clearBulletTracers()
-				table.clear(pendingTracer)
-			end
-		end
-	})
-	BulletTracerColor = SilentAim:CreateColorSlider({
-		Name = 'Tracer Color',
-		Darker = true,
-		Visible = false
-	})
-	BulletTracerTransparency = SilentAim:CreateSlider({
-		Name = 'Tracer Transparency',
-		Min = 0,
-		Max = 1,
-		Decimal = 10,
-		Default = 0.2,
-		Darker = true,
-		Visible = false
-	})
-	BulletTracerThickness = SilentAim:CreateSlider({
-		Name = 'Tracer Thickness',
-		Min = 1,
-		Max = 6,
-		Default = 2,
-		Darker = true,
-		Visible = false
-	})
-	BulletTracerDuration = SilentAim:CreateSlider({
-		Name = 'Tracer Duration',
-		Min = 0.1,
-		Max = 2,
-		Decimal = 10,
-		Default = 0.35,
-		Suffix = function(val)
-			return val == 1 and 'second' or 'seconds'
-		end,
 		Darker = true,
 		Visible = false
 	})
