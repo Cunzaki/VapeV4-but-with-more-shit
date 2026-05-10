@@ -312,10 +312,18 @@ end
 
 run(function()
 	if not entitylib then return end
-	local function getTorsoColor(char)
+	local function getTorsoTeamKey(char)
 		if not char then return nil end
 		local torso = char:FindFirstChild('UpperTorso') or char:FindFirstChild('Torso') or char:FindFirstChild('LowerTorso') or char:FindFirstChild('HumanoidRootPart')
-		return torso and torso.Color or nil
+		if torso and torso:IsA('BasePart') then
+			return 'brick_'..tostring(torso.BrickColor.Number)
+		end
+		local body = char:FindFirstChildOfClass('BodyColors')
+		if body then
+			local c = body.TorsoColor3
+			return string.format('rgb_%d_%d_%d', math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
+		end
+		return nil
 	end
 
 	entitylib.getUpdateConnections = function(ent)
@@ -347,8 +355,8 @@ run(function()
 		if isFriend(ent.Player) then return false end
 		if not select(2, whitelist:get(ent.Player)) then return false end
 		if vape.Categories.Main.Options['Teams by torso color'].Enabled then
-			local localColor = getTorsoColor(entitylib.character and entitylib.character.Character or lplr.Character)
-			local entColor = getTorsoColor(ent.Character)
+			local localColor = getTorsoTeamKey(entitylib.character and entitylib.character.Character or lplr.Character)
+			local entColor = getTorsoTeamKey(ent.Character)
 			if localColor and entColor then
 				return localColor ~= entColor
 			end
@@ -1162,7 +1170,6 @@ run(function()
 	local bulletTracerActive = {}
 	local bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	local healthCache = setmetatable({}, {__mode = 'k'})
-	local tracerCooldown = setmetatable({}, {__mode = 'k'})
 
 	local function getTracerColors()
 		local mainColor = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
@@ -1192,17 +1199,12 @@ run(function()
 	local function registerShot(ent, targetPart, origin)
 		if not BulletTracers.Enabled then return end
 		if not (ent and targetPart and origin) then return end
-		local now = tick()
-		local pending = bulletTracerPending[ent]
-		if pending and (now - pending.Time) < 0.12 then
-			return
-		end
 		bulletTracerPending[ent] = {
 			Entity = ent,
 			Health = ent.Health,
 			Origin = getLocalTracerOrigin(),
 			TargetPosition = targetPart.Position,
-			Time = now
+			Time = tick()
 		}
 	end
 
@@ -1215,40 +1217,36 @@ run(function()
 			local lastHealth = healthCache[ent] or currentHealth
 			local pending = bulletTracerPending[ent]
 			if pending then
-				if (now - pending.Time) > 1 or not ent.Character then
+				if (now - pending.Time) > 1.5 or not ent.Character then
 					bulletTracerPending[ent] = nil
-				elseif currentHealth < lastHealth and currentHealth < pending.Health and ((now - (tracerCooldown[ent] or 0)) > 0.08) then
+				elseif currentHealth < lastHealth and currentHealth < pending.Health then
 					local allowTracer = true
 					if Target.Walls.Enabled then
 						BulletTracerWallcheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
 						local ray = workspace:Raycast(pending.Origin, pending.TargetPosition - pending.Origin, BulletTracerWallcheck)
 						allowTracer = ray == nil or ray.Instance:IsDescendantOf(ent.Character)
 					end
-					if not allowTracer then
-						bulletTracerPending[ent] = nil
-						continue
+					if allowTracer then
+						if vape.ThreadFix then
+							setthreadidentity(8)
+						end
+						local main = Drawing.new('Line')
+						local glow = Drawing.new('Line')
+						local thickness = BulletTracerThickness.Value
+						main.Thickness = thickness
+						glow.Thickness = thickness + 2
+						main.Color = mainColor
+						glow.Color = glowColor
+						table.insert(bulletTracerActive, {
+							Main = main,
+							Glow = glow,
+							Entity = ent,
+							Origin = pending.Origin,
+							TargetPosition = pending.TargetPosition,
+							CreatedAt = now,
+							DieAt = now + BulletTracerDuration.Value
+						})
 					end
-					if vape.ThreadFix then
-						setthreadidentity(8)
-					end
-					local main = Drawing.new('Line')
-					local glow = Drawing.new('Line')
-					local thickness = BulletTracerThickness.Value
-					main.Thickness = thickness
-					glow.Thickness = thickness + 2
-					main.Color = mainColor
-					glow.Color = glowColor
-					table.insert(bulletTracerActive, {
-						Main = main,
-						Glow = glow,
-						Entity = ent,
-						Origin = pending.Origin,
-						TargetPosition = pending.TargetPosition,
-						CreatedAt = now,
-						DieAt = now + BulletTracerDuration.Value
-					})
-					bulletTracerPending[ent] = nil
-					tracerCooldown[ent] = now
 				end
 			end
 			healthCache[ent] = currentHealth
