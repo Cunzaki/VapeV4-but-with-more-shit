@@ -3551,14 +3551,46 @@ run(function()
 	local Targets
 	local Mode
 	local FillColor
+	local VisibleColor
 	local OutlineColor
 	local FillTransparency
 	local OutlineTransparency
+	local VisibleOverride
 	local Teammates
 	local Walls
 	local Reference = {}
 	local Folder = Instance.new('Folder')
 	Folder.Parent = vape.gui
+	local VisibilityCheck = RaycastParams.new()
+	VisibilityCheck.FilterType = Enum.RaycastFilterType.Exclude
+	VisibilityCheck.RespectCanCollide = true
+
+	local function isVisible(ent)
+		local part = ent.Head or ent.RootPart
+		if not (part and part.Parent) then return false end
+		VisibilityCheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
+		local ray = workspace:Raycast(gameCamera.CFrame.Position, part.Position - gameCamera.CFrame.Position, VisibilityCheck)
+		return ray == nil or ray.Instance:IsDescendantOf(ent.Character)
+	end
+
+	local function getChamColor(ent, fallbackColor)
+		local color = fallbackColor
+		if VisibleOverride.Enabled and isVisible(ent) then
+			color = Color3.fromHSV(VisibleColor.Hue, VisibleColor.Sat, VisibleColor.Value)
+		end
+		return color
+	end
+
+	local function applyColor(ent, obj, fallbackColor)
+		local color = getChamColor(ent, fallbackColor)
+		if type(obj) == 'table' then
+			for _, v2 in obj do
+				v2.Color3 = color
+			end
+		else
+			obj.FillColor = color
+		end
+	end
 	
 	local function Added(ent)
 		if not Targets.Players.Enabled and ent.Player then return end
@@ -3571,7 +3603,7 @@ run(function()
 			local cham = Instance.new('Highlight')
 			cham.Adornee = ent.Character
 			cham.DepthMode = Enum.HighlightDepthMode[Walls.Enabled and 'AlwaysOnTop' or 'Occluded']
-			cham.FillColor = entitylib.getEntityColor(ent) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
+			cham.FillColor = getChamColor(ent, entitylib.getEntityColor(ent) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value))
 			cham.OutlineColor = Color3.fromHSV(OutlineColor.Hue, OutlineColor.Sat, OutlineColor.Value)
 			cham.FillTransparency = FillTransparency.Value
 			cham.OutlineTransparency = OutlineTransparency.Value
@@ -3591,7 +3623,7 @@ run(function()
 					box.Adornee = v
 					box.ZIndex = 0
 					box.Transparency = FillTransparency.Value
-					box.Color3 = entitylib.getEntityColor(ent) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
+					box.Color3 = getChamColor(ent, entitylib.getEntityColor(ent) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value))
 					box.Parent = Folder
 					table.insert(chams, box)
 				end
@@ -3631,11 +3663,14 @@ run(function()
 				Chams:Clean(vape.Categories.Friends.ColorUpdate.Event:Connect(function()
 					for i, v in Reference do
 						local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
-						if type(v) == 'table' then
-							for _, v2 in v do v2.Color3 = color end
-						else
-							v.FillColor = color
-						end
+						applyColor(i, v, color)
+					end
+				end))
+				Chams:Clean(runService.RenderStepped:Connect(function()
+					if not VisibleOverride.Enabled then return end
+					for i, v in Reference do
+						local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
+						applyColor(i, v, color)
 					end
 				end))
 				for _, v in entitylib.List do
@@ -3678,11 +3713,31 @@ run(function()
 		Function = function(hue, sat, val)
 			for i, v in Reference do
 				local color = entitylib.getEntityColor(i) or Color3.fromHSV(hue, sat, val)
-				if type(v) == 'table' then
-					for _, v2 in v do v2.Color3 = color end
-				else
-					v.FillColor = color
-				end
+				applyColor(i, v, color)
+			end
+		end
+	})
+	VisibleOverride = Chams:CreateToggle({
+		Name = 'Visible Color Override',
+		Function = function(callback)
+			if VisibleColor and VisibleColor.Object then
+				VisibleColor.Object.Visible = callback
+			end
+			for i, v in Reference do
+				local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
+				applyColor(i, v, color)
+			end
+		end
+	})
+	VisibleColor = Chams:CreateColorSlider({
+		Name = 'Visible Color',
+		Darker = true,
+		Visible = false,
+		Function = function(hue, sat, val)
+			if not VisibleOverride.Enabled then return end
+			for i, v in Reference do
+				local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
+				applyColor(i, v, color)
 			end
 		end
 	})
