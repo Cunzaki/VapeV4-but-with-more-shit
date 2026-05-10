@@ -1138,6 +1138,9 @@ run(function()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
 	local ProjectileRaycast = RaycastParams.new()
 	ProjectileRaycast.RespectCanCollide = true
+	local BulletTracerWallcheck = RaycastParams.new()
+	BulletTracerWallcheck.FilterType = Enum.RaycastFilterType.Exclude
+	BulletTracerWallcheck.RespectCanCollide = true
 	local fireoffset, rand, delayCheck = CFrame.identity, Random.new(), tick()
 	local oldnamecall, oldray
 	local bulletTracerActive = {}
@@ -1212,6 +1215,7 @@ run(function()
 					table.insert(bulletTracerActive, {
 						Main = main,
 						Glow = glow,
+						Entity = ent,
 						Origin = pending.Origin,
 						TargetPosition = pending.TargetPosition,
 						CreatedAt = now,
@@ -1241,7 +1245,13 @@ run(function()
 			local baseAlpha = (1 - BulletTracerTransparency.Value) * lifeAlpha
 			local fromPos, fromVis = gameCamera:WorldToViewportPoint(tracer.Origin)
 			local toPos, toVis = gameCamera:WorldToViewportPoint(tracer.TargetPosition)
-			local visible = fromVis and toVis and SilentAim.Enabled and BulletTracers.Enabled
+			local wallVisible = true
+			if not Target.Walls.Enabled then
+				BulletTracerWallcheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
+				local ray = workspace:Raycast(tracer.Origin, tracer.TargetPosition - tracer.Origin, BulletTracerWallcheck)
+				wallVisible = ray == nil or (tracer.Entity and tracer.Entity.Character and ray.Instance:IsDescendantOf(tracer.Entity.Character))
+			end
+			local visible = fromVis and toVis and wallVisible and SilentAim.Enabled and BulletTracers.Enabled
 			tracer.Main.Visible = visible
 			tracer.Glow.Visible = visible
 			tracer.Main.From = Vector2.new(fromPos.X, fromPos.Y)
