@@ -83,6 +83,7 @@ entitylib.getUpdateConnections = function(ent)
 		hum:GetPropertyChangedSignal('MaxHealth')
 	}
 end
+entitylib.getupdatedconnections = entitylib.getUpdateConnections
 
 entitylib.isVulnerable = function(ent, forcefieldCheck)
 	return ent.Health > 0 and ((forcefieldCheck == false) or not ent.Character.FindFirstChildWhichIsA(ent.Character, 'ForceField'))
@@ -256,7 +257,8 @@ entitylib.addEntity = function(char, plr, teamfunc)
 			else
 				entity.Targetable = entitylib.targetCheck(entity)
 
-				for _, v in entitylib.getUpdateConnections(entity) do
+				local updateConnections = entitylib.getUpdateConnections or entitylib.getupdatedconnections
+				for _, v in updateConnections(entity) do
 					table.insert(entity.Connections, v:Connect(function()
 						entity.Health = hum.Health
 						entity.MaxHealth = hum.MaxHealth
