@@ -1140,79 +1140,109 @@ run(function()
 	ProjectileRaycast.RespectCanCollide = true
 	local fireoffset, rand, delayCheck = CFrame.identity, Random.new(), tick()
 	local oldnamecall, oldray
-	local bulletTracerActive, bulletTracerPending = {}, {}
+	local bulletTracerActive = {}
+	local bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	local healthCache = setmetatable({}, {__mode = 'k'})
+	local tracerCooldown = setmetatable({}, {__mode = 'k'})
+
+	local function getTracerColors()
+		local mainColor = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
+		return mainColor, mainColor:Lerp(Color3.new(1, 1, 1), 0.45)
+	end
 
 	local function clearBulletTracers()
 		for _, record in bulletTracerActive do
 			pcall(function()
-				record.Line.Visible = false
-				record.Line:Remove()
+				record.Main.Visible = false
+				record.Glow.Visible = false
+				record.Main:Remove()
+				record.Glow:Remove()
 			end)
 		end
 		table.clear(bulletTracerActive)
-		table.clear(bulletTracerPending)
+		bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	end
 
 	local function registerShot(ent, targetPart, origin)
 		if not BulletTracers.Enabled then return end
 		if not (ent and targetPart and origin) then return end
-		table.insert(bulletTracerPending, {
+		local now = tick()
+		local pending = bulletTracerPending[ent]
+		if pending and (now - pending.Time) < 0.12 then
+			return
+		end
+		bulletTracerPending[ent] = {
 			Entity = ent,
 			Health = ent.Health,
 			Origin = origin,
 			TargetPosition = targetPart.Position,
-			Time = tick()
-		})
+			Time = now
+		}
 	end
 
 	local function renderBulletTracers()
 		local now = tick()
-		for i = #bulletTracerPending, 1, -1 do
-			local shot = bulletTracerPending[i]
-			local ent = shot.Entity
-			if (not ent) or (not ent.Character) or (now - shot.Time > 1) then
-				table.remove(bulletTracerPending, i)
-				continue
-			end
-			local lastHealth = healthCache[ent] or ent.Health
-			if ent.Health < math.min(lastHealth, shot.Health) then
-				if vape.ThreadFix then
-					setthreadidentity(8)
+		local mainColor, glowColor = getTracerColors()
+
+		for _, ent in entitylib.List do
+			local currentHealth = ent.Health
+			local lastHealth = healthCache[ent] or currentHealth
+			local pending = bulletTracerPending[ent]
+			if pending then
+				if (now - pending.Time) > 1 or not ent.Character then
+					bulletTracerPending[ent] = nil
+				elseif currentHealth < lastHealth and currentHealth < pending.Health and ((now - (tracerCooldown[ent] or 0)) > 0.08) then
+					if vape.ThreadFix then
+						setthreadidentity(8)
+					end
+					local main = Drawing.new('Line')
+					local glow = Drawing.new('Line')
+					local thickness = BulletTracerThickness.Value
+					main.Thickness = thickness
+					glow.Thickness = thickness + 2
+					main.Color = mainColor
+					glow.Color = glowColor
+					table.insert(bulletTracerActive, {
+						Main = main,
+						Glow = glow,
+						Origin = pending.Origin,
+						TargetPosition = pending.TargetPosition,
+						CreatedAt = now,
+						DieAt = now + BulletTracerDuration.Value
+					})
+					bulletTracerPending[ent] = nil
+					tracerCooldown[ent] = now
 				end
-				local line = Drawing.new('Line')
-				line.Thickness = BulletTracerThickness.Value
-				line.Transparency = 1 - BulletTracerTransparency.Value
-				line.Color = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
-				table.insert(bulletTracerActive, {
-					Line = line,
-					Origin = shot.Origin,
-					TargetPosition = shot.TargetPosition,
-					DieAt = now + BulletTracerDuration.Value
-				})
-				table.remove(bulletTracerPending, i)
 			end
+			healthCache[ent] = currentHealth
 		end
 
 		for i = #bulletTracerActive, 1, -1 do
 			local tracer = bulletTracerActive[i]
 			if now >= tracer.DieAt then
 				pcall(function()
-					tracer.Line.Visible = false
-					tracer.Line:Remove()
+					tracer.Main.Visible = false
+					tracer.Glow.Visible = false
+					tracer.Main:Remove()
+					tracer.Glow:Remove()
 				end)
 				table.remove(bulletTracerActive, i)
 				continue
 			end
+
+			local lifeAlpha = math.clamp((tracer.DieAt - now) / math.max(BulletTracerDuration.Value, 0.001), 0, 1)
+			local baseAlpha = (1 - BulletTracerTransparency.Value) * lifeAlpha
 			local fromPos, fromVis = gameCamera:WorldToViewportPoint(tracer.Origin)
 			local toPos, toVis = gameCamera:WorldToViewportPoint(tracer.TargetPosition)
-			tracer.Line.Visible = fromVis and toVis and SilentAim.Enabled and BulletTracers.Enabled
-			tracer.Line.From = Vector2.new(fromPos.X, fromPos.Y)
-			tracer.Line.To = Vector2.new(toPos.X, toPos.Y)
-		end
-
-		for _, ent in entitylib.List do
-			healthCache[ent] = ent.Health
+			local visible = fromVis and toVis and SilentAim.Enabled and BulletTracers.Enabled
+			tracer.Main.Visible = visible
+			tracer.Glow.Visible = visible
+			tracer.Main.From = Vector2.new(fromPos.X, fromPos.Y)
+			tracer.Glow.From = tracer.Main.From
+			tracer.Main.To = Vector2.new(toPos.X, toPos.Y)
+			tracer.Glow.To = tracer.Main.To
+			tracer.Main.Transparency = baseAlpha
+			tracer.Glow.Transparency = math.clamp(baseAlpha * 0.5, 0, 1)
 		end
 	end
 
@@ -1595,8 +1625,10 @@ run(function()
 		Visible = false,
 		Function = function(hue, sat, val)
 			local color = Color3.fromHSV(hue, sat, val)
+			local glow = color:Lerp(Color3.new(1, 1, 1), 0.45)
 			for _, tracer in bulletTracerActive do
-				tracer.Line.Color = color
+				tracer.Main.Color = color
+				tracer.Glow.Color = glow
 			end
 		end
 	})
@@ -1610,7 +1642,8 @@ run(function()
 		Visible = false,
 		Function = function(val)
 			for _, tracer in bulletTracerActive do
-				tracer.Line.Transparency = 1 - val
+				tracer.Main.Transparency = 1 - val
+				tracer.Glow.Transparency = (1 - val) * 0.5
 			end
 		end
 	})
@@ -1623,7 +1656,8 @@ run(function()
 		Visible = false,
 		Function = function(val)
 			for _, tracer in bulletTracerActive do
-				tracer.Line.Thickness = val
+				tracer.Main.Thickness = val
+				tracer.Glow.Thickness = val + 2
 			end
 		end
 	})
