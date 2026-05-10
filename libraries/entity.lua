@@ -84,16 +84,8 @@ entitylib.getUpdateConnections = function(ent)
 	}
 end
 
-<<<<<<< HEAD
-entitylib.isVulnerable = function(ent)
-	return ent.Health > 0 and not ent.Character.FindFirstChildWhichIsA(ent.Character, 'ForceField')
-=======
-entitylib.isVulnerable = function(ent, forcefieldcheck)
-	if forcefieldcheck == nil then
-		forcefieldcheck = true
-	end
-	return ent.Health > 0 and (not forcefieldcheck or not ent.Character.FindFirstChildWhichIsA(ent.Character, 'ForceField'))
->>>>>>> c383d41 (Initial fork changes)
+entitylib.isVulnerable = function(ent, forcefieldCheck)
+	return ent.Health > 0 and ((forcefieldCheck == false) or not ent.Character.FindFirstChildWhichIsA(ent.Character, 'ForceField'))
 end
 
 entitylib.getEntityColor = function(ent)
@@ -135,11 +127,7 @@ entitylib.EntityMouse = function(entitysettings)
 			if not vis then continue end
 			local mag = (mouseLocation - Vector2.new(position.x, position.y)).Magnitude
 			if mag > entitysettings.Range then continue end
-<<<<<<< HEAD
-			if entitylib.isVulnerable(v) then
-=======
 			if entitylib.isVulnerable(v, entitysettings.Forcefield) then
->>>>>>> c383d41 (Initial fork changes)
 				table.insert(sortingTable, {
 					Entity = v,
 					Magnitude = v.Target and -1 or mag
@@ -173,11 +161,7 @@ entitylib.EntityPosition = function(entitysettings)
 			if not v.Targetable then continue end
 			local mag = (v[entitysettings.Part].Position - localPosition).Magnitude
 			if mag > entitysettings.Range then continue end
-<<<<<<< HEAD
-			if entitylib.isVulnerable(v) then
-=======
 			if entitylib.isVulnerable(v, entitysettings.Forcefield) then
->>>>>>> c383d41 (Initial fork changes)
 				table.insert(sortingTable, {
 					Entity = v,
 					Magnitude = v.Target and -1 or mag
@@ -212,11 +196,7 @@ entitylib.AllPosition = function(entitysettings)
 			if not v.Targetable then continue end
 			local mag = (v[entitysettings.Part].Position - localPosition).Magnitude
 			if mag > entitysettings.Range then continue end
-<<<<<<< HEAD
-			if entitylib.isVulnerable(v) then
-=======
 			if entitylib.isVulnerable(v, entitysettings.Forcefield) then
->>>>>>> c383d41 (Initial fork changes)
 				table.insert(sortingTable, {Entity = v, Magnitude = v.Target and -1 or mag})
 			end
 		end
@@ -450,8 +430,4 @@ end
 
 entitylib.start()
 
-<<<<<<< HEAD
 return entitylib
-=======
-return entitylib
->>>>>>> c383d41 (Initial fork changes)
