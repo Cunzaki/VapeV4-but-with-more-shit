@@ -1261,6 +1261,58 @@ run(function()
 		}
 	end
 
+	local function spawnBulletTracer(ent, pending, now, mainColor, glowColor)
+		if vape.ThreadFix then
+			setthreadidentity(8)
+		end
+		local part0 = Instance.new('Part')
+		part0.Size = Vector3.new(0.1, 0.1, 0.1)
+		part0.Anchored = true
+		part0.CanCollide = false
+		part0.CanTouch = false
+		part0.CanQuery = false
+		part0.Transparency = 1
+		part0.Position = pending.Origin
+		part0.Parent = BulletTracerFolder
+		local part1 = part0:Clone()
+		part1.Position = pending.TargetPosition
+		part1.Parent = BulletTracerFolder
+		local attach0 = Instance.new('Attachment')
+		attach0.Parent = part0
+		local attach1 = Instance.new('Attachment')
+		attach1.Parent = part1
+		local main = Instance.new('Beam')
+		local glow = Instance.new('Beam')
+		local thickness = BulletTracerThickness.Value
+		main.Attachment0 = attach0
+		main.Attachment1 = attach1
+		glow.Attachment0 = attach0
+		glow.Attachment1 = attach1
+		main.FaceCamera = true
+		glow.FaceCamera = true
+		main.LightEmission = 1
+		glow.LightEmission = 1
+		main.Width0 = thickness * 0.045
+		main.Width1 = thickness * 0.045
+		glow.Width0 = (thickness + 2) * 0.045
+		glow.Width1 = (thickness + 2) * 0.045
+		main.Color = ColorSequence.new(mainColor)
+		glow.Color = ColorSequence.new(glowColor)
+		main.Parent = part0
+		glow.Parent = part0
+		table.insert(bulletTracerActive, {
+			Main = main,
+			Glow = glow,
+			Part0 = part0,
+			Part1 = part1,
+			Entity = ent,
+			Origin = pending.Origin,
+			TargetPosition = pending.TargetPosition,
+			CreatedAt = now,
+			DieAt = now + BulletTracerDuration.Value
+		})
+	end
+
 	local function renderBulletTracers()
 		local now = tick()
 		local mainColor, glowColor = getTracerColors()
@@ -1269,68 +1321,34 @@ run(function()
 			local currentHealth = ent.Health
 			local lastHealth = healthCache[ent] or currentHealth
 			local pending = bulletTracerPending[ent]
-			if pending then
-				if (now - pending.Time) > 1.5 or not ent.Character then
-					bulletTracerPending[ent] = nil
-				elseif currentHealth < lastHealth and currentHealth < pending.Health then
-					local allowTracer = true
-					if Target.Walls.Enabled then
-						BulletTracerWallcheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
-						local ray = workspace:Raycast(pending.Origin, pending.TargetPosition - pending.Origin, BulletTracerWallcheck)
-						allowTracer = ray == nil or ray.Instance:IsDescendantOf(ent.Character)
-					end
-					if allowTracer then
-						if vape.ThreadFix then
-							setthreadidentity(8)
-						end
-						local part0 = Instance.new('Part')
-						part0.Size = Vector3.new(0.1, 0.1, 0.1)
-						part0.Anchored = true
-						part0.CanCollide = false
-						part0.CanTouch = false
-						part0.CanQuery = false
-						part0.Transparency = 1
-						part0.Position = pending.Origin
-						part0.Parent = BulletTracerFolder
-						local part1 = part0:Clone()
-						part1.Position = pending.TargetPosition
-						part1.Parent = BulletTracerFolder
-						local attach0 = Instance.new('Attachment')
-						attach0.Parent = part0
-						local attach1 = Instance.new('Attachment')
-						attach1.Parent = part1
-						local main = Instance.new('Beam')
-						local glow = Instance.new('Beam')
-						local thickness = BulletTracerThickness.Value
-						main.Attachment0 = attach0
-						main.Attachment1 = attach1
-						glow.Attachment0 = attach0
-						glow.Attachment1 = attach1
-						main.FaceCamera = true
-						glow.FaceCamera = true
-						main.LightEmission = 1
-						glow.LightEmission = 1
-						main.Width0 = thickness * 0.045
-						main.Width1 = thickness * 0.045
-						glow.Width0 = (thickness + 2) * 0.045
-						glow.Width1 = (thickness + 2) * 0.045
-						main.Color = ColorSequence.new(mainColor)
-						glow.Color = ColorSequence.new(glowColor)
-						main.Parent = part0
-						glow.Parent = part0
-						table.insert(bulletTracerActive, {
-							Main = main,
-							Glow = glow,
-							Part0 = part0,
-							Part1 = part1,
-							Entity = ent,
-							Origin = pending.Origin,
-							TargetPosition = pending.TargetPosition,
-							CreatedAt = now,
-							DieAt = now + BulletTracerDuration.Value
-						})
-					end
+			if pending and ((now - pending.Time) > 5 or not ent.Character) then
+				bulletTracerPending[ent] = nil
+				pending = nil
+			end
+			if (not pending) and targetinfo.Targets[ent] and targetinfo.Targets[ent] > now then
+				pending = {
+					Entity = ent,
+					Health = lastHealth,
+					Origin = getLocalTracerOrigin(),
+					TargetPosition = (ent.Head or ent.RootPart).Position,
+					Time = now
+				}
+				bulletTracerPending[ent] = pending
+			end
+			if pending and currentHealth < lastHealth and currentHealth < pending.Health then
+				local allowTracer = true
+				if Target.Walls.Enabled then
+					BulletTracerWallcheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
+					local ray = workspace:Raycast(pending.Origin, pending.TargetPosition - pending.Origin, BulletTracerWallcheck)
+					allowTracer = ray == nil or ray.Instance:IsDescendantOf(ent.Character)
 				end
+				if allowTracer then
+					spawnBulletTracer(ent, pending, now, mainColor, glowColor)
+				end
+				pending.Health = currentHealth
+				pending.Origin = getLocalTracerOrigin()
+				pending.TargetPosition = (ent.Head or ent.RootPart).Position
+				pending.Time = now
 			end
 			healthCache[ent] = currentHealth
 		end
