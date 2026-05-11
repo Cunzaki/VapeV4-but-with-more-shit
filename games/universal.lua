@@ -4184,6 +4184,9 @@ run(function()
 	local Teammates
 	local Distance
 	local DistanceLimit
+	local DistanceESP
+	local DistanceESPSize
+	local DistanceESPOffset
 	local Reference = {}
 	local methodused
 	local esp2d
@@ -4210,11 +4213,15 @@ run(function()
 			HeldItem = HeldItem.Enabled,
 			HeldItemTextSize = HeldItemSize.Value,
 			HeldItemOffset = HeldItemOffset.Value,
+			DistanceText = DistanceESP.Enabled,
+			DistanceTextSize = DistanceESPSize.Value,
+			DistanceTextOffset = DistanceESPOffset.Value,
 			HeldItemColor = getESPColor(),
+			UseLOD = false,
 			Skeleton = false,
 			ChamsEnable = false,
 			BoxColor = getESPColor(),
-			RenderDistance = Distance.Enabled and DistanceLimit.ValueMax or 650,
+			RenderDistance = Distance.Enabled and DistanceLimit.ValueMax or 99999,
 			ShouldRender = function(plr)
 				if not Targets.Players.Enabled then return false end
 				local ent = entitylib.getEntity(plr)
@@ -4616,7 +4623,7 @@ run(function()
 			Enabled = false,
 			Skeleton = false,
 			ChamsEnable = false,
-			UseLOD = true
+			UseLOD = false
 		})
 	end
 	
@@ -4705,6 +4712,9 @@ run(function()
 			setControlVisible(HeldItem, twod)
 			setControlVisible(HeldItemSize, twod and isControlEnabled(HeldItem, false))
 			setControlVisible(HeldItemOffset, twod and isControlEnabled(HeldItem, false))
+			setControlVisible(DistanceESP, twod)
+			setControlVisible(DistanceESPSize, twod and isControlEnabled(DistanceESP, false))
+			setControlVisible(DistanceESPOffset, twod and isControlEnabled(DistanceESP, false))
 			setControlVisible(Background, false)
 		end,
 	})
@@ -4875,6 +4885,36 @@ run(function()
 		end,
 		Darker = true
 	})
+	DistanceESP = ESP:CreateToggle({
+		Name = 'Show Distance',
+		Function = function(callback)
+			local twod = Method.Value == '2D'
+			setControlVisible(DistanceESPSize, twod and callback)
+			setControlVisible(DistanceESPOffset, twod and callback)
+			refreshESP()
+		end,
+		Darker = true
+	})
+	DistanceESPSize = ESP:CreateSlider({
+		Name = 'Distance Size',
+		Min = 12,
+		Max = 28,
+		Default = 16,
+		Function = function()
+			refreshESP()
+		end,
+		Darker = true
+	})
+	DistanceESPOffset = ESP:CreateSlider({
+		Name = 'Distance Y Offset',
+		Min = 0,
+		Max = 40,
+		Default = 30,
+		Function = function()
+			refreshESP()
+		end,
+		Darker = true
+	})
 	Background = ESP:CreateToggle({
 		Name = 'Show Background',
 		Function = function()
@@ -4923,6 +4963,9 @@ run(function()
 	setControlVisible(HeldItem, twoddefault)
 	setControlVisible(HeldItemSize, twoddefault and isControlEnabled(HeldItem, false))
 	setControlVisible(HeldItemOffset, twoddefault and isControlEnabled(HeldItem, false))
+	setControlVisible(DistanceESP, twoddefault)
+	setControlVisible(DistanceESPSize, twoddefault and isControlEnabled(DistanceESP, false))
+	setControlVisible(DistanceESPOffset, twoddefault and isControlEnabled(DistanceESP, false))
 end)
 	
 run(function()
