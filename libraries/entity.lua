@@ -167,13 +167,9 @@ local function hasInvincibility(ent)
 	return false
 end
 
-entitylib.isVulnerable = function(ent, forcefieldCheck)
+entitylib.isVulnerable = function(ent)
 	if healthCheckEnabled() and ent.Health <= 0 then
 		return false
-	end
-	-- "Ignore forcefield" enabled means bypass invincibility/forcefield filtering.
-	if forcefieldCheck == true then
-		return true
 	end
 	return not hasInvincibility(ent)
 end
@@ -217,7 +213,7 @@ entitylib.EntityMouse = function(entitysettings)
 			if not vis then continue end
 			local mag = (mouseLocation - Vector2.new(position.x, position.y)).Magnitude
 			if mag > entitysettings.Range then continue end
-			if entitylib.isVulnerable(v, entitysettings.Forcefield) then
+			if entitylib.isVulnerable(v) then
 				table.insert(sortingTable, {
 					Entity = v,
 					Magnitude = v.Target and -1 or mag
@@ -251,7 +247,7 @@ entitylib.EntityPosition = function(entitysettings)
 			if not v.Targetable then continue end
 			local mag = (v[entitysettings.Part].Position - localPosition).Magnitude
 			if mag > entitysettings.Range then continue end
-			if entitylib.isVulnerable(v, entitysettings.Forcefield) then
+			if entitylib.isVulnerable(v) then
 				table.insert(sortingTable, {
 					Entity = v,
 					Magnitude = v.Target and -1 or mag
@@ -286,7 +282,7 @@ entitylib.AllPosition = function(entitysettings)
 			if not v.Targetable then continue end
 			local mag = (v[entitysettings.Part].Position - localPosition).Magnitude
 			if mag > entitysettings.Range then continue end
-			if entitylib.isVulnerable(v, entitysettings.Forcefield) then
+			if entitylib.isVulnerable(v) then
 				table.insert(sortingTable, {Entity = v, Magnitude = v.Target and -1 or mag})
 			end
 		end
