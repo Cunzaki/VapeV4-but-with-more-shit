@@ -1392,7 +1392,7 @@ components = {
 		toollist.Parent = tool
 		local window = Instance.new('TextButton')
 		window.Name = 'TargetsTextWindow'
-		window.Size = UDim2.fromOffset(220, 175)
+		window.Size = UDim2.fromOffset(220, 145)
 		window.BackgroundColor3 = uipallet.Main
 		window.BorderSizePixel = 0
 		window.AutoButtonColor = false
@@ -1428,16 +1428,11 @@ components = {
 				Players = self.Players.Enabled,
 				NPCs = self.NPCs.Enabled,
 				Invisible = self.Invisible.Enabled,
-				Walls = self.Walls.Enabled,
-				Forcefield = self.Forcefield.Enabled
+				Walls = self.Walls.Enabled
 			}
 		end
 		
 		function optionapi:Load(tab)
-			local forcefield = tab.Forcefield
-			if forcefield == nil then
-				forcefield = false
-			end
 			if self.Players.Enabled ~= tab.Players then
 				self.Players:Toggle()
 			end
@@ -1449,9 +1444,6 @@ components = {
 			end
 			if self.Walls.Enabled ~= tab.Walls then
 				self.Walls:Toggle()
-			end
-			if self.Forcefield.Enabled ~= forcefield then
-				self.Forcefield:Toggle()
 			end
 		end
 		
@@ -1472,10 +1464,6 @@ components = {
 			if self.Walls.Enabled then
 				tween:Cancel(self.Walls.Object.Knob)
 				self.Walls.Object.Knob.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
-			end
-			if self.Forcefield.Enabled then
-				tween:Cancel(self.Forcefield.Object.Knob)
-				self.Forcefield.Object.Knob.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
 			end
 		end
 		
@@ -1507,9 +1495,6 @@ components = {
 			if optionapi.Walls.Enabled then
 				table.insert(ignored, 'behind walls')
 			end
-			if optionapi.Forcefield.Enabled then
-				table.insert(ignored, 'forcefield')
-			end
 			items.Text = 'Ignore '..(#ignored > 0 and table.concat(ignored, ', ') or 'none')
 		end
 
@@ -1529,14 +1514,6 @@ components = {
 			end
 		}, window, {Options = {}})
 		optionapi.Walls.Object.Position = UDim2.fromOffset(0, 111)
-		optionapi.Forcefield = components.Toggle({
-			Name = 'Ignore forcefield',
-			Function = function()
-				updateIgnoreText()
-				optionsettings.Function()
-			end
-		}, window, {Options = {}})
-		optionapi.Forcefield.Object.Position = UDim2.fromOffset(0, 141)
 		if optionsettings.Players then
 			optionapi.Players:Toggle()
 		end
@@ -1548,9 +1525,6 @@ components = {
 		end
 		if optionsettings.Walls then
 			optionapi.Walls:Toggle()
-		end
-		if optionsettings.Forcefield then
-			optionapi.Forcefield:Toggle()
 		end
 		
 		close.MouseButton1Click:Connect(function()
