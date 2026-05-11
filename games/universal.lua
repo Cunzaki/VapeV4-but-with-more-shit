@@ -1255,6 +1255,15 @@ run(function()
 	local function registerShot(ent, targetPart, origin)
 		if not BulletTracers.Enabled then return end
 		if not (ent and targetPart and origin) then return end
+		local existing = bulletTracerPending[ent]
+		if existing then
+			-- Keep the highest pre-hit health seen so rapid target polling doesn't erase pending damage context.
+			existing.Health = math.max(existing.Health or ent.Health, ent.Health)
+			existing.Origin = getLocalTracerOrigin()
+			existing.TargetPosition = targetPart.Position
+			existing.Time = tick()
+			return
+		end
 		bulletTracerPending[ent] = {
 			Entity = ent,
 			Health = ent.Health,
@@ -1338,7 +1347,8 @@ run(function()
 				if allowTracer then
 					spawnBulletTracer(ent, pending, now, mainColor, glowColor)
 				end
-				pending.Health = currentHealth
+				-- Advance baseline after each confirmed damage step so consecutive hits still trigger.
+				pending.Health = math.max(currentHealth, 0)
 				pending.Origin = getLocalTracerOrigin()
 				pending.TargetPosition = (ent.Head or ent.RootPart).Position
 				pending.Time = now
