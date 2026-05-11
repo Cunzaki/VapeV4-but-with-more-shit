@@ -6359,7 +6359,6 @@ run(function()
 	local AutoSendLength
 	local Visualizer
 	local VisualizerMaterial
-	local VisualizerTransparency
 	local VisualizerColor
 	local VisualizerColorToggle
 	local oldphys, oldsend
@@ -6388,7 +6387,6 @@ run(function()
 	local function applyVisualizerStyle()
 		if not visualClone then return end
 		local mat = Enum.Material[VisualizerMaterial.Value]
-		local trans = VisualizerTransparency.Value
 		local customColor = Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value)
 		for _, d in visualClone:GetDescendants() do
 			if d:IsA('BasePart') then
@@ -6399,13 +6397,13 @@ run(function()
 				d.Massless = true
 				d.CastShadow = false
 				d.Material = mat
-				d.Transparency = trans
+				d.Transparency = 0
 				d.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
 				if VisualizerColorToggle.Enabled then
 					d.Color = customColor
 				end
 			elseif d:IsA('Decal') or d:IsA('Texture') then
-				d.Transparency = math.clamp(trans + 0.2, 0, 1)
+				d.Transparency = 0
 			elseif d:IsA('Humanoid') or d:IsA('Animator') or d:IsA('AnimationController') or d:IsA('Script') or d:IsA('LocalScript') then
 				d:Destroy()
 			end
@@ -6531,7 +6529,6 @@ run(function()
 		Name = 'Visualizer',
 		Function = function(callback)
 			VisualizerMaterial.Object.Visible = callback
-			VisualizerTransparency.Object.Visible = callback
 			VisualizerColorToggle.Object.Visible = callback
 			VisualizerColor.Object.Visible = callback and VisualizerColorToggle.Enabled
 			if callback then
@@ -6547,16 +6544,6 @@ run(function()
 	VisualizerMaterial = Blink:CreateDropdown({
 		Name = 'Visualizer Material',
 		List = {'ForceField', 'Neon', 'SmoothPlastic', 'Glass', 'Plastic'},
-		Visible = false,
-		Darker = true,
-		Function = applyVisualizerStyle
-	})
-	VisualizerTransparency = Blink:CreateSlider({
-		Name = 'Visualizer Transparency',
-		Min = 0,
-		Max = 1,
-		Decimal = 10,
-		Default = 0.35,
 		Visible = false,
 		Darker = true,
 		Function = applyVisualizerStyle
