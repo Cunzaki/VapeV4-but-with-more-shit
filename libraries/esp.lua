@@ -94,13 +94,23 @@ local DEFAULT_SETTINGS = {
     OutlineColor = Color3.fromRGB(0, 0, 0),
     HealthBarColor = Color3.fromRGB(0, 255, 0),
     HealthBarOutlineColor = Color3.fromRGB(0, 0, 0),
+    HeldItemColor = Color3.new(1, 1, 1),
     
     -- Dimensions
     BoxThickness = 2,
+    BoxOutlineThickness = 4,
+    BoxOutline = true,
     LineThickness = 2,
     HealthBarlineThickness = 2,
     HealthBarOutlineThickness = 3,
+    HealthBarWidth = 5,
+    DynamicHealthBarColor = true,
     TextSize = 19,
+    NameOutline = true,
+    NameYOffset = 20,
+    HeldItem = false,
+    HeldItemTextSize = 17,
+    HeldItemOffset = 14,
     RenderDistance = 650,
     
     -- Performance settings
@@ -111,6 +121,7 @@ local DEFAULT_SETTINGS = {
     UseLOD = true,
     ShouldRender = nil,
     NameResolver = nil,
+    HeldItemResolver = nil,
     ColorResolver = nil,
 
     DeveloperMode = false
@@ -353,7 +364,26 @@ function ESPLibrary:CreateESPObject(player)
             Size = self.Settings.TextSize,
             Color = self.Settings.NicknameColor,
             Center = true,
-            Outline = true,
+            Outline = self.Settings.NameOutline,
+            OutlineColor = self.Settings.OutlineColor,
+            Transparency = 1,
+            Font = 2,
+            Visible = false,
+            Text = "",
+            Position = Vector2.new(),
+            ZIndex = 3
+        }),
+        HeldItem = ESPObjectPool:GetDrawing("Text", {
+            Size = self.Settings.HeldItemTextSize,
+            Color = self.Settings.HeldItemColor,
+            Center = true,
+            Outline = self.Settings.NameOutline,
+            OutlineColor = self.Settings.OutlineColor,
+            Transparency = 1,
+            Font = 2,
+            Visible = false,
+            Text = "",
+            Position = Vector2.new(),
             ZIndex = 3
         }),
         Skeleton = {},
@@ -365,6 +395,18 @@ function ESPLibrary:CreateESPObject(player)
     end
     
     return espObject
+end
+
+function ESPLibrary:GetHeldItemText(player, character)
+    if self.Settings.HeldItemResolver then
+        local success, result = pcall(self.Settings.HeldItemResolver, player, character)
+        if success and result and result ~= "" then
+            return tostring(result)
+        end
+    end
+
+    local tool = character and character:FindFirstChildOfClass("Tool")
+    return tool and tool.Name or nil
 end
 
 function ESPLibrary:CreateChams(player)
@@ -545,6 +587,9 @@ function ESPLibrary:UpdatePlayerESP(player)
         local renderColor = self.Settings.ColorResolver and self.Settings.ColorResolver(player) or self.Settings.BoxColor
         espObject.Box.Color = renderColor
         espObject.Nickname.Color = renderColor
+        espObject.Box.Thickness = self.Settings.BoxThickness
+        espObject.BoxOutline.Thickness = self.Settings.BoxOutlineThickness
+        espObject.BoxOutline.Color = self.Settings.OutlineColor
 
         local headScreenPos = WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
         local rootBottomScreenPos = WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3, 0))
@@ -554,9 +599,13 @@ function ESPLibrary:UpdatePlayerESP(player)
         local boxPosition = Vector2.new(rootScreenPos.X - boxWidth / 2, headScreenPos.Y)
         
         if self.Settings.BoxEnable and lodLevel.features.box then
-            espObject.BoxOutline.Size = Vector2.new(boxWidth, boxHeight)
-            espObject.BoxOutline.Position = boxPosition
-            espObject.BoxOutline.Visible = true
+            if self.Settings.BoxOutline then
+                espObject.BoxOutline.Size = Vector2.new(boxWidth, boxHeight)
+                espObject.BoxOutline.Position = boxPosition
+                espObject.BoxOutline.Visible = true
+            else
+                espObject.BoxOutline.Visible = false
+            end
             
             espObject.Box.Size = Vector2.new(boxWidth, boxHeight)
             espObject.Box.Position = boxPosition
@@ -569,14 +618,15 @@ function ESPLibrary:UpdatePlayerESP(player)
         if self.Settings.HealthBar and lodLevel.features.healthBar then
             local healthPercent = self:GetHealthPercent(player, humanoid)
             local healthBarPosition = Vector2.new(rootScreenPos.X - boxWidth / 2 - 8, headScreenPos.Y)
+            local healthBarWidth = self.Settings.HealthBarWidth
             
-            espObject.HealthBarOutline.Size = Vector2.new(5, boxHeight)
+            espObject.HealthBarOutline.Size = Vector2.new(healthBarWidth, boxHeight)
             espObject.HealthBarOutline.Position = healthBarPosition
             espObject.HealthBarOutline.Visible = true
             
-            espObject.HealthBar.Size = Vector2.new(5, boxHeight * healthPercent)
+            espObject.HealthBar.Size = Vector2.new(healthBarWidth, boxHeight * healthPercent)
             espObject.HealthBar.Position = Vector2.new(healthBarPosition.X, headScreenPos.Y + boxHeight * (1 - healthPercent))
-            espObject.HealthBar.Color = Color3.fromHSV(healthPercent * 0.33, 1, 1)
+            espObject.HealthBar.Color = self.Settings.DynamicHealthBarColor and Color3.fromHSV(healthPercent * 0.33, 1, 1) or self.Settings.HealthBarColor
             espObject.HealthBar.Visible = true
         else
             espObject.HealthBar.Visible = false
@@ -584,11 +634,31 @@ function ESPLibrary:UpdatePlayerESP(player)
         end
         
         if self.Settings.Nickname and lodLevel.features.nickname then
+            espObject.Nickname.Size = self.Settings.TextSize
+            espObject.Nickname.Outline = self.Settings.NameOutline
+            espObject.Nickname.OutlineColor = self.Settings.OutlineColor
             espObject.Nickname.Text = self.Settings.NameResolver and self.Settings.NameResolver(player) or player.Name
-            espObject.Nickname.Position = Vector2.new(rootScreenPos.X, headScreenPos.Y - 20)
+            espObject.Nickname.Position = Vector2.new(rootScreenPos.X, headScreenPos.Y - self.Settings.NameYOffset)
             espObject.Nickname.Visible = true
         else
             espObject.Nickname.Visible = false
+        end
+
+        if self.Settings.HeldItem then
+            local heldItemText = self:GetHeldItemText(player, character)
+            if heldItemText then
+                espObject.HeldItem.Size = self.Settings.HeldItemTextSize
+                espObject.HeldItem.Outline = self.Settings.NameOutline
+                espObject.HeldItem.OutlineColor = self.Settings.OutlineColor
+                espObject.HeldItem.Color = self.Settings.HeldItemColor
+                espObject.HeldItem.Text = heldItemText
+                espObject.HeldItem.Position = Vector2.new(rootScreenPos.X, headScreenPos.Y + boxHeight + self.Settings.HeldItemOffset)
+                espObject.HeldItem.Visible = true
+            else
+                espObject.HeldItem.Visible = false
+            end
+        else
+            espObject.HeldItem.Visible = false
         end
 
         if espObject.Chams and self.Settings.ChamsEnable and lodLevel.features.chams then
@@ -616,6 +686,7 @@ function ESPLibrary:HideESPElements(espObject)
     espObject.HealthBar.Visible = false
     espObject.HealthBarOutline.Visible = false
     espObject.Nickname.Visible = false
+    espObject.HeldItem.Visible = false
     
     for i = 1, #espObject.Skeleton do
         local line = espObject.Skeleton[i]
@@ -635,6 +706,7 @@ function ESPLibrary:RemoveESP(player)
     ESPObjectPool:ReturnDrawing("Square", espObject.HealthBar)
     ESPObjectPool:ReturnDrawing("Square", espObject.HealthBarOutline)
     ESPObjectPool:ReturnDrawing("Text", espObject.Nickname)
+    ESPObjectPool:ReturnDrawing("Text", espObject.HeldItem)
     
     for _, line in pairs(espObject.Skeleton) do
         if line then ESPObjectPool:ReturnDrawing("Line", line) end
