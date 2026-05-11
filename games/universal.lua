@@ -1255,7 +1255,6 @@ run(function()
 	local function registerShot(ent, targetPart, origin)
 		if not BulletTracers.Enabled then return end
 		if not (ent and targetPart and origin) then return end
-		if (not isMb1Held) and ((tick() - lastMb1Click) > TracerClickWindow) then return end
 		bulletTracerPending[ent] = {
 			Entity = ent,
 			Health = ent.Health,
