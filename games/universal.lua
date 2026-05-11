@@ -925,7 +925,6 @@ run(function()
 							Part = Part.Value,
 							Players = Targets.Players.Enabled,
 							NPCs = Targets.NPCs.Enabled,
-							Forcefield = (Targets.Forcefield and Targets.Forcefield.Enabled) or false,
 							Wallcheck = Targets.Walls.Enabled,
 							Origin = gameCamera.CFrame.Position
 						})
@@ -1365,8 +1364,7 @@ run(function()
 			Part = targetPart,
 			Origin = origin,
 			Players = Target.Players.Enabled,
-			NPCs = Target.NPCs.Enabled,
-			Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
+			NPCs = Target.NPCs.Enabled
 		})
 
 		if ent then
@@ -1493,8 +1491,7 @@ run(function()
 							Part = 'Head',
 							Origin = (origin * fireoffset).Position,
 							Players = Target.Players.Enabled,
-							NPCs = Target.NPCs.Enabled,
-							Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
+							NPCs = Target.NPCs.Enabled
 						})
 						if ent then
 							registerShot(ent, ent.Head or ent.RootPart, (origin * fireoffset).Position)
@@ -1800,7 +1797,7 @@ run(function()
 			for _, v in entitylib.List do
 				if v.Targetable and v.Character and (Targets.Players.Enabled and v.Player or Targets.NPCs.Enabled and v.NPC) then
 					if ray.Instance:IsDescendantOf(v.Character) then
-						return entitylib.isVulnerable(v, (Targets.Forcefield and Targets.Forcefield.Enabled) or false) and v
+						return entitylib.isVulnerable(v) and v
 					end
 				end
 			end
@@ -2644,7 +2641,6 @@ run(function()
 							Part = 'RootPart',
 							Players = Targets.Players.Enabled,
 							NPCs = Targets.NPCs.Enabled,
-							Forcefield = (Targets.Forcefield and Targets.Forcefield.Enabled) or false,
 							Limit = Max.Value
 						})
 	
@@ -3583,8 +3579,7 @@ run(function()
 						Wallcheck = wallcheck,
 						Part = 'RootPart',
 						Players = Targets.Players.Enabled,
-						NPCs = Targets.NPCs.Enabled,
-						Forcefield = (Targets.Forcefield and Targets.Forcefield.Enabled) or false
+						NPCs = Targets.NPCs.Enabled
 					})
 	
 					if ent then
