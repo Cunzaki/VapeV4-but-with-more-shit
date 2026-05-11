@@ -167,11 +167,14 @@ local function hasInvincibility(ent)
 	return false
 end
 
-entitylib.isVulnerable = function(ent)
+entitylib.isVulnerable = function(ent, forcefieldCheck)
 	if healthCheckEnabled() and ent.Health <= 0 then
 		return false
 	end
-	return true
+	if forcefieldCheck == false then
+		return true
+	end
+	return not hasInvincibility(ent)
 end
 
 entitylib.getEntityColor = function(ent)
@@ -213,7 +216,7 @@ entitylib.EntityMouse = function(entitysettings)
 			if not vis then continue end
 			local mag = (mouseLocation - Vector2.new(position.x, position.y)).Magnitude
 			if mag > entitysettings.Range then continue end
-			if entitylib.isVulnerable(v) then
+			if entitylib.isVulnerable(v, entitysettings.Forcefield) then
 				table.insert(sortingTable, {
 					Entity = v,
 					Magnitude = v.Target and -1 or mag
@@ -247,7 +250,7 @@ entitylib.EntityPosition = function(entitysettings)
 			if not v.Targetable then continue end
 			local mag = (v[entitysettings.Part].Position - localPosition).Magnitude
 			if mag > entitysettings.Range then continue end
-			if entitylib.isVulnerable(v) then
+			if entitylib.isVulnerable(v, entitysettings.Forcefield) then
 				table.insert(sortingTable, {
 					Entity = v,
 					Magnitude = v.Target and -1 or mag
@@ -282,7 +285,7 @@ entitylib.AllPosition = function(entitysettings)
 			if not v.Targetable then continue end
 			local mag = (v[entitysettings.Part].Position - localPosition).Magnitude
 			if mag > entitysettings.Range then continue end
-			if entitylib.isVulnerable(v) then
+			if entitylib.isVulnerable(v, entitysettings.Forcefield) then
 				table.insert(sortingTable, {Entity = v, Magnitude = v.Target and -1 or mag})
 			end
 		end
