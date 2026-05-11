@@ -6365,6 +6365,17 @@ run(function()
 	local oldphys, oldsend
 	local visualClone, visualServerCFrame
 	local lastFlagApply = 0
+	local function applyBlinkRates(physicsrate, senderrate)
+		pcall(function()
+			setfflag('S2PhysicsSenderRate', physicsrate)
+		end)
+		pcall(function()
+			setfflag('PhysicsSenderMaxBandwidthBps', physicsrate == '0' and '0' or '38760')
+		end)
+		pcall(function()
+			setfflag('DataSenderRate', senderrate)
+		end)
+	end
 
 	local function clearVisualizer()
 		if visualClone then
@@ -6437,8 +6448,7 @@ run(function()
 					Blink:Clean(entitylib.Events.LocalRemoved:Connect(clearVisualizer))
 				end
 				Blink:Clean(lplr.OnTeleport:Connect(function()
-					setfflag('S2PhysicsSenderRate', '15')
-					setfflag('DataSenderRate', '60')
+					applyBlinkRates('15', '60')
 					teleported = true
 				end))
 				Blink:Clean(guiService.ErrorMessageChanged:Connect(function(str)
@@ -6478,8 +6488,7 @@ run(function()
 					wasSending = sendingNow
 	
 					if physicsrate ~= oldphys or senderrate ~= oldsend or (tick() - lastFlagApply) > 0.35 then
-						setfflag('S2PhysicsSenderRate', physicsrate)
-						setfflag('DataSenderRate', senderrate)
+						applyBlinkRates(physicsrate, senderrate)
 						oldphys, oldsend = physicsrate, senderrate
 						lastFlagApply = tick()
 					end
@@ -6487,10 +6496,7 @@ run(function()
 					task.wait(0.03)
 				until (not Blink.Enabled and not teleported)
 			else
-				if setfflag then
-					setfflag('S2PhysicsSenderRate', '15')
-					setfflag('DataSenderRate', '60')
-				end
+				applyBlinkRates('15', '60')
 				lastFlagApply = 0
 				oldphys, oldsend = nil, nil
 				clearVisualizer()
