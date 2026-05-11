@@ -312,6 +312,8 @@ end
 
 run(function()
 	if not entitylib then return end
+	local torsoWatcherThread
+	local torsoColorCache = {}
 
 	local function colorKeyFromColor3(c)
 		return string.format('rgb_%d_%d_%d', math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
@@ -336,6 +338,14 @@ run(function()
 			return 'brick_'..tostring(root.BrickColor.Number)
 		end
 		return nil
+	end
+
+	local function getPlayerTorsoKey(plr)
+		if not plr then return nil end
+		if plr == lplr then
+			return getTorsoTeamKey(entitylib.character and entitylib.character.Character or lplr.Character)
+		end
+		return getTorsoTeamKey(plr.Character)
 	end
 
 	entitylib.getUpdateConnections = function(ent)
@@ -392,6 +402,10 @@ run(function()
 	end
 
 	vape:Clean(function()
+		if torsoWatcherThread then
+			task.cancel(torsoWatcherThread)
+			torsoWatcherThread = nil
+		end
 		entitylib.kill()
 		entitylib = nil
 	end)
@@ -401,6 +415,32 @@ run(function()
 	vape:Clean(workspace:GetPropertyChangedSignal('CurrentCamera'):Connect(function()
 		gameCamera = workspace.CurrentCamera or workspace:FindFirstChildWhichIsA('Camera')
 	end))
+	torsoWatcherThread = task.spawn(function()
+		while vape.Loaded and entitylib and entitylib.Running do
+			if vape.Categories.Main.Options['Teams by torso color'].Enabled then
+				local changed = false
+				for _, plr in playersService:GetPlayers() do
+					local key = getPlayerTorsoKey(plr)
+					if torsoColorCache[plr] ~= key then
+						torsoColorCache[plr] = key
+						changed = true
+					end
+				end
+				for plr in torsoColorCache do
+					if not plr.Parent then
+						torsoColorCache[plr] = nil
+						changed = true
+					end
+				end
+				if changed then
+					entitylib.refresh()
+				end
+			elseif next(torsoColorCache) ~= nil then
+				table.clear(torsoColorCache)
+			end
+			task.wait(0.25)
+		end
+	end)
 end)
 
 run(function()
