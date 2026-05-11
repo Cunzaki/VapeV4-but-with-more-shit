@@ -312,16 +312,28 @@ end
 
 run(function()
 	if not entitylib then return end
+
+	local function colorKeyFromColor3(c)
+		return string.format('rgb_%d_%d_%d', math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
+	end
+
 	local function getTorsoTeamKey(char)
 		if not char then return nil end
-		local torso = char:FindFirstChild('UpperTorso') or char:FindFirstChild('Torso') or char:FindFirstChild('LowerTorso') or char:FindFirstChild('HumanoidRootPart')
+		local body = char:FindFirstChildOfClass('BodyColors')
+		if body then
+			return colorKeyFromColor3(body.TorsoColor3)
+		end
+		local torso = char:FindFirstChild('UpperTorso') or char:FindFirstChild('Torso') or char:FindFirstChild('LowerTorso')
 		if torso and torso:IsA('BasePart') then
 			return 'brick_'..tostring(torso.BrickColor.Number)
 		end
-		local body = char:FindFirstChildOfClass('BodyColors')
-		if body then
-			local c = body.TorsoColor3
-			return string.format('rgb_%d_%d_%d', math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
+		local hum = char:FindFirstChildOfClass('Humanoid')
+		if hum and hum.RootPart and hum.RootPart:IsA('BasePart') then
+			return 'brick_'..tostring(hum.RootPart.BrickColor.Number)
+		end
+		local root = char:FindFirstChild('HumanoidRootPart')
+		if root and root:IsA('BasePart') then
+			return 'brick_'..tostring(root.BrickColor.Number)
 		end
 		return nil
 	end
@@ -1267,15 +1279,9 @@ run(function()
 
 			local lifeAlpha = math.clamp((tracer.DieAt - now) / math.max(BulletTracerDuration.Value, 0.001), 0, 1)
 			local baseAlpha = (1 - BulletTracerTransparency.Value) * lifeAlpha
-			local fromPos, fromVis = gameCamera:WorldToViewportPoint(tracer.Origin)
-			local toPos, toVis = gameCamera:WorldToViewportPoint(tracer.TargetPosition)
-			local wallVisible = true
-			if Target.Walls.Enabled then
-				BulletTracerWallcheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
-				local ray = workspace:Raycast(tracer.Origin, tracer.TargetPosition - tracer.Origin, BulletTracerWallcheck)
-				wallVisible = ray == nil or (tracer.Entity and tracer.Entity.Character and ray.Instance:IsDescendantOf(tracer.Entity.Character))
-			end
-			local visible = fromVis and toVis and wallVisible and SilentAim.Enabled and BulletTracers.Enabled
+			local fromPos = gameCamera:WorldToViewportPoint(tracer.Origin)
+			local toPos = gameCamera:WorldToViewportPoint(tracer.TargetPosition)
+			local visible = SilentAim.Enabled and BulletTracers.Enabled
 			tracer.Main.Visible = visible
 			tracer.Glow.Visible = visible
 			tracer.Main.From = Vector2.new(fromPos.X, fromPos.Y)
