@@ -4247,6 +4247,12 @@ run(function()
 		ESP:Toggle()
 		ESP:Toggle()
 	end
+
+	local function setControlVisible(control, visible)
+		if control and control.Object then
+			control.Object.Visible = visible
+		end
+	end
 	
 	local function ESPWorldToViewport(pos)
 		local newpos = gameCamera:WorldToViewportPoint(gameCamera.CFrame:pointToWorldSpace(gameCamera.CFrame:PointToObjectSpace(pos)))
@@ -4676,23 +4682,23 @@ run(function()
 				ESP:Toggle()
 			end
 			local twod = (val == '2D')
-			BoundingBox.Object.Visible = twod
-			Filled.Object.Visible = false
-			BoxThickness.Object.Visible = twod and BoundingBox.Enabled
-			BoxOutline.Object.Visible = twod and BoundingBox.Enabled
-			BoxOutlineThickness.Object.Visible = twod and BoundingBox.Enabled and BoxOutline.Enabled
-			HealthBar.Object.Visible = twod
-			HealthBarWidth.Object.Visible = twod and HealthBar.Enabled
-			DynamicHealthColor.Object.Visible = twod and HealthBar.Enabled
-			Name.Object.Visible = twod
-			DisplayName.Object.Visible = twod and Name.Enabled
-			NameSize.Object.Visible = twod and Name.Enabled
-			NameOutline.Object.Visible = twod and Name.Enabled
-			NameYOffset.Object.Visible = twod and Name.Enabled
-			HeldItem.Object.Visible = twod
-			HeldItemSize.Object.Visible = twod and HeldItem.Enabled
-			HeldItemOffset.Object.Visible = twod and HeldItem.Enabled
-			Background.Object.Visible = false
+			setControlVisible(BoundingBox, twod)
+			setControlVisible(Filled, false)
+			setControlVisible(BoxThickness, twod and BoundingBox.Enabled)
+			setControlVisible(BoxOutline, twod and BoundingBox.Enabled)
+			setControlVisible(BoxOutlineThickness, twod and BoundingBox.Enabled and BoxOutline and BoxOutline.Enabled)
+			setControlVisible(HealthBar, twod)
+			setControlVisible(HealthBarWidth, twod and HealthBar.Enabled)
+			setControlVisible(DynamicHealthColor, twod and HealthBar.Enabled)
+			setControlVisible(Name, twod)
+			setControlVisible(DisplayName, twod and Name.Enabled)
+			setControlVisible(NameSize, twod and Name.Enabled)
+			setControlVisible(NameOutline, twod and Name.Enabled)
+			setControlVisible(NameYOffset, twod and Name.Enabled)
+			setControlVisible(HeldItem, twod)
+			setControlVisible(HeldItemSize, twod and HeldItem and HeldItem.Enabled)
+			setControlVisible(HeldItemOffset, twod and HeldItem and HeldItem.Enabled)
+			setControlVisible(Background, false)
 		end,
 	})
 	Color = ESP:CreateColorSlider({
@@ -4711,9 +4717,9 @@ run(function()
 		Name = 'Bounding Box',
 		Function = function()
 			local twod = Method.Value == '2D'
-			BoxThickness.Object.Visible = twod and BoundingBox.Enabled
-			BoxOutline.Object.Visible = twod and BoundingBox.Enabled
-			BoxOutlineThickness.Object.Visible = twod and BoundingBox.Enabled and BoxOutline.Enabled
+			setControlVisible(BoxThickness, twod and BoundingBox.Enabled)
+			setControlVisible(BoxOutline, twod and BoundingBox.Enabled)
+			setControlVisible(BoxOutlineThickness, twod and BoundingBox.Enabled and BoxOutline and BoxOutline.Enabled)
 			refreshESP()
 		end,
 		Default = true,
@@ -4732,7 +4738,7 @@ run(function()
 	BoxOutline = ESP:CreateToggle({
 		Name = 'Box Outline',
 		Function = function(callback)
-			BoxOutlineThickness.Object.Visible = Method.Value == '2D' and BoundingBox.Enabled and callback
+			setControlVisible(BoxOutlineThickness, Method.Value == '2D' and BoundingBox.Enabled and callback)
 			refreshESP()
 		end,
 		Default = true,
@@ -4759,8 +4765,8 @@ run(function()
 		Name = 'Health Bar',
 		Function = function()
 			local twod = Method.Value == '2D'
-			HealthBarWidth.Object.Visible = twod and HealthBar.Enabled
-			DynamicHealthColor.Object.Visible = twod and HealthBar.Enabled
+			setControlVisible(HealthBarWidth, twod and HealthBar.Enabled)
+			setControlVisible(DynamicHealthColor, twod and HealthBar.Enabled)
 			refreshESP()
 		end,
 		Darker = true
@@ -4788,11 +4794,11 @@ run(function()
 		Function = function(callback)
 			refreshESP()
 			local twod = Method.Value == '2D'
-			DisplayName.Object.Visible = twod and callback
-			NameSize.Object.Visible = twod and callback
-			NameOutline.Object.Visible = twod and callback
-			NameYOffset.Object.Visible = twod and callback
-			Background.Object.Visible = false
+			setControlVisible(DisplayName, twod and callback)
+			setControlVisible(NameSize, twod and callback)
+			setControlVisible(NameOutline, twod and callback)
+			setControlVisible(NameYOffset, twod and callback)
+			setControlVisible(Background, false)
 		end,
 		Darker = true
 	})
@@ -4836,8 +4842,8 @@ run(function()
 		Name = 'Held Item',
 		Function = function(callback)
 			local twod = Method.Value == '2D'
-			HeldItemSize.Object.Visible = twod and callback
-			HeldItemOffset.Object.Visible = twod and callback
+			setControlVisible(HeldItemSize, twod and callback)
+			setControlVisible(HeldItemOffset, twod and callback)
 			refreshESP()
 		end,
 		Darker = true
@@ -4880,7 +4886,7 @@ run(function()
 	Distance = ESP:CreateToggle({
 		Name = 'Distance Check',
 		Function = function(callback)
-			DistanceLimit.Object.Visible = callback
+			setControlVisible(DistanceLimit, callback)
 			refreshESP()
 		end
 	})
@@ -4896,20 +4902,20 @@ run(function()
 			refreshESP()
 		end
 	})
-	Filled.Object.Visible = false
-	Background.Object.Visible = false
+	setControlVisible(Filled, false)
+	setControlVisible(Background, false)
 	local twoddefault = Method.Value == '2D'
-	BoxThickness.Object.Visible = twoddefault and BoundingBox.Enabled
-	BoxOutline.Object.Visible = twoddefault and BoundingBox.Enabled
-	BoxOutlineThickness.Object.Visible = twoddefault and BoundingBox.Enabled and BoxOutline.Enabled
-	HealthBarWidth.Object.Visible = twoddefault and HealthBar.Enabled
-	DynamicHealthColor.Object.Visible = twoddefault and HealthBar.Enabled
-	NameSize.Object.Visible = twoddefault and Name.Enabled
-	NameOutline.Object.Visible = twoddefault and Name.Enabled
-	NameYOffset.Object.Visible = twoddefault and Name.Enabled
-	HeldItem.Object.Visible = twoddefault
-	HeldItemSize.Object.Visible = twoddefault and HeldItem.Enabled
-	HeldItemOffset.Object.Visible = twoddefault and HeldItem.Enabled
+	setControlVisible(BoxThickness, twoddefault and BoundingBox.Enabled)
+	setControlVisible(BoxOutline, twoddefault and BoundingBox.Enabled)
+	setControlVisible(BoxOutlineThickness, twoddefault and BoundingBox.Enabled and BoxOutline.Enabled)
+	setControlVisible(HealthBarWidth, twoddefault and HealthBar.Enabled)
+	setControlVisible(DynamicHealthColor, twoddefault and HealthBar.Enabled)
+	setControlVisible(NameSize, twoddefault and Name.Enabled)
+	setControlVisible(NameOutline, twoddefault and Name.Enabled)
+	setControlVisible(NameYOffset, twoddefault and Name.Enabled)
+	setControlVisible(HeldItem, twoddefault)
+	setControlVisible(HeldItemSize, twoddefault and HeldItem.Enabled)
+	setControlVisible(HeldItemOffset, twoddefault and HeldItem.Enabled)
 end)
 	
 run(function()
