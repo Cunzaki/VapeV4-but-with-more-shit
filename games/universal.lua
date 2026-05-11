@@ -925,7 +925,7 @@ run(function()
 							Part = Part.Value,
 							Players = Targets.Players.Enabled,
 							NPCs = Targets.NPCs.Enabled,
-							Forcefield = not (Targets.Forcefield and Targets.Forcefield.Enabled),
+							Forcefield = (Targets.Forcefield and Targets.Forcefield.Enabled) or false,
 							Wallcheck = Targets.Walls.Enabled,
 							Origin = gameCamera.CFrame.Position
 						})
@@ -1366,7 +1366,7 @@ run(function()
 			Origin = origin,
 			Players = Target.Players.Enabled,
 			NPCs = Target.NPCs.Enabled,
-			Forcefield = not (Target.Forcefield and Target.Forcefield.Enabled)
+			Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
 		})
 
 		if ent then
@@ -1494,7 +1494,7 @@ run(function()
 							Origin = (origin * fireoffset).Position,
 							Players = Target.Players.Enabled,
 							NPCs = Target.NPCs.Enabled,
-							Forcefield = not (Target.Forcefield and Target.Forcefield.Enabled)
+							Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
 						})
 						if ent then
 							registerShot(ent, ent.Head or ent.RootPart, (origin * fireoffset).Position)
@@ -1800,7 +1800,7 @@ run(function()
 			for _, v in entitylib.List do
 				if v.Targetable and v.Character and (Targets.Players.Enabled and v.Player or Targets.NPCs.Enabled and v.NPC) then
 					if ray.Instance:IsDescendantOf(v.Character) then
-						return entitylib.isVulnerable(v, not (Targets.Forcefield and Targets.Forcefield.Enabled)) and v
+						return entitylib.isVulnerable(v, (Targets.Forcefield and Targets.Forcefield.Enabled) or false) and v
 					end
 				end
 			end
@@ -2644,7 +2644,7 @@ run(function()
 							Part = 'RootPart',
 							Players = Targets.Players.Enabled,
 							NPCs = Targets.NPCs.Enabled,
-							Forcefield = not (Targets.Forcefield and Targets.Forcefield.Enabled),
+							Forcefield = (Targets.Forcefield and Targets.Forcefield.Enabled) or false,
 							Limit = Max.Value
 						})
 	
@@ -3584,7 +3584,7 @@ run(function()
 						Part = 'RootPart',
 						Players = Targets.Players.Enabled,
 						NPCs = Targets.NPCs.Enabled,
-						Forcefield = not (Targets.Forcefield and Targets.Forcefield.Enabled)
+						Forcefield = (Targets.Forcefield and Targets.Forcefield.Enabled) or false
 					})
 	
 					if ent then
