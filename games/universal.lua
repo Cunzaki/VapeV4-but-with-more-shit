@@ -1252,6 +1252,11 @@ run(function()
 		bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	end
 
+	local function resetTracerTracking()
+		clearBulletTracers()
+		healthCache = setmetatable({}, {__mode = 'k'})
+	end
+
 	local function registerShot(ent, targetPart, origin)
 		if not BulletTracers.Enabled then return end
 		if not (ent and targetPart and origin) then return end
@@ -1276,6 +1281,11 @@ run(function()
 	local function spawnBulletTracer(ent, pending, now, mainColor, glowColor)
 		if vape.ThreadFix then
 			setthreadidentity(8)
+		end
+		if not BulletTracerFolder or not BulletTracerFolder.Parent then
+			BulletTracerFolder = Instance.new('Folder')
+			BulletTracerFolder.Name = 'SilentAimTracers'
+			BulletTracerFolder.Parent = workspace
 		end
 		local part0 = Instance.new('Part')
 		part0.Size = Vector3.new(0.1, 0.1, 0.1)
@@ -1455,6 +1465,7 @@ run(function()
 				CircleObject.Visible = callback and Mode.Value == 'Mouse'
 			end
 			if callback then
+				resetTracerTracking()
 				SilentAim:Clean(inputService.InputBegan:Connect(function(input, gameProcessed)
 					if gameProcessed then return end
 					if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -1467,6 +1478,8 @@ run(function()
 						isMb1Held = false
 					end
 				end))
+				SilentAim:Clean(entitylib.Events.LocalRemoved:Connect(resetTracerTracking))
+				SilentAim:Clean(entitylib.Events.LocalAdded:Connect(resetTracerTracking))
 				if Method.Value == 'Ray' then
 					oldray = hookfunction(Ray.new, function(origin, direction)
 						if checkcaller() then
@@ -1564,7 +1577,7 @@ run(function()
 					hookfunction(Ray.new, oldray)
 				end
 				oldnamecall, oldray = nil, nil
-				clearBulletTracers()
+				resetTracerTracking()
 			end
 		end,
 		ExtraText = function()
@@ -1817,7 +1830,7 @@ run(function()
 		Darker = true,
 		Visible = false
 	})
-	SilentAim:Clean(BulletTracerFolder)
+	vape:Clean(BulletTracerFolder)
 end)
 	
 run(function()
