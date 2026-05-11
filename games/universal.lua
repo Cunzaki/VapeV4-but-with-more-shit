@@ -1224,6 +1224,7 @@ run(function()
 	local fireoffset, rand, delayCheck = CFrame.identity, Random.new(), tick()
 	local oldnamecall, oldray
 	local lastMb1Click = 0
+	local isMb1Held = false
 	local bulletTracerActive = {}
 	local bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	local healthCache = setmetatable({}, {__mode = 'k'})
@@ -1254,7 +1255,7 @@ run(function()
 	local function registerShot(ent, targetPart, origin)
 		if not BulletTracers.Enabled then return end
 		if not (ent and targetPart and origin) then return end
-		if (tick() - lastMb1Click) > TracerClickWindow then return end
+		if (not isMb1Held) and ((tick() - lastMb1Click) > TracerClickWindow) then return end
 		bulletTracerPending[ent] = {
 			Entity = ent,
 			Health = ent.Health,
@@ -1448,7 +1449,13 @@ run(function()
 				SilentAim:Clean(inputService.InputBegan:Connect(function(input, gameProcessed)
 					if gameProcessed then return end
 					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+						isMb1Held = true
 						lastMb1Click = tick()
+					end
+				end))
+				SilentAim:Clean(inputService.InputEnded:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+						isMb1Held = false
 					end
 				end))
 				if Method.Value == 'Ray' then
@@ -1540,6 +1547,7 @@ run(function()
 					task.wait()
 				until not SilentAim.Enabled
 			else
+				isMb1Held = false
 				if oldnamecall then
 					hookmetamethod(game, '__namecall', oldnamecall)
 				end
