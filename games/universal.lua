@@ -6364,6 +6364,7 @@ run(function()
 	local VisualizerColorToggle
 	local oldphys, oldsend
 	local visualClone, visualServerCFrame
+	local lastFlagApply = 0
 
 	local function clearVisualizer()
 		if visualClone then
@@ -6452,7 +6453,8 @@ run(function()
 				end))
 	
 				repeat
-					local physicsrate, senderrate = '0', Type.Value == 'All' and '-1' or '60'
+					local allmode = Type.Value == 'All'
+					local physicsrate, senderrate = '0', allmode and '-1' or '60'
 					if AutoSend.Enabled and tick() % (AutoSendLength.Value + 0.1) > AutoSendLength.Value then
 						physicsrate, senderrate = '15', '60'
 					end
@@ -6475,10 +6477,11 @@ run(function()
 					end
 					wasSending = sendingNow
 	
-					if physicsrate ~= oldphys or senderrate ~= oldsend then
+					if physicsrate ~= oldphys or senderrate ~= oldsend or (tick() - lastFlagApply) > 0.35 then
 						setfflag('S2PhysicsSenderRate', physicsrate)
 						setfflag('DataSenderRate', senderrate)
 						oldphys, oldsend = physicsrate, senderrate
+						lastFlagApply = tick()
 					end
 					
 					task.wait(0.03)
@@ -6488,6 +6491,7 @@ run(function()
 					setfflag('S2PhysicsSenderRate', '15')
 					setfflag('DataSenderRate', '60')
 				end
+				lastFlagApply = 0
 				oldphys, oldsend = nil, nil
 				clearVisualizer()
 			end
