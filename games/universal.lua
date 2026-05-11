@@ -1177,6 +1177,9 @@ run(function()
 	local BulletTracerWallcheck = RaycastParams.new()
 	BulletTracerWallcheck.FilterType = Enum.RaycastFilterType.Exclude
 	BulletTracerWallcheck.RespectCanCollide = true
+	local BulletTracerFolder = Instance.new('Folder')
+	BulletTracerFolder.Name = 'SilentAimTracers'
+	BulletTracerFolder.Parent = workspace
 	local fireoffset, rand, delayCheck = CFrame.identity, Random.new(), tick()
 	local oldnamecall, oldray
 	local bulletTracerActive = {}
@@ -1198,10 +1201,8 @@ run(function()
 	local function clearBulletTracers()
 		for _, record in bulletTracerActive do
 			pcall(function()
-				record.Main.Visible = false
-				record.Glow.Visible = false
-				record.Main:Remove()
-				record.Glow:Remove()
+				record.Part0:Destroy()
+				record.Part1:Destroy()
 			end)
 		end
 		table.clear(bulletTracerActive)
@@ -1242,16 +1243,46 @@ run(function()
 						if vape.ThreadFix then
 							setthreadidentity(8)
 						end
-						local main = Drawing.new('Line')
-						local glow = Drawing.new('Line')
+						local part0 = Instance.new('Part')
+						part0.Size = Vector3.new(0.1, 0.1, 0.1)
+						part0.Anchored = true
+						part0.CanCollide = false
+						part0.CanTouch = false
+						part0.CanQuery = false
+						part0.Transparency = 1
+						part0.Position = pending.Origin
+						part0.Parent = BulletTracerFolder
+						local part1 = part0:Clone()
+						part1.Position = pending.TargetPosition
+						part1.Parent = BulletTracerFolder
+						local attach0 = Instance.new('Attachment')
+						attach0.Parent = part0
+						local attach1 = Instance.new('Attachment')
+						attach1.Parent = part1
+						local main = Instance.new('Beam')
+						local glow = Instance.new('Beam')
 						local thickness = BulletTracerThickness.Value
-						main.Thickness = thickness
-						glow.Thickness = thickness + 2
-						main.Color = mainColor
-						glow.Color = glowColor
+						main.Attachment0 = attach0
+						main.Attachment1 = attach1
+						glow.Attachment0 = attach0
+						glow.Attachment1 = attach1
+						main.FaceCamera = true
+						glow.FaceCamera = true
+						main.LightEmission = 1
+						glow.LightEmission = 1
+						main.Width0 = thickness * 0.045
+						main.Width1 = thickness * 0.045
+						glow.Width0 = (thickness + 2) * 0.045
+						glow.Width1 = (thickness + 2) * 0.045
+						main.Color = ColorSequence.new(mainColor)
+						glow.Color = ColorSequence.new(glowColor)
+						main.Parent = part0
+						glow.Parent = part0
 						table.insert(bulletTracerActive, {
 							Main = main,
 							Glow = glow,
+							Part0 = part0,
+							Part1 = part1,
 							Entity = ent,
 							Origin = pending.Origin,
 							TargetPosition = pending.TargetPosition,
@@ -1268,10 +1299,8 @@ run(function()
 			local tracer = bulletTracerActive[i]
 			if now >= tracer.DieAt then
 				pcall(function()
-					tracer.Main.Visible = false
-					tracer.Glow.Visible = false
-					tracer.Main:Remove()
-					tracer.Glow:Remove()
+					tracer.Part0:Destroy()
+					tracer.Part1:Destroy()
 				end)
 				table.remove(bulletTracerActive, i)
 				continue
@@ -1279,17 +1308,11 @@ run(function()
 
 			local lifeAlpha = math.clamp((tracer.DieAt - now) / math.max(BulletTracerDuration.Value, 0.001), 0, 1)
 			local baseAlpha = (1 - BulletTracerTransparency.Value) * lifeAlpha
-			local fromPos = gameCamera:WorldToViewportPoint(tracer.Origin)
-			local toPos = gameCamera:WorldToViewportPoint(tracer.TargetPosition)
 			local visible = SilentAim.Enabled and BulletTracers.Enabled
-			tracer.Main.Visible = visible
-			tracer.Glow.Visible = visible
-			tracer.Main.From = Vector2.new(fromPos.X, fromPos.Y)
-			tracer.Glow.From = tracer.Main.From
-			tracer.Main.To = Vector2.new(toPos.X, toPos.Y)
-			tracer.Glow.To = tracer.Main.To
-			tracer.Main.Transparency = baseAlpha
-			tracer.Glow.Transparency = math.clamp(baseAlpha * 0.5, 0, 1)
+			local mainAlpha = visible and (1 - baseAlpha) or 1
+			local glowAlpha = visible and (1 - math.clamp(baseAlpha * 0.5, 0, 1)) or 1
+			tracer.Main.Transparency = NumberSequence.new(mainAlpha)
+			tracer.Glow.Transparency = NumberSequence.new(glowAlpha)
 		end
 	end
 
@@ -1674,8 +1697,8 @@ run(function()
 			local color = Color3.fromHSV(hue, sat, val)
 			local glow = color:Lerp(Color3.new(1, 1, 1), 0.45)
 			for _, tracer in bulletTracerActive do
-				tracer.Main.Color = color
-				tracer.Glow.Color = glow
+				tracer.Main.Color = ColorSequence.new(color)
+				tracer.Glow.Color = ColorSequence.new(glow)
 			end
 		end
 	})
@@ -1689,8 +1712,8 @@ run(function()
 		Visible = false,
 		Function = function(val)
 			for _, tracer in bulletTracerActive do
-				tracer.Main.Transparency = 1 - val
-				tracer.Glow.Transparency = (1 - val) * 0.5
+				tracer.Main.Transparency = NumberSequence.new(val)
+				tracer.Glow.Transparency = NumberSequence.new(1 - ((1 - val) * 0.5))
 			end
 		end
 	})
@@ -1703,8 +1726,10 @@ run(function()
 		Visible = false,
 		Function = function(val)
 			for _, tracer in bulletTracerActive do
-				tracer.Main.Thickness = val
-				tracer.Glow.Thickness = val + 2
+				tracer.Main.Width0 = val * 0.045
+				tracer.Main.Width1 = val * 0.045
+				tracer.Glow.Width0 = (val + 2) * 0.045
+				tracer.Glow.Width1 = (val + 2) * 0.045
 			end
 		end
 	})
@@ -1717,6 +1742,7 @@ run(function()
 		Darker = true,
 		Visible = false
 	})
+	SilentAim:Clean(BulletTracerFolder)
 end)
 	
 run(function()
