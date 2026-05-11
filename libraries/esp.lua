@@ -108,6 +108,9 @@ local DEFAULT_SETTINGS = {
     TextSize = 19,
     NameOutline = true,
     NameYOffset = 20,
+    DistanceText = false,
+    DistanceTextSize = 16,
+    DistanceTextOffset = 30,
     HeldItem = false,
     HeldItemTextSize = 17,
     HeldItemOffset = 14,
@@ -376,6 +379,19 @@ function ESPLibrary:CreateESPObject(player)
         HeldItem = ESPObjectPool:GetDrawing("Text", {
             Size = self.Settings.HeldItemTextSize,
             Color = self.Settings.HeldItemColor,
+            Center = true,
+            Outline = self.Settings.NameOutline,
+            OutlineColor = self.Settings.OutlineColor,
+            Transparency = 1,
+            Font = 2,
+            Visible = false,
+            Text = "",
+            Position = Vector2.new(),
+            ZIndex = 3
+        }),
+        DistanceText = ESPObjectPool:GetDrawing("Text", {
+            Size = self.Settings.DistanceTextSize,
+            Color = self.Settings.NicknameColor,
             Center = true,
             Outline = self.Settings.NameOutline,
             OutlineColor = self.Settings.OutlineColor,
@@ -661,6 +677,18 @@ function ESPLibrary:UpdatePlayerESP(player)
             espObject.HeldItem.Visible = false
         end
 
+        if self.Settings.DistanceText then
+            espObject.DistanceText.Size = self.Settings.DistanceTextSize
+            espObject.DistanceText.Outline = self.Settings.NameOutline
+            espObject.DistanceText.OutlineColor = self.Settings.OutlineColor
+            espObject.DistanceText.Color = renderColor
+            espObject.DistanceText.Text = string.format("%.0f studs", math.sqrt(squaredDistance))
+            espObject.DistanceText.Position = Vector2.new(rootScreenPos.X, headScreenPos.Y + boxHeight + self.Settings.DistanceTextOffset)
+            espObject.DistanceText.Visible = true
+        else
+            espObject.DistanceText.Visible = false
+        end
+
         if espObject.Chams and self.Settings.ChamsEnable and lodLevel.features.chams then
             espObject.Chams.FillTransparency = 0.0
             espObject.Chams.OutlineTransparency = 0.0
@@ -687,6 +715,7 @@ function ESPLibrary:HideESPElements(espObject)
     espObject.HealthBarOutline.Visible = false
     espObject.Nickname.Visible = false
     espObject.HeldItem.Visible = false
+    espObject.DistanceText.Visible = false
     
     for i = 1, #espObject.Skeleton do
         local line = espObject.Skeleton[i]
@@ -707,6 +736,7 @@ function ESPLibrary:RemoveESP(player)
     ESPObjectPool:ReturnDrawing("Square", espObject.HealthBarOutline)
     ESPObjectPool:ReturnDrawing("Text", espObject.Nickname)
     ESPObjectPool:ReturnDrawing("Text", espObject.HeldItem)
+    ESPObjectPool:ReturnDrawing("Text", espObject.DistanceText)
     
     for _, line in pairs(espObject.Skeleton) do
         if line then ESPObjectPool:ReturnDrawing("Line", line) end
