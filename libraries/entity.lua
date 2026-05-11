@@ -171,7 +171,7 @@ entitylib.isVulnerable = function(ent)
 	if healthCheckEnabled() and ent.Health <= 0 then
 		return false
 	end
-	return not hasInvincibility(ent)
+	return true
 end
 
 entitylib.getEntityColor = function(ent)
