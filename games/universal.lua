@@ -4214,6 +4214,16 @@ run(function()
 			end
 		})
 	end
+
+	local function refreshESP()
+		if not ESP or not ESP.Enabled then return end
+		if Method and Method.Value == '2D' and esp2d then
+			updateExternal2DESP()
+			return
+		end
+		ESP:Toggle()
+		ESP:Toggle()
+	end
 	
 	local function ESPWorldToViewport(pos)
 		local newpos = gameCamera:WorldToViewportPoint(gameCamera.CFrame:pointToWorldSpace(gameCamera.CFrame:PointToObjectSpace(pos)))
@@ -4631,10 +4641,7 @@ run(function()
 	Targets = ESP:CreateTargets({
 		Players = true,
 		Function = function()
-			if ESP.Enabled then
-				ESP:Toggle()
-				ESP:Toggle()
-			end
+			refreshESP()
 		end
 	})
 	Method = ESP:CreateDropdown({
@@ -4668,10 +4675,7 @@ run(function()
 	BoundingBox = ESP:CreateToggle({
 		Name = 'Bounding Box',
 		Function = function()
-			if ESP.Enabled then
-				ESP:Toggle()
-				ESP:Toggle()
-			end
+			refreshESP()
 		end,
 		Default = true,
 		Darker = true
@@ -4679,31 +4683,22 @@ run(function()
 	Filled = ESP:CreateToggle({
 		Name = 'Filled',
 		Function = function()
-			if ESP.Enabled then
-				ESP:Toggle()
-				ESP:Toggle()
-			end
+			refreshESP()
 		end,
 		Darker = true
 	})
 	HealthBar = ESP:CreateToggle({
 		Name = 'Health Bar',
 		Function = function()
-			if ESP.Enabled then
-				ESP:Toggle()
-				ESP:Toggle()
-			end
+			refreshESP()
 		end,
 		Darker = true
 	})
 	Name = ESP:CreateToggle({
 		Name = 'Name',
 		Function = function(callback)
-			if ESP.Enabled then
-				ESP:Toggle()
-				ESP:Toggle()
-			end
-			DisplayName.Object.Visible = callback
+			refreshESP()
+			DisplayName.Object.Visible = Method.Value == '2D' and callback
 			Background.Object.Visible = false
 		end,
 		Darker = true
@@ -4711,10 +4706,7 @@ run(function()
 	DisplayName = ESP:CreateToggle({
 		Name = 'Use Displayname',
 		Function = function()
-			if ESP.Enabled then
-				ESP:Toggle()
-				ESP:Toggle()
-			end
+			refreshESP()
 		end,
 		Default = true,
 		Darker = true
@@ -4722,20 +4714,14 @@ run(function()
 	Background = ESP:CreateToggle({
 		Name = 'Show Background',
 		Function = function()
-			if ESP.Enabled then
-				ESP:Toggle()
-				ESP:Toggle()
-			end
+			refreshESP()
 		end,
 		Darker = true
 	})
 	Teammates = ESP:CreateToggle({
 		Name = 'Priority Only',
 		Function = function()
-			if ESP.Enabled then
-				ESP:Toggle()
-				ESP:Toggle()
-			end
+			refreshESP()
 		end,
 		Default = true,
 		Tooltip = 'Hides teammates & non targetable entities'
@@ -4744,6 +4730,7 @@ run(function()
 		Name = 'Distance Check',
 		Function = function(callback)
 			DistanceLimit.Object.Visible = callback
+			refreshESP()
 		end
 	})
 	DistanceLimit = ESP:CreateTwoSlider({
@@ -4753,7 +4740,10 @@ run(function()
 		DefaultMin = 0,
 		DefaultMax = 64,
 		Darker = true,
-		Visible = false
+		Visible = false,
+		Function = function()
+			refreshESP()
+		end
 	})
 	Filled.Object.Visible = false
 	Background.Object.Visible = false
