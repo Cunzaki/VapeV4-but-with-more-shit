@@ -6357,7 +6357,65 @@ run(function()
 	local Type
 	local AutoSend
 	local AutoSendLength
+	local Visualizer
+	local VisualizerMaterial
+	local VisualizerTransparency
+	local VisualizerColor
+	local VisualizerColorToggle
 	local oldphys, oldsend
+	local visualClone, visualServerCFrame
+
+	local function clearVisualizer()
+		if visualClone then
+			visualClone:Destroy()
+			visualClone = nil
+		end
+		visualServerCFrame = nil
+	end
+
+	local function applyVisualizerStyle()
+		if not visualClone then return end
+		local mat = Enum.Material[VisualizerMaterial.Value]
+		local trans = VisualizerTransparency.Value
+		local customColor = Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value)
+		for _, d in visualClone:GetDescendants() do
+			if d:IsA('BasePart') then
+				d.Anchored = true
+				d.CanCollide = false
+				d.CanTouch = false
+				d.CanQuery = false
+				d.CastShadow = false
+				d.Material = mat
+				d.Transparency = trans
+				if VisualizerColorToggle.Enabled then
+					d.Color = customColor
+				end
+			elseif d:IsA('Decal') or d:IsA('Texture') then
+				d.Transparency = math.clamp(trans + 0.2, 0, 1)
+			elseif d:IsA('Script') or d:IsA('LocalScript') then
+				d:Destroy()
+			end
+		end
+	end
+
+	local function createVisualizer()
+		clearVisualizer()
+		if not (entitylib.isAlive and entitylib.character and entitylib.character.Character) then return end
+		local char = entitylib.character.Character
+		local oldarch = char.Archivable
+		char.Archivable = true
+		local suc, clone = pcall(function()
+			return char:Clone()
+		end)
+		char.Archivable = oldarch
+		if not suc or not clone then return end
+		clone.Name = 'BlinkVisualizer'
+		clone.Parent = workspace
+		visualClone = clone
+		visualServerCFrame = entitylib.character.RootPart.CFrame
+		clone:PivotTo(visualServerCFrame)
+		applyVisualizerStyle()
+	end
 	
 	Blink = vape.Categories.Utility:CreateModule({
 		Name = 'Blink',
@@ -6365,6 +6423,16 @@ run(function()
 			if callback then
 				local teleported
 				local blinkerror
+				local wasSending = false
+				if Visualizer.Enabled then
+					createVisualizer()
+					Blink:Clean(entitylib.Events.LocalAdded:Connect(function()
+						if Blink.Enabled and Visualizer.Enabled then
+							createVisualizer()
+						end
+					end))
+					Blink:Clean(entitylib.Events.LocalRemoved:Connect(clearVisualizer))
+				end
 				Blink:Clean(lplr.OnTeleport:Connect(function()
 					setfflag('S2PhysicsSenderRate', '15')
 					setfflag('DataSenderRate', '60')
@@ -6386,11 +6454,29 @@ run(function()
 					if AutoSend.Enabled and tick() % (AutoSendLength.Value + 0.1) > AutoSendLength.Value then
 						physicsrate, senderrate = '15', '60'
 					end
+
+					local sendingNow = physicsrate ~= '0'
+					if Visualizer.Enabled and not visualClone then
+						createVisualizer()
+					end
+					if visualClone and entitylib.isAlive and entitylib.character and entitylib.character.RootPart then
+						if not AutoSend.Enabled then
+							visualServerCFrame = visualServerCFrame or entitylib.character.RootPart.CFrame
+						elseif sendingNow then
+							visualServerCFrame = entitylib.character.RootPart.CFrame
+						elseif wasSending and not sendingNow then
+							visualServerCFrame = visualServerCFrame or entitylib.character.RootPart.CFrame
+						end
+						if visualServerCFrame then
+							visualClone:PivotTo(visualServerCFrame)
+						end
+					end
+					wasSending = sendingNow
 	
 					if physicsrate ~= oldphys or senderrate ~= oldsend then
 						setfflag('S2PhysicsSenderRate', physicsrate)
 						setfflag('DataSenderRate', senderrate)
-						oldphys, oldsend = physicsrate, oldsend
+						oldphys, oldsend = physicsrate, senderrate
 					end
 					
 					task.wait(0.03)
@@ -6401,6 +6487,7 @@ run(function()
 					setfflag('DataSenderRate', '60')
 				end
 				oldphys, oldsend = nil, nil
+				clearVisualizer()
 			end
 		end,
 		Tooltip = 'Chokes packets until disabled.'
@@ -6427,6 +6514,55 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'second' or 'seconds'
 		end
+	})
+	Visualizer = Blink:CreateToggle({
+		Name = 'Visualizer',
+		Function = function(callback)
+			VisualizerMaterial.Object.Visible = callback
+			VisualizerTransparency.Object.Visible = callback
+			VisualizerColorToggle.Object.Visible = callback
+			VisualizerColor.Object.Visible = callback and VisualizerColorToggle.Enabled
+			if callback then
+				if Blink.Enabled then
+					createVisualizer()
+				end
+			else
+				clearVisualizer()
+			end
+		end,
+		Tooltip = 'Shows a clone indicating your server-side blink position'
+	})
+	VisualizerMaterial = Blink:CreateDropdown({
+		Name = 'Visualizer Material',
+		List = {'ForceField', 'Neon', 'SmoothPlastic', 'Glass', 'Plastic'},
+		Visible = false,
+		Darker = true,
+		Function = applyVisualizerStyle
+	})
+	VisualizerTransparency = Blink:CreateSlider({
+		Name = 'Visualizer Transparency',
+		Min = 0,
+		Max = 1,
+		Decimal = 10,
+		Default = 0.35,
+		Visible = false,
+		Darker = true,
+		Function = applyVisualizerStyle
+	})
+	VisualizerColorToggle = Blink:CreateToggle({
+		Name = 'Custom Color',
+		Visible = false,
+		Darker = true,
+		Function = function(enabled)
+			VisualizerColor.Object.Visible = enabled and Visualizer.Enabled
+			applyVisualizerStyle()
+		end
+	})
+	VisualizerColor = Blink:CreateColorSlider({
+		Name = 'Visualizer Color',
+		Visible = false,
+		Darker = true,
+		Function = applyVisualizerStyle
 	})
 end)
 	
