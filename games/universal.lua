@@ -6286,6 +6286,7 @@ end)
 	
 run(function()
 	local AutoRejoin
+	local Mode
 	local Sort
 	
 	AutoRejoin = vape.Categories.Utility:CreateModule({
@@ -6294,18 +6295,36 @@ run(function()
 			if callback then
 				local check
 				AutoRejoin:Clean(guiService.ErrorMessageChanged:Connect(function(str)
-					if (not check or guiService:GetErrorCode() ~= Enum.ConnectionError.DisconnectLuaKick) and guiService:GetErrorCode() ~= Enum.ConnectionError.DisconnectConnectionLost and not str:lower():find('ban') then
+					local code = guiService:GetErrorCode()
+					if (not check or code ~= Enum.ConnectionError.DisconnectLuaKick) and code ~= Enum.ConnectionError.DisconnectConnectionLost and not str:lower():find('ban') then
 						check = true
-						serverHop(nil, Sort.Value)
+						if Mode.Value == 'Same Server' then
+							if playersService.NumPlayers > 1 then
+								teleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId)
+							else
+								teleportService:Teleport(game.PlaceId)
+							end
+						else
+							serverHop(nil, Sort.Value)
+						end
 					end
 				end))
 			end
 		end,
 		Tooltip = 'Automatically rejoins into a new server if you get disconnected / kicked'
 	})
+	Mode = AutoRejoin:CreateDropdown({
+		Name = 'Mode',
+		List = {'ServerHop', 'Same Server'},
+		Function = function(val)
+			Sort.Object.Visible = val == 'ServerHop'
+		end
+	})
 	Sort = AutoRejoin:CreateDropdown({
 		Name = 'Sort',
 		List = {'Descending', 'Ascending'},
+		Visible = true,
+		Darker = true,
 		Tooltip = 'Descending - Prefers full servers\nAscending - Prefers empty servers'
 	})
 end)
@@ -6322,10 +6341,21 @@ run(function()
 		Function = function(callback)
 			if callback then
 				local teleported
+				local blinkerror
 				Blink:Clean(lplr.OnTeleport:Connect(function()
 					setfflag('S2PhysicsSenderRate', '15')
 					setfflag('DataSenderRate', '60')
 					teleported = true
+				end))
+				Blink:Clean(guiService.ErrorMessageChanged:Connect(function(str)
+					local code = guiService:GetErrorCode()
+					if blinkerror then return end
+					if code ~= Enum.ConnectionError.OK or (str and str:lower():find('ban')) then
+						blinkerror = true
+						if Blink.Enabled then
+							Blink:Toggle()
+						end
+					end
 				end))
 	
 				repeat
