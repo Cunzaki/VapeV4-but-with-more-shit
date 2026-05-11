@@ -3762,6 +3762,17 @@ run(function()
 	local Teammates
 	local Distance
 	local DistanceLimit
+	local BoxThickness
+	local BoxOutline
+	local BoxOutlineThickness
+	local NameSize
+	local NameOutline
+	local NameYOffset
+	local HealthBarWidth
+	local DynamicHealthColor
+	local HeldItem
+	local HeldItemSize
+	local HeldItemOffset
 	local Reference = {}
 	local Folder = Instance.new('Folder')
 	Folder.Parent = vape.gui
@@ -4188,6 +4199,18 @@ run(function()
 			BoxEnable = BoundingBox.Enabled,
 			HealthBar = HealthBar.Enabled,
 			Nickname = Name.Enabled,
+			BoxThickness = BoxThickness.Value,
+			BoxOutline = BoxOutline.Enabled,
+			BoxOutlineThickness = BoxOutlineThickness.Value,
+			TextSize = NameSize.Value,
+			NameOutline = NameOutline.Enabled,
+			NameYOffset = NameYOffset.Value,
+			HealthBarWidth = HealthBarWidth.Value,
+			DynamicHealthBarColor = DynamicHealthColor.Enabled,
+			HeldItem = HeldItem.Enabled,
+			HeldItemTextSize = HeldItemSize.Value,
+			HeldItemOffset = HeldItemOffset.Value,
+			HeldItemColor = getESPColor(),
 			Skeleton = false,
 			ChamsEnable = false,
 			BoxColor = getESPColor(),
@@ -4652,11 +4675,23 @@ run(function()
 				ESP:Toggle()
 				ESP:Toggle()
 			end
-			BoundingBox.Object.Visible = (val == '2D')
+			local twod = (val == '2D')
+			BoundingBox.Object.Visible = twod
 			Filled.Object.Visible = false
-			HealthBar.Object.Visible = (val == '2D')
-			Name.Object.Visible = (val == '2D')
-			DisplayName.Object.Visible = Name.Object.Visible and Name.Enabled
+			BoxThickness.Object.Visible = twod and BoundingBox.Enabled
+			BoxOutline.Object.Visible = twod and BoundingBox.Enabled
+			BoxOutlineThickness.Object.Visible = twod and BoundingBox.Enabled and BoxOutline.Enabled
+			HealthBar.Object.Visible = twod
+			HealthBarWidth.Object.Visible = twod and HealthBar.Enabled
+			DynamicHealthColor.Object.Visible = twod and HealthBar.Enabled
+			Name.Object.Visible = twod
+			DisplayName.Object.Visible = twod and Name.Enabled
+			NameSize.Object.Visible = twod and Name.Enabled
+			NameOutline.Object.Visible = twod and Name.Enabled
+			NameYOffset.Object.Visible = twod and Name.Enabled
+			HeldItem.Object.Visible = twod
+			HeldItemSize.Object.Visible = twod and HeldItem.Enabled
+			HeldItemOffset.Object.Visible = twod and HeldItem.Enabled
 			Background.Object.Visible = false
 		end,
 	})
@@ -4675,9 +4710,42 @@ run(function()
 	BoundingBox = ESP:CreateToggle({
 		Name = 'Bounding Box',
 		Function = function()
+			local twod = Method.Value == '2D'
+			BoxThickness.Object.Visible = twod and BoundingBox.Enabled
+			BoxOutline.Object.Visible = twod and BoundingBox.Enabled
+			BoxOutlineThickness.Object.Visible = twod and BoundingBox.Enabled and BoxOutline.Enabled
 			refreshESP()
 		end,
 		Default = true,
+		Darker = true
+	})
+	BoxThickness = ESP:CreateSlider({
+		Name = 'Box Thickness',
+		Min = 1,
+		Max = 6,
+		Default = 2,
+		Function = function()
+			refreshESP()
+		end,
+		Darker = true
+	})
+	BoxOutline = ESP:CreateToggle({
+		Name = 'Box Outline',
+		Function = function(callback)
+			BoxOutlineThickness.Object.Visible = Method.Value == '2D' and BoundingBox.Enabled and callback
+			refreshESP()
+		end,
+		Default = true,
+		Darker = true
+	})
+	BoxOutlineThickness = ESP:CreateSlider({
+		Name = 'Outline Thickness',
+		Min = 1,
+		Max = 8,
+		Default = 4,
+		Function = function()
+			refreshESP()
+		end,
 		Darker = true
 	})
 	Filled = ESP:CreateToggle({
@@ -4690,16 +4758,69 @@ run(function()
 	HealthBar = ESP:CreateToggle({
 		Name = 'Health Bar',
 		Function = function()
+			local twod = Method.Value == '2D'
+			HealthBarWidth.Object.Visible = twod and HealthBar.Enabled
+			DynamicHealthColor.Object.Visible = twod and HealthBar.Enabled
 			refreshESP()
 		end,
+		Darker = true
+	})
+	HealthBarWidth = ESP:CreateSlider({
+		Name = 'HP Bar Width',
+		Min = 2,
+		Max = 12,
+		Default = 5,
+		Function = function()
+			refreshESP()
+		end,
+		Darker = true
+	})
+	DynamicHealthColor = ESP:CreateToggle({
+		Name = 'Dynamic HP Color',
+		Function = function()
+			refreshESP()
+		end,
+		Default = true,
 		Darker = true
 	})
 	Name = ESP:CreateToggle({
 		Name = 'Name',
 		Function = function(callback)
 			refreshESP()
-			DisplayName.Object.Visible = Method.Value == '2D' and callback
+			local twod = Method.Value == '2D'
+			DisplayName.Object.Visible = twod and callback
+			NameSize.Object.Visible = twod and callback
+			NameOutline.Object.Visible = twod and callback
+			NameYOffset.Object.Visible = twod and callback
 			Background.Object.Visible = false
+		end,
+		Darker = true
+	})
+	NameSize = ESP:CreateSlider({
+		Name = 'Name Size',
+		Min = 12,
+		Max = 30,
+		Default = 19,
+		Function = function()
+			refreshESP()
+		end,
+		Darker = true
+	})
+	NameOutline = ESP:CreateToggle({
+		Name = 'Name Outline',
+		Function = function()
+			refreshESP()
+		end,
+		Default = true,
+		Darker = true
+	})
+	NameYOffset = ESP:CreateSlider({
+		Name = 'Name Y Offset',
+		Min = 8,
+		Max = 36,
+		Default = 20,
+		Function = function()
+			refreshESP()
 		end,
 		Darker = true
 	})
@@ -4709,6 +4830,36 @@ run(function()
 			refreshESP()
 		end,
 		Default = true,
+		Darker = true
+	})
+	HeldItem = ESP:CreateToggle({
+		Name = 'Held Item',
+		Function = function(callback)
+			local twod = Method.Value == '2D'
+			HeldItemSize.Object.Visible = twod and callback
+			HeldItemOffset.Object.Visible = twod and callback
+			refreshESP()
+		end,
+		Darker = true
+	})
+	HeldItemSize = ESP:CreateSlider({
+		Name = 'Item Text Size',
+		Min = 12,
+		Max = 28,
+		Default = 17,
+		Function = function()
+			refreshESP()
+		end,
+		Darker = true
+	})
+	HeldItemOffset = ESP:CreateSlider({
+		Name = 'Item Y Offset',
+		Min = 0,
+		Max = 30,
+		Default = 14,
+		Function = function()
+			refreshESP()
+		end,
 		Darker = true
 	})
 	Background = ESP:CreateToggle({
@@ -4747,6 +4898,18 @@ run(function()
 	})
 	Filled.Object.Visible = false
 	Background.Object.Visible = false
+	local twoddefault = Method.Value == '2D'
+	BoxThickness.Object.Visible = twoddefault and BoundingBox.Enabled
+	BoxOutline.Object.Visible = twoddefault and BoundingBox.Enabled
+	BoxOutlineThickness.Object.Visible = twoddefault and BoundingBox.Enabled and BoxOutline.Enabled
+	HealthBarWidth.Object.Visible = twoddefault and HealthBar.Enabled
+	DynamicHealthColor.Object.Visible = twoddefault and HealthBar.Enabled
+	NameSize.Object.Visible = twoddefault and Name.Enabled
+	NameOutline.Object.Visible = twoddefault and Name.Enabled
+	NameYOffset.Object.Visible = twoddefault and Name.Enabled
+	HeldItem.Object.Visible = twoddefault
+	HeldItemSize.Object.Visible = twoddefault and HeldItem.Enabled
+	HeldItemOffset.Object.Visible = twoddefault and HeldItem.Enabled
 end)
 	
 run(function()
