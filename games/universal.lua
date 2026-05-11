@@ -6384,15 +6384,17 @@ run(function()
 				d.CanCollide = false
 				d.CanTouch = false
 				d.CanQuery = false
+				d.Massless = true
 				d.CastShadow = false
 				d.Material = mat
 				d.Transparency = trans
+				d.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
 				if VisualizerColorToggle.Enabled then
 					d.Color = customColor
 				end
 			elseif d:IsA('Decal') or d:IsA('Texture') then
 				d.Transparency = math.clamp(trans + 0.2, 0, 1)
-			elseif d:IsA('Script') or d:IsA('LocalScript') then
+			elseif d:IsA('Humanoid') or d:IsA('Animator') or d:IsA('AnimationController') or d:IsA('Script') or d:IsA('LocalScript') then
 				d:Destroy()
 			end
 		end
@@ -6410,11 +6412,11 @@ run(function()
 		char.Archivable = oldarch
 		if not suc or not clone then return end
 		clone.Name = 'BlinkVisualizer'
-		clone.Parent = workspace
 		visualClone = clone
+		applyVisualizerStyle()
+		clone.Parent = workspace
 		visualServerCFrame = entitylib.character.RootPart.CFrame
 		clone:PivotTo(visualServerCFrame)
-		applyVisualizerStyle()
 	end
 	
 	Blink = vape.Categories.Utility:CreateModule({
