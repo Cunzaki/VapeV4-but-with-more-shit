@@ -138,35 +138,6 @@ entitylib.getUpdateConnections = function(ent)
 end
 entitylib.getupdatedconnections = entitylib.getUpdateConnections
 
-local invincibleAttributes = {'Invincible', 'Invulnerable', 'IFrame', 'IFrames', 'iFrame', 'iFrames', 'iframes'}
-local function hasInvincibility(ent)
-	local char = ent.Character
-	local hum = ent.Humanoid
-	if not char then return false end
-
-	-- Default Roblox spawn protection
-	if char:FindFirstChildOfClass('ForceField') then
-		return true
-	end
-
-	-- Common invincibility flags used by many games
-	for _, attr in invincibleAttributes do
-		if char:GetAttribute(attr) == true then
-			return true
-		end
-		if hum and hum:GetAttribute(attr) == true then
-			return true
-		end
-	end
-
-	local boolFlag = char:FindFirstChild('Invincible') or char:FindFirstChild('Invulnerable')
-	if boolFlag and boolFlag:IsA('BoolValue') and boolFlag.Value then
-		return true
-	end
-
-	return false
-end
-
 entitylib.isVulnerable = function(ent, forcefieldCheck)
 	if healthCheckEnabled() and ent.Health <= 0 then
 		return false
@@ -174,7 +145,8 @@ entitylib.isVulnerable = function(ent, forcefieldCheck)
 	if forcefieldCheck == false then
 		return true
 	end
-	return not hasInvincibility(ent)
+	local char = ent.Character
+	return char ~= nil and not char:FindFirstChildOfClass('ForceField')
 end
 
 entitylib.getEntityColor = function(ent)
