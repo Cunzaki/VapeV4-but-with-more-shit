@@ -1210,6 +1210,7 @@ run(function()
 	local BulletTracerTransparency
 	local BulletTracerThickness
 	local BulletTracerDuration
+	local TracerClickWindow = 0.4
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
 	local ProjectileRaycast = RaycastParams.new()
@@ -1222,6 +1223,7 @@ run(function()
 	BulletTracerFolder.Parent = workspace
 	local fireoffset, rand, delayCheck = CFrame.identity, Random.new(), tick()
 	local oldnamecall, oldray
+	local lastMb1Click = 0
 	local bulletTracerActive = {}
 	local bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	local healthCache = setmetatable({}, {__mode = 'k'})
@@ -1252,6 +1254,7 @@ run(function()
 	local function registerShot(ent, targetPart, origin)
 		if not BulletTracers.Enabled then return end
 		if not (ent and targetPart and origin) then return end
+		if (tick() - lastMb1Click) > TracerClickWindow then return end
 		bulletTracerPending[ent] = {
 			Entity = ent,
 			Health = ent.Health,
@@ -1324,16 +1327,6 @@ run(function()
 			if pending and ((now - pending.Time) > 5 or not ent.Character) then
 				bulletTracerPending[ent] = nil
 				pending = nil
-			end
-			if (not pending) and targetinfo.Targets[ent] and targetinfo.Targets[ent] > now then
-				pending = {
-					Entity = ent,
-					Health = lastHealth,
-					Origin = getLocalTracerOrigin(),
-					TargetPosition = (ent.Head or ent.RootPart).Position,
-					Time = now
-				}
-				bulletTracerPending[ent] = pending
 			end
 			if pending and currentHealth < lastHealth and currentHealth < pending.Health then
 				local allowTracer = true
@@ -1452,6 +1445,12 @@ run(function()
 				CircleObject.Visible = callback and Mode.Value == 'Mouse'
 			end
 			if callback then
+				SilentAim:Clean(inputService.InputBegan:Connect(function(input, gameProcessed)
+					if gameProcessed then return end
+					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+						lastMb1Click = tick()
+					end
+				end))
 				if Method.Value == 'Ray' then
 					oldray = hookfunction(Ray.new, function(origin, direction)
 						if checkcaller() then
@@ -1526,6 +1525,7 @@ run(function()
 										delayCheck = tick() + AutoFireShootDelay.Value
 									else
 										mouse1press()
+										lastMb1Click = tick()
 									end
 									mouseClicked = not mouseClicked
 								end
