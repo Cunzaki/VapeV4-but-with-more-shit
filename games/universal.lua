@@ -210,11 +210,15 @@ end
 local hash = loadstring(downloadFile('newvape/libraries/hash.lua'), 'hash')()
 local prediction = loadstring(downloadFile('newvape/libraries/prediction.lua'), 'prediction')()
 entitylib = loadstring(downloadFile('newvape/libraries/entity.lua'), 'entitylibrary')()
+local ESPLibrary = loadstring(downloadFile('newvape/libraries/esp.lua'), 'esplibrary')()
 if not entitylib then
 	entitylib = vape.Libraries.entity
 end
 if not entitylib then
 	error('Failed to load entity library')
+end
+if not ESPLibrary then
+	ESPLibrary = vape.Libraries.esp
 end
 local whitelist = {
 	alreadychecked = {},
@@ -231,6 +235,7 @@ local whitelist = {
 	said = {}
 }
 vape.Libraries.entity = entitylib
+vape.Libraries.esp = ESPLibrary
 vape.Libraries.whitelist = whitelist
 vape.Libraries.prediction = prediction
 vape.Libraries.hash = hash
@@ -4170,6 +4175,45 @@ run(function()
 	local DistanceLimit
 	local Reference = {}
 	local methodused
+	local esp2d
+
+	local function getESPColor()
+		return Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+	end
+
+	local function updateExternal2DESP()
+		if not esp2d then return end
+		esp2d:UpdateSettings({
+			Enabled = ESP.Enabled and Method.Value == '2D',
+			BoxEnable = BoundingBox.Enabled,
+			HealthBar = HealthBar.Enabled,
+			Nickname = Name.Enabled,
+			Skeleton = false,
+			ChamsEnable = false,
+			BoxColor = getESPColor(),
+			RenderDistance = Distance.Enabled and DistanceLimit.ValueMax or 650,
+			ShouldRender = function(plr)
+				if not Targets.Players.Enabled then return false end
+				local ent = entitylib.getEntity(plr)
+				if not ent then return false end
+				if Teammates.Enabled and (not ent.Targetable) and (not ent.Friend) then return false end
+				if Distance.Enabled and entitylib.isAlive and entitylib.character and entitylib.character.RootPart and ent.RootPart then
+					local distance = (entitylib.character.RootPart.Position - ent.RootPart.Position).Magnitude
+					if distance < DistanceLimit.ValueMin or distance > DistanceLimit.ValueMax then
+						return false
+					end
+				end
+				return true
+			end,
+			NameResolver = function(plr)
+				return whitelist:tag(plr, true)..(DisplayName.Enabled and plr.DisplayName or plr.Name)
+			end,
+			ColorResolver = function(plr)
+				local ent = entitylib.getEntity(plr)
+				return ent and (entitylib.getEntityColor(ent) or getESPColor()) or getESPColor()
+			end
+		})
+	end
 	
 	local function ESPWorldToViewport(pos)
 		local newpos = gameCamera:WorldToViewportPoint(gameCamera.CFrame:pointToWorldSpace(gameCamera.CFrame:PointToObjectSpace(pos)))
@@ -4520,12 +4564,26 @@ run(function()
 			end
 		end
 	}
+
+	if ESPLibrary then
+		esp2d = ESPLibrary.new({
+			Enabled = false,
+			Skeleton = false,
+			ChamsEnable = false,
+			UseLOD = true
+		})
+	end
 	
 	ESP = vape.Categories.Render:CreateModule({
 		Name = 'ESP',
 		Function = function(callback)
 			if callback then
 				methodused = 'Drawing'..Method.Value
+				if methodused == 'Drawing2D' and esp2d then
+					updateExternal2DESP()
+					esp2d:Start()
+					return
+				end
 				if ESPRemoved[methodused] then
 					ESP:Clean(entitylib.Events.EntityRemoved:Connect(ESPRemoved[methodused]))
 				end
@@ -4558,6 +4616,9 @@ run(function()
 					ESP:Clean(runService.RenderStepped:Connect(ESPLoop[methodused]))
 				end
 			else
+				if methodused == 'Drawing2D' and esp2d then
+					esp2d:Stop()
+				end
 				if ESPRemoved[methodused] then
 					for i in Reference do
 						ESPRemoved[methodused](i)
@@ -4585,16 +4646,20 @@ run(function()
 				ESP:Toggle()
 			end
 			BoundingBox.Object.Visible = (val == '2D')
-			Filled.Object.Visible = (val == '2D')
+			Filled.Object.Visible = false
 			HealthBar.Object.Visible = (val == '2D')
 			Name.Object.Visible = (val == '2D')
 			DisplayName.Object.Visible = Name.Object.Visible and Name.Enabled
-			Background.Object.Visible = Name.Object.Visible and Name.Enabled
+			Background.Object.Visible = false
 		end,
 	})
 	Color = ESP:CreateColorSlider({
 		Name = 'Player Color',
 		Function = function(hue, sat, val)
+			if ESP.Enabled and Method.Value == '2D' and esp2d then
+				updateExternal2DESP()
+				return
+			end
 			if ESP.Enabled and ColorFunc[methodused] then
 				ColorFunc[methodused](hue, sat, val)
 			end
@@ -4639,7 +4704,7 @@ run(function()
 				ESP:Toggle()
 			end
 			DisplayName.Object.Visible = callback
-			Background.Object.Visible = callback
+			Background.Object.Visible = false
 		end,
 		Darker = true
 	})
@@ -4690,6 +4755,8 @@ run(function()
 		Darker = true,
 		Visible = false
 	})
+	Filled.Object.Visible = false
+	Background.Object.Visible = false
 end)
 	
 run(function()
