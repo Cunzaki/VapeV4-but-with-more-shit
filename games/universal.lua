@@ -4197,6 +4197,15 @@ run(function()
 
 	local function updateExternal2DESP()
 		if not esp2d then return end
+		local npcs = {}
+		if Targets.NPCs.Enabled then
+			for _, v in entitylib.List do
+				if v.NPC then
+					table.insert(npcs, v.Player or v)
+				end
+			end
+		end
+		esp2d:TrackNPCs(npcs)
 		esp2d:UpdateSettings({
 			Enabled = ESP.Enabled and Method.Value == '2D',
 			BoxEnable = BoundingBox.Enabled,
@@ -4223,9 +4232,13 @@ run(function()
 			BoxColor = getESPColor(),
 			RenderDistance = Distance.Enabled and DistanceLimit.ValueMax or 99999,
 			ShouldRender = function(plr)
-				if not Targets.Players.Enabled then return false end
 				local ent = entitylib.getEntity(plr)
 				if not ent then return false end
+				if ent.NPC then
+					if not Targets.NPCs.Enabled then return false end
+				else
+					if not Targets.Players.Enabled then return false end
+				end
 				if Teammates.Enabled and (not ent.Targetable) and (not ent.Friend) then return false end
 				if Distance.Enabled and entitylib.isAlive and entitylib.character and entitylib.character.RootPart and ent.RootPart then
 					local distance = (entitylib.character.RootPart.Position - ent.RootPart.Position).Magnitude
@@ -4236,6 +4249,10 @@ run(function()
 				return true
 			end,
 			NameResolver = function(plr)
+				local ent = entitylib.getEntity(plr)
+				if ent and ent.NPC then
+					return ent.Character and ent.Character.Name or plr.Name
+				end
 				return whitelist:tag(plr, true)..(DisplayName.Enabled and plr.DisplayName or plr.Name)
 			end,
 			ColorResolver = function(plr)
@@ -4248,6 +4265,7 @@ run(function()
 	local function refreshESP()
 		if not ESP or not ESP.Enabled then return end
 		if Method and Method.Value == '2D' and esp2d then
+			esp2d:RefreshAll()
 			updateExternal2DESP()
 			return
 		end
@@ -4633,6 +4651,7 @@ run(function()
 			if callback then
 				methodused = 'Drawing'..Method.Value
 				if methodused == 'Drawing2D' and esp2d then
+					esp2d:RefreshAll()
 					updateExternal2DESP()
 					esp2d:Start()
 					return
