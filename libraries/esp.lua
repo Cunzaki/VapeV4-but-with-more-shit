@@ -749,6 +749,20 @@ function ESPLibrary:RemoveESP(player)
     self.ESPObjects[player] = nil
 end
 
+function ESPLibrary:TrackNPCs(npcArray)
+    self.TrackedNPCs = npcArray or {}
+end
+
+function ESPLibrary:RefreshAll()
+    for _, player in ipairs(Players:GetPlayers()) do
+        self:RemoveESP(player)
+    end
+    for _, npc in ipairs(self.TrackedNPCs or {}) do
+        self:RemoveESP(npc)
+    end
+    self.FrameCounter = 0
+end
+
 function ESPLibrary:UpdateAllESP()
     UpdateCameraCache()
     UpdatePerformanceMetrics()
@@ -757,8 +771,7 @@ function ESPLibrary:UpdateAllESP()
     ESPObjectPool:PeriodicCleanup()
     local currentPlayerCount = #Players:GetPlayers()
 
-    -- Force cleanup if player count changed significantly
-   if math.abs(currentPlayerCount - self.LastPlayerCount) > 5 then
+    if math.abs(currentPlayerCount - self.LastPlayerCount) > 5 then
         ESPObjectPool:Output(string.format(
             "[ESP Player Count Change] Player count changed from %d to %d, triggering cleanup...",
             self.LastPlayerCount,
@@ -773,6 +786,14 @@ function ESPLibrary:UpdateAllESP()
             self:UpdatePlayerESP(player)
         else
             self:RemoveESP(player)
+        end
+    end
+    
+    for _, npc in ipairs(self.TrackedNPCs or {}) do
+        if npc.Character and npc.Character:FindFirstChild("HumanoidRootPart") then
+            self:UpdatePlayerESP(npc)
+        else
+            self:RemoveESP(npc)
         end
     end
 end
