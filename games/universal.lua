@@ -1215,6 +1215,7 @@ run(function()
 	local BulletTracerTransparency
 	local BulletTracerThickness
 	local BulletTracerDuration
+	local HitSounds
 	playHitSound = function() end
 	local hitSoundChannel
 	local TracerClickWindow = 0.4
@@ -1548,7 +1549,7 @@ run(function()
 					if CircleObject then
 						CircleObject.Position = inputService:GetMouseLocation()
 					end
-					if BulletTracers.Enabled then
+					if BulletTracers.Enabled or (HitSounds and HitSounds.Enabled) then
 						renderBulletTracers()
 					end
 					if AutoFire.Enabled then
@@ -1854,7 +1855,6 @@ run(function()
 end)
 
 run(function()
-	local HitSounds
 	local HitSoundPreset
 	local HitSoundCustom
 	local HitSoundVolume
