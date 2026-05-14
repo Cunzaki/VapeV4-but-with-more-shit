@@ -1265,7 +1265,9 @@ run(function()
 	end
 
 	local function registerShot(ent, targetPart, origin)
-		if not BulletTracers.Enabled then return end
+		local wantsTracers = BulletTracers and BulletTracers.Enabled
+		local wantsSounds = HitSounds and HitSounds.Enabled
+		if not wantsTracers and not wantsSounds then return end
 		if not (ent and targetPart and origin) then return end
 		local existing = bulletTracerPending[ent]
 		if existing then
@@ -1355,6 +1357,13 @@ run(function()
 				pending = nil
 			end
 			if pending and currentHealth < lastHealth and currentHealth < pending.Health then
+				local didShootRecently = isMb1Held or (now - lastMb1Click) <= TracerClickWindow
+				if not didShootRecently then
+					pending.Health = math.max(currentHealth, 0)
+					healthCache[ent] = currentHealth
+					continue
+				end
+
 				local allowTracer = true
 				if Target.Walls.Enabled then
 					BulletTracerWallcheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
@@ -1362,9 +1371,13 @@ run(function()
 					allowTracer = ray == nil or ray.Instance:IsDescendantOf(ent.Character)
 				end
 				if allowTracer then
-					spawnBulletTracer(ent, pending, now, mainColor, glowColor)
+					if BulletTracers and BulletTracers.Enabled then
+						spawnBulletTracer(ent, pending, now, mainColor, glowColor)
+					end
+					if HitSounds and HitSounds.Enabled then
+						playHitSound()
+					end
 				end
-				playHitSound()
 				pending.Health = math.max(currentHealth, 0)
 				pending.Origin = getLocalTracerOrigin()
 				pending.TargetPosition = (ent.Head or ent.RootPart).Position
