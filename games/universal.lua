@@ -1217,6 +1217,7 @@ run(function()
 	local BulletTracerDuration
 	local HitSounds
 	local playHitSound = function() end
+	local lastHitsoundTime = 0
 	local TracerClickWindow = 0.4
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
@@ -1427,6 +1428,7 @@ run(function()
 				ProjectileRaycast.CollisionGroup = ent[targetPart].CollisionGroup
 			end
 			registerShot(ent, ent[targetPart], origin)
+			playHitSound()
 		end
 		
 		return ent, ent and ent[targetPart], origin
@@ -1889,7 +1891,10 @@ run(function()
 	end
 
 	playHitSound = function()
-		if not HitSounds.Enabled then return end
+		if not HitSounds or not HitSounds.Enabled then return end
+		local now = tick()
+		if (now - lastHitsoundTime) < 0.05 then return end
+		lastHitsoundTime = now
 		local soundId = getHitSoundId()
 		if not soundId then return end
 		
