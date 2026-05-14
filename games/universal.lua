@@ -1922,7 +1922,7 @@ run(function()
 		Function = function()
 		end
 	})
-	HitSoundCustom = HitSounds:CreateInput({
+	HitSoundCustom = HitSounds:CreateTextBox({
 		Name = 'Custom Sound',
 		Placeholder = 'rbxassetid://... or file path',
 		Function = function()
