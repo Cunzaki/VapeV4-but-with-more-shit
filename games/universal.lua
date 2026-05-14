@@ -1848,18 +1848,17 @@ run(function()
 
 	local HITSOUND_PRESETS = {
 		['None'] = '',
-		['Rust'] = 'rbxassetid://6233966982',
-		['Holloween'] = 'rbxassetid://17008106117',
-		['Fatality'] = 'rbxassetid://6023206947',
-		['Skibi'] = 'rbxassetid://9125400026',
-		['Pause'] = 'rbxassetid://9090783931',
-		['XSized'] = 'rbxassetid://13879317005',
-		['Retro'] = 'rbxassetid://6023426927',
-		['Minecraft'] = 'rbxassetid://6417254539',
-		['Bypasser'] = 'rbxassetid://13989481514',
-		['Yeet'] = 'rbxassetid://9120696059',
-		['Neverlose'] = 'rbxassetid://12063841283',
-		['Fluxus'] = 'rbxassetid://12264169479',
+		['Rust'] = 'rbxassetid://4764109000',
+		['Fatality'] = 'rbxassetid://5991770206',
+		['Neverlose'] = 'rbxassetid://8679627751',
+		['TF2'] = 'rbxassetid://6909318500',
+		['Minecraft'] = 'rbxassetid://118095854380310',
+		['Punch'] = 'rbxassetid://140626490819228',
+		['Double Kill'] = 'rbxassetid://130819307',
+		['Boom Headshot'] = 'rbxassetid://7361085557',
+		['Windows Error'] = 'rbxassetid://2661731024',
+		['Anime Ping'] = 'rbxassetid://8120788861',
+		['Bells'] = 'rbxassetid://1053865439',
 		['Custom'] = 'CUSTOM'
 	}
 
