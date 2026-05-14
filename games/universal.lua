@@ -1216,8 +1216,7 @@ run(function()
 	local BulletTracerThickness
 	local BulletTracerDuration
 	local HitSounds
-	playHitSound = function() end
-	local hitSoundChannel
+	local playHitSound = function() end
 	local TracerClickWindow = 0.4
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
@@ -1893,16 +1892,17 @@ run(function()
 		if not HitSounds.Enabled then return end
 		local soundId = getHitSoundId()
 		if not soundId then return end
-		if not hitSoundChannel then
-			hitSoundChannel = Instance.new('Sound')
-			hitSoundChannel.Parent = workspace
-		end
-		hitSoundChannel.SoundId = soundId
-		hitSoundChannel.Volume = (HitSoundVolume.Value or 50) / 100
-		hitSoundChannel.PlayOnRemove = false
-		hitSoundChannel:Stop()
-		hitSoundChannel.PlayOnRemove = true
-		hitSoundChannel:Play()
+		
+		local sound = Instance.new('Sound')
+		sound.SoundId = soundId
+		sound.Volume = (HitSoundVolume.Value or 50) / 100
+		sound.Parent = workspace
+		sound:Play()
+		task.delay(4, function()
+			if sound then
+				sound:Destroy()
+			end
+		end)
 	end
 
 	local presetList = {}
@@ -1920,11 +1920,6 @@ run(function()
 	HitSounds = vape.Categories.Combat:CreateModule({
 		Name = 'HitSounds',
 		Function = function(callback)
-			if not callback then
-				if hitSoundChannel then
-					hitSoundChannel:Stop()
-				end
-			end
 		end,
 		Tooltip = 'Plays a sound when you hit an enemy'
 	})
@@ -1946,9 +1941,6 @@ run(function()
 		Max = 100,
 		Default = 50,
 		Function = function(val)
-			if hitSoundChannel then
-				hitSoundChannel.Volume = val / 100
-			end
 		end
 	})
 end)
