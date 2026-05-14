@@ -1215,6 +1215,8 @@ run(function()
 	local BulletTracerTransparency
 	local BulletTracerThickness
 	local BulletTracerDuration
+	playHitSound = function() end
+	local hitSoundChannel
 	local TracerClickWindow = 0.4
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
@@ -1362,7 +1364,7 @@ run(function()
 				if allowTracer then
 					spawnBulletTracer(ent, pending, now, mainColor, glowColor)
 				end
-				-- Advance baseline after each confirmed damage step so consecutive hits still trigger.
+				playHitSound()
 				pending.Health = math.max(currentHealth, 0)
 				pending.Origin = getLocalTracerOrigin()
 				pending.TargetPosition = (ent.Head or ent.RootPart).Position
@@ -1837,7 +1839,108 @@ run(function()
 	})
 	vape:Clean(BulletTracerFolder)
 end)
-	
+
+run(function()
+	local HitSounds
+	local HitSoundPreset
+	local HitSoundCustom
+	local HitSoundVolume
+
+	local HITSOUND_PRESETS = {
+		['None'] = '',
+		['Rust'] = 'rbxassetid://6233966982',
+		['Holloween'] = 'rbxassetid://17008106117',
+		['Fatality'] = 'rbxassetid://6023206947',
+		['Skibi'] = 'rbxassetid://9125400026',
+		['Pause'] = 'rbxassetid://9090783931',
+		['XSized'] = 'rbxassetid://13879317005',
+		['Retro'] = 'rbxassetid://6023426927',
+		['Minecraft'] = 'rbxassetid://6417254539',
+		['Bypasser'] = 'rbxassetid://13989481514',
+		['Yeet'] = 'rbxassetid://9120696059',
+		['Neverlose'] = 'rbxassetid://12063841283',
+		['Fluxus'] = 'rbxassetid://12264169479',
+		['Custom'] = 'CUSTOM'
+	}
+
+	local function getHitSoundId()
+		local preset = HITSOUND_PRESETS[HitSoundPreset.Value]
+		if preset == '' or not preset then return nil end
+		if preset == 'CUSTOM' then
+			local custom = HitSoundCustom.Value
+			if custom and custom ~= '' then
+				local trimmed = custom:gsub('^%s+', ''):gsub('%s+$', '')
+				if trimmed ~= '' then return trimmed end
+			end
+			return nil
+		end
+		return preset
+	end
+
+	playHitSound = function()
+		if not HitSounds.Enabled then return end
+		local soundId = getHitSoundId()
+		if not soundId then return end
+		if not hitSoundChannel then
+			hitSoundChannel = Instance.new('Sound')
+			hitSoundChannel.Parent = workspace
+		end
+		hitSoundChannel.SoundId = soundId
+		hitSoundChannel.Volume = (HitSoundVolume.Value or 50) / 100
+		hitSoundChannel.PlayOnRemove = false
+		hitSoundChannel:Stop()
+		hitSoundChannel.PlayOnRemove = true
+		hitSoundChannel:Play()
+	end
+
+	local presetList = {}
+	for name, _ in pairs(HITSOUND_PRESETS) do
+		table.insert(presetList, name)
+	end
+	table.sort(presetList, function(a, b)
+		if a == 'None' then return true end
+		if b == 'None' then return false end
+		if a == 'Custom' then return false end
+		if b == 'Custom' then return true end
+		return a < b
+	end)
+
+	HitSounds = vape.Categories.Combat:CreateModule({
+		Name = 'HitSounds',
+		Function = function(callback)
+			if not callback then
+				if hitSoundChannel then
+					hitSoundChannel:Stop()
+				end
+			end
+		end,
+		Tooltip = 'Plays a sound when you hit an enemy'
+	})
+	HitSoundPreset = HitSounds:CreateDropdown({
+		Name = 'Sound',
+		List = presetList,
+		Function = function()
+		end
+	})
+	HitSoundCustom = HitSounds:CreateInput({
+		Name = 'Custom Sound',
+		Placeholder = 'rbxassetid://... or file path',
+		Function = function()
+		end
+	})
+	HitSoundVolume = HitSounds:CreateSlider({
+		Name = 'Volume',
+		Min = 1,
+		Max = 100,
+		Default = 50,
+		Function = function(val)
+			if hitSoundChannel then
+				hitSoundChannel.Volume = val / 100
+			end
+		end
+	})
+end)
+
 run(function()
 	local TriggerBot
 	local Targets
