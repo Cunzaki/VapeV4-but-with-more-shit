@@ -295,7 +295,7 @@ run(function()
 	local AutoHop
 	local Autostrafe
 
-	AutoHop = vape.Categories.Movement:CreateModule({
+	AutoHop = vape.Categories.Combat:CreateModule({
 		Name = 'AutoHop',
 		Function = function(callback)
 			if callback then
@@ -319,7 +319,7 @@ run(function()
 		Tooltip = 'Automatically hops when on surf'
 	})
 
-	Autostrafe = vape.Categories.Movement:CreateModule({
+	Autostrafe = vape.Categories.Combat:CreateModule({
 		Name = 'AutoStrafe',
 		Function = function(callback)
 			if callback then
@@ -363,7 +363,7 @@ run(function()
 	local LagServer
 	local lagThread = nil
 
-	LagServer = vape.Categories.Movement:CreateModule({
+	LagServer = vape.Categories.Combat:CreateModule({
 		Name = 'LagServer',
 		Function = function(callback)
 			if callback then
@@ -389,7 +389,7 @@ end)
 run(function()
 	local ShowTimes
 
-	ShowTimes = vape.Categories.Render:CreateModule({
+	ShowTimes = vape.Categories.Blatant:CreateModule({
 		Name = 'ShowSurfTimes',
 		Function = function(callback)
 			local nametagObjects = {}
