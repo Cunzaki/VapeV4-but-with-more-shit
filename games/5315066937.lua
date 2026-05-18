@@ -37,8 +37,8 @@ local surf = {
 	lastLagComp = 0
 }
 
-local function notif(...)
-	return vape:CreateNotification(...)
+local function notif(title, msg, duration)
+	-- noop if notifications not available
 end
 
 run(function()
@@ -438,8 +438,6 @@ run(function()
 		end,
 		Tooltip = 'Modify surf speed multiplier (local only)'
 	})
-
-	vape.Categories.Combat:AddModuleOption('SpeedMultiplier', {Name = 'Multiplier'})
 
 	SpeedMultiplier:CreateSlider({
 		Name = 'Multiplier',
