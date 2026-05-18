@@ -1,6 +1,3 @@
-local run = function(func)
-	func()
-end
 local cloneref = cloneref or function(obj)
 	return obj
 end
@@ -16,11 +13,29 @@ local gameCamera = cloneref(workspace.CurrentCamera)
 local lplr = playersService.LocalPlayer
 
 local vape = shared.vape
-local entitylib = vape.Libraries.entity
-local targetinfo = vape.Libraries.targetinfo
-local sessioninfo = vape.Libraries.sessioninfo
-local whitelist = vape.Libraries.whitelist
-local prediction = vape.Libraries.prediction
+
+local function notif(title, msg, duration)
+end
+
+local function deferFunc(func)
+	if vape.Categories then
+		task.spawn(func)
+	else
+		local oldInit = vape.Init
+		if oldInit then
+			vape.Init = function(...)
+				oldInit(...)
+				func()
+			end
+		else
+			vape.Init = func
+		end
+	end
+end
+
+local run = function(func)
+	deferFunc(func)
+end
 
 local surf = {
 	remotes = {},
@@ -37,10 +52,6 @@ local surf = {
 	lastLagComp = 0
 }
 
-local function notif(title, msg, duration)
-	-- noop if notifications not available
-end
-
 run(function()
 	local RemoteCall = nil
 	local RemoteFetch = nil
@@ -55,7 +66,6 @@ run(function()
 	end
 
 	if not RemoteCall or not RemoteFetch then
-		print('[Surf] Remotes not found, waiting...')
 		task.wait(3)
 		for _, v in replicatedStorage:GetChildren() do
 			if v.Name == 'RemoteCall' and v.ClassName == 'RemoteEvent' then
@@ -68,7 +78,6 @@ run(function()
 	end
 
 	if not RemoteCall or not RemoteFetch then
-		print('[Surf] Failed to find remotes')
 		return
 	end
 
@@ -91,7 +100,6 @@ run(function()
 	end
 
 	surf.remotes.Fetch = function(name, ...)
-		local args = {...}
 		local serialized = httpService:JSONEncode({name, 2 + select('#', ...), ...})
 		local success, result = pcall(function()
 			return RemoteFetch:InvokeServer(serialized, 2 + select('#', ...))
@@ -276,16 +284,20 @@ run(function()
 	}
 end)
 
-entitylib.Running = true
-
-entitylib.Events.EntityAdded:Connect(function(entity)
-	local player = entity.Player
-	if player and surf.CharacterManager then
-		local info = surf.CharacterManager.CharacterInfos[player]
-		if info then
-			entity.Speed = info.Speed
-			entity.SurfSpeed = info.SurfSpeed
-		end
+run(function()
+	local entitylib = vape.Libraries.entity
+	if entitylib then
+		entitylib.Running = true
+		entitylib.Events.EntityAdded:Connect(function(entity)
+			local player = entity.Player
+			if player and surf.CharacterManager then
+				local info = surf.CharacterManager.CharacterInfos[player]
+				if info then
+					entity.Speed = info.Speed
+					entity.SurfSpeed = info.SurfSpeed
+				end
+			end
+		end)
 	end
 end)
 
@@ -331,6 +343,8 @@ run(function()
 end)
 
 run(function()
+	local sessioninfo = vape.Libraries.sessioninfo
+	if not sessioninfo then return end
 	local speedItem = sessioninfo:AddItem('SurfSpeed')
 	local timeItem = sessioninfo:AddItem('Time')
 	local cpItem = sessioninfo:AddItem('CP')
@@ -494,9 +508,6 @@ end)
 run(function()
 	local Fly
 	local flyConnection = nil
-	local flyToggled = false
-	local flyUpHeld = false
-	local flyDownHeld = false
 	local flySpeed = 50
 
 	local keysHeld = {}
@@ -666,16 +677,11 @@ run(function()
 						else
 							local data = surf.playerData[player.Name]
 							if data then
-								local label = tag:FindFirstChild('Frame'):FindFirstChild('TextLabel')
-								if label then
-									local time = data.Time or 0
-									label.Text = string.format('%.2f', time)
-								end
-								local styleLabel = tag:FindFirstChild('Frame'):FindFirstChild('TextLabel')
-								if styleLabel then
-									local sLabel = tag:FindFirstChild('Frame'):FindFirstChildWhichIsA('TextLabel', true)
-									if sLabel and sLabel ~= label then
-										sLabel.Text = data.Style or ''
+								local bg = tag:FindFirstChild('Frame')
+								if bg then
+									local lbl = bg:FindFirstChildWhichIsA('TextLabel')
+									if lbl then
+										lbl.Text = string.format('%.2f', data.Time or 0)
 									end
 								end
 							end
@@ -691,9 +697,4 @@ run(function()
 		end,
 		Tooltip = 'Shows surf times above other players'
 	})
-end)
-
-run(function()
-	surf.remotes.Call('GetTimes')
-	notif('Surf', 'Surf module loaded!', 3)
 end)
