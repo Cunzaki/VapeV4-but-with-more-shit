@@ -342,26 +342,7 @@ run(function()
 	end)
 end)
 
-run(function()
-	local sessioninfo = vape.Libraries.sessioninfo
-	if not sessioninfo then return end
-	local speedItem = sessioninfo:AddItem('SurfSpeed')
-	local timeItem = sessioninfo:AddItem('Time')
-	local cpItem = sessioninfo:AddItem('CP')
-	local styleItem = sessioninfo:AddItem('Style')
 
-	runService.Heartbeat:Connect(function()
-		local info = surf.CharacterManager and surf.CharacterManager.localInfo()
-		if info then
-			local spd = info.SurfSpeed or 0
-			speedItem:Set(math.floor(spd))
-			surf.store.speed = spd
-		end
-		timeItem:Set(surf.store.time)
-		cpItem:Set(tostring(surf.store.checkpoint))
-		styleItem:Set(surf.store.style or '')
-	end)
-end)
 
 run(function()
 	local AutoHop
