@@ -91,18 +91,19 @@ run(function()
 
 	surf.remotes.Call = function(name, ...)
 		local args = {...}
-		table.insert(callQueue, {name, 2 + select('#', ...), ...})
+		table.insert(callQueue, {name, #args + 2, unpack(args)})
 	end
 
 	surf.remotes.Fire = function(name, ...)
 		local args = {...}
-		table.insert(callQueue, {name, 2 + select('#', ...), ...})
+		table.insert(callQueue, {name, #args + 2, unpack(args)})
 	end
 
 	surf.remotes.Fetch = function(name, ...)
-		local serialized = httpService:JSONEncode({name, 2 + select('#', ...), ...})
+		local args = {...}
+		local serialized = httpService:JSONEncode({name, #args + 2, unpack(args)})
 		local success, result = pcall(function()
-			return RemoteFetch:InvokeServer(serialized, 2 + select('#', ...))
+			return RemoteFetch:InvokeServer(serialized, #args + 2)
 		end)
 		if success and result then
 			local decodeSuccess, data = pcall(function()
