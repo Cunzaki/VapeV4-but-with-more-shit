@@ -7129,13 +7129,10 @@ run(function()
 		end
 
 		local ignore_empty_scripts = true
-		local randomize_name = true
-		local overwrite_duplicates = false
 		local prefix = 'scripts_'..tostring(game.PlaceId)..'_'..math.random(100000, 999999)
 		local coreGuiRef = game.CoreGui
 		local corePackagesRef = game.CorePackages
-		local decomp_idx = 0
-		local scripts, tree = {}, {}
+		local scripts = {}
 		local invalid_chars = {}
 
 		for i = 0, 32 do table.insert(invalid_chars, string.char(i)) end
@@ -7152,86 +7149,46 @@ run(function()
 			gatherScripts(settingsobj, scripts, coreGuiRef, corePackagesRef)
 		end
 
+		print('Starting dump to folder:', prefix)
+		notif('Scriptdumper', 'Dumping scripts...', 3)
+		local idx = 0
+		local pendingWrites = {}
 		for _, v in scripts do
-			local fullname = v:GetFullName()
-			local split = string.split(fullname, '.')
-			local top_parent = v
-			while top_parent.Parent do
-				top_parent = top_parent.Parent
+			idx += 1
+			if idx % 50 == 0 or idx == #scripts then
+				print(string.format('Decompiling %d/%d', idx, #scripts))
 			end
-
-			local ct = tree[top_parent.Name] or {}
-			tree[top_parent.Name] = ct
-
-			for i = 1, #split - 1 do
-				local s = makevalid(split[i], invalid_chars)
-				if not ct[s] then ct[s] = {} end
-				ct = ct[s]
+			local success, src = pcall(decompile, v)
+			if not success or not src then
+				print('Failed to decompile:', v:GetFullName())
+				continue
 			end
-
-			local filename = makevalid(v.Name..'.'..v.ClassName..'.lua', invalid_chars)
-			if randomize_name then
-				filename = v:GetDebugId()..'_'..filename
-			end
-
-			if ct[filename] and not overwrite_duplicates then
-				warn('Duplicate ignored:', fullname)
-			else
-				ct[filename] = v
-			end
-		end
-
-		local function walk_tree(t, path)
-			for name, value in t do
-				name = makevalid(name, invalid_chars)
-				local current_path = path == '' and '' or path..'/'..name
-
-				if typeof(value) == 'table' then
-					walk_tree(value, current_path)
-				elseif typeof(value) == 'Instance' then
-					decomp_idx += 1
-					if decomp_idx % 10 == 0 or decomp_idx == #scripts then
-						print(string.format('Decompiling %d/%d', decomp_idx, #scripts))
+			if ignore_empty_scripts and #src < 150 then
+				local is_empty = true
+				for line in src:gmatch('[^\r\n]+') do
+					local trimmed = line:match('^%s*(.-)%s*$')
+					if trimmed ~= '' and not trimmed:match('^%-%-') then
+						is_empty = false
+						break
 					end
-
-					local success, src = pcall(decompile, value)
-					if not success or not src then
-						print('Failed to decompile:', value:GetFullName())
-						continue
-					end
-
-					if ignore_empty_scripts and #src < 150 then
-						local is_empty = true
-						for line in src:gmatch('[^\r\n]+') do
-							local trimmed = line:match('^%s*(.-)%s*$')
-							if trimmed ~= '' and not trimmed:match('^%-%-') then
-								is_empty = false
-								break
-							end
-						end
-						if is_empty then
-							continue
-						end
-					end
-
-					local full_folder = prefix..current_path
-					if not isfolder(full_folder) then
-						makefolder(full_folder)
-					end
-
-					local full_path = full_folder..'/'..name
-					local write_ok = pcall(writefile, full_path, src)
-					if not write_ok then
-						local fallback = full_folder..'/script_'..decomp_idx..'.lua'
-						pcall(writefile, fallback, src)
-					end
-					task.wait(math.random(5, 15) / 1000)
+				end
+				if is_empty then
+					continue
 				end
 			end
+			local fullname = v:GetFullName()
+			local full_path = prefix..'/'..makevalid(fullname:gsub('[\\/:*?"<>|]', '_'):gsub(string.char(0):rep(32), '_'):sub(1, 200)..'.lua')
+			table.insert(pendingWrites, {full_path, src})
 		end
-
-		print('Starting dump to folder:', prefix)
-		walk_tree(tree, '')
+		notif('Scriptdumper', 'Writing '..#pendingWrites..' files...', 3)
+		local write_idx = 0
+		for _, entry in pendingWrites do
+			write_idx += 1
+			if write_idx % 100 == 0 or write_idx == #pendingWrites then
+				print(string.format('Writing %d/%d', write_idx, #pendingWrites))
+			end
+			pcall(writefile, entry[1], entry[2])
+		end
 		print('Dump finished! Total scripts:', #scripts)
 		notif('Scriptdumper', 'Saved to workspace/'..prefix, 10)
 	end
