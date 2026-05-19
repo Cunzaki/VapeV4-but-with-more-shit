@@ -1872,8 +1872,8 @@ run(function()
 		['Fatality'] = 'rbxassetid://5991770206',
 		['Neverlose'] = 'rbxassetid://8679627751',
 		['TF2'] = 'rbxassetid://6909318500',
-		['Minecraft'] = 'rbxassetid://118095854380310',
-		['Punch'] = 'rbxassetid://140626490819228',
+		['Minecraft'] = 'rbxassetid://4018615234',
+		['Punch'] = 'rbxassetid://6822606558',
 		['Double Kill'] = 'rbxassetid://130819307',
 		['Boom Headshot'] = 'rbxassetid://7361085557',
 		['Windows Error'] = 'rbxassetid://2661731024',
@@ -1889,7 +1889,12 @@ run(function()
 			local custom = HitSoundCustom.Value
 			if custom and custom ~= '' then
 				local trimmed = custom:gsub('^%s+', ''):gsub('%s+$', '')
-				if trimmed ~= '' then return trimmed end
+				if trimmed ~= '' then 
+					if tonumber(trimmed) then
+						return 'rbxassetid://' .. trimmed
+					end
+					return trimmed 
+				end
 			end
 			return nil
 		end
@@ -1903,16 +1908,22 @@ run(function()
 		lastHitsoundTime = now
 		local soundId = getHitSoundId()
 		if not soundId then return end
+
+		local isCustom = HitSoundPreset.Value == 'Custom' and not soundId:find('rbxassetid://')
+		if isCustom then
+			local suc, res = pcall(function() return getcustomasset(soundId) end)
+			if suc and res then
+				soundId = res
+			end
+		end
 		
 		local sound = Instance.new('Sound')
 		sound.SoundId = soundId
 		sound.Volume = (HitSoundVolume.Value or 50) / 100
-		sound.Parent = workspace
-		sound:Play()
-		task.delay(4, function()
-			if sound then
-				sound:Destroy()
-			end
+		sound.Parent = game:GetService('SoundService')
+		game:GetService('SoundService'):PlayLocalSound(sound)
+		task.delay(5, function()
+			if sound then sound:Destroy() end
 		end)
 	end
 
@@ -7157,35 +7168,51 @@ run(function()
 
 		print('Starting dump to folder:', prefix)
 		notif('Scriptdumper', 'Dumping scripts...', 3)
+		
+		if not isfolder(prefix) then
+			pcall(makefolder, prefix)
+		end
+		
 		local idx = 0
 		local pendingWrites = {}
+		local threads = 0
+		local batch_size = 20
+		
 		for _, v in scripts do
 			idx += 1
 			if idx % 50 == 0 or idx == #scripts then
 				print(string.format('Decompiling %d/%d', idx, #scripts))
 			end
-			local success, src = pcall(decompile, v)
-			if not success or not src then
-				print('Failed to decompile:', v:GetFullName())
-				continue
-			end
-			if ignore_empty_scripts and #src < 150 then
-				local is_empty = true
-				for line in src:gmatch('[^\r\n]+') do
-					local trimmed = line:match('^%s*(.-)%s*$')
-					if trimmed ~= '' and not trimmed:match('^%-%-') then
-						is_empty = false
-						break
+			
+			while threads >= batch_size do task.wait() end
+			
+			threads += 1
+			task.spawn(function()
+				local success, src = pcall(decompile, v)
+				if success and src then
+					local is_empty = false
+					if ignore_empty_scripts and #src < 150 then
+						is_empty = true
+						for line in src:gmatch('[^\r\n]+') do
+							local trimmed = line:match('^%s*(.-)%s*$')
+							if trimmed ~= '' and not trimmed:match('^%-%-') then
+								is_empty = false
+								break
+							end
+						end
+					end
+					if not is_empty then
+						local fullname = v:GetFullName()
+						local full_path = prefix..'/'..makevalid(fullname:gsub('[\\/:*?"<>|]', '_'):gsub(string.char(0):rep(32), '_'):sub(1, 200)..'.lua')
+						table.insert(pendingWrites, {full_path, src})
 					end
 				end
-				if is_empty then
-					continue
-				end
-			end
-			local fullname = v:GetFullName()
-			local full_path = prefix..'/'..makevalid(fullname:gsub('[\\/:*?"<>|]', '_'):gsub(string.char(0):rep(32), '_'):sub(1, 200)..'.lua')
-			table.insert(pendingWrites, {full_path, src})
+				threads -= 1
+			end)
 		end
+		
+		while threads > 0 do task.wait() end
+		
 		notif('Scriptdumper', 'Writing '..#pendingWrites..' files...', 3)
 		local write_idx = 0
 		for _, entry in pendingWrites do
@@ -7194,6 +7221,7 @@ run(function()
 				print(string.format('Writing %d/%d', write_idx, #pendingWrites))
 			end
 			pcall(writefile, entry[1], entry[2])
+			if write_idx % 50 == 0 then task.wait() end
 		end
 		print('Dump finished! Total scripts:', #scripts)
 		notif('Scriptdumper', 'Saved to workspace/'..prefix, 10)
