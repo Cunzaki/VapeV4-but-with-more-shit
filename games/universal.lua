@@ -1555,9 +1555,7 @@ run(function()
 					if CircleObject then
 						CircleObject.Position = inputService:GetMouseLocation()
 					end
-					if BulletTracers.Enabled or (HitSounds and HitSounds.Enabled) then
-						processHitDetection()
-					end
+					processHitDetection()
 					if BulletTracers.Enabled then
 						renderBulletTracers()
 					end
