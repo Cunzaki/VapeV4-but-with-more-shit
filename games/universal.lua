@@ -1345,9 +1345,11 @@ run(function()
 		})
 	end
 
-	local function renderBulletTracers()
+	local function processHitDetection()
 		local now = tick()
-		local mainColor, glowColor = getTracerColors()
+		local wantsTracer = BulletTracers and BulletTracers.Enabled
+		local wantsSound = HitSounds and HitSounds.Enabled
+		if not wantsTracer and not wantsSound then return end
 
 		for _, ent in entitylib.List do
 			local currentHealth = ent.Health
@@ -1365,17 +1367,17 @@ run(function()
 					continue
 				end
 
-				local allowTracer = true
+				local allowHit = true
 				if Target.Walls.Enabled then
 					BulletTracerWallcheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
 					local ray = workspace:Raycast(pending.Origin, pending.TargetPosition - pending.Origin, BulletTracerWallcheck)
-					allowTracer = ray == nil or ray.Instance:IsDescendantOf(ent.Character)
+					allowHit = ray == nil or (ray.Instance and ray.Instance:IsDescendantOf(ent.Character))
 				end
-				if allowTracer then
-					if BulletTracers and BulletTracers.Enabled then
-						spawnBulletTracer(ent, pending, now, mainColor, glowColor)
+				if allowHit then
+					if wantsTracer then
+						spawnBulletTracer(ent, pending, now, getTracerColors())
 					end
-					if HitSounds and HitSounds.Enabled then
+					if wantsSound then
 						playHitSound()
 					end
 				end
@@ -1386,6 +1388,10 @@ run(function()
 			end
 			healthCache[ent] = currentHealth
 		end
+	end
+
+	local function renderBulletTracers()
+		local now = tick()
 
 		for i = #bulletTracerActive, 1, -1 do
 			local tracer = bulletTracerActive[i]
@@ -1428,7 +1434,6 @@ run(function()
 				ProjectileRaycast.CollisionGroup = ent[targetPart].CollisionGroup
 			end
 			registerShot(ent, ent[targetPart], origin)
-			playHitSound()
 		end
 		
 		return ent, ent and ent[targetPart], origin
@@ -1551,6 +1556,9 @@ run(function()
 						CircleObject.Position = inputService:GetMouseLocation()
 					end
 					if BulletTracers.Enabled or (HitSounds and HitSounds.Enabled) then
+						processHitDetection()
+					end
+					if BulletTracers.Enabled then
 						renderBulletTracers()
 					end
 					if AutoFire.Enabled then
