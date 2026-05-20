@@ -7218,16 +7218,49 @@ run(function()
 			return
 		end
 
-		local ignore_empty_scripts = true
 		local prefix = 'scripts_'..tostring(game.PlaceId)..'_'..math.random(100000, 999999)
 		local coreGuiRef = game.CoreGui
 		local corePackagesRef = game.CorePackages
 		local scripts = {}
-		local invalid_chars = {}
+		local seenPaths = {}
 
-		for i = 0, 32 do table.insert(invalid_chars, string.char(i)) end
-		for i = 127, 255 do table.insert(invalid_chars, string.char(i)) end
-		for _, c in {'\\', ':', '*', '?', '"', '<', '>', '|'} do table.insert(invalid_chars, c) end
+		local function isRobloxDefault(script)
+			local path = script:GetFullName()
+			if path:find('ReplicatedStorage[/\\]Default') then return true end
+			if path:find('ReplicatedStorage[/\\]Shared[/\\]Modules') then return true end
+			if path:find('ReplicatedStorage[/\\]Studio[/\\]') then return true end
+			if path:find('ServerScriptService[/\\]Default') then return true end
+			if path:find('StarterPlayer[/\\]Default') then return true end
+			if path:find('StarterGui[/\\]Default') then return true end
+			if path:find('StarterPlayerScripts[/\\]Default') then return true end
+			if path:find('StarterCharacterScripts[/\\]Default') then return true end
+			if path:find('Lighting[/\\]Default') then return true end
+			if path:find('GameInsight[/\\]') then return true end
+			if path:find('CoreGui[/\\]Roboto[/\\]') then return true end
+			if path:find('CorePackages[/\\]') then return true end
+			if path:find('Players[/\\]LocalPlayer[/\\]PlayerScripts[/\\]') then return true end
+			if path:find('Players[/\\]LocalPlayer[/\\]Backpack[/\\]') then return true end
+			if path:find('Players[/\\]LocalPlayer[/\\]Character[/\\]') then return true end
+			if path:find('PlayerScriptsLoader[/\\]') then return true end
+			if path:find('GameSettings[/\\]') then return true end
+			if path:find('SessionService[/\\]') then return true end
+			if path:find('Chat[/\\]') and not path:find('Chat[/\\]CustomChat') then return true end
+			return false
+		end
+
+		local function gatherScripts(inst, scripts, coreGuiRef, corePackagesRef)
+			if (inst.ClassName == 'LocalScript' or inst.ClassName == 'ModuleScript' or inst.ClassName == 'Script') then
+				if inst:IsDescendantOf(coreGuiRef) or inst:IsDescendantOf(corePackagesRef) then return end
+				if isRobloxDefault(inst) then return end
+				local path = inst:GetFullName()
+				if seenPaths[path] then return end
+				seenPaths[path] = true
+				table.insert(scripts, inst)
+			end
+			for _, v in inst:GetChildren() do
+				gatherScripts(v, scripts, coreGuiRef, corePackagesRef)
+			end
+		end
 
 		local nilinstances = (getnilinstances and getnilinstances()) or {}
 		for _, v in nilinstances do
@@ -7239,47 +7272,50 @@ run(function()
 			gatherScripts(settingsobj, scripts, coreGuiRef, corePackagesRef)
 		end
 
-		print('Starting dump to folder:', prefix)
-		notif('Scriptdumper', 'Dumping scripts...', 3)
-		
 		if not isfolder(prefix) then
 			pcall(makefolder, prefix)
 		end
+
+		print('Starting dump to folder:', prefix)
+		notif('Scriptdumper', 'Dumping '..#scripts..' scripts...', 3)
 		
 		local idx = 0
-		local pendingWrites = {}
 		local threads = 0
-		local batch_size = 20
+		local batch_size = 50
+		local pendingWrites = {}
+		
+		local function writeFolderPath(path)
+			local parts = {}
+			for part in path:gmatch('([^/\\]+)') do
+				table.insert(parts, part)
+			end
+			local currentPath = prefix
+			for i = 1, #parts - 1 do
+				currentPath = currentPath..'/'..parts[i]
+				if not isfolder(currentPath) then
+					pcall(makefolder, currentPath)
+				end
+			end
+		end
 		
 		for _, v in scripts do
 			idx += 1
-			if idx % 50 == 0 or idx == #scripts then
+			if idx % 100 == 0 or idx == #scripts then
 				print(string.format('Decompiling %d/%d', idx, #scripts))
 			end
 			
 			while threads >= batch_size do task.wait() end
-			
 			threads += 1
+			
 			task.spawn(function()
 				local success, src = pcall(decompile, v)
-				if success and src then
-					local is_empty = false
-					if ignore_empty_scripts and #src < 150 then
-						is_empty = true
-						for line in src:gmatch('[^\r\n]+') do
-							local trimmed = line:match('^%s*(.-)%s*$')
-							if trimmed ~= '' and not trimmed:match('^%-%-') then
-								is_empty = false
-								break
-							end
-						end
-					end
-					if not is_empty then
-						local fullname = v:GetFullName()
-						local sanitized = fullname:gsub('[\\/:*?"<>|]', '_'):gsub(string.char(0):rep(32), '_'):sub(1, 200)
-						local full_path = prefix..'/'..sanitized..'.lua'
-						table.insert(pendingWrites, {full_path, src})
-					end
+				if success and src and #src > 10 then
+					local fullname = v:GetFullName()
+					writeFolderPath(fullname)
+					local sanitized = fullname:gsub('[\\/:*?"<>|]', '_'):gsub(string.char(0):rep(32), '_')
+					sanitized = sanitized:gsub('^Game%.' , ''):gsub('^Workspace%.', 'Workspace/')
+					local full_path = prefix..'/'..sanitized..'.lua'
+					table.insert(pendingWrites, {full_path, src})
 				end
 				threads -= 1
 			end)
@@ -7291,13 +7327,12 @@ run(function()
 		local write_idx = 0
 		for _, entry in pendingWrites do
 			write_idx += 1
-			if write_idx % 100 == 0 or write_idx == #pendingWrites then
+			if write_idx % 200 == 0 or write_idx == #pendingWrites then
 				print(string.format('Writing %d/%d', write_idx, #pendingWrites))
 			end
 			pcall(writefile, entry[1], entry[2])
-			if write_idx % 50 == 0 then task.wait() end
 		end
-		print('Dump finished! Total scripts:', #scripts)
+		print('Dump finished! Dumped '..#pendingWrites..' scripts out of '..#scripts..' found')
 		notif('Scriptdumper', 'Saved to workspace/'..prefix, 10)
 	end
 
