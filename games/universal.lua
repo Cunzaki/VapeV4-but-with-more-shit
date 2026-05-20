@@ -1218,6 +1218,42 @@ run(function()
 	local HitSounds
 	playHitSound = function() end
 	lastHitsoundTime = 0
+	local HitSoundPreset
+	local HitSoundCustom
+	local HitSoundVolume
+	local HITSOUND_PRESETS = {
+		['None'] = '',
+		['Rust'] = 'rbxassetid://4764109000',
+		['Fatality'] = 'rbxassetid://5991770206',
+		['Neverlose'] = 'rbxassetid://8679627751',
+		['TF2'] = 'rbxassetid://6909318500',
+		['Minecraft'] = 'rbxassetid://4018615234',
+		['Punch'] = 'rbxassetid://6822606558',
+		['Double Kill'] = 'rbxassetid://130819307',
+		['Boom Headshot'] = 'rbxassetid://7361085557',
+		['Windows Error'] = 'rbxassetid://2661731024',
+		['Anime Ping'] = 'rbxassetid://8120788861',
+		['Bells'] = 'rbxassetid://1053865439',
+		['Custom'] = 'CUSTOM'
+	}
+	local function getHitSoundId()
+		local preset = HITSOUND_PRESETS[HitSoundPreset.Value]
+		if preset == '' or not preset then return nil end
+		if preset == 'CUSTOM' then
+			local custom = HitSoundCustom.Value
+			if custom and custom ~= '' then
+				local trimmed = custom:gsub('^%s+', ''):gsub('%s+$', '')
+				if trimmed ~= '' then 
+					if tonumber(trimmed) then
+						return 'rbxassetid://' .. trimmed
+					end
+					return trimmed 
+				end
+			end
+			return nil
+		end
+		return preset
+	end
 	local TracerClickWindow = 0.4
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
@@ -1862,45 +1898,6 @@ run(function()
 end)
 
 run(function()
-	local HitSoundPreset
-	local HitSoundCustom
-	local HitSoundVolume
-
-	local HITSOUND_PRESETS = {
-		['None'] = '',
-		['Rust'] = 'rbxassetid://4764109000',
-		['Fatality'] = 'rbxassetid://5991770206',
-		['Neverlose'] = 'rbxassetid://8679627751',
-		['TF2'] = 'rbxassetid://6909318500',
-		['Minecraft'] = 'rbxassetid://4018615234',
-		['Punch'] = 'rbxassetid://6822606558',
-		['Double Kill'] = 'rbxassetid://130819307',
-		['Boom Headshot'] = 'rbxassetid://7361085557',
-		['Windows Error'] = 'rbxassetid://2661731024',
-		['Anime Ping'] = 'rbxassetid://8120788861',
-		['Bells'] = 'rbxassetid://1053865439',
-		['Custom'] = 'CUSTOM'
-	}
-
-	local function getHitSoundId()
-		local preset = HITSOUND_PRESETS[HitSoundPreset.Value]
-		if preset == '' or not preset then return nil end
-		if preset == 'CUSTOM' then
-			local custom = HitSoundCustom.Value
-			if custom and custom ~= '' then
-				local trimmed = custom:gsub('^%s+', ''):gsub('%s+$', '')
-				if trimmed ~= '' then 
-					if tonumber(trimmed) then
-						return 'rbxassetid://' .. trimmed
-					end
-					return trimmed 
-				end
-			end
-			return nil
-		end
-		return preset
-	end
-
 	playHitSound = function()
 		if not HitSounds or not HitSounds.Enabled then return end
 		local now = tick()
