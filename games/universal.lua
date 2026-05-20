@@ -7276,7 +7276,8 @@ run(function()
 					end
 					if not is_empty then
 						local fullname = v:GetFullName()
-						local full_path = prefix..'/'..makevalid(fullname:gsub('[\\/:*?"<>|]', '_'):gsub(string.char(0):rep(32), '_'):sub(1, 200)..'.lua')
+						local sanitized = fullname:gsub('[\\/:*?"<>|]', '_'):gsub(string.char(0):rep(32), '_'):sub(1, 200)
+						local full_path = prefix..'/'..sanitized..'.lua'
 						table.insert(pendingWrites, {full_path, src})
 					end
 				end
