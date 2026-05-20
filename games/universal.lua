@@ -1216,8 +1216,8 @@ run(function()
 	local BulletTracerThickness
 	local BulletTracerDuration
 	local HitSounds
-	local playHitSound = function() end
-	local lastHitsoundTime = 0
+	playHitSound = function() end
+	lastHitsoundTime = 0
 	local TracerClickWindow = 0.4
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
