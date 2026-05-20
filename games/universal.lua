@@ -1948,7 +1948,21 @@ run(function()
 	HitSoundPreset = HitSounds:CreateDropdown({
 		Name = 'Sound',
 		List = presetList,
-		Function = function()
+		Function = function(val)
+			if val == 'None' then return end
+			local soundId = getHitSoundId()
+			if not soundId then return end
+			local isCustom = HitSoundPreset.Value == 'Custom' and not soundId:find('rbxassetid://')
+			if isCustom then
+				local suc, res = pcall(function() return getcustomasset(soundId) end)
+				if suc and res then soundId = res end
+			end
+			local preview = Instance.new('Sound')
+			preview.SoundId = soundId
+			preview.Volume = (HitSoundVolume.Value or 50) / 100
+			preview.Parent = game:GetService('SoundService')
+			game:GetService('SoundService'):PlayLocalSound(preview)
+			task.delay(5, function() preview:Destroy() end)
 		end
 	})
 	HitSoundCustom = HitSounds:CreateTextBox({
