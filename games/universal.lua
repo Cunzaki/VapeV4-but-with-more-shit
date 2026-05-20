@@ -403,6 +403,19 @@ run(function()
 		if isFriend(ent, true) then
 			return Color3.fromHSV(vape.Categories.Friends.Options['Friends color'].Hue, vape.Categories.Friends.Options['Friends color'].Sat, vape.Categories.Friends.Options['Friends color'].Value)
 		end
+		if vape.Categories.Main.Options['Teams by torso color'].Enabled then
+			local torsoKey = torsoColorCache[ent]
+			if torsoKey then
+				if torsoKey:find('rgb_') then
+					local r, g, b = torsoKey:match('rgb_(%d+)_(%d+)_(%d+)')
+					return Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
+				elseif torsoKey:find('brick_') then
+					local num = tonumber(torsoKey:gsub('brick_', ''))
+					return BrickColor.new(num).Color
+				end
+			end
+			return nil
+		end
 		return tostring(ent.TeamColor) ~= 'White' and ent.TeamColor.Color or nil
 	end
 
@@ -420,6 +433,34 @@ run(function()
 	vape:Clean(workspace:GetPropertyChangedSignal('CurrentCamera'):Connect(function()
 		gameCamera = workspace.CurrentCamera or workspace:FindFirstChildWhichIsA('Camera')
 	end))
+	local torsoPlayerConnections = {}
+	local function onPlayerCharacterAdded(plr)
+		if torsoColorCache[plr] ~= nil then
+			torsoColorCache[plr] = nil
+		end
+		task.wait()
+		local key = getPlayerTorsoKey(plr)
+		if torsoColorCache[plr] ~= key then
+			torsoColorCache[plr] = key
+			entitylib.refresh()
+		end
+	end
+	local function onPlayerAdded(plr)
+		local conn = plr.CharacterAdded:Connect(function()
+			onPlayerCharacterAdded(plr)
+		end)
+		torsoPlayerConnections[plr] = conn
+		vape:Clean(conn)
+		if plr.Character then
+			task.spawn(function()
+				onPlayerCharacterAdded(plr)
+			end)
+		end
+	end
+	for _, plr in playersService:GetPlayers() do
+		onPlayerAdded(plr)
+	end
+	vape:Clean(playersService.PlayerAdded:Connect(onPlayerAdded))
 	torsoWatcherThread = task.spawn(function()
 		while vape.Loaded and entitylib and entitylib.Running do
 			if vape.Categories.Main.Options['Teams by torso color'].Enabled then
@@ -443,7 +484,7 @@ run(function()
 			elseif next(torsoColorCache) ~= nil then
 				table.clear(torsoColorCache)
 			end
-			task.wait(0.25)
+			task.wait(0.05)
 		end
 	end)
 end)
