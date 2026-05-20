@@ -375,18 +375,30 @@ run(function()
 		if vape.Categories.Main.Options['Health check'].Enabled and ent.Health <= 0 then
 			return false
 		end
-		if ent.TeamCheck then
-			return ent:TeamCheck()
-		end
 		if ent.NPC then return true end
 		if isFriend(ent.Player) then return false end
 		if not select(2, whitelist:get(ent.Player)) then return false end
 		if vape.Categories.Main.Options['Teams by torso color'].Enabled then
-			local localColor = getTorsoTeamKey(entitylib.character and entitylib.character.Character or lplr.Character)
-			local entColor = getTorsoTeamKey(ent.Character)
-			if localColor and entColor then
-				return localColor ~= entColor
+			local localKey = torsoColorCache[lplr]
+			local entKey = torsoColorCache[ent.Player]
+			if localKey and entKey then
+				return localKey ~= entKey
 			end
+			if not localKey then
+				localKey = getTorsoTeamKey(entitylib.character and entitylib.character.Character or lplr.Character)
+			end
+			if not entKey then
+				entKey = getTorsoTeamKey(ent.Character)
+			end
+			if localKey and entKey then
+				torsoColorCache[lplr] = localKey
+				torsoColorCache[ent.Player] = entKey
+				return localKey ~= entKey
+			end
+			return true
+		end
+		if ent.TeamCheck then
+			return ent:TeamCheck()
 		end
 		if vape.Categories.Main.Options['Teams by server'].Enabled then
 			if not lplr.Team then return true end
@@ -399,7 +411,7 @@ run(function()
 
 	entitylib.getEntityColor = function(ent)
 		ent = ent.Player
-		if not (ent and vape.Categories.Main.Options['Use team color'].Enabled) then return end
+		if not ent then return end
 		if isFriend(ent, true) then
 			return Color3.fromHSV(vape.Categories.Friends.Options['Friends color'].Hue, vape.Categories.Friends.Options['Friends color'].Sat, vape.Categories.Friends.Options['Friends color'].Value)
 		end
@@ -416,7 +428,10 @@ run(function()
 			end
 			return nil
 		end
-		return tostring(ent.TeamColor) ~= 'White' and ent.TeamColor.Color or nil
+		if vape.Categories.Main.Options['Use team color'].Enabled then
+			return tostring(ent.TeamColor) ~= 'White' and ent.TeamColor.Color or nil
+		end
+		return nil
 	end
 
 	vape:Clean(function()
