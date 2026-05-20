@@ -1251,7 +1251,6 @@ run(function()
 	local BulletTracerTransparency
 	local BulletTracerThickness
 	local BulletTracerDuration
-	local HitSounds
 	playHitSound = function() end
 	lastHitsoundTime = 0
 	local TracerClickWindow = 0.4
