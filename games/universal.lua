@@ -379,20 +379,20 @@ run(function()
 		if isFriend(ent.Player) then return false end
 		if not select(2, whitelist:get(ent.Player)) then return false end
 		if vape.Categories.Main.Options['Teams by torso color'].Enabled then
+			local localChar = entitylib.character and entitylib.character.Character or lplr.Character
+			local entChar = ent.Character
+			if not localChar or not entChar then return true end
 			local localKey = torsoColorCache[lplr]
 			local entKey = torsoColorCache[ent.Player]
-			if localKey and entKey then
-				return localKey ~= entKey
-			end
 			if not localKey then
-				localKey = getTorsoTeamKey(entitylib.character and entitylib.character.Character or lplr.Character)
+				localKey = getTorsoTeamKey(localChar)
+				if localKey then torsoColorCache[lplr] = localKey end
 			end
 			if not entKey then
-				entKey = getTorsoTeamKey(ent.Character)
+				entKey = getTorsoTeamKey(entChar)
+				if entKey then torsoColorCache[ent.Player] = entKey end
 			end
 			if localKey and entKey then
-				torsoColorCache[lplr] = localKey
-				torsoColorCache[ent.Player] = entKey
 				return localKey ~= entKey
 			end
 			return true
@@ -417,6 +417,13 @@ run(function()
 		end
 		if vape.Categories.Main.Options['Teams by torso color'].Enabled then
 			local torsoKey = torsoColorCache[ent]
+			if not torsoKey then
+				local char = ent.Character
+				if char then
+					torsoKey = getTorsoTeamKey(char)
+					if torsoKey then torsoColorCache[ent] = torsoKey end
+				end
+			end
 			if torsoKey then
 				if torsoKey:find('rgb_') then
 					local r, g, b = torsoKey:match('rgb_(%d+)_(%d+)_(%d+)')
@@ -4425,6 +4432,10 @@ run(function()
 			Skeleton = false,
 			ChamsEnable = false,
 			BoxColor = getESPColor(),
+			ColorResolver = function(plr)
+				local ent = entitylib.getEntity(plr)
+				return ent and (entitylib.getEntityColor(ent) or getESPColor()) or getESPColor()
+			end,
 			RenderDistance = Distance.Enabled and DistanceLimit.ValueMax or 99999,
 			ShouldRender = function(plr)
 				local ent = entitylib.getEntity(plr)
@@ -4434,6 +4445,7 @@ run(function()
 				else
 					if not Targets.Players.Enabled then return false end
 				end
+				if not entitylib.targetCheck(ent) then return false end
 				if Teammates.Enabled and (not ent.Targetable) and (not ent.Friend) then return false end
 				if Distance.Enabled and entitylib.isAlive and entitylib.character and entitylib.character.RootPart and ent.RootPart then
 					local distance = (entitylib.character.RootPart.Position - ent.RootPart.Position).Magnitude
@@ -4490,6 +4502,7 @@ run(function()
 		Drawing2D = function(ent)
 			if not Targets.Players.Enabled and ent.Player then return end
 			if not Targets.NPCs.Enabled and ent.NPC then return end
+			if not entitylib.targetCheck(ent) then return end
 			if Teammates.Enabled and (not ent.Targetable) and (not ent.Friend) then return end
 			if vape.ThreadFix then
 				setthreadidentity(8)
@@ -4556,6 +4569,7 @@ run(function()
 		Drawing3D = function(ent)
 			if not Targets.Players.Enabled and ent.Player then return end
 			if not Targets.NPCs.Enabled and ent.NPC then return end
+			if not entitylib.targetCheck(ent) then return end
 			if Teammates.Enabled and (not ent.Targetable) and (not ent.Friend) then return end
 			if vape.ThreadFix then
 				setthreadidentity(8)
@@ -4585,6 +4599,7 @@ run(function()
 		DrawingSkeleton = function(ent)
 			if not Targets.Players.Enabled and ent.Player then return end
 			if not Targets.NPCs.Enabled and ent.NPC then return end
+			if not entitylib.targetCheck(ent) then return end
 			if Teammates.Enabled and (not ent.Targetable) and (not ent.Friend) then return end
 			if vape.ThreadFix then
 				setthreadidentity(8)
