@@ -320,37 +320,38 @@ run(function()
 	local torsoWatcherThread
 	local torsoColorCache = {}
 
-	local function colorKeyFromColor3(c)
-		return string.format('rgb_%d_%d_%d', math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
-	end
-
-	local function getTorsoTeamKey(char)
+	local function getTorsoColor3(char)
 		if not char then return nil end
 		local body = char:FindFirstChildOfClass('BodyColors')
 		if body then
-			return colorKeyFromColor3(body.TorsoColor3)
+			return body.TorsoColor3
 		end
 		local torso = char:FindFirstChild('UpperTorso') or char:FindFirstChild('Torso') or char:FindFirstChild('LowerTorso')
 		if torso and torso:IsA('BasePart') then
-			return 'brick_'..tostring(torso.BrickColor.Number)
+			return torso.Color
 		end
 		local hum = char:FindFirstChildOfClass('Humanoid')
 		if hum and hum.RootPart and hum.RootPart:IsA('BasePart') then
-			return 'brick_'..tostring(hum.RootPart.BrickColor.Number)
+			return hum.RootPart.Color
 		end
 		local root = char:FindFirstChild('HumanoidRootPart')
 		if root and root:IsA('BasePart') then
-			return 'brick_'..tostring(root.BrickColor.Number)
+			return root.Color
 		end
 		return nil
 	end
 
-	local function getPlayerTorsoKey(plr)
+	local function colorsMatch(c1, c2)
+		if not c1 or not c2 then return false end
+		return math.abs(c1.R - c2.R) < 0.01 and math.abs(c1.G - c2.G) < 0.01 and math.abs(c1.B - c2.B) < 0.01
+	end
+
+	local function getPlayerTorsoColor(plr)
 		if not plr then return nil end
 		if plr == lplr then
-			return getTorsoTeamKey(entitylib.character and entitylib.character.Character or lplr.Character)
+			return getTorsoColor3(entitylib.character and entitylib.character.Character or lplr.Character)
 		end
-		return getTorsoTeamKey(plr.Character)
+		return getTorsoColor3(plr.Character)
 	end
 
 	entitylib.getUpdateConnections = function(ent)
@@ -382,18 +383,18 @@ run(function()
 			local localChar = entitylib.character and entitylib.character.Character or lplr.Character
 			local entChar = ent.Character
 			if not localChar or not entChar then return true end
-			local localKey = torsoColorCache[lplr]
-			local entKey = torsoColorCache[ent.Player]
-			if not localKey then
-				localKey = getTorsoTeamKey(localChar)
-				if localKey then torsoColorCache[lplr] = localKey end
+			local localColor = torsoColorCache[lplr]
+			local entColor = torsoColorCache[ent.Player]
+			if not localColor then
+				localColor = getTorsoColor3(localChar)
+				if localColor then torsoColorCache[lplr] = localColor end
 			end
-			if not entKey then
-				entKey = getTorsoTeamKey(entChar)
-				if entKey then torsoColorCache[ent.Player] = entKey end
+			if not entColor then
+				entColor = getTorsoColor3(entChar)
+				if entColor then torsoColorCache[ent.Player] = entColor end
 			end
-			if localKey and entKey then
-				return localKey ~= entKey
+			if localColor and entColor then
+				return not colorsMatch(localColor, entColor)
 			end
 			return true
 		end
@@ -416,24 +417,15 @@ run(function()
 			return Color3.fromHSV(vape.Categories.Friends.Options['Friends color'].Hue, vape.Categories.Friends.Options['Friends color'].Sat, vape.Categories.Friends.Options['Friends color'].Value)
 		end
 		if vape.Categories.Main.Options['Teams by torso color'].Enabled then
-			local torsoKey = torsoColorCache[ent]
-			if not torsoKey then
+			local torsoColor = torsoColorCache[ent]
+			if not torsoColor then
 				local char = ent.Character
 				if char then
-					torsoKey = getTorsoTeamKey(char)
-					if torsoKey then torsoColorCache[ent] = torsoKey end
+					torsoColor = getTorsoColor3(char)
+					if torsoColor then torsoColorCache[ent] = torsoColor end
 				end
 			end
-			if torsoKey then
-				if torsoKey:find('rgb_') then
-					local r, g, b = torsoKey:match('rgb_(%d+)_(%d+)_(%d+)')
-					return Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
-				elseif torsoKey:find('brick_') then
-					local num = tonumber(torsoKey:gsub('brick_', ''))
-					return BrickColor.new(num).Color
-				end
-			end
-			return nil
+			return torsoColor
 		end
 		if vape.Categories.Main.Options['Use team color'].Enabled then
 			return tostring(ent.TeamColor) ~= 'White' and ent.TeamColor.Color or nil
@@ -461,9 +453,9 @@ run(function()
 			torsoColorCache[plr] = nil
 		end
 		task.wait()
-		local key = getPlayerTorsoKey(plr)
-		if torsoColorCache[plr] ~= key then
-			torsoColorCache[plr] = key
+		local color = getPlayerTorsoColor(plr)
+		if torsoColorCache[plr] ~= color then
+			torsoColorCache[plr] = color
 			entitylib.refresh()
 		end
 	end
@@ -488,9 +480,9 @@ run(function()
 			if vape.Categories.Main.Options['Teams by torso color'].Enabled then
 				local changed = false
 				for _, plr in playersService:GetPlayers() do
-					local key = getPlayerTorsoKey(plr)
-					if torsoColorCache[plr] ~= key then
-						torsoColorCache[plr] = key
+					local color = getPlayerTorsoColor(plr)
+					if not torsoColorCache[plr] or (color and not colorsMatch(torsoColorCache[plr], color)) then
+						torsoColorCache[plr] = color
 						changed = true
 					end
 				end
