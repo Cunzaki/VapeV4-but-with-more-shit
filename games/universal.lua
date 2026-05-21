@@ -1611,6 +1611,7 @@ run(function()
 			if MethodRay.Value ~= 'All' and args[3] and args[3].FilterType ~= Enum.RaycastFilterType[MethodRay.Value] then return end
 			local ent, targetPart, origin = getTarget(args[1])
 			if not ent then return end
+			args[1] = origin
 			args[2] = CFrame.lookAt(origin, targetPart.Position).LookVector * args[2].Magnitude
 			if Wallbang.Enabled then
 				RaycastWhitelist.FilterDescendantsInstances = {targetPart}
@@ -1634,8 +1635,10 @@ run(function()
 			if Projectile.Enabled then
 				local calc = prediction.SolveTrajectory(origin, ProjectileSpeed.Value, ProjectileGravity.Value, targetPart.Position, targetPart.Velocity, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
 				if not calc then return end
+				args[1] = origin
 				args[2] = CFrame.lookAt(origin, calc).LookVector * args[2].Magnitude
 			else
+				args[1] = origin
 				args[2] = CFrame.lookAt(origin, targetPart.Position).LookVector * args[2].Magnitude
 			end
 		end
