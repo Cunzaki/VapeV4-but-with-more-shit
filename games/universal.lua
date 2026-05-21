@@ -1506,6 +1506,66 @@ run(function()
 		end
 	end
 
+	local function getManipulatedOrigin(origin, targetPos, radius, ignoreList)
+		local params = RaycastParams.new()
+		params.FilterDescendantsInstances = ignoreList
+		params.FilterType = Enum.RaycastFilterType.Exclude
+
+		local function isClear(startPos, endPos)
+			return not workspace:Raycast(startPos, endPos - startPos, params)
+		end
+
+		if isClear(origin, targetPos) then
+			return origin
+		end
+
+		local step = math.max(1, radius / 3) 
+		local bestPos = nil
+		local bestDist = math.huge
+
+		for x = -radius, radius, step do
+			for y = -radius, radius, step do
+				for z = -radius, radius, step do
+					local offset = Vector3.new(x, y, z)
+					if offset.Magnitude <= radius then
+						local testPos = origin + offset
+						if isClear(testPos, targetPos) then
+							if isClear(origin, testPos) then
+								local dist = offset.Magnitude
+								if dist < bestDist then
+									bestDist = dist
+									bestPos = testPos
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+
+		if not bestPos then
+			for x = -radius, radius, step do
+				for y = -radius, radius, step do
+					for z = -radius, radius, step do
+						local offset = Vector3.new(x, y, z)
+						if offset.Magnitude <= radius then
+							local testPos = origin + offset
+							if isClear(testPos, targetPos) then
+								local dist = offset.Magnitude
+								if dist < bestDist then
+									bestDist = dist
+									bestPos = testPos
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+
+		return bestPos
+	end
+
 	local function getTarget(origin, obj)
 		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then return end
 		local targetPart = (rand.NextNumber(rand, 0, 100) < (AutoFire.Enabled and 100 or HeadshotChance.Value)) and 'Head' or 'RootPart'
@@ -1525,7 +1585,6 @@ run(function()
 		if ent and BulletManipulation.Enabled then
 			local targetPos = ent[targetPart].Position
 			local radius = BulletManipulationRadius.Value
-			local params = RaycastParams.new()
 			local ignoreList = {gameCamera, entitylib.character, ent.Character}
 			if type(obj) == "table" then
 				for _, v in obj do 
@@ -1536,52 +1595,13 @@ run(function()
 					end
 				end
 			end
-			params.FilterDescendantsInstances = ignoreList
-			params.FilterType = Enum.RaycastFilterType.Exclude
-
-			local function isClear(pos)
-				return not workspace:Raycast(pos, targetPos - pos, params)
-			end
-
-			if not isClear(origin) then
-				local found = false
-				local testOffsets = {
-					Vector3.new(0, radius, 0),
-					Vector3.new(0, -radius, 0),
-					Vector3.new(radius, 0, 0),
-					Vector3.new(-radius, 0, 0),
-					Vector3.new(0, 0, radius),
-					Vector3.new(0, 0, -radius),
-				}
-				for _, offset in testOffsets do
-					local testOrigin = origin + offset
-					if isClear(testOrigin) then
-						origin = testOrigin
-						found = true
-						break
-					end
-				end
-
-				if not found then
-					for i = 1, 40 do
-						local offset = Vector3.new(
-							rand:NextNumber(-1, 1),
-							rand:NextNumber(-1, 1),
-							rand:NextNumber(-1, 1)
-						).Unit * (rand:NextNumber(0, radius))
-						
-						local testOrigin = origin + offset
-						if isClear(testOrigin) then
-							origin = testOrigin
-							found = true
-							break
-						end
-					end
-				end
-				
-				if not found and Target.Walls.Enabled then
-					return nil
-				end
+			
+			local bestOrigin = getManipulatedOrigin(origin, targetPos, radius, ignoreList)
+			
+			if bestOrigin then
+				origin = bestOrigin
+			elseif Target.Walls.Enabled then
+				return nil
 			end
 		end
 
@@ -1747,45 +1767,10 @@ run(function()
 						if ent and BulletManipulation.Enabled then
 							local targetPos = (ent.Head or ent.RootPart).Position
 							local radius = BulletManipulationRadius.Value
-							local params = RaycastParams.new()
 							local ignoreList = {gameCamera, entitylib.character, ent.Character}
-							params.FilterDescendantsInstances = ignoreList
-							params.FilterType = Enum.RaycastFilterType.Exclude
-				
-							local function isClear(pos)
-								return not workspace:Raycast(pos, targetPos - pos, params)
-							end
-				
-							if not isClear((origin * fireoffset).Position) then
-								local testOffsets = {
-									Vector3.new(0, radius, 0),
-									Vector3.new(0, -radius, 0),
-									Vector3.new(radius, 0, 0),
-									Vector3.new(-radius, 0, 0),
-									Vector3.new(0, 0, radius),
-									Vector3.new(0, 0, -radius),
-								}
-								for _, offset in testOffsets do
-									if isClear((origin * fireoffset).Position + offset) then
-										hasClearShot = true
-										break
-									end
-								end
-				
-								if not hasClearShot then
-									for i = 1, 40 do
-										local offset = Vector3.new(
-											rand:NextNumber(-1, 1),
-											rand:NextNumber(-1, 1),
-											rand:NextNumber(-1, 1)
-										).Unit * (rand:NextNumber(0, radius))
-										if isClear((origin * fireoffset).Position + offset) then
-											hasClearShot = true
-											break
-										end
-									end
-								end
-							else
+							
+							local bestOrigin = getManipulatedOrigin((origin * fireoffset).Position, targetPos, radius, ignoreList)
+							if bestOrigin then
 								hasClearShot = true
 							end
 						else
