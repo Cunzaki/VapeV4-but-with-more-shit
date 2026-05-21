@@ -1331,6 +1331,9 @@ run(function()
 	local resolverDebugFolder = nil
 	local scanPointParts = {}
 	local resolverDebugParts = {}
+	local scanActiveThisFrame = false
+	local lastDebugRenderTime = 0
+	local DEBUG_RENDER_INTERVAL = 0.1
 
 	local resolverConfig = {
 		HistorySize = 6,
@@ -1339,27 +1342,33 @@ run(function()
 		PredictiveMultiplier = 1.05
 	}
 
+	local function isVector3(val)
+		return type(val) == 'userdata' and typeof(val) == 'Vector3'
+	end
+
 	local function safeVelocity(vel)
-		if not vel then return Vector3.zero end
-		local mx = math.max(math.abs(vel.X), 0.001)
-		local my = math.max(math.abs(vel.Y), 0.001)
-		local mz = math.max(math.abs(vel.Z), 0.001)
-		if mx ~= mx or my ~= my or mz ~= mz then return Vector3.zero end
-		if not math.isfinite(mx) then mx = 0.001 end
-		if not math.isfinite(my) then my = 0.001 end
-		if not math.isfinite(mz) then mz = 0.001 end
-		return Vector3.new(vel.X ~= vel.X and 0 or vel.X, vel.Y ~= vel.Y and 0 or vel.Y, vel.Z ~= vel.Z and 0 or vel.Z)
+		if not isVector3(vel) then return Vector3.zero end
+		local vx = vel.X
+		local vy = vel.Y
+		local vz = vel.Z
+		if vx ~= vx or vy ~= vy or vz ~= vz then return Vector3.zero end
+		if not math.isfinite(vx) then vx = 0 end
+		if not math.isfinite(vy) then vy = 0 end
+		if not math.isfinite(vz) then vz = 0 end
+		return Vector3.new(vx, vy, vz)
 	end
 
 	local function safeMagnitude(vec)
+		if not isVector3(vec) then return 0 end
 		local m = vec.Magnitude
 		if m ~= m or not math.isfinite(m) then return 0 end
 		return m
 	end
 
 	local function safeUnit(vec)
-		local m = safeMagnitude(vec)
-		if m < 0.001 then return Vector3.zero end
+		if not isVector3(vec) then return Vector3.zero end
+		local m = vec.Magnitude
+		if m ~= m or m < 0.001 or not math.isfinite(m) then return Vector3.zero end
 		return vec / m
 	end
 
@@ -1392,19 +1401,30 @@ run(function()
 	end
 
 	local function calculateScanScore(hitpoint, origin, targetVel)
+		if not hitpoint or not isVector3(hitpoint.pos) or not isVector3(origin) then return 0, 0 end
 		local direction = hitpoint.pos - origin
+		if not isVector3(direction) then return 0, 0 end
 		local distance = safeMagnitude(direction)
 		if distance < 0.1 then return 0, 0 end
 		local normalizedDir = direction / distance
+		if not isVector3(normalizedDir) then return 0, 0 end
 		local targetUnit = safeUnit(targetVel)
-		local dotProduct = normalizedDir:Dot(targetUnit)
+		if not isVector3(targetUnit) then targetUnit = Vector3.zero end
+		local dotProduct = 0
+		local success, err = pcall(function()
+			dotProduct = normalizedDir:Dot(targetUnit)
+		end)
+		if not success then return 0, 0 end
+		if dotProduct ~= dotProduct then dotProduct = 0 end
+		dotProduct = math.clamp(dotProduct, -1, 1)
 		local angleScore = math.max(0, dotProduct)
-		local timeToHit = distance / math.max(1000, safeMagnitude(targetVel))
+		local targetSpeed = safeMagnitude(targetVel)
+		local timeToHit = distance / math.max(1000, targetSpeed)
 		local predictedOffset = targetVel * timeToHit * resolverConfig.PredictiveMultiplier
 		local predictedDist = safeMagnitude(predictedOffset)
 		local predictionBonus = 1 / (1 + predictedDist)
 		local finalScore = (angleScore * 0.4) + (hitpoint.weight * 0.3) + (predictionBonus * 0.3)
-		if finalScore ~= finalScore then return 0, 0 end
+		if finalScore ~= finalScore or not math.isfinite(finalScore) then return 0, 0 end
 		return math.min(finalScore, 1), distance
 	end
 
@@ -1505,7 +1525,7 @@ run(function()
 	local function renderPositionScanDebug(hitpoints, bestPoint, origin)
 		if not DebugVisualization or not DebugVisualization.Enabled then return end
 		clearScanDebugParts()
-		if not hitpoints or #hitpoints == 0 or not origin then return end
+		if not hitpoints or #hitpoints == 0 or not isVector3(origin) then return end
 		if not scanDebugFolder or not scanDebugFolder.Parent then
 			scanDebugFolder = Instance.new('Folder')
 			scanDebugFolder.Name = 'PositionScanDebug'
@@ -1514,6 +1534,7 @@ run(function()
 		local maxShow = math.min(#hitpoints, 20)
 		for i = 1, maxShow do
 			local hp = hitpoints[i]
+			if not hp or not isVector3(hp.pos) then continue end
 			local isBest = hp == bestPoint
 			local part = Instance.new('Part')
 			part.Size = Vector3.new(isBest and 0.4 or 0.15, isBest and 0.4 or 0.15, isBest and 0.4 or 0.15)
@@ -1528,9 +1549,9 @@ run(function()
 			part.Parent = scanDebugFolder
 			table.insert(scanPointParts, part)
 		end
-		if bestPoint and origin then
+		if bestPoint and isVector3(bestPoint.pos) then
 			local dist = safeMagnitude(bestPoint.pos - origin)
-			if dist > 0.1 then
+			if dist > 0.1 and isVector3(origin) then
 				local linePart = Instance.new('Part')
 				linePart.Size = Vector3.new(0.05, 0.05, dist)
 				linePart.CFrame = CFrame.lookAt(origin, bestPoint.pos) * CFrame.new(0, 0, -dist * 0.5)
@@ -1550,7 +1571,7 @@ run(function()
 	local function renderResolverDebug(rawPos, predictedPos)
 		if not DebugVisualization or not DebugVisualization.Enabled then return end
 		clearResolverDebugParts()
-		if not rawPos or not predictedPos then return end
+		if not isVector3(rawPos) or not isVector3(predictedPos) then return end
 		if not resolverDebugFolder or not resolverDebugFolder.Parent then
 			resolverDebugFolder = Instance.new('Folder')
 			resolverDebugFolder.Name = 'ResolverDebug'
@@ -1581,7 +1602,7 @@ run(function()
 		predPart.Parent = resolverDebugFolder
 		table.insert(resolverDebugParts, predPart)
 		local dist = safeMagnitude(predictedPos - rawPos)
-		if dist > 0.1 then
+		if dist > 0.1 and isVector3(rawPos) and isVector3(predictedPos) then
 			local linePart = Instance.new('Part')
 			linePart.Size = Vector3.new(0.05, 0.05, dist)
 			linePart.CFrame = CFrame.lookAt(rawPos, predictedPos) * CFrame.new(0, 0, -dist * 0.5)
@@ -1602,7 +1623,8 @@ run(function()
 	local SCAN_THROTTLE = 0.05
 
 	local function getBestScanPosition(ent, origin, wallcheckEnabled)
-		if not ent or not ent.Character or not origin then return nil, nil, 0 end
+		if not ent or not ent.Character then return nil, nil, 0 end
+		if not isVector3(origin) then return nil, nil, 0 end
 		local now = tick()
 		if ent == lastScanTarget and (now - lastScanTime) < SCAN_THROTTLE then
 			return nil, nil, 0
@@ -1625,7 +1647,7 @@ run(function()
 		end
 		if #allHitpoints == 0 then return nil, nil, 0 end
 		local targetVel = Vector3.zero
-		if ent.RootPart then
+		if ent.RootPart and isVector3(ent.RootPart.AssemblyLinearVelocity) then
 			targetVel = safeVelocity(ent.RootPart.AssemblyLinearVelocity)
 		end
 		local bestPoint = nil
@@ -1639,7 +1661,13 @@ run(function()
 				bestDistance = dist
 			end
 		end
-		renderPositionScanDebug(allHitpoints, bestPoint, origin)
+		if DebugVisualization and DebugVisualization.Enabled then
+			local now2 = tick()
+			if (now2 - lastDebugRenderTime) >= DEBUG_RENDER_INTERVAL then
+				lastDebugRenderTime = now2
+				renderPositionScanDebug(allHitpoints, bestPoint, origin)
+			end
+		end
 		return bestPoint, bestPoint and bestPoint.pos, bestDistance
 	end
 
@@ -1981,9 +2009,8 @@ run(function()
 						end
 					else
 						clearResolverDebugParts()
-						clearScanDebugParts()
 					end
-					if PositionScan.Enabled and (not DebugVisualization or not DebugVisualization.Enabled) then
+					if not PositionScan.Enabled then
 						clearScanDebugParts()
 					end
 					processHitDetection()
