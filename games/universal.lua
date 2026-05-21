@@ -6919,6 +6919,18 @@ run(function()
 		char.Archivable = oldarch
 		if not suc or not clone then return end
 		clone.Name = 'BlinkVisualizer'
+
+		local hrp = clone:FindFirstChild('HumanoidRootPart')
+		if hrp then hrp:Destroy() end
+
+		for _, part in clone:GetDescendants() do
+			if part:IsA('BasePart') then
+				part.CanCollide = false
+				part.CanTouch = false
+				part.CanQuery = false
+			end
+		end
+
 		visualClone = clone
 		applyVisualizerStyle()
 		clone.Parent = workspace
