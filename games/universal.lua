@@ -952,17 +952,10 @@ run(function()
 	local FOV
 	local Speed
 	local CircleColor
-	local CircleColor2
 	local CircleTransparency
 	local CircleFilled
 	local CircleObject
-	local CircleGradient
-	local CircleAnimation
-	local CircleSpeed
-	local CircleThickness
 	local RightClick
-	local circleObjects = {}
-	local circleAnimTime = 0
 	local moveConst = Vector2.new(1, 0.77) * math.rad(0.5)
 	
 	local function wrapAngle(num)
@@ -982,36 +975,8 @@ run(function()
 				local ent
 				local rightClicked = not RightClick.Enabled or inputService:IsMouseButtonPressed(1)
 				AimAssist:Clean(runService.RenderStepped:Connect(function(dt)
-					circleAnimTime = circleAnimTime + dt
-					local mousePos = inputService:GetMouseLocation()
-					if CircleGradient and CircleGradient.Enabled and circleObjects[1] then
-						local color1 = Color3.fromHSV(CircleColor.Hue, CircleColor.Sat, CircleColor.Value)
-						local color2 = Color3.fromHSV(CircleColor2.Hue, CircleColor2.Sat, CircleColor2.Value)
-						for i, circle in ipairs(circleObjects) do
-							circle.Position = mousePos
-							local t = (i - 1) / (#circleObjects - 1)
-							if CircleAnimation.Value == 'Pulse' then
-								local pulse = 1 + math.sin(circleAnimTime * CircleSpeed.Value * 3) * 0.1
-								circle.Radius = (FOV.Value - (i - 1) * CircleThickness.Value) * pulse
-							elseif CircleAnimation.Value == 'Rotate' then
-								circle.Rotation = circleAnimTime * CircleSpeed.Value * 50
-								circle.Radius = FOV.Value - (i - 1) * CircleThickness.Value
-							elseif CircleAnimation.Value == 'Breathe' then
-								local breathe = 1 + math.sin(circleAnimTime * CircleSpeed.Value * 2) * 0.15
-								circle.Radius = (FOV.Value - (i - 1) * CircleThickness.Value) * breathe
-							else
-								circle.Radius = FOV.Value - (i - 1) * CircleThickness.Value
-							end
-							circle.Color = color1:Lerp(color2, t)
-							circle.Filled = CircleFilled.Enabled
-							circle.Transparency = 1 - CircleTransparency.Value
-							circle.Visible = AimAssist.Enabled
-						end
-					elseif CircleObject then
-						CircleObject.Position = mousePos
-						CircleObject.Radius = FOV.Value
-						CircleObject.Filled = CircleFilled.Enabled
-						CircleObject.Visible = AimAssist.Enabled
+					if CircleObject then 
+						CircleObject.Position = inputService:GetMouseLocation() 
 					end
 					
 					if rightClicked and not vape.gui.ScaledGui.ClickGui.Visible then
@@ -1085,67 +1050,33 @@ run(function()
 		Name = 'Range Circle',
 		Function = function(callback)
 			if callback then
-				if CircleGradient and CircleGradient.Enabled then
-					for i = 1, 8 do
-						circleObjects[i] = Drawing.new('Circle')
-						circleObjects[i].Filled = CircleFilled.Enabled
-						circleObjects[i].Position = vape.gui.AbsoluteSize / 2
-						circleObjects[i].Radius = FOV.Value - (i - 1) * CircleThickness.Value
-						circleObjects[i].NumSides = 100
-						circleObjects[i].Transparency = 1 - CircleTransparency.Value
-						circleObjects[i].Visible = AimAssist.Enabled
-					end
-				else
-					CircleObject = Drawing.new('Circle')
-					CircleObject.Filled = CircleFilled.Enabled
-					CircleObject.Color = Color3.fromHSV(CircleColor.Hue, CircleColor.Sat, CircleColor.Value)
-					CircleObject.Position = vape.gui.AbsoluteSize / 2
-					CircleObject.Radius = FOV.Value
-					CircleObject.NumSides = 100
-					CircleObject.Transparency = 1 - CircleTransparency.Value
-					CircleObject.Visible = AimAssist.Enabled
-				end
+				CircleObject = Drawing.new('Circle')
+				CircleObject.Filled = CircleFilled.Enabled
+				CircleObject.Color = Color3.fromHSV(CircleColor.Hue, CircleColor.Sat, CircleColor.Value)
+				CircleObject.Position = vape.gui.AbsoluteSize / 2
+				CircleObject.Radius = FOV.Value
+				CircleObject.NumSides = 100
+				CircleObject.Transparency = 1 - CircleTransparency.Value
+				CircleObject.Visible = AimAssist.Enabled
 			else
 				pcall(function()
-					if circleObjects[1] then
-						for _, circle in circleObjects do
-							circle.Visible = false
-							circle:Remove()
-						end
-						circleObjects = {}
-					end
-					if CircleObject then
-						CircleObject.Visible = false
-						CircleObject:Remove()
-						CircleObject = nil
-					end
+					CircleObject.Visible = false
+					CircleObject:Remove()
 				end)
 			end
 			CircleColor.Object.Visible = callback
-			CircleColor2.Object.Visible = callback and CircleGradient and CircleGradient.Enabled
 			CircleTransparency.Object.Visible = callback
 			CircleFilled.Object.Visible = callback
-			CircleGradient.Object.Visible = callback
-			CircleThickness.Object.Visible = callback and CircleGradient and CircleGradient.Enabled
-			CircleAnimation.Object.Visible = callback and CircleGradient and CircleGradient.Enabled
-			CircleSpeed.Object.Visible = callback and CircleGradient and CircleGradient.Enabled
 		end
 	})
 	CircleColor = AimAssist:CreateColorSlider({
 		Name = 'Circle Color', 
 		Function = function(hue, sat, val)
-			if CircleObject and not circleObjects[1] then
+			if CircleObject then
 				CircleObject.Color = Color3.fromHSV(hue, sat, val)
 			end
 		end, 
 		Darker = true, 
-		Visible = false
-	})
-	CircleColor2 = AimAssist:CreateColorSlider({
-		Name = 'Circle Color 2',
-		Function = function(hue, sat, val)
-		end,
-		Darker = true,
 		Visible = false
 	})
 	CircleTransparency = AimAssist:CreateSlider({
@@ -1155,6 +1086,9 @@ run(function()
 		Decimal = 10,
 		Default = 0.5,
 		Function = function(val)
+			if CircleObject then
+				CircleObject.Transparency = 1 - val
+			end
 		end,
 		Darker = true,
 		Visible = false
@@ -1162,71 +1096,12 @@ run(function()
 	CircleFilled = AimAssist:CreateToggle({
 		Name = 'Circle Filled', 
 		Function = function(callback)
+			if CircleObject then
+				CircleObject.Filled = callback
+			end
 		end, 
 		Darker = true, 
 		Visible = false
-	})
-	CircleGradient = AimAssist:CreateToggle({
-		Name = 'Gradient',
-		Function = function(callback)
-			if CircleObject or circleObjects[1] then
-				pcall(function()
-					if circleObjects[1] then
-						for _, c in circleObjects do c:Remove() end
-						circleObjects = {}
-					end
-					if CircleObject then
-						CircleObject:Remove()
-						CircleObject = nil
-					end
-				end)
-			end
-			if callback and AimAssist and AimAssist.Enabled then
-				local btn = AimAssist.Objects and AimAssist.Objects.Buttons and AimAssist.Objects.Buttons['Range Circle']
-				if btn and btn.Api then
-					pcall(btn.Api.Function, true)
-				end
-			elseif AimAssist and AimAssist.Enabled then
-				local btn = AimAssist.Objects and AimAssist.Objects.Buttons and AimAssist.Objects.Buttons['Range Circle']
-				if btn and btn.Api then
-					pcall(btn.Api.Function, false)
-				end
-			end
-			CircleColor2.Object.Visible = callback
-			CircleThickness.Object.Visible = callback
-			CircleAnimation.Object.Visible = callback
-			CircleSpeed.Object.Visible = callback
-		end,
-		Darker = true,
-		Visible = false
-	})
-	CircleThickness = AimAssist:CreateSlider({
-		Name = 'Gradient Thickness',
-		Min = 1,
-		Max = 20,
-		Default = 5,
-		Darker = true,
-		Visible = false,
-		Function = function(val)
-		end
-	})
-	CircleAnimation = AimAssist:CreateDropdown({
-		Name = 'Animation',
-		List = {'None', 'Pulse', 'Rotate', 'Breathe'},
-		Default = 'None',
-		Darker = true,
-		Visible = false,
-		Function = function(val)
-		end
-	})
-	CircleSpeed = AimAssist:CreateSlider({
-		Name = 'Animation Speed',
-		Min = 0.1,
-		Max = 5,
-		Default = 1,
-		Darker = true,
-		Visible = false,
-		Suffix = 'x'
 	})
 	RightClick = AimAssist:CreateToggle({
 		Name = 'Require right click',
@@ -1420,25 +1295,14 @@ run(function()
 	local AutoFirePosition
 	local Wallbang
 	local CircleColor
-	local CircleColor2
 	local CircleTransparency
 	local CircleFilled
 	local CircleObject
-	local CircleGradient
-	local CircleAnimation
-	local CircleSpeed
-	local CircleThickness
 	local Projectile
 	local ProjectileSpeed
 	local ProjectileGravity
 	local BulletTracers
-	local BulletTracerColor2
-	local BulletTracerGradient
-	local BulletTracerAnimation
-	local BulletTracerTrail
-	local bulletTracerActive = {}
-	local circleObjects = {}
-	local circleAnimTime = 0
+	local BulletTracerColor
 	local BulletTracerTransparency
 	local BulletTracerThickness
 	local BulletTracerDuration
@@ -1554,24 +1418,7 @@ run(function()
 		main.Width1 = thickness * 0.045
 		glow.Width0 = (thickness + 2) * 0.045
 		glow.Width1 = (thickness + 2) * 0.045
-		if BulletTracerGradient and BulletTracerGradient.Enabled and BulletTracerColor2 then
-			local color1 = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
-			local color2 = Color3.fromHSV(BulletTracerColor2.Hue, BulletTracerColor2.Sat, BulletTracerColor2.Value)
-			main.Color = ColorSequence.new({
-				Color = color1,
-				Time = 0,
-				Color = color2,
-				Time = 1
-			})
-		else
-			local color1 = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
-			main.Color = ColorSequence.new({
-				Color = color1,
-				Time = 0,
-				Color = color1,
-				Time = 1
-			})
-		end
+		main.Color = ColorSequence.new(mainColor)
 		glow.Color = ColorSequence.new(glowColor)
 		main.Parent = part0
 		glow.Parent = part0
@@ -1584,9 +1431,7 @@ run(function()
 			Origin = pending.Origin,
 			TargetPosition = pending.TargetPosition,
 			CreatedAt = now,
-			DieAt = now + BulletTracerDuration.Value,
-			BaseThickness = thickness,
-			LifeAlpha = 1
+			DieAt = now + BulletTracerDuration.Value
 		})
 	end
 
@@ -1637,8 +1482,6 @@ run(function()
 
 	local function renderBulletTracers()
 		local now = tick()
-		local animType = BulletTracerAnimation and BulletTracerAnimation.Value or 'None'
-		local trailEnabled = BulletTracerTrail and BulletTracerTrail.Enabled
 
 		for i = #bulletTracerActive, 1, -1 do
 			local tracer = bulletTracerActive[i]
@@ -1652,39 +1495,12 @@ run(function()
 			end
 
 			local lifeAlpha = math.clamp((tracer.DieAt - now) / math.max(BulletTracerDuration.Value, 0.001), 0, 1)
-			tracer.LifeAlpha = lifeAlpha
 			local baseAlpha = (1 - BulletTracerTransparency.Value) * lifeAlpha
 			local visible = SilentAim.Enabled and BulletTracers.Enabled
-			
 			local mainAlpha = visible and (1 - baseAlpha) or 1
 			local glowAlpha = visible and (1 - math.clamp(baseAlpha * 0.5, 0, 1)) or 1
-			
-			local thickness = tracer.BaseThickness
-			local thicknessMult = 1
-			
-			if animType == 'Pulse' then
-				local pulse = 1 + math.sin(now * 10) * 0.3
-				thicknessMult = pulse * lifeAlpha
-			elseif animType == 'Fade' then
-				thicknessMult = lifeAlpha
-			elseif animType == 'Wave' then
-				local wave = 1 + math.sin(now * 8 + tracer.CreatedAt * 3) * 0.25
-				thicknessMult = wave * lifeAlpha
-			end
-			
-			tracer.Main.Width0 = (thickness * 0.045) * thicknessMult
-			tracer.Main.Width1 = (thickness * 0.045) * thicknessMult
-			tracer.Glow.Width0 = ((thickness + 2) * 0.045) * thicknessMult
-			tracer.Glow.Width1 = ((thickness + 2) * 0.045) * thicknessMult
-			
-			if trailEnabled then
-				local trailLife = math.clamp((now - tracer.CreatedAt) / 0.1, 0, 1)
-				tracer.Main.Transparency = NumberSequence.new(mainAlpha)
-				tracer.Glow.Transparency = NumberSequence.new(glowAlpha * (1 - trailLife))
-			else
-				tracer.Main.Transparency = NumberSequence.new(mainAlpha)
-				tracer.Glow.Transparency = NumberSequence.new(glowAlpha)
-			end
+			tracer.Main.Transparency = NumberSequence.new(mainAlpha)
+			tracer.Glow.Transparency = NumberSequence.new(glowAlpha)
 		end
 	end
 
@@ -1826,38 +1642,8 @@ run(function()
 				end
 
 				repeat
-					circleAnimTime = circleAnimTime + task.wait()
-					local mousePos = inputService:GetMouseLocation()
 					if CircleObject then
-						if CircleGradient and CircleGradient.Enabled and circleObjects[1] then
-							local color1 = Color3.fromHSV(CircleColor.Hue, CircleColor.Sat, CircleColor.Value)
-							local color2 = Color3.fromHSV(CircleColor2.Hue, CircleColor2.Sat, CircleColor2.Value)
-							for i, circle in ipairs(circleObjects) do
-								circle.Position = mousePos
-								local t = (i - 1) / (#circleObjects - 1)
-								if CircleAnimation.Value == 'Pulse' then
-									local pulse = 1 + math.sin(circleAnimTime * CircleSpeed.Value * 3) * 0.1
-									circle.Radius = (Range.Value - (i - 1) * CircleThickness.Value) * pulse
-								elseif CircleAnimation.Value == 'Rotate' then
-									circle.Rotation = circleAnimTime * CircleSpeed.Value * 50
-									circle.Radius = Range.Value - (i - 1) * CircleThickness.Value
-								elseif CircleAnimation.Value == 'Breathe' then
-									local breathe = 1 + math.sin(circleAnimTime * CircleSpeed.Value * 2) * 0.15
-									circle.Radius = (Range.Value - (i - 1) * CircleThickness.Value) * breathe
-								else
-									circle.Radius = Range.Value - (i - 1) * CircleThickness.Value
-								end
-								circle.Color = color1:Lerp(color2, t)
-								circle.Filled = CircleFilled.Enabled
-								circle.Transparency = 1 - CircleTransparency.Value
-								circle.Visible = SilentAim.Enabled and Mode.Value == 'Mouse'
-							end
-						elseif CircleObject then
-							CircleObject.Position = mousePos
-							CircleObject.Radius = Range.Value
-							CircleObject.Filled = CircleFilled.Enabled
-							CircleObject.Visible = SilentAim.Enabled and Mode.Value == 'Mouse'
-						end
+						CircleObject.Position = inputService:GetMouseLocation()
 					end
 					processHitDetection()
 					if BulletTracers.Enabled then
@@ -2018,64 +1804,31 @@ run(function()
 		Name = 'Range Circle',
 		Function = function(callback)
 			if callback then
-				if CircleGradient and CircleGradient.Enabled and circleObjects[1] then
-					for i = 1, 8 do
-						circleObjects[i] = Drawing.new('Circle')
-						circleObjects[i].Filled = CircleFilled.Enabled
-						circleObjects[i].Position = vape.gui.AbsoluteSize / 2
-						circleObjects[i].Radius = Range.Value - (i - 1) * CircleThickness.Value
-						circleObjects[i].NumSides = 100
-						circleObjects[i].Transparency = 1 - CircleTransparency.Value
-						circleObjects[i].Visible = SilentAim.Enabled and Mode.Value == 'Mouse'
-					end
-				else
-					CircleObject = Drawing.new('Circle')
-					CircleObject.Filled = CircleFilled.Enabled
-					CircleObject.Color = Color3.fromHSV(CircleColor.Hue, CircleColor.Sat, CircleColor.Value)
-					CircleObject.Position = vape.gui.AbsoluteSize / 2
-					CircleObject.Radius = Range.Value
-					CircleObject.NumSides = 100
-					CircleObject.Transparency = 1 - CircleTransparency.Value
-					CircleObject.Visible = SilentAim.Enabled and Mode.Value == 'Mouse'
-				end
+				CircleObject = Drawing.new('Circle')
+				CircleObject.Filled = CircleFilled.Enabled
+				CircleObject.Color = Color3.fromHSV(CircleColor.Hue, CircleColor.Sat, CircleColor.Value)
+				CircleObject.Position = vape.gui.AbsoluteSize / 2
+				CircleObject.Radius = Range.Value
+				CircleObject.NumSides = 100
+				CircleObject.Transparency = 1 - CircleTransparency.Value
+				CircleObject.Visible = SilentAim.Enabled and Mode.Value == 'Mouse'
 			else
 				pcall(function()
-					if circleObjects[1] then
-						for _, circle in circleObjects do
-							circle.Visible = false
-							circle:Remove()
-						end
-					end
-					if CircleObject then
-						CircleObject.Visible = false
-						CircleObject:Remove()
-					end
-					circleObjects = {}
+					CircleObject.Visible = false
+					CircleObject:Remove()
 				end)
 			end
 			CircleColor.Object.Visible = callback
-			CircleColor2.Object.Visible = callback and CircleGradient and CircleGradient.Enabled
 			CircleTransparency.Object.Visible = callback
 			CircleFilled.Object.Visible = callback
-			CircleGradient.Object.Visible = callback
-			CircleThickness.Object.Visible = callback and CircleGradient and CircleGradient.Enabled
-			CircleAnimation.Object.Visible = callback and CircleGradient and CircleGradient.Enabled
-			CircleSpeed.Object.Visible = callback and CircleGradient and CircleGradient.Enabled
 		end
 	})
 	CircleColor = SilentAim:CreateColorSlider({
 		Name = 'Circle Color',
 		Function = function(hue, sat, val)
-			if CircleObject and not circleObjects[1] then
+			if CircleObject then
 				CircleObject.Color = Color3.fromHSV(hue, sat, val)
 			end
-		end,
-		Darker = true,
-		Visible = false
-	})
-	CircleColor2 = SilentAim:CreateColorSlider({
-		Name = 'Circle Color 2',
-		Function = function(hue, sat, val)
 		end,
 		Darker = true,
 		Visible = false
@@ -2087,6 +1840,9 @@ run(function()
 		Decimal = 10,
 		Default = 0.5,
 		Function = function(val)
+			if CircleObject then
+				CircleObject.Transparency = 1 - val
+			end
 		end,
 		Darker = true,
 		Visible = false
@@ -2094,69 +1850,12 @@ run(function()
 	CircleFilled = SilentAim:CreateToggle({
 		Name = 'Circle Filled',
 		Function = function(callback)
-		end,
-		Darker = true,
-		Visible = false
-	})
-	CircleGradient = SilentAim:CreateToggle({
-		Name = 'Gradient',
-		Function = function(callback)
 			if CircleObject then
-				pcall(function()
-					if circleObjects[1] then
-						for _, c in circleObjects do c:Remove() end
-						circleObjects = {}
-					end
-					CircleObject:Remove()
-					CircleObject = nil
-				end)
+				CircleObject.Filled = callback
 			end
-			if callback and SilentAim and SilentAim.Enabled then
-				local btn = SilentAim.Objects and SilentAim.Objects.Buttons and SilentAim.Objects.Buttons['Range Circle']
-				if btn and btn.Api then
-					pcall(btn.Api.Function, true)
-				end
-			elseif SilentAim and SilentAim.Enabled then
-				local btn = SilentAim.Objects and SilentAim.Objects.Buttons and SilentAim.Objects.Buttons['Range Circle']
-				if btn and btn.Api then
-					pcall(btn.Api.Function, false)
-				end
-			end
-			CircleColor2.Object.Visible = callback
-			CircleThickness.Object.Visible = callback
-			CircleAnimation.Object.Visible = callback
-			CircleSpeed.Object.Visible = callback
 		end,
 		Darker = true,
 		Visible = false
-	})
-	CircleThickness = SilentAim:CreateSlider({
-		Name = 'Gradient Thickness',
-		Min = 1,
-		Max = 20,
-		Default = 5,
-		Darker = true,
-		Visible = false,
-		Function = function(val)
-		end
-	})
-	CircleAnimation = SilentAim:CreateDropdown({
-		Name = 'Animation',
-		List = {'None', 'Pulse', 'Rotate', 'Breathe'},
-		Default = 'None',
-		Darker = true,
-		Visible = false,
-		Function = function(val)
-		end
-	})
-	CircleSpeed = SilentAim:CreateSlider({
-		Name = 'Animation Speed',
-		Min = 0.1,
-		Max = 5,
-		Default = 1,
-		Darker = true,
-		Visible = false,
-		Suffix = 'x'
 	})
 	Projectile = SilentAim:CreateToggle({
 		Name = 'Projectile',
@@ -2188,13 +1887,9 @@ run(function()
 		Name = 'Bullet Tracers',
 		Function = function(callback)
 			BulletTracerColor.Object.Visible = callback
-			BulletTracerColor2.Object.Visible = callback and BulletTracerGradient and BulletTracerGradient.Enabled
 			BulletTracerTransparency.Object.Visible = callback
 			BulletTracerThickness.Object.Visible = callback
 			BulletTracerDuration.Object.Visible = callback
-			BulletTracerGradient.Object.Visible = callback
-			BulletTracerAnimation.Object.Visible = callback and BulletTracerGradient and BulletTracerGradient.Enabled
-			BulletTracerTrail.Object.Visible = callback
 			if not callback then
 				clearBulletTracers()
 			end
@@ -2205,48 +1900,11 @@ run(function()
 		Darker = true,
 		Visible = false,
 		Function = function(hue, sat, val)
-			local color1 = Color3.fromHSV(hue, sat, val)
-			local glow = color1:Lerp(Color3.new(1, 1, 1), 0.45)
+			local color = Color3.fromHSV(hue, sat, val)
+			local glow = color:Lerp(Color3.new(1, 1, 1), 0.45)
 			for _, tracer in bulletTracerActive do
-				if BulletTracerGradient and BulletTracerGradient.Enabled and BulletTracerColor2 then
-					local color2 = Color3.fromHSV(BulletTracerColor2.Hue, BulletTracerColor2.Sat, BulletTracerColor2.Value)
-					tracer.Main.Color = ColorSequence.new({
-						Color = color1,
-						Time = 0,
-						Color = color2,
-						Time = 1
-					})
-				else
-					tracer.Main.Color = ColorSequence.new({
-						Color = color1,
-						Time = 0,
-						Color = color1,
-						Time = 1
-					})
-				end
-				tracer.Glow.Color = ColorSequence.new({
-					Color = glow,
-					Time = 0,
-					Color = glow,
-					Time = 1
-				})
-			end
-		end
-	})
-	BulletTracerColor2 = SilentAim:CreateColorSlider({
-		Name = 'Tracer Color 2',
-		Darker = true,
-		Visible = false,
-		Function = function(hue, sat, val)
-			local color1 = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
-			local color2 = Color3.fromHSV(hue, sat, val)
-			for _, tracer in bulletTracerActive do
-				tracer.Main.Color = ColorSequence.new({
-					Color = color1,
-					Time = 0,
-					Color = color2,
-					Time = 1
-				})
+				tracer.Main.Color = ColorSequence.new(color)
+				tracer.Glow.Color = ColorSequence.new(glow)
 			end
 		end
 	})
@@ -2268,7 +1926,7 @@ run(function()
 	BulletTracerThickness = SilentAim:CreateSlider({
 		Name = 'Tracer Thickness',
 		Min = 1,
-		Max = 8,
+		Max = 5,
 		Default = 2,
 		Darker = true,
 		Visible = false,
@@ -2289,31 +1947,6 @@ run(function()
 		Decimal = 100,
 		Darker = true,
 		Visible = false
-	})
-	BulletTracerGradient = SilentAim:CreateToggle({
-		Name = 'Gradient',
-		Darker = true,
-		Visible = false,
-		Function = function(callback)
-			BulletTracerColor2.Object.Visible = callback
-			BulletTracerAnimation.Object.Visible = callback
-		end
-	})
-	BulletTracerAnimation = SilentAim:CreateDropdown({
-		Name = 'Animation',
-		List = {'None', 'Pulse', 'Fade', 'Wave'},
-		Default = 'None',
-		Darker = true,
-		Visible = false,
-		Function = function(val)
-		end
-	})
-	BulletTracerTrail = SilentAim:CreateToggle({
-		Name = 'Trail Effect',
-		Darker = true,
-		Visible = false,
-		Function = function(callback)
-		end
 	})
 	vape:Clean(BulletTracerFolder)
 end)
