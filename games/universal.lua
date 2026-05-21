@@ -1589,6 +1589,7 @@ run(function()
 		return ent, ent and ent[targetPart], origin
 	end
 
+	local HookingRecursion = false
 	local Hooks = {
 		FindPartOnRayWithIgnoreList = function(args)
 			local ent, targetPart, origin = getTarget(args[1].Origin, {args[2]})
@@ -1659,20 +1660,23 @@ run(function()
 				SilentAim:Clean(entitylib.Events.LocalAdded:Connect(resetTracerTracking))
 				if Method.Value == 'Ray' then
 					oldray = hookfunction(Ray.new, function(origin, direction)
-						if checkcaller() then
+						if checkcaller() or HookingRecursion then
 							return oldray(origin, direction)
 						end
+						HookingRecursion = true
 						local calling = getcallingscript()
 
 						if calling then
 							local list = #IgnoredScripts.ListEnabled > 0 and IgnoredScripts.ListEnabled or {'ControlScript', 'ControlModule'}
 							if table.find(list, tostring(calling)) then
+								HookingRecursion = false
 								return oldray(origin, direction)
 							end
 						end
 
 						local args = {origin, direction}
 						Hooks.Ray(args)
+						HookingRecursion = false
 						return oldray(unpack(args))
 					end)
 				else
@@ -1680,20 +1684,23 @@ run(function()
 						if getnamecallmethod() ~= Method.Value then
 							return oldnamecall(...)
 						end
-						if checkcaller() then
+						if checkcaller() or HookingRecursion then
 							return oldnamecall(...)
 						end
+						HookingRecursion = true
 
 						local calling = getcallingscript()
 						if calling then
 							local list = #IgnoredScripts.ListEnabled > 0 and IgnoredScripts.ListEnabled or {'ControlScript', 'ControlModule'}
 							if table.find(list, tostring(calling)) then
+								HookingRecursion = false
 								return oldnamecall(...)
 							end
 						end
 
 						local self, args = ..., {select(2, ...)}
 						local res = Hooks[Method.Value](args)
+						HookingRecursion = false
 						if res then
 							return unpack(res)
 						end
