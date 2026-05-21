@@ -1509,9 +1509,12 @@ run(function()
 	local function getTarget(origin, obj)
 		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then return end
 		local targetPart = (rand.NextNumber(rand, 0, 100) < (AutoFire.Enabled and 100 or HeadshotChance.Value)) and 'Head' or 'RootPart'
+		local isWallcheck = Target.Walls.Enabled and (obj or true) or nil
+		local isTargetingBehindWalls = BulletManipulation.Enabled and Target.Walls.Enabled
+		
 		local ent = entitylib['Entity'..Mode.Value]({
 			Range = Range.Value,
-			Wallcheck = Target.Walls.Enabled and (obj or true) or nil,
+			Wallcheck = isTargetingBehindWalls and nil or isWallcheck,
 			Part = targetPart,
 			Origin = origin,
 			Players = Target.Players.Enabled,
@@ -1570,9 +1573,14 @@ run(function()
 						local testOrigin = origin + offset
 						if isClear(testOrigin) then
 							origin = testOrigin
+							found = true
 							break
 						end
 					end
+				end
+				
+				if not found and Target.Walls.Enabled then
+					return nil
 				end
 			end
 		end
@@ -1718,21 +1726,75 @@ run(function()
 					end
 					if AutoFire.Enabled then
 						local origin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
+						
+						local isWallcheck = Target.Walls.Enabled or nil
+						local isTargetingBehindWalls = BulletManipulation.Enabled and Target.Walls.Enabled
+						
 						local ent = entitylib['Entity'..Mode.Value]({
 							Range = Range.Value,
-							Wallcheck = Target.Walls.Enabled or nil,
+							Wallcheck = isTargetingBehindWalls and nil or isWallcheck,
 							Part = 'Head',
 							Origin = (origin * fireoffset).Position,
 							Players = Target.Players.Enabled,
 							NPCs = Target.NPCs.Enabled,
 							Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
 						})
-						if ent then
+						
+						local hasClearShot = false
+						if ent and BulletManipulation.Enabled then
+							local targetPos = (ent.Head or ent.RootPart).Position
+							local radius = BulletManipulationRadius.Value
+							local params = RaycastParams.new()
+							local ignoreList = {gameCamera, entitylib.character, ent.Character}
+							params.FilterDescendantsInstances = ignoreList
+							params.FilterType = Enum.RaycastFilterType.Exclude
+				
+							local function isClear(pos)
+								return not workspace:Raycast(pos, targetPos - pos, params)
+							end
+				
+							if not isClear((origin * fireoffset).Position) then
+								local testOffsets = {
+									Vector3.new(0, radius, 0),
+									Vector3.new(0, -radius, 0),
+									Vector3.new(radius, 0, 0),
+									Vector3.new(-radius, 0, 0),
+									Vector3.new(0, 0, radius),
+									Vector3.new(0, 0, -radius),
+								}
+								for _, offset in testOffsets do
+									if isClear((origin * fireoffset).Position + offset) then
+										hasClearShot = true
+										break
+									end
+								end
+				
+								if not hasClearShot then
+									for i = 1, 40 do
+										local offset = Vector3.new(
+											rand:NextNumber(-1, 1),
+											rand:NextNumber(-1, 1),
+											rand:NextNumber(-1, 1)
+										).Unit * (rand:NextNumber(0, radius))
+										if isClear((origin * fireoffset).Position + offset) then
+											hasClearShot = true
+											break
+										end
+									end
+								end
+							else
+								hasClearShot = true
+							end
+						else
+							hasClearShot = ent ~= nil
+						end
+						
+						if ent and hasClearShot then
 							registerShot(ent, ent.Head or ent.RootPart, (origin * fireoffset).Position)
 						end
 
 						if mouse1click and (isrbxactive or iswindowactive)() then
-							if ent and canClick() then
+							if ent and hasClearShot and canClick() then
 								if delayCheck < tick() then
 									if mouseClicked then
 										mouse1release()
