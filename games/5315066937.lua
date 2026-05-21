@@ -72,7 +72,14 @@ run(function()
 
 	local function getGroundState()
 		local hrp = getHRP()
-		return hrp and hrp.IsGround or false
+		if not hrp then return false end
+		local rayOrigin = hrp.Position
+		local rayDir = Vector3.new(0, -4, 0)
+		local params = RaycastParams.new()
+		params.FilterDescendantsInstances = {getCharacter()}
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		local result = workspaceService:Raycast(rayOrigin, rayDir, params)
+		return result ~= nil
 	end
 
 	Speed = vape.Categories.Blatant:CreateModule({
