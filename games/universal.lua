@@ -1554,20 +1554,23 @@ run(function()
 		main.Width1 = thickness * 0.045
 		glow.Width0 = (thickness + 2) * 0.045
 		glow.Width1 = (thickness + 2) * 0.045
-		local color2 = mainColor
 		if BulletTracerGradient and BulletTracerGradient.Enabled and BulletTracerColor2 then
-			color2 = Color3.fromHSV(BulletTracerColor2.Hue, BulletTracerColor2.Sat, BulletTracerColor2.Value)
-			if math.abs(color2.R - mainColor.R) < 0.01 and math.abs(color2.G - mainColor.G) < 0.01 and math.abs(color2.B - mainColor.B) < 0.01 then
-				color2 = mainColor:Lerp(color2.R < 0.5 and Color3.new(1,1,1) or Color3.new(0,0,0), 0.5)
-			end
+			local color1 = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
+			local color2 = Color3.fromHSV(BulletTracerColor2.Hue, BulletTracerColor2.Sat, BulletTracerColor2.Value)
 			main.Color = ColorSequence.new({
-				Color = mainColor,
+				Color = color1,
 				Time = 0,
 				Color = color2,
 				Time = 1
 			})
 		else
-			main.Color = ColorSequence.new(mainColor)
+			local color1 = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
+			main.Color = ColorSequence.new({
+				Color = color1,
+				Time = 0,
+				Color = color1,
+				Time = 1
+			})
 		end
 		glow.Color = ColorSequence.new(glowColor)
 		main.Parent = part0
@@ -2202,16 +2205,31 @@ run(function()
 		Darker = true,
 		Visible = false,
 		Function = function(hue, sat, val)
-			local color = Color3.fromHSV(hue, sat, val)
-			local glow = color:Lerp(Color3.new(1, 1, 1), 0.45)
+			local color1 = Color3.fromHSV(hue, sat, val)
+			local glow = color1:Lerp(Color3.new(1, 1, 1), 0.45)
 			for _, tracer in bulletTracerActive do
-				tracer.Main.Color = BulletTracerGradient and BulletTracerGradient.Enabled and ColorSequence.new({
-					Color = color,
+				if BulletTracerGradient and BulletTracerGradient.Enabled and BulletTracerColor2 then
+					local color2 = Color3.fromHSV(BulletTracerColor2.Hue, BulletTracerColor2.Sat, BulletTracerColor2.Value)
+					tracer.Main.Color = ColorSequence.new({
+						Color = color1,
+						Time = 0,
+						Color = color2,
+						Time = 1
+					})
+				else
+					tracer.Main.Color = ColorSequence.new({
+						Color = color1,
+						Time = 0,
+						Color = color1,
+						Time = 1
+					})
+				end
+				tracer.Glow.Color = ColorSequence.new({
+					Color = glow,
 					Time = 0,
-					Color = Color3.fromHSV(BulletTracerColor2.Hue, BulletTracerColor2.Sat, BulletTracerColor2.Value),
+					Color = glow,
 					Time = 1
-				}) or ColorSequence.new(color)
-				tracer.Glow.Color = ColorSequence.new(glow)
+				})
 			end
 		end
 	})
