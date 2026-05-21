@@ -1476,7 +1476,10 @@ run(function()
 			scanDelay = BulletScanDelay.Value
 		end
 		if (now - lastScanTime) < scanDelay then
-			return currentManipulatedOrigin, currentScanTarget, "Cooldown"
+			if currentManipulatedOrigin and type(currentManipulatedOrigin) == "userdata" then
+				return currentManipulatedOrigin, currentScanTarget, "Cooldown"
+			end
+			return origin, targetPos, "Cooldown-Fallback"
 		end
 		lastScanTime = now
 
@@ -1517,12 +1520,13 @@ run(function()
 			end
 			return bestPoint, targetPos, "Found"
 		else
-			currentManipulatedOrigin = nil
-			currentScanTarget = nil
+			currentManipulatedOrigin = origin
+			currentScanTarget = targetPos
 			if isDebug then
-				print(string.format("[BulletScan] FAILED | No visible points found | Blocked:%d", #blockedPoints))
+				print(string.format("[BulletScan] FAILED | No visible points found | Blocked:%d | Using original origin",
+					#blockedPoints))
 			end
-			return nil, nil, "No visible points"
+			return origin, targetPos, "No visible points"
 		end
 	end
 
@@ -1727,15 +1731,17 @@ run(function()
 				if ent.Character and targetPart then
 					local scanOrigin, scanTarget, status = performBulletScan(baseOrigin, targetPart.Position, ent.Character)
 					scanStatus = status
-					if scanOrigin then
+					if scanOrigin and type(scanOrigin) == "userdata" then
 						manipulatedOrigin = scanOrigin
 						if isDebug then
 							print(string.format("[getTarget] BulletManipulation | Original:%s | Manipulated:%s | Status:%s",
 								tostring(baseOrigin), tostring(manipulatedOrigin), scanStatus))
 						end
 					else
+						manipulatedOrigin = baseOrigin
 						if isDebug then
-							print(string.format("[getTarget] BulletManipulation FAILED | Status:%s", scanStatus))
+							print(string.format("[getTarget] BulletManipulation FAILED | Status:%s | Falling back to original",
+								tostring(scanStatus)))
 						end
 					end
 				end
@@ -1896,6 +1902,9 @@ run(function()
 					if AutoFire.Enabled then
 						local baseOrigin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
 						local originPos = (baseOrigin * fireoffset).Position
+						if not originPos then
+							originPos = gameCamera.CFrame.Position
+						end
 						local targetPartName = 'Head'
 						local ent = entitylib['Entity'..Mode.Value]({
 							Range = Range.Value,
@@ -1916,15 +1925,17 @@ run(function()
 								if ent.Character and targetPart then
 									local scanOrigin, scanTarget, status = performBulletScan(originPos, targetPart.Position, ent.Character)
 									scanStatus = status
-									if scanOrigin then
+									if scanOrigin and type(scanOrigin) == "userdata" then
 										manipulatedOrigin = scanOrigin
 										if isDebug then
 											print(string.format("[AutoFire] BulletManipulation | Original:%s | Manipulated:%s | Status:%s",
 												tostring(originPos), tostring(manipulatedOrigin), scanStatus))
 										end
 									else
+										manipulatedOrigin = originPos
 										if isDebug then
-											print(string.format("[AutoFire] BulletManipulation FAILED | Status:%s", scanStatus))
+											print(string.format("[AutoFire] BulletManipulation FAILED | Status:%s | Falling back to original",
+												tostring(scanStatus)))
 										end
 									end
 								end
