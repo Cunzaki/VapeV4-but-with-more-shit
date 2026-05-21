@@ -1181,10 +1181,16 @@ run(function()
 					end
 				end)
 			end
-			if callback and AimAssist.Enabled then
-				AimAssist.Objects.Buttons['Range Circle'].Api.Function(true)
-			elseif AimAssist.Enabled then
-				AimAssist.Objects.Buttons['Range Circle'].Api.Function(false)
+			if callback and AimAssist and AimAssist.Enabled then
+				local btn = AimAssist.Objects and AimAssist.Objects.Buttons and AimAssist.Objects.Buttons['Range Circle']
+				if btn and btn.Api then
+					pcall(btn.Api.Function, true)
+				end
+			elseif AimAssist and AimAssist.Enabled then
+				local btn = AimAssist.Objects and AimAssist.Objects.Buttons and AimAssist.Objects.Buttons['Range Circle']
+				if btn and btn.Api then
+					pcall(btn.Api.Function, false)
+				end
 			end
 			CircleColor2.Object.Visible = callback
 			CircleThickness.Object.Visible = callback
@@ -1548,8 +1554,12 @@ run(function()
 		main.Width1 = thickness * 0.045
 		glow.Width0 = (thickness + 2) * 0.045
 		glow.Width1 = (thickness + 2) * 0.045
-		local color2 = BulletTracerColor2 and Color3.fromHSV(BulletTracerColor2.Hue, BulletTracerColor2.Sat, BulletTracerColor2.Value) or mainColor
-		if BulletTracerGradient and BulletTracerGradient.Enabled then
+		local color2 = mainColor
+		if BulletTracerGradient and BulletTracerGradient.Enabled and BulletTracerColor2 then
+			color2 = Color3.fromHSV(BulletTracerColor2.Hue, BulletTracerColor2.Sat, BulletTracerColor2.Value)
+			if math.abs(color2.R - mainColor.R) < 0.01 and math.abs(color2.G - mainColor.G) < 0.01 and math.abs(color2.B - mainColor.B) < 0.01 then
+				color2 = mainColor:Lerp(color2.R < 0.5 and Color3.new(1,1,1) or Color3.new(0,0,0), 0.5)
+			end
 			main.Color = ColorSequence.new({
 				Color = mainColor,
 				Time = 0,
@@ -2098,10 +2108,16 @@ run(function()
 					CircleObject = nil
 				end)
 			end
-			if callback and SilentAim.Enabled then
-				SilentAim.Objects.Buttons['Range Circle'].Api.Function(true)
-			elseif SilentAim.Enabled then
-				SilentAim.Objects.Buttons['Range Circle'].Api.Function(false)
+			if callback and SilentAim and SilentAim.Enabled then
+				local btn = SilentAim.Objects and SilentAim.Objects.Buttons and SilentAim.Objects.Buttons['Range Circle']
+				if btn and btn.Api then
+					pcall(btn.Api.Function, true)
+				end
+			elseif SilentAim and SilentAim.Enabled then
+				local btn = SilentAim.Objects and SilentAim.Objects.Buttons and SilentAim.Objects.Buttons['Range Circle']
+				if btn and btn.Api then
+					pcall(btn.Api.Function, false)
+				end
 			end
 			CircleColor2.Object.Visible = callback
 			CircleThickness.Object.Visible = callback
