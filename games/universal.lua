@@ -1326,6 +1326,279 @@ run(function()
 	local bulletTracerActive = {}
 	local bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	local healthCache = setmetatable({}, {__mode = 'k'})
+	local resolverCache = setmetatable({}, {__mode = 'k'})
+	local positionScanDebug = {}
+	local scanPointParts = {}
+
+	local resolverConfig = {
+		HistorySize = 8,
+		JitterThreshold = 0.15,
+		InterpolationWindow = 3,
+		VelocitySmoothing = 0.6,
+		PredictiveMultiplier = 1.05
+	}
+
+	local function getPartHitpoints(part, origin)
+		if not part or not part.Parent then return {} end
+		local cf = part.CFrame
+		local size = part.Size
+		local hitpoints = {}
+		table.insert(hitpoints, {pos = cf.Position, weight = 1.0, name = 'Center'})
+		local vertices = {
+			cf * CFrame.new(size.X * 0.5, 0, 0),
+			cf * CFrame.new(-size.X * 0.5, 0, 0),
+			cf * CFrame.new(0, size.Y * 0.5, 0),
+			cf * CFrame.new(0, -size.Y * 0.5, 0),
+			cf * CFrame.new(0, 0, size.Z * 0.5),
+			cf * CFrame.new(0, 0, -size.Z * 0.5),
+		}
+		for i, v in vertices do
+			local toCam = (gameCamera.CFrame.Position - v.Position).Magnitude
+			local rayDir = (v.Position - origin).Unit
+			local rayResult = workspace:Raycast(origin, rayDir * toCam, RaycastParams.new())
+			if not rayResult or rayResult.Instance == part or rayResult.Instance:IsDescendantOf(part.Parent) then
+				table.insert(hitpoints, {pos = v.Position, weight = 0.7, name = 'Vertex'..i})
+			end
+		end
+		if part.Name == 'HumanoidRootPart' or part.Name == 'Torso' or part.Name == 'UpperTorso' then
+			local torsoCfs = {
+				cf * CFrame.new(0, size.Y * 0.2, 0),
+				cf * CFrame.new(0, -size.Y * 0.2, 0),
+				cf * CFrame.new(0, size.Y * 0.4, 0),
+			}
+			for i, tc in torsoCfs do
+				table.insert(hitpoints, {pos = tc.Position, weight = 0.85, name = 'Torso'..i})
+			end
+		elseif part.Name == 'Head' then
+			table.insert(hitpoints, {pos = cf * CFrame.new(0, size.Y * 0.3, 0).Position, weight = 0.95, name = 'HeadTop'})
+		end
+		return hitpoints
+	end
+
+	local function calculateScanScore(hitpoint, origin, targetVel, targetPart, wallcheckParams)
+		local toTarget = (hitpoint.pos - origin).Unit
+		local hitpointVel = targetVel or Vector3.zero
+		local direction = hitpoint.pos - origin
+		local distance = direction.Magnitude
+		if distance < 0.01 then return 0, 0 end
+		local normalizedDir = direction / distance
+		local dotProduct = normalizedDir:Dot(toTarget)
+		local angleScore = math.max(0, dotProduct)
+		if wallcheckParams then
+			local rayResult = workspace:Raycast(origin, direction, wallcheckParams)
+			if rayResult then
+				local hitDist = (rayResult.Position - origin).Magnitude
+				local pointDist = distance
+				if hitDist < pointDist - 0.5 then
+					return 0, 0
+				end
+			end
+		end
+		local velocityAlignment = 1 - math.abs(normalizedDir:Dot(hitpointVel.Unit))
+		local timeToHit = distance / 1000
+		local predictedOffset = hitpointVel * timeToHit * resolverConfig.PredictiveMultiplier
+		local predictedPos = hitpoint.pos + predictedOffset
+		local predictionBonus = 1 / (1 + predictedOffset.Magnitude)
+		local finalScore = (angleScore * 0.4) + (hitpoint.weight * 0.3) + (velocityAlignment * 0.15) + (predictionBonus * 0.15)
+		return finalScore, distance
+	end
+
+	local function updateResolverCache(ent)
+		if not ent or not ent.Character then
+			resolverCache[ent] = nil
+			return nil
+		end
+		local rootPart = ent.RootPart
+		if not rootPart then return nil end
+		local currentTime = tick()
+		local currentPos = rootPart.Position
+		local currentVel = rootPart.AssemblyLinearVelocity
+		if not resolverCache[ent] then
+			resolverCache[ent] = {
+				positions = {},
+				velocities = {},
+				timestamps = {},
+				jitterDetected = false,
+				lastResolvedPos = currentPos,
+				predictedPos = currentPos
+			}
+		end
+		local cache = resolverCache[ent]
+		table.insert(cache.positions, currentPos)
+		table.insert(cache.velocities, currentVel)
+		table.insert(cache.timestamps, currentTime)
+		while #cache.positions > resolverConfig.HistorySize do
+			table.remove(cache.positions, 1)
+			table.remove(cache.velocities, 1)
+			table.remove(cache.timestamps, 1)
+		end
+		if #cache.positions >= 3 then
+			local recentPositions = cache.positions
+			local totalJitter = 0
+			for i = 2, #recentPositions do
+				local expected = recentPositions[i-1] + (recentPositions[i-1] - (recentPositions[i-2] or recentPositions[i-1]))
+				local jitter = (recentPositions[i] - expected).Magnitude
+				totalJitter = totalJitter + jitter
+			end
+			local avgJitter = totalJitter / (#recentPositions - 1)
+			cache.jitterDetected = avgJitter > resolverConfig.JitterThreshold
+		end
+		local avgVel = Vector3.zero
+		for _, v in cache.velocities do
+			avgVel = avgVel + v
+		end
+		avgVel = avgVel / math.max(#cache.velocities, 1)
+		avgVel = avgVel * resolverConfig.VelocitySmoothing + (currentVel * (1 - resolverConfig.VelocitySmoothing))
+		local timeDelta = math.max(currentTime - (cache.timestamps[1] or currentTime), 0.001)
+		local displacement = (currentPos - (cache.positions[1] or currentPos))
+		local smoothVel = displacement / timeDelta
+		local combinedVel = (avgVel + smoothVel) * 0.5
+		cache.lastResolvedPos = currentPos
+		cache.predictedPos = currentPos + (combinedVel * resolverConfig.PredictiveMultiplier)
+		return cache
+	end
+
+	local function getResolvedPosition(ent)
+		local cache = resolverCache[ent]
+		if not cache then return nil end
+		return cache.predictedPos, cache.jitterDetected, cache.lastResolvedPos
+	end
+
+	local function clearScanDebugParts()
+		for _, part in scanPointParts do
+			pcall(function() part:Destroy() end)
+		end
+		table.clear(scanPointParts)
+	end
+
+	local function renderPositionScanDebug(targetPart, hitpoints, bestPoint, origin)
+		if not DebugVisualization.Enabled then return end
+		clearScanDebugParts()
+		if not targetPart or not targetPart.Parent then return end
+		for _, hp in hitpoints do
+			local isBest = hp == bestPoint
+			local part = Instance.new('Part')
+			part.Size = Vector3.new(isBest and 0.4 or 0.2, isBest and 0.4 or 0.2, isBest and 0.4 or 0.2)
+			part.Position = hp.pos
+			part.Anchored = true
+			part.CanCollide = false
+			part.CanTouch = false
+			part.CanQuery = false
+			part.Transparency = 0.5
+			part.Color = isBest and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 200, 0)
+			part.Material = Enum.Material.Neon
+			part.Parent = workspace
+			table.insert(scanPointParts, part)
+		end
+		if bestPoint and origin then
+			local linePart = Instance.new('Part')
+			linePart.Size = Vector3.new(0.05, 0.05, (bestPoint.pos - origin).Magnitude)
+			linePart.CFrame = CFrame.lookAt(origin, bestPoint.pos) * CFrame.new(0, 0, -(bestPoint.pos - origin).Magnitude * 0.5)
+			linePart.Anchored = true
+			linePart.CanCollide = false
+			linePart.CanTouch = false
+			linePart.CanQuery = false
+			linePart.Transparency = 0.3
+			linePart.Color = Color3.fromRGB(0, 255, 255)
+			linePart.Material = Enum.Material.Neon
+			linePart.Parent = workspace
+			table.insert(scanPointParts, linePart)
+		end
+	end
+
+	local resolverDebugParts = {}
+	local function clearResolverDebugParts()
+		for _, part in resolverDebugParts do
+			pcall(function() part:Destroy() end)
+		end
+		table.clear(resolverDebugParts)
+	end
+
+	local function renderResolverDebug(ent, rawPos, predictedPos)
+		if not DebugVisualization.Enabled then return end
+		clearResolverDebugParts()
+		if not ent or not ent.Character or not rawPos or not predictedPos then return end
+		local rawPart = Instance.new('Part')
+		rawPart.Size = Vector3.new(0.3, 0.3, 0.3)
+		rawPart.Position = rawPos
+		rawPart.Anchored = true
+		rawPart.CanCollide = false
+		rawPart.CanTouch = false
+		rawPart.CanQuery = false
+		rawPart.Transparency = 0.5
+		rawPart.Color = Color3.fromRGB(255, 100, 100)
+		rawPart.Material = Enum.Material.Neon
+		rawPart.Parent = workspace
+		table.insert(resolverDebugParts, rawPart)
+		local predPart = Instance.new('Part')
+		predPart.Size = Vector3.new(0.3, 0.3, 0.3)
+		predPart.Position = predictedPos
+		predPart.Anchored = true
+		predPart.CanCollide = false
+		predPart.CanTouch = false
+		predPart.CanQuery = false
+		predPart.Transparency = 0.5
+		predPart.Color = Color3.fromRGB(100, 255, 100)
+		predPart.Material = Enum.Material.Neon
+		predPart.Parent = workspace
+		table.insert(resolverDebugParts, predPart)
+		local linePart = Instance.new('Part')
+		linePart.Size = Vector3.new(0.05, 0.05, (predictedPos - rawPos).Magnitude)
+		linePart.CFrame = CFrame.lookAt(rawPos, predictedPos) * CFrame.new(0, 0, -(predictedPos - rawPos).Magnitude * 0.5)
+		linePart.Anchored = true
+		linePart.CanCollide = false
+		linePart.CanTouch = false
+		linePart.CanQuery = false
+		linePart.Transparency = 0.3
+		linePart.Color = Color3.fromRGB(255, 255, 100)
+		linePart.Material = Enum.Material.Neon
+		linePart.Parent = workspace
+		table.insert(resolverDebugParts, linePart)
+	end
+
+	local function getBestScanPosition(ent, origin, wallcheckEnabled)
+		if not ent or not ent.Character then return nil, nil, 0 end
+		local targetParts = {}
+		if ent.Head then table.insert(targetParts, ent.Head) end
+		if ent.RootPart then table.insert(targetParts, ent.RootPart) end
+		local humanoid = ent.Character:FindFirstChildOfClass('Humanoid')
+		if humanoid then
+			for _, descendant in ent.Character:GetDescendants() do
+				if descendant:IsA('BasePart') and descendant.Name ~= 'HumanoidRootPart' then
+					if descendant.Name == 'Head' or descendant.Name == 'Torso' or descendant.Name == 'UpperTorso' or descendant.Name == 'LowerTorso' or descendant.Name == 'LeftHand' or descendant.Name == 'RightHand' or descendant.Name == 'LeftFoot' or descendant.Name == 'RightFoot' then
+						table.insert(targetParts, descendant)
+					end
+				end
+			end
+		end
+		local allHitpoints = {}
+		local wallcheckParams = nil
+		if wallcheckEnabled then
+			wallcheckParams = RaycastParams.new()
+			wallcheckParams.FilterType = Enum.RaycastFilterType.Exclude
+			wallcheckParams.FilterDescendantsInstances = {ent.Character}
+		end
+		for _, part in targetParts do
+			local hitpoints = getPartHitpoints(part, origin)
+			for _, hp in hitpoints do
+				hp.sourcePart = part
+				table.insert(allHitpoints, hp)
+			end
+		end
+		local bestPoint = nil
+		local bestScore = 0
+		local bestDistance = 0
+		for _, hp in allHitpoints do
+			local score, dist = calculateScanScore(hp, origin, ent.RootPart and ent.RootPart.AssemblyLinearVelocity or Vector3.zero, hp.sourcePart, wallcheckParams)
+			if score > bestScore then
+				bestScore = score
+				bestPoint = hp
+				bestDistance = dist
+			end
+		end
+		renderPositionScanDebug(ent.RootPart, allHitpoints, bestPoint, origin)
+		return bestPoint, bestPoint and bestPoint.pos, bestDistance
+	end
 
 	local function getTracerColors()
 		local mainColor = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
@@ -1519,10 +1792,26 @@ run(function()
 
 		if ent then
 			targetinfo.Targets[ent] = tick() + 1
+			local resolvedPos, jitterDetected, rawPos = nil, false, nil
+			if Resolver.Enabled then
+				updateResolverCache(ent)
+				resolvedPos, jitterDetected, rawPos = getResolvedPosition(ent)
+				if DebugVisualization.Enabled and jitterDetected then
+					renderResolverDebug(ent, rawPos, resolvedPos)
+				end
+			end
+			local scanPos = nil
+			if PositionScan.Enabled then
+				local bestPoint, bestPos = getBestScanPosition(ent, origin, Target.Walls.Enabled)
+				if bestPos then
+					scanPos = bestPos
+				end
+			end
 			if Projectile.Enabled then
 				ProjectileRaycast.FilterDescendantsInstances = {gameCamera, ent.Character}
 				ProjectileRaycast.CollisionGroup = ent[targetPart].CollisionGroup
 			end
+			local finalTargetPos = scanPos or resolvedPos or ent[targetPart].Position
 			registerShot(ent, ent[targetPart], origin)
 		end
 		
@@ -1645,6 +1934,17 @@ run(function()
 					if CircleObject then
 						CircleObject.Position = inputService:GetMouseLocation()
 					end
+					if Resolver.Enabled then
+						for _, ent in entitylib.List do
+							updateResolverCache(ent)
+						end
+					else
+						clearResolverDebugParts()
+						clearScanDebugParts()
+					end
+					if PositionScan.Enabled and not DebugVisualization.Enabled then
+						clearScanDebugParts()
+					end
 					processHitDetection()
 					if BulletTracers.Enabled then
 						renderBulletTracers()
@@ -1688,6 +1988,10 @@ run(function()
 				until not SilentAim.Enabled
 			else
 				isMb1Held = false
+				clearResolverDebugParts()
+				clearScanDebugParts()
+				clearBulletTracers()
+				resolverCache = setmetatable({}, {__mode = 'k'})
 				if oldnamecall then
 					hookmetamethod(game, '__namecall', oldnamecall)
 				end
@@ -1695,7 +1999,6 @@ run(function()
 					hookfunction(Ray.new, oldray)
 				end
 				oldnamecall, oldray = nil, nil
-				resetTracerTracking()
 			end
 		end,
 		ExtraText = function()
@@ -1947,6 +2250,55 @@ run(function()
 		Decimal = 100,
 		Darker = true,
 		Visible = false
+	})
+	Resolver = SilentAim:CreateToggle({
+		Name = 'Resolver',
+		Function = function(callback)
+			ResolverMode.Object.Visible = callback
+			if not callback then
+				clearResolverDebugParts()
+				resolverCache = setmetatable({}, {__mode = 'k'})
+			end
+		end
+	})
+	ResolverMode = SilentAim:CreateDropdown({
+		Name = 'Resolver Mode',
+		List = {'Adaptive', 'Standard', 'Predictive'},
+		Default = 'Adaptive',
+		Darker = true,
+		Visible = false,
+		Function = function(val)
+			if val == 'Adaptive' then
+				resolverConfig.PredictiveMultiplier = 1.05
+				resolverConfig.VelocitySmoothing = 0.6
+			elseif val == 'Standard' then
+				resolverConfig.PredictiveMultiplier = 1.0
+				resolverConfig.VelocitySmoothing = 0.5
+			elseif val == 'Predictive' then
+				resolverConfig.PredictiveMultiplier = 1.15
+				resolverConfig.VelocitySmoothing = 0.7
+			end
+		end,
+		Tooltip = 'Adaptive - Automatically adjusts prediction\nStandard - Basic velocity smoothing\nPredictive - Aggressive prediction for fast targets'
+	})
+	PositionScan = SilentAim:CreateToggle({
+		Name = 'Position Scan',
+		Function = function(callback)
+			if not callback then
+				clearScanDebugParts()
+			end
+		end,
+		Tooltip = 'Scans multiple hit points on targets to find the best position'
+	})
+	DebugVisualization = SilentAim:CreateToggle({
+		Name = 'Debug Visualization',
+		Function = function(callback)
+			if not callback then
+				clearScanDebugParts()
+				clearResolverDebugParts()
+			end
+		end,
+		Tooltip = 'Shows resolver predictions and position scan points'
 	})
 	vape:Clean(BulletTracerFolder)
 end)
