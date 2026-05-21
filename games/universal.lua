@@ -6900,18 +6900,22 @@ run(function()
 				d.CanQuery = false
 				d.Massless = true
 				d.CastShadow = false
-				d.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
-				if d.Name == "HumanoidRootPart" then
-					d.Transparency = 1
-					continue
-				end
 				d.Material = mat
-				d.Transparency = 0
+				if d.Name == 'HumanoidRootPart' then
+					d.Transparency = 1
+				else
+					d.Transparency = 0
+				end
+				d.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
 				if VisualizerColorToggle.Enabled then
 					d.Color = customColor
 				end
 			elseif d:IsA('Decal') or d:IsA('Texture') then
-				d.Transparency = 0
+				if d.Parent and d.Parent.Name == 'HumanoidRootPart' then
+					d.Transparency = 1
+				else
+					d.Transparency = 0
+				end
 			elseif d:IsA('Humanoid') or d:IsA('Animator') or d:IsA('AnimationController') or d:IsA('Script') or d:IsA('LocalScript') then
 				d:Destroy()
 			end
@@ -6932,9 +6936,7 @@ run(function()
 		clone.Name = 'BlinkVisualizer'
 
 		local hrp = clone:FindFirstChild('HumanoidRootPart')
-		if hrp then
-			hrp.Transparency = 1
-		end
+		if hrp then hrp:Destroy() end
 
 		for _, part in clone:GetDescendants() do
 			if part:IsA('BasePart') then
