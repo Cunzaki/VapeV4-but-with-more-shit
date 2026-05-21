@@ -1471,22 +1471,39 @@ run(function()
 
 	local function performBulletScan(origin, targetPos, targetChar)
 		local now = tick()
-		if (now - lastScanTime) < BulletScanDelay then
+		local scanDelay = 0.05
+		if BulletScanDelay and type(BulletScanDelay.Value) == "number" then
+			scanDelay = BulletScanDelay.Value
+		end
+		if (now - lastScanTime) < scanDelay then
 			return currentManipulatedOrigin, currentScanTarget, "Cooldown"
 		end
 		lastScanTime = now
 
-		if BulletDebug then
+		local scanRadius = 5
+		local scanPoints = 12
+		local isDebug = false
+		if BulletScanRadius and type(BulletScanRadius.Value) == "number" then
+			scanRadius = BulletScanRadius.Value
+		end
+		if BulletScanPoints and type(BulletScanPoints.Value) == "number" then
+			scanPoints = BulletScanPoints.Value
+		end
+		if BulletDebug and BulletDebug.ToggleState == true then
+			isDebug = true
+		end
+
+		if isDebug then
 			print(string.format("[BulletScan] Starting scan | Origin:%s | Target:%s | Radius:%d | Points:%d",
-				tostring(origin), tostring(targetPos), BulletScanRadius, BulletScanPoints))
+				tostring(origin), tostring(targetPos), scanRadius, scanPoints))
 		end
 
 		local visiblePoints, blockedPoints, centerVisible = scanForVisiblePoints(
 			origin,
 			targetPos,
 			targetChar,
-			BulletScanRadius,
-			BulletScanPoints
+			scanRadius,
+			scanPoints
 		)
 
 		local bestPoint = getBestVisiblePoint(visiblePoints)
@@ -1494,7 +1511,7 @@ run(function()
 		if bestPoint then
 			currentManipulatedOrigin = bestPoint
 			currentScanTarget = targetPos
-			if BulletDebug then
+			if isDebug then
 				print(string.format("[BulletScan] SUCCESS | Best point:%s | Distance from base:%s",
 					tostring(bestPoint), tostring((bestPoint - origin).Magnitude)))
 			end
@@ -1502,7 +1519,7 @@ run(function()
 		else
 			currentManipulatedOrigin = nil
 			currentScanTarget = nil
-			if BulletDebug then
+			if isDebug then
 				print(string.format("[BulletScan] FAILED | No visible points found | Blocked:%d", #blockedPoints))
 			end
 			return nil, nil, "No visible points"
@@ -1703,6 +1720,7 @@ run(function()
 			local targetPart = ent[targetPartName]
 			local manipulatedOrigin = origin
 			local scanStatus = "Disabled"
+			local isDebug = BulletDebug and (BulletDebug.ToggleState == true)
 
 			if BulletManipulation and BulletManipulation.ToggleState and not skipManipulation then
 				local baseOrigin = origin
@@ -1711,12 +1729,12 @@ run(function()
 					scanStatus = status
 					if scanOrigin then
 						manipulatedOrigin = scanOrigin
-						if BulletDebug.ToggleState then
+						if isDebug then
 							print(string.format("[getTarget] BulletManipulation | Original:%s | Manipulated:%s | Status:%s",
 								tostring(baseOrigin), tostring(manipulatedOrigin), scanStatus))
 						end
-				 else
-						if BulletDebug.ToggleState then
+					else
+						if isDebug then
 							print(string.format("[getTarget] BulletManipulation FAILED | Status:%s", scanStatus))
 						end
 					end
@@ -1740,7 +1758,8 @@ run(function()
 			local result = getTarget(args[1].Origin, {args[2]})
 			if not result then return end
 			local ent, targetPart, origin, scanStatus = result[1], result[2], result[3], result[4]
-			if BulletDebug.ToggleState then
+			local isDebug = BulletDebug and (BulletDebug.ToggleState == true)
+			if isDebug then
 				print(string.format("[Hook:FindPartOnRayWithIgnoreList] ScanStatus:%s | Origin:%s | Target:%s", scanStatus, tostring(origin), tostring(targetPart.Position)))
 			end
 			if Wallbang.Enabled then
@@ -1753,7 +1772,8 @@ run(function()
 			local result = getTarget(args[1])
 			if not result then return end
 			local ent, targetPart, origin, scanStatus = result[1], result[2], result[3], result[4]
-			if BulletDebug.ToggleState then
+			local isDebug = BulletDebug and (BulletDebug.ToggleState == true)
+			if isDebug then
 				print(string.format("[Hook:Raycast] ScanStatus:%s | Origin:%s | Target:%s", scanStatus, tostring(origin), tostring(targetPart.Position)))
 			end
 			args[2] = CFrame.lookAt(origin, targetPart.Position).LookVector * args[2].Magnitude
@@ -1766,7 +1786,8 @@ run(function()
 			local result = getTarget(gameCamera.CFrame.Position)
 			if not result then return end
 			local ent, targetPart, origin, scanStatus = result[1], result[2], result[3], result[4]
-			if BulletDebug.ToggleState then
+			local isDebug = BulletDebug and (BulletDebug.ToggleState == true)
+			if isDebug then
 				print(string.format("[Hook:ScreenPointToRay] ScanStatus:%s | Origin:%s | Target:%s", scanStatus, tostring(origin), tostring(targetPart.Position)))
 			end
 			local direction = CFrame.lookAt(origin, targetPart.Position)
@@ -1781,7 +1802,8 @@ run(function()
 			local result = getTarget(args[1])
 			if not result then return end
 			local ent, targetPart, origin, scanStatus = result[1], result[2], result[3], result[4]
-			if BulletDebug.ToggleState then
+			local isDebug = BulletDebug and (BulletDebug.ToggleState == true)
+			if isDebug then
 				print(string.format("[Hook:Ray] ScanStatus:%s | Origin:%s | Target:%s", scanStatus, tostring(origin), tostring(targetPart.Position)))
 			end
 			if Projectile.Enabled then
@@ -1888,6 +1910,7 @@ run(function()
 							local targetPart = ent.Head or ent.RootPart
 							local manipulatedOrigin = originPos
 							local scanStatus = "Disabled"
+							local isDebug = BulletDebug and (BulletDebug.ToggleState == true)
 
 							if BulletManipulation and BulletManipulation.ToggleState then
 								if ent.Character and targetPart then
@@ -1895,12 +1918,12 @@ run(function()
 									scanStatus = status
 									if scanOrigin then
 										manipulatedOrigin = scanOrigin
-										if BulletDebug.ToggleState then
+										if isDebug then
 											print(string.format("[AutoFire] BulletManipulation | Original:%s | Manipulated:%s | Status:%s",
 												tostring(originPos), tostring(manipulatedOrigin), scanStatus))
 										end
 									else
-										if BulletDebug.ToggleState then
+										if isDebug then
 											print(string.format("[AutoFire] BulletManipulation FAILED | Status:%s", scanStatus))
 										end
 									end
@@ -1908,12 +1931,13 @@ run(function()
 							end
 							registerShot(ent, targetPart, manipulatedOrigin)
 
-							if BulletDebug.ToggleState and BulletManipulation.ToggleState then
+							if isDebug and BulletManipulation and BulletManipulation.ToggleState then
 								print(string.format("[AutoFire] Target found | Ent:%s | TargetPart:%s | ManipulatedOrigin:%s",
 									tostring(ent.Name), tostring(targetPart.Name), tostring(manipulatedOrigin)))
 							end
 						else
-							if BulletDebug.ToggleState then
+							local isDebug = BulletDebug and (BulletDebug.ToggleState == true)
+							if isDebug then
 								print(string.format("[AutoFire] No target found | Origin:%s", tostring(originPos)))
 							end
 						end
