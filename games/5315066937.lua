@@ -193,6 +193,7 @@ run(function()
 		Name = 'Value',
 		Default = '0, 5, 0',
 		Function = function(val)
+			if type(val) ~= "string" then return end
 			local parts = {}
 			for p in val:gmatch('[^,]+') do
 				table.insert(parts, tonumber(p:gsub(' ', '')))
