@@ -1417,15 +1417,15 @@ run(function()
 		main.Color = ColorSequence.new(mainColor)
 		local style = BulletTracerStyle.Value
 		if style == 'Solid' then
-			main.Style = Enum.BeamStyle.Sequential
+			main.TextureMode = Enum.TextureMode.Stretch
 			main.SegmentScale = 1
 			main.SegmentPerUnit = 1
 		elseif style == 'Dotted' then
-			main.Style = Enum.BeamStyle.Periodic
+			main.TextureMode = Enum.TextureMode.Wrap
 			main.SegmentScale = 0.5
 			main.SegmentPerUnit = BulletTracerSegments.Value
 		elseif style == 'Dashed' then
-			main.Style = Enum.BeamStyle.Sequential
+			main.TextureMode = Enum.TextureMode.Stretch
 			main.SegmentScale = 1
 			main.SegmentPerUnit = BulletTracerSegments.Value
 		end
