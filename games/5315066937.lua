@@ -15,11 +15,7 @@ local playersService = cloneref(game:GetService('Players'))
 local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
 local runService = cloneref(game:GetService('RunService'))
 local inputService = cloneref(game:GetService('UserInputService'))
-local tweenService = cloneref(game:GetService('TweenService'))
-local httpService = cloneref(game:GetService('HttpService'))
 local virtualInputManager = cloneref(game:GetService('VirtualInputManager'))
-local teleportService = cloneref(game:GetService('TeleportService'))
-local lightingService = cloneref(game:GetService('Lighting'))
 local workspaceService = cloneref(game:GetService('Workspace'))
 
 local gameCamera = workspace.CurrentCamera
@@ -28,85 +24,71 @@ local lplr = playersService.LocalPlayer
 local vape = shared.vape
 
 local function obtain(name)
-	return _G.obtain(name)
+	return _G.obtain and _G.obtain(name) or nil
 end
 
 run(function()
 	local SpeedHack
+	local VelocityHack
 	local FlyHack
 	local NoclipHack
 	local TeleportHack
 	local BhopHack
 
-	local speedCoeff = 1
-	local flyEnabled = false
-	local noclipEnabled = false
-
-	local function getCharacter()
-		return lplr.Character or lplr.CharacterAdded:Wait()
-	end
-
-	local function getRootPart()
-		local char = getCharacter()
-		if not char then return nil end
-		for _, part in char:GetDescendants() do
-			if part:IsA('BasePart') and part.Name == 'HumanoidRootPart' then
-				return part
-			end
-		end
-		return char:FindFirstChild('RootPart') or char:FindFirstChild('Torso') or char:FindFirstChild('UpperTorso')
-	end
-
-	local function setCharacterCFrame(pos)
-		local posChar = obtain("PositionCharacter")
-		if posChar and posChar.SetCharacterCFrameFromPlayer then
-			posChar.SetCharacterCFrameFromPlayer("Local", pos)
-		end
-	end
-
-	local function pressSpace()
-		virtualInputManager:SendKeyDown(Enum.KeyCode.Space)
-		task.delay(0.01, function()
-			virtualInputManager:SendKeyUp(Enum.KeyCode.Space)
-		end)
-	end
-
 	SpeedHack = vape.Categories.Blatant:CreateModule({
 		Name = 'SpeedHack',
 		Function = function(callback)
 			if callback then
-				speedCoeff = SpeedHack.SpeedValue.Value
-				local visMgr = obtain("VisibilityManager")
-				if visMgr and visMgr.SetSpeedCoeff then
-					visMgr.SetSpeedCoeff(speedCoeff)
-				end
 				SpeedHack:Clean(runService.Heartbeat:Connect(function()
-					speedCoeff = SpeedHack.SpeedValue.Value
-					if visMgr and visMgr.SetSpeedCoeff then
-						visMgr.SetSpeedCoeff(speedCoeff)
+					local timerSys = obtain("RealtimeTimerSystem")
+					if timerSys and timerSys.RootTimer then
+						timerSys.RootTimer.Scale = SpeedHack.SpeedValue.Value
 					end
 				end))
 			else
-				local visMgr = obtain("VisibilityManager")
-				if visMgr and visMgr.SetSpeedCoeff then
-					visMgr.SetSpeedCoeff(1)
+				local timerSys = obtain("RealtimeTimerSystem")
+				if timerSys and timerSys.RootTimer then
+					timerSys.RootTimer.Scale = 1
 				end
 			end
 		end,
-		Tooltip = 'Modify game speed coefficient'
+		Tooltip = 'Speed up game simulation ticks (Timer Scale)'
 	})
 	SpeedHack.SpeedValue = SpeedHack:CreateSlider({
 		Name = 'Speed',
 		Min = 1,
 		Max = 10,
 		Default = 2,
-		Function = function(val)
-			speedCoeff = val
-			local visMgr = obtain("VisibilityManager")
-			if visMgr and visMgr.SetSpeedCoeff then
-				visMgr.SetSpeedCoeff(val)
+		Function = function() end
+	})
+
+	VelocityHack = vape.Categories.Blatant:CreateModule({
+		Name = 'VelocityHack',
+		Function = function(callback)
+			if callback then
+				VelocityHack:Clean(runService.Heartbeat:Connect(function()
+					local ctxMgr = obtain("ContextManager")
+					if not ctxMgr then return end
+					local localCtx = ctxMgr.GetContext("Local")
+					if localCtx and localCtx.Context and localCtx.Context.Simulation then
+						local mechanics = localCtx.Context.Simulation.GameMechanics
+						if mechanics then
+							mechanics.MaxSpeed = VelocityHack.SpeedValue.Value * 100
+							mechanics.Accelerate = VelocityHack.SpeedValue.Value * 10
+							mechanics.AirAccelerate = VelocityHack.SpeedValue.Value * 10
+						end
+					end
+				end))
 			end
-		end
+		end,
+		Tooltip = 'Modify internal GameMechanics physics limits'
+	})
+	VelocityHack.SpeedValue = VelocityHack:CreateSlider({
+		Name = 'Multiplier',
+		Min = 1,
+		Max = 100,
+		Default = 5,
+		Function = function() end
 	})
 
 	BhopHack = vape.Categories.Blatant:CreateModule({
@@ -115,121 +97,97 @@ run(function()
 			if callback then
 				local lastJump = 0
 				BhopHack:Clean(runService.Heartbeat:Connect(function()
-					local rootPart = getRootPart()
-					if not rootPart then return end
-					local now = tick()
-					local delay = BhopHack.Delay.Value
-					if now - lastJump < delay then return end
-					local rayOrigin = rootPart.Position
-					local rayDir = Vector3.new(0, -3.5, 0)
-					local params = RaycastParams.new()
-					params.FilterDescendantsInstances = {getCharacter()}
-					params.FilterType = Enum.RaycastFilterType.Exclude
-					local result = workspaceService:Raycast(rayOrigin, rayDir, params)
-					if result then
-						local vel = rootPart.AssemblyLinearVelocity
-						local speed = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
-						if speed > 2 then
-							lastJump = now
-							pressSpace()
+					local CustomEnums = obtain("CustomEnums")
+					local TICKINFO_BIT_TOUCHING = CustomEnums and CustomEnums.TICKINFO_BIT_TOUCHING or 8
+					local ctxMgr = obtain("ContextManager")
+					if not ctxMgr then return end
+					
+					local localCtx = ctxMgr.GetContext("Local")
+					if localCtx and localCtx.Context and localCtx.Context.GetOutput then
+						local _, tickInfo = localCtx.Context:GetOutput()
+						if tickInfo and bit32.band(tickInfo, TICKINFO_BIT_TOUCHING) ~= 0 then
+							local now = tick()
+							if now - lastJump > 0.05 then
+								lastJump = now
+								virtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+								task.delay(0.01, function()
+									virtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+								end)
+							end
 						end
 					end
 				end))
 			end
 		end,
-		Tooltip = 'Auto bunny hop'
-	})
-	BhopHack.Delay = BhopHack:CreateSlider({
-		Name = 'Jump Delay',
-		Min = 0,
-		Max = 0.2,
-		Default = 0.03,
-		Function = function() end
+		Tooltip = 'Perfect auto bunny hop using game tick data'
 	})
 
+	local cachedGravity = nil
 	FlyHack = vape.Categories.Blatant:CreateModule({
 		Name = 'FlyHack',
 		Function = function(callback)
+			local ctxMgr = obtain("ContextManager")
 			if callback then
-				flyEnabled = true
-				local flySpeed = FlyHack.SpeedValue.Value
 				FlyHack:Clean(runService.Heartbeat:Connect(function()
-					flySpeed = FlyHack.SpeedValue.Value
-					local rootPart = getRootPart()
-					if not rootPart then return end
-					local vel = Vector3.zero
-					local cam = gameCamera
-					if cam then
-						local lookCFrame = CFrame.new(rootPart.Position, cam.CFrame.Position)
-						local forward = lookCFrame.LookVector
-						local right = lookCFrame.RightVector
-						if inputService:IsKeyDown(Enum.KeyCode.W) then
-							vel = vel + forward * flySpeed
-						end
-						if inputService:IsKeyDown(Enum.KeyCode.S) then
-							vel = vel - forward * flySpeed
-						end
-						if inputService:IsKeyDown(Enum.KeyCode.A) then
-							vel = vel - right * flySpeed
-						end
-						if inputService:IsKeyDown(Enum.KeyCode.D) then
-							vel = vel + right * flySpeed
-						end
-						if inputService:IsKeyDown(Enum.KeyCode.Space) then
-							vel = vel + Vector3.new(0, flySpeed, 0)
-						end
-						if inputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-							vel = vel - Vector3.new(0, flySpeed, 0)
+					if not ctxMgr then return end
+					local localCtx = ctxMgr.GetContext("Local")
+					if localCtx and localCtx.Context and localCtx.Context.Simulation then
+						local mechanics = localCtx.Context.Simulation.GameMechanics
+						if mechanics then
+							if cachedGravity == nil then
+								cachedGravity = mechanics.Gravity
+							end
+							mechanics.Gravity = 0
 						end
 					end
-					rootPart.AssemblyLinearVelocity = vel
 				end))
 			else
-				flyEnabled = false
+				if ctxMgr and cachedGravity ~= nil then
+					local localCtx = ctxMgr.GetContext("Local")
+					if localCtx and localCtx.Context and localCtx.Context.Simulation then
+						local mechanics = localCtx.Context.Simulation.GameMechanics
+						if mechanics then
+							mechanics.Gravity = cachedGravity
+						end
+					end
+				end
 			end
 		end,
-		Tooltip = 'Fly with WASD + Space/Ctrl'
-	})
-	FlyHack.SpeedValue = FlyHack:CreateSlider({
-		Name = 'Speed',
-		Min = 10,
-		Max = 200,
-		Default = 50,
-		Function = function() end
+		Tooltip = 'Zero gravity fly using GameMechanics'
 	})
 
 	NoclipHack = vape.Categories.Blatant:CreateModule({
 		Name = 'NoclipHack',
 		Function = function(callback)
 			if callback then
-				noclipEnabled = true
 				NoclipHack:Clean(runService.Heartbeat:Connect(function()
-					local char = getCharacter()
-					if char then
-						for _, part in char:GetDescendants() do
-							if part:IsA('BasePart') then
+					local mapMgr = obtain("MapManager")
+					if mapMgr and mapMgr.MapInfo and mapMgr.MapInfo.RobloxModel then
+						for _, part in mapMgr.MapInfo.RobloxModel:GetDescendants() do
+							if part:IsA("BasePart") and part.CanCollide then
 								part.CanCollide = false
 							end
 						end
 					end
 				end))
 			else
-				noclipEnabled = false
+				local mapMgr = obtain("MapManager")
+				if mapMgr and mapMgr.MapInfo and mapMgr.MapInfo.RobloxModel then
+					for _, part in mapMgr.MapInfo.RobloxModel:GetDescendants() do
+						if part:IsA("BasePart") then
+							part.CanCollide = true
+						end
+					end
+				end
 			end
 		end,
-		Tooltip = 'No collision'
+		Tooltip = 'Disable collision on map parts'
 	})
 
 	TeleportHack = vape.Categories.Utility:CreateModule({
 		Name = 'TeleportHack',
-		Function = function(callback)
-		end,
-		Tooltip = 'Teleport to position or player'
-	})
-	TeleportHack:CreateDropdown({
-		Name = 'Mode',
-		List = {'Position', 'Player'},
-		Function = function() end
+		Function = function(callback) end,
+		Tooltip = 'Teleport to position'
 	})
 	TeleportHack:CreateTextBox({
 		Name = 'Value',
@@ -241,7 +199,10 @@ run(function()
 			end
 			if #parts >= 3 and parts[1] and parts[2] and parts[3] then
 				local pos = Vector3.new(parts[1], parts[2], parts[3])
-				setCharacterCFrame(pos)
+				local posChar = obtain("PositionCharacter")
+				if posChar and posChar.SetCharacterCFrame then
+					posChar.SetCharacterCFrame("Local", CFrame.new(pos), 1)
+				end
 			end
 		end
 	})
