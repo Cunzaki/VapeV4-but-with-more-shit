@@ -6378,8 +6378,97 @@ run(function()
 			}
 		end
 	}
+
+	local function updateDynamicInfo()
+		local sessioninfo = vape.Libraries.sessioninfo
+		if not sessioninfo or not sessioninfo.Objects then return end
+
+		if sessioninfo.Objects['FPS'] then
+			sessioninfo.Objects['FPS'].Value = math.floor(1 / (DeltaTime or 0.016))
+		end
+		if sessioninfo.Objects['Ping'] then
+			sessioninfo.Objects['Ping'].Value = math.floor(playersService.LocalPlayer:GetNetworkPing() * 1000)
+		end
+		if sessioninfo.Objects['Server Time'] then
+			sessioninfo.Objects['Server Time'].Value = os.time()
+		end
+		if sessioninfo.Objects['Players'] then
+			sessioninfo.Objects['Players'].Value = #playersService:GetPlayers()
+		end
+		if sessioninfo.Objects['In Game'] then
+			sessioninfo.Objects['In Game'].Value = #playersService:GetPlayers() - 1
+		end
+		if sessioninfo.Objects['Region'] and not shared._regioninfo then
+			shared._regioninfo = 'Loading...'
+			task.spawn(function()
+				local success, data = pcall(function()
+					return game:GetService('HttpService'):GetAsync('http://ip-api.com/json/?fields=status,country,regionName,city,org')
+				end)
+				if success and data then
+					local decoded = game:GetService('HttpService'):JSONDecode(data)
+					if decoded.status == 'success' then
+						shared._regioninfo = decoded.city..', '..decoded.country
+				 else
+						shared._regioninfo = 'Unavailable'
+					end
+				else
+					shared._regioninfo = 'Unavailable'
+				end
+			end)
+		end
+	end
+
+	task.spawn(function()
+		while vape.Loaded do
+			updateDynamicInfo()
+			task.wait(1)
+		end
+	end)
+
 	vape.Libraries.sessioninfo:AddItem('Time Played', os.clock(), function(value) 
 		return os.date('!%X', math.floor(os.clock() - value)) 
+	end)
+	vape.Libraries.sessioninfo:AddItem('FPS', 0, function(value)
+		return value..' fps'
+	end)
+	vape.Libraries.sessioninfo:AddItem('Ping', 0, function(value)
+		return value..' ms'
+	end)
+	vape.Libraries.sessioninfo:AddItem('Server Time', 0, function(value)
+		return os.date('!%H:%M:%S', value)
+	end)
+	vape.Libraries.sessioninfo:AddItem('Place ID', 0, function(value)
+		return tostring(game.PlaceId)
+	end)
+	vape.Libraries.sessioninfo:AddItem('Job ID', '', function(value)
+		local jobId = game.JobId
+		if #jobId > 20 then
+			return jobId:sub(1, 20)..'...'
+		end
+		return jobId
+	end)
+	vape.Libraries.sessioninfo:AddItem('Players', 0, function(value)
+		return value..' players'
+	end)
+	vape.Libraries.sessioninfo:AddItem('In Game', 0, function(value)
+		return value..' in game'
+	end)
+	vape.Libraries.sessioninfo:AddItem('Server Type', '', function(value)
+		local url = pcall(function() return game:GetService('HttpService'):GetGameServerHttpUrl() end)
+		if url and type(url) == 'string' and url:find('private') then return 'Private' end
+		return 'Standard'
+	end)
+	vape.Libraries.sessioninfo:AddItem('Server ID', '', function(value)
+		local url = pcall(function() return game:GetService('HttpService'):GetGameServerHttpUrl() end)
+		if url and type(url) == 'string' then
+			local match = url:match('s=([^&]+)')
+			if match then return match:sub(1, 12)..'...' end
+		end
+		return 'N/A'
+	end)
+	vape.Libraries.sessioninfo:AddItem('Region', '', function(value)
+		if shared._regioninfo then return shared._regioninfo end
+		return 'Loading...'
 	end)
 end)
 	
