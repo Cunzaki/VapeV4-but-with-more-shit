@@ -1462,7 +1462,9 @@ run(function()
 		table.sort(visiblePoints, function(a, b)
 			if a.isCenter and not b.isCenter then return true end
 			if not a.isCenter and b.isCenter then return false end
-			return a.distance < b.distance
+			local distA = a.distance or 0
+			local distB = b.distance or 0
+			return distA < distB
 		end)
 		return visiblePoints[1].pos
 	end
