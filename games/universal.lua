@@ -1327,80 +1327,85 @@ run(function()
 	local bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	local healthCache = setmetatable({}, {__mode = 'k'})
 	local resolverCache = setmetatable({}, {__mode = 'k'})
-	local positionScanDebug = {}
+	local scanDebugFolder = nil
+	local resolverDebugFolder = nil
 	local scanPointParts = {}
+	local resolverDebugParts = {}
 
 	local resolverConfig = {
-		HistorySize = 8,
+		HistorySize = 6,
 		JitterThreshold = 0.15,
-		InterpolationWindow = 3,
 		VelocitySmoothing = 0.6,
 		PredictiveMultiplier = 1.05
 	}
 
-	local function getPartHitpoints(part, origin)
+	local function safeVelocity(vel)
+		if not vel then return Vector3.zero end
+		local mx = math.max(math.abs(vel.X), 0.001)
+		local my = math.max(math.abs(vel.Y), 0.001)
+		local mz = math.max(math.abs(vel.Z), 0.001)
+		if mx ~= mx or my ~= my or mz ~= mz then return Vector3.zero end
+		if not math.isfinite(mx) then mx = 0.001 end
+		if not math.isfinite(my) then my = 0.001 end
+		if not math.isfinite(mz) then mz = 0.001 end
+		return Vector3.new(vel.X ~= vel.X and 0 or vel.X, vel.Y ~= vel.Y and 0 or vel.Y, vel.Z ~= vel.Z and 0 or vel.Z)
+	end
+
+	local function safeMagnitude(vec)
+		local m = vec.Magnitude
+		if m ~= m or not math.isfinite(m) then return 0 end
+		return m
+	end
+
+	local function safeUnit(vec)
+		local m = safeMagnitude(vec)
+		if m < 0.001 then return Vector3.zero end
+		return vec / m
+	end
+
+	local function getPartHitpointsLight(part, origin)
 		if not part or not part.Parent then return {} end
 		local cf = part.CFrame
 		local size = part.Size
 		local hitpoints = {}
 		table.insert(hitpoints, {pos = cf.Position, weight = 1.0, name = 'Center'})
-		local vertices = {
-			cf * CFrame.new(size.X * 0.5, 0, 0),
-			cf * CFrame.new(-size.X * 0.5, 0, 0),
-			cf * CFrame.new(0, size.Y * 0.5, 0),
-			cf * CFrame.new(0, -size.Y * 0.5, 0),
-			cf * CFrame.new(0, 0, size.Z * 0.5),
-			cf * CFrame.new(0, 0, -size.Z * 0.5),
+		local offsets = {
+			Vector3.new(size.X * 0.5, 0, 0),
+			Vector3.new(-size.X * 0.5, 0, 0),
+			Vector3.new(0, size.Y * 0.5, 0),
+			Vector3.new(0, -size.Y * 0.5, 0),
+			Vector3.new(0, 0, size.Z * 0.5),
+			Vector3.new(0, 0, -size.Z * 0.5),
 		}
-		for i, v in vertices do
-			local toCam = (gameCamera.CFrame.Position - v.Position).Magnitude
-			local rayDir = (v.Position - origin).Unit
-			local rayResult = workspace:Raycast(origin, rayDir * toCam, RaycastParams.new())
-			if not rayResult or rayResult.Instance == part or rayResult.Instance:IsDescendantOf(part.Parent) then
-				table.insert(hitpoints, {pos = v.Position, weight = 0.7, name = 'Vertex'..i})
-			end
+		for i = 1, 6 do
+			local pos = cf.Position + offsets[i]
+			table.insert(hitpoints, {pos = pos, weight = 0.7, name = 'V'..i})
 		end
-		if part.Name == 'HumanoidRootPart' or part.Name == 'Torso' or part.Name == 'UpperTorso' then
-			local torsoCfs = {
-				cf * CFrame.new(0, size.Y * 0.2, 0),
-				cf * CFrame.new(0, -size.Y * 0.2, 0),
-				cf * CFrame.new(0, size.Y * 0.4, 0),
-			}
-			for i, tc in torsoCfs do
-				table.insert(hitpoints, {pos = tc.Position, weight = 0.85, name = 'Torso'..i})
-			end
-		elseif part.Name == 'Head' then
-			table.insert(hitpoints, {pos = cf * CFrame.new(0, size.Y * 0.3, 0).Position, weight = 0.95, name = 'HeadTop'})
+		local pn = part.Name
+		if pn == 'HumanoidRootPart' or pn == 'Torso' or pn == 'UpperTorso' then
+			table.insert(hitpoints, {pos = cf.Position + Vector3.new(0, size.Y * 0.2, 0), weight = 0.85, name = 'T1'})
+			table.insert(hitpoints, {pos = cf.Position + Vector3.new(0, -size.Y * 0.2, 0), weight = 0.85, name = 'T2'})
+		elseif pn == 'Head' then
+			table.insert(hitpoints, {pos = cf.Position + Vector3.new(0, size.Y * 0.3, 0), weight = 0.95, name = 'HT'})
 		end
 		return hitpoints
 	end
 
-	local function calculateScanScore(hitpoint, origin, targetVel, targetPart, wallcheckParams)
-		local toTarget = (hitpoint.pos - origin).Unit
-		local hitpointVel = targetVel or Vector3.zero
+	local function calculateScanScore(hitpoint, origin, targetVel)
 		local direction = hitpoint.pos - origin
-		local distance = direction.Magnitude
-		if distance < 0.01 then return 0, 0 end
+		local distance = safeMagnitude(direction)
+		if distance < 0.1 then return 0, 0 end
 		local normalizedDir = direction / distance
-		local dotProduct = normalizedDir:Dot(toTarget)
+		local targetUnit = safeUnit(targetVel)
+		local dotProduct = normalizedDir:Dot(targetUnit)
 		local angleScore = math.max(0, dotProduct)
-		if wallcheckParams then
-			local rayResult = workspace:Raycast(origin, direction, wallcheckParams)
-			if rayResult then
-				local hitDist = (rayResult.Position - origin).Magnitude
-				local pointDist = distance
-				if hitDist < pointDist - 0.5 then
-					return 0, 0
-				end
-			end
-		end
-		local velocityAlignment = 1 - math.abs(normalizedDir:Dot(hitpointVel.Unit))
-		local timeToHit = distance / 1000
-		local predictedOffset = hitpointVel * timeToHit * resolverConfig.PredictiveMultiplier
-		local predictedPos = hitpoint.pos + predictedOffset
-		local predictionBonus = 1 / (1 + predictedOffset.Magnitude)
-		local finalScore = (angleScore * 0.4) + (hitpoint.weight * 0.3) + (velocityAlignment * 0.15) + (predictionBonus * 0.15)
-		return finalScore, distance
+		local timeToHit = distance / math.max(1000, safeMagnitude(targetVel))
+		local predictedOffset = targetVel * timeToHit * resolverConfig.PredictiveMultiplier
+		local predictedDist = safeMagnitude(predictedOffset)
+		local predictionBonus = 1 / (1 + predictedDist)
+		local finalScore = (angleScore * 0.4) + (hitpoint.weight * 0.3) + (predictionBonus * 0.3)
+		if finalScore ~= finalScore then return 0, 0 end
+		return math.min(finalScore, 1), distance
 	end
 
 	local function updateResolverCache(ent)
@@ -1412,7 +1417,7 @@ run(function()
 		if not rootPart then return nil end
 		local currentTime = tick()
 		local currentPos = rootPart.Position
-		local currentVel = rootPart.AssemblyLinearVelocity
+		local currentVel = safeVelocity(rootPart.AssemblyLinearVelocity)
 		if not resolverCache[ent] then
 			resolverCache[ent] = {
 				positions = {},
@@ -1420,7 +1425,8 @@ run(function()
 				timestamps = {},
 				jitterDetected = false,
 				lastResolvedPos = currentPos,
-				predictedPos = currentPos
+				predictedPos = currentPos,
+				predictedVel = Vector3.zero
 			}
 		end
 		local cache = resolverCache[ent]
@@ -1432,15 +1438,18 @@ run(function()
 			table.remove(cache.velocities, 1)
 			table.remove(cache.timestamps, 1)
 		end
+		cache.jitterDetected = false
 		if #cache.positions >= 3 then
-			local recentPositions = cache.positions
 			local totalJitter = 0
-			for i = 2, #recentPositions do
-				local expected = recentPositions[i-1] + (recentPositions[i-1] - (recentPositions[i-2] or recentPositions[i-1]))
-				local jitter = (recentPositions[i] - expected).Magnitude
+			for i = 2, #cache.positions do
+				local prev = cache.positions[i - 1]
+				local curr = cache.positions[i]
+				local prevPrev = cache.positions[i - 2] or prev
+				local expected = prev + (prev - prevPrev)
+				local jitter = safeMagnitude(curr - expected)
 				totalJitter = totalJitter + jitter
 			end
-			local avgJitter = totalJitter / (#recentPositions - 1)
+			local avgJitter = totalJitter / (#cache.positions - 1)
 			cache.jitterDetected = avgJitter > resolverConfig.JitterThreshold
 		end
 		local avgVel = Vector3.zero
@@ -1448,20 +1457,27 @@ run(function()
 			avgVel = avgVel + v
 		end
 		avgVel = avgVel / math.max(#cache.velocities, 1)
-		avgVel = avgVel * resolverConfig.VelocitySmoothing + (currentVel * (1 - resolverConfig.VelocitySmoothing))
+		avgVel = avgVel * resolverConfig.VelocitySmoothing + currentVel * (1 - resolverConfig.VelocitySmoothing)
 		local timeDelta = math.max(currentTime - (cache.timestamps[1] or currentTime), 0.001)
-		local displacement = (currentPos - (cache.positions[1] or currentPos))
+		local displacement = currentPos - (cache.positions[1] or currentPos)
 		local smoothVel = displacement / timeDelta
+		if safeMagnitude(smoothVel) > 500 then
+			smoothVel = safeUnit(smoothVel) * 500
+		end
 		local combinedVel = (avgVel + smoothVel) * 0.5
+		if safeMagnitude(combinedVel) > 500 then
+			combinedVel = safeUnit(combinedVel) * 500
+		end
 		cache.lastResolvedPos = currentPos
 		cache.predictedPos = currentPos + (combinedVel * resolverConfig.PredictiveMultiplier)
+		cache.predictedVel = combinedVel
 		return cache
 	end
 
 	local function getResolvedPosition(ent)
 		local cache = resolverCache[ent]
-		if not cache then return nil end
-		return cache.predictedPos, cache.jitterDetected, cache.lastResolvedPos
+		if not cache then return nil, false, nil end
+		return cache.predictedPos, cache.jitterDetected, cache.lastResolvedPos, cache.predictedVel
 	end
 
 	local function clearScanDebugParts()
@@ -1469,55 +1485,77 @@ run(function()
 			pcall(function() part:Destroy() end)
 		end
 		table.clear(scanPointParts)
-	end
-
-	local function renderPositionScanDebug(targetPart, hitpoints, bestPoint, origin)
-		if not DebugVisualization.Enabled then return end
-		clearScanDebugParts()
-		if not targetPart or not targetPart.Parent then return end
-		for _, hp in hitpoints do
-			local isBest = hp == bestPoint
-			local part = Instance.new('Part')
-			part.Size = Vector3.new(isBest and 0.4 or 0.2, isBest and 0.4 or 0.2, isBest and 0.4 or 0.2)
-			part.Position = hp.pos
-			part.Anchored = true
-			part.CanCollide = false
-			part.CanTouch = false
-			part.CanQuery = false
-			part.Transparency = 0.5
-			part.Color = isBest and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 200, 0)
-			part.Material = Enum.Material.Neon
-			part.Parent = workspace
-			table.insert(scanPointParts, part)
-		end
-		if bestPoint and origin then
-			local linePart = Instance.new('Part')
-			linePart.Size = Vector3.new(0.05, 0.05, (bestPoint.pos - origin).Magnitude)
-			linePart.CFrame = CFrame.lookAt(origin, bestPoint.pos) * CFrame.new(0, 0, -(bestPoint.pos - origin).Magnitude * 0.5)
-			linePart.Anchored = true
-			linePart.CanCollide = false
-			linePart.CanTouch = false
-			linePart.CanQuery = false
-			linePart.Transparency = 0.3
-			linePart.Color = Color3.fromRGB(0, 255, 255)
-			linePart.Material = Enum.Material.Neon
-			linePart.Parent = workspace
-			table.insert(scanPointParts, linePart)
+		if scanDebugFolder then
+			pcall(function() scanDebugFolder:Destroy() end)
+			scanDebugFolder = nil
 		end
 	end
 
-	local resolverDebugParts = {}
 	local function clearResolverDebugParts()
 		for _, part in resolverDebugParts do
 			pcall(function() part:Destroy() end)
 		end
 		table.clear(resolverDebugParts)
+		if resolverDebugFolder then
+			pcall(function() resolverDebugFolder:Destroy() end)
+			resolverDebugFolder = nil
+		end
 	end
 
-	local function renderResolverDebug(ent, rawPos, predictedPos)
-		if not DebugVisualization.Enabled then return end
+	local function renderPositionScanDebug(hitpoints, bestPoint, origin)
+		if not DebugVisualization or not DebugVisualization.Enabled then return end
+		clearScanDebugParts()
+		if not hitpoints or #hitpoints == 0 or not origin then return end
+		if not scanDebugFolder or not scanDebugFolder.Parent then
+			scanDebugFolder = Instance.new('Folder')
+			scanDebugFolder.Name = 'PositionScanDebug'
+			scanDebugFolder.Parent = workspace
+		end
+		local maxShow = math.min(#hitpoints, 20)
+		for i = 1, maxShow do
+			local hp = hitpoints[i]
+			local isBest = hp == bestPoint
+			local part = Instance.new('Part')
+			part.Size = Vector3.new(isBest and 0.4 or 0.15, isBest and 0.4 or 0.15, isBest and 0.4 or 0.15)
+			part.Position = hp.pos
+			part.Anchored = true
+			part.CanCollide = false
+			part.CanTouch = false
+			part.CanQuery = false
+			part.Transparency = 0.4
+			part.Color = isBest and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 200, 0)
+			part.Material = Enum.Material.Neon
+			part.Parent = scanDebugFolder
+			table.insert(scanPointParts, part)
+		end
+		if bestPoint and origin then
+			local dist = safeMagnitude(bestPoint.pos - origin)
+			if dist > 0.1 then
+				local linePart = Instance.new('Part')
+				linePart.Size = Vector3.new(0.05, 0.05, dist)
+				linePart.CFrame = CFrame.lookAt(origin, bestPoint.pos) * CFrame.new(0, 0, -dist * 0.5)
+				linePart.Anchored = true
+				linePart.CanCollide = false
+				linePart.CanTouch = false
+				linePart.CanQuery = false
+				linePart.Transparency = 0.3
+				linePart.Color = Color3.fromRGB(0, 255, 255)
+				linePart.Material = Enum.Material.Neon
+				linePart.Parent = scanDebugFolder
+				table.insert(scanPointParts, linePart)
+			end
+		end
+	end
+
+	local function renderResolverDebug(rawPos, predictedPos)
+		if not DebugVisualization or not DebugVisualization.Enabled then return end
 		clearResolverDebugParts()
-		if not ent or not ent.Character or not rawPos or not predictedPos then return end
+		if not rawPos or not predictedPos then return end
+		if not resolverDebugFolder or not resolverDebugFolder.Parent then
+			resolverDebugFolder = Instance.new('Folder')
+			resolverDebugFolder.Name = 'ResolverDebug'
+			resolverDebugFolder.Parent = workspace
+		end
 		local rawPart = Instance.new('Part')
 		rawPart.Size = Vector3.new(0.3, 0.3, 0.3)
 		rawPart.Position = rawPos
@@ -1525,10 +1563,10 @@ run(function()
 		rawPart.CanCollide = false
 		rawPart.CanTouch = false
 		rawPart.CanQuery = false
-		rawPart.Transparency = 0.5
+		rawPart.Transparency = 0.4
 		rawPart.Color = Color3.fromRGB(255, 100, 100)
 		rawPart.Material = Enum.Material.Neon
-		rawPart.Parent = workspace
+		rawPart.Parent = resolverDebugFolder
 		table.insert(resolverDebugParts, rawPart)
 		local predPart = Instance.new('Part')
 		predPart.Size = Vector3.new(0.3, 0.3, 0.3)
@@ -1537,66 +1575,71 @@ run(function()
 		predPart.CanCollide = false
 		predPart.CanTouch = false
 		predPart.CanQuery = false
-		predPart.Transparency = 0.5
+		predPart.Transparency = 0.4
 		predPart.Color = Color3.fromRGB(100, 255, 100)
 		predPart.Material = Enum.Material.Neon
-		predPart.Parent = workspace
+		predPart.Parent = resolverDebugFolder
 		table.insert(resolverDebugParts, predPart)
-		local linePart = Instance.new('Part')
-		linePart.Size = Vector3.new(0.05, 0.05, (predictedPos - rawPos).Magnitude)
-		linePart.CFrame = CFrame.lookAt(rawPos, predictedPos) * CFrame.new(0, 0, -(predictedPos - rawPos).Magnitude * 0.5)
-		linePart.Anchored = true
-		linePart.CanCollide = false
-		linePart.CanTouch = false
-		linePart.CanQuery = false
-		linePart.Transparency = 0.3
-		linePart.Color = Color3.fromRGB(255, 255, 100)
-		linePart.Material = Enum.Material.Neon
-		linePart.Parent = workspace
-		table.insert(resolverDebugParts, linePart)
+		local dist = safeMagnitude(predictedPos - rawPos)
+		if dist > 0.1 then
+			local linePart = Instance.new('Part')
+			linePart.Size = Vector3.new(0.05, 0.05, dist)
+			linePart.CFrame = CFrame.lookAt(rawPos, predictedPos) * CFrame.new(0, 0, -dist * 0.5)
+			linePart.Anchored = true
+			linePart.CanCollide = false
+			linePart.CanTouch = false
+			linePart.CanQuery = false
+			linePart.Transparency = 0.3
+			linePart.Color = Color3.fromRGB(255, 255, 100)
+			linePart.Material = Enum.Material.Neon
+			linePart.Parent = resolverDebugFolder
+			table.insert(resolverDebugParts, linePart)
+		end
 	end
 
+	local lastScanTarget = nil
+	local lastScanTime = 0
+	local SCAN_THROTTLE = 0.05
+
 	local function getBestScanPosition(ent, origin, wallcheckEnabled)
-		if not ent or not ent.Character then return nil, nil, 0 end
+		if not ent or not ent.Character or not origin then return nil, nil, 0 end
+		local now = tick()
+		if ent == lastScanTarget and (now - lastScanTime) < SCAN_THROTTLE then
+			return nil, nil, 0
+		end
+		lastScanTarget = ent
+		lastScanTime = now
 		local targetParts = {}
-		if ent.Head then table.insert(targetParts, ent.Head) end
 		if ent.RootPart then table.insert(targetParts, ent.RootPart) end
-		local humanoid = ent.Character:FindFirstChildOfClass('Humanoid')
-		if humanoid then
-			for _, descendant in ent.Character:GetDescendants() do
-				if descendant:IsA('BasePart') and descendant.Name ~= 'HumanoidRootPart' then
-					if descendant.Name == 'Head' or descendant.Name == 'Torso' or descendant.Name == 'UpperTorso' or descendant.Name == 'LowerTorso' or descendant.Name == 'LeftHand' or descendant.Name == 'RightHand' or descendant.Name == 'LeftFoot' or descendant.Name == 'RightFoot' then
-						table.insert(targetParts, descendant)
-					end
-				end
-			end
-		end
+		if ent.Head then table.insert(targetParts, ent.Head) end
+		if #targetParts == 0 then return nil, nil, 0 end
 		local allHitpoints = {}
-		local wallcheckParams = nil
-		if wallcheckEnabled then
-			wallcheckParams = RaycastParams.new()
-			wallcheckParams.FilterType = Enum.RaycastFilterType.Exclude
-			wallcheckParams.FilterDescendantsInstances = {ent.Character}
-		end
 		for _, part in targetParts do
-			local hitpoints = getPartHitpoints(part, origin)
-			for _, hp in hitpoints do
+			local hps = getPartHitpointsLight(part, origin)
+			for _, hp in hps do
 				hp.sourcePart = part
 				table.insert(allHitpoints, hp)
+				if #allHitpoints >= 30 then break end
 			end
+			if #allHitpoints >= 30 then break end
+		end
+		if #allHitpoints == 0 then return nil, nil, 0 end
+		local targetVel = Vector3.zero
+		if ent.RootPart then
+			targetVel = safeVelocity(ent.RootPart.AssemblyLinearVelocity)
 		end
 		local bestPoint = nil
 		local bestScore = 0
 		local bestDistance = 0
 		for _, hp in allHitpoints do
-			local score, dist = calculateScanScore(hp, origin, ent.RootPart and ent.RootPart.AssemblyLinearVelocity or Vector3.zero, hp.sourcePart, wallcheckParams)
+			local score, dist = calculateScanScore(hp, origin, targetVel)
 			if score > bestScore then
 				bestScore = score
 				bestPoint = hp
 				bestDistance = dist
 			end
 		end
-		renderPositionScanDebug(ent.RootPart, allHitpoints, bestPoint, origin)
+		renderPositionScanDebug(allHitpoints, bestPoint, origin)
 		return bestPoint, bestPoint and bestPoint.pos, bestDistance
 	end
 
@@ -1796,8 +1839,8 @@ run(function()
 			if Resolver.Enabled then
 				updateResolverCache(ent)
 				resolvedPos, jitterDetected, rawPos = getResolvedPosition(ent)
-				if DebugVisualization.Enabled and jitterDetected then
-					renderResolverDebug(ent, rawPos, resolvedPos)
+				if DebugVisualization and DebugVisualization.Enabled and jitterDetected and rawPos and resolvedPos then
+					renderResolverDebug(rawPos, resolvedPos)
 				end
 			end
 			local scanPos = nil
@@ -1811,8 +1854,6 @@ run(function()
 				ProjectileRaycast.FilterDescendantsInstances = {gameCamera, ent.Character}
 				ProjectileRaycast.CollisionGroup = ent[targetPart].CollisionGroup
 			end
-			local finalTargetPos = scanPos or resolvedPos or ent[targetPart].Position
-			registerShot(ent, ent[targetPart], origin)
 		end
 		
 		return ent, ent and ent[targetPart], origin
@@ -1936,13 +1977,13 @@ run(function()
 					end
 					if Resolver.Enabled then
 						for _, ent in entitylib.List do
-							updateResolverCache(ent)
+							pcall(function() updateResolverCache(ent) end)
 						end
 					else
 						clearResolverDebugParts()
 						clearScanDebugParts()
 					end
-					if PositionScan.Enabled and not DebugVisualization.Enabled then
+					if PositionScan.Enabled and (not DebugVisualization or not DebugVisualization.Enabled) then
 						clearScanDebugParts()
 					end
 					processHitDetection()
