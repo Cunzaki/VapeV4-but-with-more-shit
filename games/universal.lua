@@ -1530,32 +1530,10 @@ run(function()
 					if offset.Magnitude <= radius then
 						local testPos = origin + offset
 						if isClear(testPos, targetPos) then
-							if isClear(origin, testPos) then
-								local dist = offset.Magnitude
-								if dist < bestDist then
-									bestDist = dist
-									bestPos = testPos
-								end
-							end
-						end
-					end
-				end
-			end
-		end
-
-		if not bestPos then
-			for x = -radius, radius, step do
-				for y = -radius, radius, step do
-					for z = -radius, radius, step do
-						local offset = Vector3.new(x, y, z)
-						if offset.Magnitude <= radius then
-							local testPos = origin + offset
-							if isClear(testPos, targetPos) then
-								local dist = offset.Magnitude
-								if dist < bestDist then
-									bestDist = dist
-									bestPos = testPos
-								end
+							local dist = offset.Magnitude
+							if dist < bestDist then
+								bestDist = dist
+								bestPos = testPos
 							end
 						end
 					end
@@ -1764,21 +1742,23 @@ run(function()
 						})
 						
 						local hasClearShot = false
+						local finalOrigin = (origin * fireoffset).Position
 						if ent and BulletManipulation.Enabled then
 							local targetPos = (ent.Head or ent.RootPart).Position
 							local radius = BulletManipulationRadius.Value
 							local ignoreList = {gameCamera, entitylib.character, ent.Character}
 							
-							local bestOrigin = getManipulatedOrigin((origin * fireoffset).Position, targetPos, radius, ignoreList)
+							local bestOrigin = getManipulatedOrigin(finalOrigin, targetPos, radius, ignoreList)
 							if bestOrigin then
 								hasClearShot = true
+								finalOrigin = bestOrigin
 							end
 						else
 							hasClearShot = ent ~= nil
 						end
 						
 						if ent and hasClearShot then
-							registerShot(ent, ent.Head or ent.RootPart, (origin * fireoffset).Position)
+							registerShot(ent, ent.Head or ent.RootPart, finalOrigin)
 						end
 
 						if mouse1click and (isrbxactive or iswindowactive)() then
