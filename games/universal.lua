@@ -6384,13 +6384,27 @@ run(function()
 		if not sessioninfo or not sessioninfo.Objects then return end
 
 		if sessioninfo.Objects['FPS'] then
-			sessioninfo.Objects['FPS'].Value = math.floor(1 / (DeltaTime or 0.016))
+			local framecount = 0
+			local lastupdate = tick()
+			if not shared._fpscount then shared._fpscount = 0 end
+			if not shared._fpslast then shared._fpslast = tick() end
+			shared._fpscount = shared._fpscount + 1
+			if tick() - shared._fpslast >= 1 then
+				sessioninfo.Objects['FPS'].Value = shared._fpscount
+				shared._fpscount = 0
+				shared._fpslast = tick()
+			end
 		end
 		if sessioninfo.Objects['Ping'] then
-			sessioninfo.Objects['Ping'].Value = math.floor(playersService.LocalPlayer:GetNetworkPing() * 1000)
+			local ping = 0
+			local suc = pcall(function()
+				ping = math.floor(playersService.LocalPlayer:GetNetworkPing() * 1000)
+			end)
+			if not suc then ping = 0 end
+			sessioninfo.Objects['Ping'].Value = ping
 		end
 		if sessioninfo.Objects['Server Time'] then
-			sessioninfo.Objects['Server Time'].Value = os.time()
+			sessioninfo.Objects['Server Time'].Value = tick()
 		end
 		if sessioninfo.Objects['Players'] then
 			sessioninfo.Objects['Players'].Value = #playersService:GetPlayers()
@@ -6420,19 +6434,20 @@ run(function()
 
 	task.spawn(function()
 		while vape.Loaded do
-			updateDynamicInfo()
+			local suc = pcall(updateDynamicInfo)
+			if not suc then end
 			task.wait(1)
 		end
 	end)
 
-	vape.Libraries.sessioninfo:AddItem('Time Played', os.clock(), function(value) 
-		return os.date('!%X', math.floor(os.clock() - value)) 
+	vape.Libraries.sessioninfo:AddItem('Time Played', os.clock(), function(value)
+		return os.date('!%X', math.floor(os.clock() - value))
 	end)
 	vape.Libraries.sessioninfo:AddItem('FPS', 0, function(value)
-		return value..' fps'
+		return tostring(value)..' fps'
 	end)
 	vape.Libraries.sessioninfo:AddItem('Ping', 0, function(value)
-		return value..' ms'
+		return tostring(value)..' ms'
 	end)
 	vape.Libraries.sessioninfo:AddItem('Server Time', 0, function(value)
 		return os.date('!%H:%M:%S', value)
@@ -6448,19 +6463,25 @@ run(function()
 		return jobId
 	end)
 	vape.Libraries.sessioninfo:AddItem('Players', 0, function(value)
-		return value..' players'
+		return tostring(value)..' players'
 	end)
 	vape.Libraries.sessioninfo:AddItem('In Game', 0, function(value)
-		return value..' in game'
+		return tostring(value)..' in game'
 	end)
 	vape.Libraries.sessioninfo:AddItem('Server Type', '', function(value)
-		local url = pcall(function() return game:GetService('HttpService'):GetGameServerHttpUrl() end)
-		if url and type(url) == 'string' and url:find('private') then return 'Private' end
+		local url = ''
+		local suc = pcall(function()
+			url = game:GetService('HttpService'):GetGameServerHttpUrl()
+		end)
+		if suc and url and type(url) == 'string' and url:find('private') then return 'Private' end
 		return 'Standard'
 	end)
 	vape.Libraries.sessioninfo:AddItem('Server ID', '', function(value)
-		local url = pcall(function() return game:GetService('HttpService'):GetGameServerHttpUrl() end)
-		if url and type(url) == 'string' then
+		local url = ''
+		local suc = pcall(function()
+			url = game:GetService('HttpService'):GetGameServerHttpUrl()
+		end)
+		if suc and url and type(url) == 'string' then
 			local match = url:match('s=([^&]+)')
 			if match then return match:sub(1, 12)..'...' end
 		end
