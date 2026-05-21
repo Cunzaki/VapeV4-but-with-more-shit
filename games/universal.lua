@@ -1327,228 +1327,6 @@ run(function()
 	local bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	local healthCache = setmetatable({}, {__mode = 'k'})
 
-	local BulletManipulation = false
-	local BulletScanRadius = 5
-	local BulletScanPoints = 12
-	local BulletScanDelay = 0.02
-	local BulletDebug = false
-	local lastScanTime = 0
-	local currentVisiblePoint = nil
-	local originalCharacterCFrame = nil
-	local isTeleportingBack = false
-	local scanDebugVisuals = {}
-
-	local function clearScanDebugVisuals()
-		for _, obj in scanDebugVisuals do
-			pcall(function() obj:Destroy() end)
-		end
-		scanDebugVisuals = {}
-	end
-
-	local function createScanDebugSphere(pos, color, name)
-		if not BulletDebug or not (BulletDebug.ToggleState == true) then return end
-		local part = Instance.new('Part')
-		part.Name = name or 'ScanDebug'
-		part.Shape = Enum.PartType.Ball
-		part.Size = Vector3.new(0.4, 0.4, 0.4)
-		part.Color = color or Color3.fromRGB(0, 255, 0)
-		part.Material = Enum.Material.Neon
-		part.Position = pos
-		part.Anchored = true
-		part.CanCollide = false
-		part.CanTouch = false
-		part.CanQuery = false
-		part.Transparency = 0.3
-		part.Parent = workspace
-		table.insert(scanDebugVisuals, part)
-		return part
-	end
-
-	local function createScanDebugLine(startPos, endPos, color, name)
-		if not BulletDebug or not (BulletDebug.ToggleState == true) then return end
-		local part = Instance.new('Part')
-		part.Name = name or 'ScanLine'
-		part.Size = Vector3.new(0.1, 0.1, (startPos - endPos).Magnitude)
-		part.Color = color or Color3.fromRGB(255, 255, 0)
-		part.Material = Enum.Material.Neon
-		part.CFrame = CFrame.lookAt(startPos, endPos) * CFrame.new(0, 0, -(startPos - endPos).Magnitude / 2)
-		part.Anchored = true
-		part.CanCollide = false
-		part.CanTouch = false
-		part.CanQuery = false
-		part.Transparency = 0.5
-		part.Parent = workspace
-		table.insert(scanDebugVisuals, part)
-		return part
-	end
-
-	local function isPointVisibleToTarget(origin, targetPos, targetChar)
-		if not targetChar then return false, "No target character" end
-		local direction = targetPos - origin
-		local distance = direction.Magnitude
-		if distance <= 0 then return false, "Zero distance" end
-
-		local raycastParams = RaycastParams.new()
-		raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-		raycastParams.FilterDescendantsInstances = {targetChar}
-		raycastParams.RespectCanCollide = true
-
-		local result = workspace:Raycast(origin, direction.Unit * (distance + 0.1), raycastParams)
-
-		if result then
-			return false, string.format("Blocked by %s", result.Instance.Name or "unknown")
-		end
-		return true, "Clear line of sight"
-	end
-
-	local function scanForVisiblePoints(baseOrigin, targetPos, targetChar, radius, numPoints)
-		local visiblePoints = {}
-		local checkedPoints = {}
-		local blockedPoints = {}
-		local isDebug = BulletDebug and (BulletDebug.ToggleState == true)
-
-		if isDebug then
-			clearScanDebugVisuals()
-			createScanDebugSphere(baseOrigin, Color3.fromRGB(255, 255, 255), "BaseOrigin")
-			createScanDebugSphere(targetPos, Color3.fromRGB(255, 0, 0), "TargetPos")
-		end
-
-		for i = 1, numPoints do
-			local angle = (i / numPoints) * math.pi * 2
-			local offsetX = math.cos(angle) * radius
-			local offsetZ = math.sin(angle) * radius
-			local scanPos = baseOrigin + Vector3.new(offsetX, 0, offsetZ)
-
-			table.insert(checkedPoints, scanPos)
-
-			local isVisible, reason = isPointVisibleToTarget(scanPos, targetPos, targetChar)
-
-			if isDebug then
-				local lineColor = isVisible and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-				createScanDebugLine(scanPos, targetPos, lineColor, isVisible and "VisibleLine" or "BlockedLine")
-				createScanDebugSphere(scanPos, lineColor, isVisible and "VisiblePoint" or "BlockedPoint")
-			end
-
-			if isVisible then
-				local distance = (scanPos - baseOrigin).Magnitude
-				table.insert(visiblePoints, {pos = scanPos, distance = distance, angle = angle})
-			else
-				table.insert(blockedPoints, {pos = scanPos, reason = reason})
-			end
-		end
-
-		local centerVisible, centerReason = isPointVisibleToTarget(baseOrigin, targetPos, targetChar)
-		if isDebug then
-			createScanDebugSphere(baseOrigin, centerVisible and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(255, 128, 0), "CenterPoint")
-		end
-
-		if centerVisible then
-			table.insert(visiblePoints, 1, {pos = baseOrigin, distance = 0, angle = 0, isCenter = true})
-		end
-
-		if isDebug then
-			print(string.format("[BulletScan] Base:%s Target:%s Checked:%d Visible:%d Blocked:%d Center:%s",
-				tostring(baseOrigin), tostring(targetPos), #checkedPoints, #visiblePoints, #blockedPoints,
-				centerVisible and "YES" or "NO"))
-			for i, v in ipairs(blockedPoints) do
-				print(string.format("  Blocked[%d]: %s - %s", i, tostring(v.pos), v.reason))
-			end
-		end
-
-		return visiblePoints, blockedPoints, centerVisible
-	end
-
-	local function getBestVisiblePoint(visiblePoints)
-		if #visiblePoints == 0 then return nil end
-		table.sort(visiblePoints, function(a, b)
-			if a.isCenter and not b.isCenter then return true end
-			if not a.isCenter and b.isCenter then return false end
-			local distA = a.distance or 0
-			local distB = b.distance or 0
-			return distA < distB
-		end)
-		return visiblePoints[1].pos
-	end
-
-	local function teleportCharacterToPoint(position, targetPos)
-		if not entitylib.isAlive or not entitylib.character then return false end
-		local rootPart = entitylib.character.RootPart
-		if not rootPart then return false end
-
-		if not originalCharacterCFrame then
-			originalCharacterCFrame = rootPart.CFrame
-		end
-
-		local lookAtCFrame = CFrame.lookAt(position, targetPos)
-		rootPart.CFrame = lookAtCFrame
-		currentVisiblePoint = position
-
-		return true
-	end
-
-	local function restoreOriginalPosition()
-		if not originalCharacterCFrame or not entitylib.isAlive or not entitylib.character then
-			originalCharacterCFrame = nil
-			currentVisiblePoint = nil
-			return
-		end
-
-		local rootPart = entitylib.character.RootPart
-		if rootPart then
-			rootPart.CFrame = originalCharacterCFrame
-		end
-
-		originalCharacterCFrame = nil
-		currentVisiblePoint = nil
-	end
-
-	local function performBulletScanAndTeleport(baseOrigin, targetPos, targetChar)
-		local now = tick()
-		local scanDelay = 0.02
-		if BulletScanDelay and type(BulletScanDelay.Value) == "number" then
-			scanDelay = BulletScanDelay.Value
-		end
-
-		local scanRadius = 5
-		local scanPoints = 12
-		if BulletScanRadius and type(BulletScanRadius.Value) == "number" then
-			scanRadius = BulletScanRadius.Value
-		end
-		if BulletScanPoints and type(BulletScanPoints.Value) == "number" then
-			scanPoints = BulletScanPoints.Value
-		end
-		local isDebug = BulletDebug and (BulletDebug.ToggleState == true)
-
-		if isDebug then
-			print(string.format("[BulletTeleport] Scan started | Origin:%s | Target:%s | Radius:%d | Points:%d",
-				tostring(baseOrigin), tostring(targetPos), scanRadius, scanPoints))
-		end
-
-		local visiblePoints, blockedPoints, centerVisible = scanForVisiblePoints(
-			baseOrigin,
-			targetPos,
-			targetChar,
-			scanRadius,
-			scanPoints
-		)
-
-		local bestPoint = getBestVisiblePoint(visiblePoints)
-
-		if bestPoint then
-			if isDebug then
-				print(string.format("[BulletTeleport] Found visible point:%s | Distance from base:%s",
-					tostring(bestPoint), tostring((bestPoint - baseOrigin).Magnitude)))
-			end
-			local success = teleportCharacterToPoint(bestPoint, targetPos)
-			return success, bestPoint, "Found"
-		else
-			if isDebug then
-				print(string.format("[BulletTeleport] No visible points found | Blocked:%d", #blockedPoints))
-			end
-			return false, nil, "No visible points"
-		end
-	end
-
 	local function getTracerColors()
 		local mainColor = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
 		return mainColor, mainColor:Lerp(Color3.new(1, 1, 1), 0.45)
@@ -1728,11 +1506,11 @@ run(function()
 
 	local function getTarget(origin, obj)
 		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then return end
-		local targetPartName = (rand.NextNumber(rand, 0, 100) < (AutoFire.Enabled and 100 or HeadshotChance.Value)) and 'Head' or 'RootPart'
+		local targetPart = (rand.NextNumber(rand, 0, 100) < (AutoFire.Enabled and 100 or HeadshotChance.Value)) and 'Head' or 'RootPart'
 		local ent = entitylib['Entity'..Mode.Value]({
 			Range = Range.Value,
 			Wallcheck = Target.Walls.Enabled and (obj or true) or nil,
-			Part = targetPartName,
+			Part = targetPart,
 			Origin = origin,
 			Players = Target.Players.Enabled,
 			NPCs = Target.NPCs.Enabled,
@@ -1740,34 +1518,30 @@ run(function()
 		})
 
 		if ent then
-			local targetPart = ent[targetPartName]
 			targetinfo.Targets[ent] = tick() + 1
 			if Projectile.Enabled then
 				ProjectileRaycast.FilterDescendantsInstances = {gameCamera, ent.Character}
-				ProjectileRaycast.CollisionGroup = targetPart.CollisionGroup
+				ProjectileRaycast.CollisionGroup = ent[targetPart].CollisionGroup
 			end
-			registerShot(ent, targetPart, origin)
-			return ent, targetPart, origin
+			registerShot(ent, ent[targetPart], origin)
 		end
-
-		return nil
+		
+		return ent, ent and ent[targetPart], origin
 	end
 
 	local Hooks = {
 		FindPartOnRayWithIgnoreList = function(args)
-			local result = getTarget(args[1].Origin, {args[2]})
-			if not result then return end
-			local ent, targetPart, origin = result[1], result[2], result[3]
-			if Wallbang.Enabled then
-				return {targetPart, targetPart.Position, targetPart.GetClosestPointOnSurface(targetPart, origin), targetPart.Material}
+			local ent, targetPart, origin = getTarget(args[1].Origin, {args[2]})
+			if not ent then return end
+			if Wallbang.Enabled then 
+				return {targetPart, targetPart.Position, targetPart.GetClosestPointOnSurface(targetPart, origin), targetPart.Material} 
 			end
 			args[1] = Ray.new(origin, CFrame.lookAt(origin, targetPart.Position).LookVector * args[1].Direction.Magnitude)
 		end,
 		Raycast = function(args)
 			if MethodRay.Value ~= 'All' and args[3] and args[3].FilterType ~= Enum.RaycastFilterType[MethodRay.Value] then return end
-			local result = getTarget(args[1])
-			if not result then return end
-			local ent, targetPart, origin = result[1], result[2], result[3]
+			local ent, targetPart, origin = getTarget(args[1])
+			if not ent then return end
 			args[2] = CFrame.lookAt(origin, targetPart.Position).LookVector * args[2].Magnitude
 			if Wallbang.Enabled then
 				RaycastWhitelist.FilterDescendantsInstances = {targetPart}
@@ -1775,9 +1549,8 @@ run(function()
 			end
 		end,
 		ScreenPointToRay = function(args)
-			local result = getTarget(gameCamera.CFrame.Position)
-			if not result then return end
-			local ent, targetPart, origin = result[1], result[2], result[3]
+			local ent, targetPart, origin = getTarget(gameCamera.CFrame.Position)
+			if not ent then return end
 			local direction = CFrame.lookAt(origin, targetPart.Position)
 			if Projectile.Enabled then
 				local calc = prediction.SolveTrajectory(origin, ProjectileSpeed.Value, ProjectileGravity.Value, targetPart.Position, targetPart.Velocity, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
@@ -1787,9 +1560,8 @@ run(function()
 			return {Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)}
 		end,
 		Ray = function(args)
-			local result = getTarget(args[1])
-			if not result then return end
-			local ent, targetPart, origin = result[1], result[2], result[3]
+			local ent, targetPart, origin = getTarget(args[1])
+			if not ent then return end
 			if Projectile.Enabled then
 				local calc = prediction.SolveTrajectory(origin, ProjectileSpeed.Value, ProjectileGravity.Value, targetPart.Position, targetPart.Velocity, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
 				if not calc then return end
@@ -1877,61 +1649,19 @@ run(function()
 					if BulletTracers.Enabled then
 						renderBulletTracers()
 					end
-
 					if AutoFire.Enabled then
-						local baseOrigin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
-						local originPos = (baseOrigin * fireoffset).Position
-						if not originPos then
-							originPos = gameCamera.CFrame.Position
-						end
-						local targetPartName = 'Head'
+						local origin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
 						local ent = entitylib['Entity'..Mode.Value]({
 							Range = Range.Value,
 							Wallcheck = Target.Walls.Enabled or nil,
-							Part = targetPartName,
-							Origin = originPos,
+							Part = 'Head',
+							Origin = (origin * fireoffset).Position,
 							Players = Target.Players.Enabled,
 							NPCs = Target.NPCs.Enabled,
 							Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
 						})
-
-						local isDebug = BulletDebug and (BulletDebug.ToggleState == true)
-
 						if ent then
-							local targetPart = ent.Head or ent.RootPart
-							local shouldTeleport = BulletManipulation and BulletManipulation.ToggleState and ent.Character and targetPart
-
-							if shouldTeleport then
-								local charRootPart = entitylib.character and entitylib.character.RootPart
-								if charRootPart then
-									originalCharacterCFrame = charRootPart.CFrame
-									local scanSuccess, scanPoint, scanStatus = performBulletScanAndTeleport(
-										charRootPart.Position,
-										targetPart.Position,
-										ent.Character
-									)
-
-									if isDebug then
-										if scanSuccess then
-											print(string.format("[AutoFire] Teleported to visible point | Point:%s | Status:%s",
-												tostring(scanPoint), scanStatus))
-										else
-											print(string.format("[AutoFire] Teleport failed | Status:%s", scanStatus))
-										end
-									end
-								end
-							end
-
-							registerShot(ent, targetPart, originPos)
-
-							if isDebug then
-								print(string.format("[AutoFire] Target found | Ent:%s | TargetPart:%s",
-									tostring(ent.Name), tostring(targetPart.Name)))
-							end
-						else
-							if isDebug then
-								print(string.format("[AutoFire] No target found | Origin:%s", tostring(originPos)))
-							end
+							registerShot(ent, ent.Head or ent.RootPart, (origin * fireoffset).Position)
 						end
 
 						if mouse1click and (isrbxactive or iswindowactive)() then
@@ -1940,7 +1670,6 @@ run(function()
 									if mouseClicked then
 										mouse1release()
 										delayCheck = tick() + AutoFireShootDelay.Value
-										restoreOriginalPosition()
 									else
 										mouse1press()
 										lastMb1Click = tick()
@@ -1952,20 +1681,13 @@ run(function()
 									mouse1release()
 								end
 								mouseClicked = false
-								restoreOriginalPosition()
 							end
-						end
-					else
-						if originalCharacterCFrame then
-							restoreOriginalPosition()
 						end
 					end
 					task.wait()
 				until not SilentAim.Enabled
-				restoreOriginalPosition()
 			else
 				isMb1Held = false
-				restoreOriginalPosition()
 				if oldnamecall then
 					hookmetamethod(game, '__namecall', oldnamecall)
 				end
@@ -2223,70 +1945,6 @@ run(function()
 		Max = 2,
 		Default = 0.25,
 		Decimal = 100,
-		Darker = true,
-		Visible = false
-	})
-	BulletManipulation = SilentAim:CreateToggle({
-		Name = 'Bullet Manipulation',
-		Function = function(callback)
-			BulletManipulation.ToggleState = callback
-			BulletScanRadius.Object.Visible = callback
-			BulletScanPoints.Object.Visible = callback
-			BulletScanDelay.Object.Visible = callback
-			BulletDebug.Object.Visible = callback
-			if not callback then
-				clearScanDebugVisuals()
-				restoreOriginalPosition()
-			end
-		end
-	})
-	BulletScanRadius = SilentAim:CreateSlider({
-		Name = 'Scan Radius',
-		Min = 1,
-		Max = 20,
-		Default = 5,
-		Function = function(val)
-			BulletScanRadius.Value = val
-		end,
-		Suffix = 'studs',
-		Darker = true,
-		Visible = false
-	})
-	BulletScanPoints = SilentAim:CreateSlider({
-		Name = 'Scan Points',
-		Min = 4,
-		Max = 36,
-		Default = 12,
-		Function = function(val)
-			BulletScanPoints.Value = val
-		end,
-		Suffix = function(val)
-			return val == 1 and 'point' or 'points'
-		end,
-		Darker = true,
-		Visible = false
-	})
-	BulletScanDelay = SilentAim:CreateSlider({
-		Name = 'Scan Delay',
-		Min = 0.01,
-		Max = 0.5,
-		Default = 0.05,
-		Decimal = 100,
-		Function = function(val)
-			BulletScanDelay.Value = val
-		end,
-		Suffix = 's',
-		Darker = true,
-		Visible = false
-	})
-	BulletDebug = SilentAim:CreateToggle({
-		Name = 'Debug Scan',
-		Function = function(callback)
-			BulletDebug.ToggleState = callback
-			if not callback then
-				clearScanDebugVisuals()
-			end
-		end,
 		Darker = true,
 		Visible = false
 	})
