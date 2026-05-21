@@ -70,16 +70,39 @@ run(function()
 		return math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
 	end
 
-	local function getGroundState()
+	local function isGrounded()
 		local hrp = getHRP()
 		if not hrp then return false end
 		local rayOrigin = hrp.Position
-		local rayDir = Vector3.new(0, -4, 0)
+		local rayDir = Vector3.new(0, -3.5, 0)
 		local params = RaycastParams.new()
 		params.FilterDescendantsInstances = {getCharacter()}
 		params.FilterType = Enum.RaycastFilterType.Exclude
 		local result = workspaceService:Raycast(rayOrigin, rayDir, params)
 		return result ~= nil
+	end
+
+	local function pressSpace()
+		virtualInputManager:SendKeyDown(Enum.KeyCode.Space)
+		task.delay(0.01, function()
+			virtualInputManager:SendKeyUp(Enum.KeyCode.Space)
+		end)
+	end
+
+	local function getMoveDirection()
+		local hrp = getHRP()
+		if not hrp then return Vector3.zero end
+		local vel = getVelocity()
+		local horizontalSpeed = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
+		if horizontalSpeed > 0.5 then
+			return Vector3.new(vel.X / horizontalSpeed, 0, vel.Z / horizontalSpeed)
+		end
+		local cam = workspaceService.CurrentCamera
+		if cam then
+			local lookVector = cam.CFrame.LookVector
+			return Vector3.new(lookVector.X, 0, lookVector.Z).Unit
+		end
+		return Vector3.zero
 	end
 
 	Speed = vape.Categories.Blatant:CreateModule({
@@ -92,12 +115,14 @@ run(function()
 					local currentVel = getVelocity()
 					local horizontalSpeed = math.sqrt(currentVel.X * currentVel.X + currentVel.Z * currentVel.Z)
 					if horizontalSpeed > 1 then
-						local targetSpeed = horizontalSpeed * Speed.Multiplier.Value
-						local scale = targetSpeed / horizontalSpeed
+						local multiplier = Speed.Multiplier.Value
+						local verticalBoost = Speed.VerticalBoost.Value
+						local moveDir = getMoveDirection()
+						local newSpeed = horizontalSpeed * multiplier
 						local newVel = Vector3.new(
-							currentVel.X * scale,
-							currentVel.Y + (Speed.VerticalBoost and Speed.VerticalBoost.Value or 0),
-							currentVel.Z * scale
+							moveDir.X * newSpeed,
+							currentVel.Y + verticalBoost,
+							moveDir.Z * newSpeed
 						)
 						setVelocity(newVel)
 					end
@@ -129,21 +154,24 @@ run(function()
 					local hrp = getHRP()
 					if not hrp then return end
 					local currentVel = getVelocity()
-					local isGrounded = getGroundState()
-					local friction = isGrounded and VelocityExploit.GroundFriction.Value or VelocityExploit.AirFriction.Value
+					local isOnGround = isGrounded()
 					local tickRate = VelocityExploit.TickRate.Value
-					local frictionForce = currentVel * friction * dt * tickRate
+					local dtAdjusted = math.min(dt, 1/tickRate)
+					local friction = isOnGround and VelocityExploit.GroundFriction.Value or VelocityExploit.AirFriction.Value
+					local frictionForce = currentVel * friction * dtAdjusted * tickRate * 0.1
 					local newVel = currentVel - frictionForce
-					newVel = newVel + Vector3.new(0, -50 * dt * VelocityExploit.GravityMultiplier.Value, 0)
-					local horizontalSpeed = math.sqrt(newVel.X * newVel.X + newVel.Z * newVel.Z)
-					if horizontalSpeed > VelocityExploit.BaseSpeed.Value then
-						local scale = VelocityExploit.BaseSpeed.Value / horizontalSpeed
-						newVel = Vector3.new(newVel.X * scale, newVel.Y, newVel.Z * scale)
-					else
-						local boost = VelocityExploit.BoostMultiplier.Value
-						newVel = Vector3.new(newVel.X * boost, newVel.Y * boost, newVel.Z * boost)
+					if VelocityExploit.GravityReduce.Value > 0 and not isOnGround then
+						local gravMult = 1 - (VelocityExploit.GravityReduce.Value / 100)
+						newVel = Vector3.new(newVel.X, newVel.Y * gravMult, newVel.Z)
 					end
-					hrp.AssemblyLinearVelocity = newVel
+					local horizontalSpeed = math.sqrt(newVel.X * newVel.X + newVel.Z * newVel.Z)
+					local baseSpeed = VelocityExploit.BaseSpeed.Value
+					local boostMult = VelocityExploit.BoostMultiplier.Value
+					if horizontalSpeed < baseSpeed then
+						local scale = (baseSpeed * boostMult) / math.max(horizontalSpeed, 0.1)
+						newVel = Vector3.new(newVel.X * scale * 0.1, newVel.Y, newVel.Z * scale * 0.1)
+					end
+					setVelocity(newVel)
 				end))
 			end
 		end,
@@ -163,25 +191,25 @@ run(function()
 		Default = 1.2,
 		Function = function() end
 	})
-	VelocityExploit.GravityMultiplier = VelocityExploit:CreateSlider({
-		Name = 'Gravity Multiplier',
+	VelocityExploit.GravityReduce = VelocityExploit:CreateSlider({
+		Name = 'Gravity Reduce %',
 		Min = 0,
-		Max = 3,
-		Default = 1,
+		Max = 90,
+		Default = 0,
 		Function = function() end
 	})
 	VelocityExploit.GroundFriction = VelocityExploit:CreateSlider({
 		Name = 'Ground Friction',
 		Min = 0,
 		Max = 2,
-		Default = 0.5,
+		Default = 0.1,
 		Function = function() end
 	})
 	VelocityExploit.AirFriction = VelocityExploit:CreateSlider({
 		Name = 'Air Friction',
 		Min = 0,
 		Max = 1,
-		Default = 0.02,
+		Default = 0.01,
 		Function = function() end
 	})
 	VelocityExploit.TickRate = VelocityExploit:CreateSlider({
@@ -203,13 +231,13 @@ run(function()
 					local now = tick()
 					local jumpDelay = BHop.JumpDelay.Value
 					if now - lastJumpTime < jumpDelay then return end
-					if hrp.IsGround then
-						local vel = hrp.AssemblyLinearVelocity
+					if isGrounded() then
+						local vel = getVelocity()
 						local speed = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
-						if speed > 5 then
+						if speed > 3 then
 							lastJumpTime = now
 							if BHop.AutoJump.Value then
-								virtualInputManager:SendLuaKeyCode(true, Enum.KeyCode.Space, false)
+								pressSpace()
 							end
 						end
 					end
@@ -230,11 +258,11 @@ run(function()
 		Default = 0,
 		Function = function() end
 	})
-	BHop.VelocityRetention = BHop:CreateSlider({
-		Name = 'Velocity Retention',
-		Min = 0.8,
-		Max = 1.5,
-		Default = 1,
+	BHop.JumpPower = BHop:CreateSlider({
+		Name = 'Jump Power',
+		Min = 0,
+		Max = 100,
+		Default = 50,
 		Function = function() end
 	})
 
