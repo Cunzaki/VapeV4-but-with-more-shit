@@ -9,7 +9,7 @@ local function getgev2()
     local v8 = game:GetService("Workspace")
     local v9 = v1.LocalPlayer
     local v10 = v9.Character or v9.CharacterAdded:Wait()
-    local v11 = {
+    return {
         Services = {
             Players = v1,
             RunService = v2,
@@ -25,35 +25,11 @@ local function getgev2()
         HumanoidRootPart = v10:WaitForChild("HumanoidRootPart"),
         Humanoid = v10:WaitForChild("Humanoid")
     }
-    return v11
-end
-
-local function getRemote(name)
-    local rs = game:GetService("ReplicatedStorage")
-    local success, result = pcall(function()
-        return rs:WaitForChild(name, 5)
-    end)
-    return success and result or nil
-end
-
-local function getGameModule(name)
-    local ss = game:GetService("ReplicatedStorage"):WaitForChild("Shared", 5)
-    if not ss then return nil end
-    local success, result = pcall(function()
-        for _, child in ss:GetChildren() do
-            if child.Name == name and child:IsA("ModuleScript") then
-                return require(child)
-            end
-        end
-        return nil
-    end)
-    return success and result or nil
 end
 
 local function createSpeedExploit()
     local entity = getgev2()
     local services = entity.Services
-    
     local SpeedExploit = {
         Enabled = false,
         Multiplier = 1.5,
@@ -62,30 +38,14 @@ local function createSpeedExploit()
         LastJumpTime = 0,
         JumpCooldown = 0.03
     }
-    
     local function getVelocity()
-        local hrp = entity.HumanoidRootPart
-        return hrp.AssemblyLinearVelocity
+        return entity.HumanoidRootPart.AssemblyLinearVelocity
     end
-    
     local function setVelocity(vec3)
-        local hrp = entity.HumanoidRootPart
-        hrp.AssemblyLinearVelocity = vec3
+        entity.HumanoidRootPart.AssemblyLinearVelocity = vec3
     end
-    
-    local function getHorizontalSpeed()
-        local vel = getVelocity()
-        return math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
-    end
-    
-    local function getGroundState()
-        local hrp = entity.HumanoidRootPart
-        return hrp.IsGround
-    end
-    
     SpeedExploit.ApplySpeed = function()
         if not SpeedExploit.Enabled then return end
-        local hrp = entity.HumanoidRootPart
         local currentVel = getVelocity()
         local horizontalSpeed = math.sqrt(currentVel.X * currentVel.X + currentVel.Z * currentVel.Z)
         local targetSpeed = horizontalSpeed * SpeedExploit.Multiplier
@@ -99,7 +59,6 @@ local function createSpeedExploit()
             setVelocity(newVel)
         end
     end
-    
     SpeedExploit.AutoHop = function()
         if not SpeedExploit.AutoHopEnabled then return end
         local now = tick()
@@ -111,7 +70,6 @@ local function createSpeedExploit()
         end
         return false
     end
-    
     return SpeedExploit
 end
 
@@ -126,8 +84,6 @@ local SpeedExploitModule = {
 
 local function createVelocityExploit()
     local entity = getgev2()
-    local services = entity.Services
-    
     local VelocityExploit = {
         Enabled = false,
         BaseSpeed = 50,
@@ -137,10 +93,6 @@ local function createVelocityExploit()
         AirFriction = 0.02,
         TickRate = 60
     }
-    
-    local lastTick = 0
-    local velocityHistory = {}
-    
     VelocityExploit.ProcessTick = function(dt)
         if not VelocityExploit.Enabled then return end
         local hrp = entity.HumanoidRootPart
@@ -161,7 +113,6 @@ local function createVelocityExploit()
         end
         hrp.AssemblyLinearVelocity = newVel
     end
-    
     return VelocityExploit
 end
 
@@ -172,12 +123,11 @@ local VelocityExploitModule = {
         mod.Api = api
         return mod
     end
-end
+}
 
 local function createBHopExploit()
     local entity = getgev2()
     local services = entity.Services
-    
     local BHopExploit = {
         Enabled = false,
         AutoJump = false,
@@ -188,18 +138,6 @@ local function createBHopExploit()
         SyncAngle = 90,
         LastJumpTime = 0
     }
-    
-    local function getMouse()
-        return services.UserInputService:GetMouseLocation()
-    end
-    
-    local function isMoving()
-        local hrp = entity.HumanoidRootPart
-        local vel = hrp.AssemblyLinearVelocity
-        local speed = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
-        return speed > 1
-    end
-    
     BHopExploit.ShouldJump = function()
         if not BHopExploit.Enabled then return false end
         local hrp = entity.HumanoidRootPart
@@ -216,7 +154,6 @@ local function createBHopExploit()
         end
         return false
     end
-    
     BHopExploit.GetStrafeAngle = function()
         local hrp = entity.HumanoidRootPart
         local vel = hrp.AssemblyLinearVelocity
@@ -228,7 +165,6 @@ local function createBHopExploit()
         local angleDiff = math.deg(moveAngle - lookAngle)
         return angleDiff
     end
-    
     return BHopExploit
 end
 
@@ -239,19 +175,17 @@ local BHopExploitModule = {
         mod.Api = api
         return mod
     end
-end
+}
 
 local function createTeleportExploit()
     local entity = getgev2()
     local services = entity.Services
-    
     local TeleportExploit = {
         Enabled = false,
         TargetPosition = nil,
         SmoothTeleport = false,
         TeleportDelay = 0
     }
-    
     TeleportExploit.TeleportTo = function(pos)
         local hrp = entity.HumanoidRootPart
         if not hrp then return end
@@ -268,7 +202,6 @@ local function createTeleportExploit()
             hrp.CFrame = CFrame.new(pos)
         end
     end
-    
     TeleportExploit.TeleportToPlayer = function(playerName)
         local targetPlayer = nil
         for _, player in services.Players:GetPlayers() do
@@ -284,7 +217,6 @@ local function createTeleportExploit()
             end
         end
     end
-    
     return TeleportExploit
 end
 
@@ -295,7 +227,7 @@ local TeleportExploitModule = {
         mod.Api = api
         return mod
     end
-end
+}
 
 return {
     Name = "5315066937",
