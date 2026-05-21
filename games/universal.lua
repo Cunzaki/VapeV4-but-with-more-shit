@@ -1418,16 +1418,16 @@ run(function()
 		local style = BulletTracerStyle.Value
 		if style == 'Solid' then
 			main.TextureMode = Enum.TextureMode.Stretch
-			main.SegmentScale = 1
-			main.SegmentPerUnit = 1
+			main.SegmentFrequency = 1
+			main.NumSegments = 1
 		elseif style == 'Dotted' then
 			main.TextureMode = Enum.TextureMode.Wrap
-			main.SegmentScale = 0.5
-			main.SegmentPerUnit = BulletTracerSegments.Value
+			main.SegmentFrequency = BulletTracerSegments.Value
+			main.NumSegments = 2
 		elseif style == 'Dashed' then
 			main.TextureMode = Enum.TextureMode.Stretch
-			main.SegmentScale = 1
-			main.SegmentPerUnit = BulletTracerSegments.Value
+			main.SegmentFrequency = BulletTracerSegments.Value
+			main.NumSegments = 2
 		end
 		if BulletTracerGlow.Enabled then
 			glow = Instance.new('Beam')
@@ -2087,7 +2087,7 @@ run(function()
 		Visible = false,
 		Function = function(val)
 			for _, tracer in bulletTracerActive do
-				tracer.Main.SegmentPerUnit = val
+				tracer.Main.SegmentFrequency = val
 			end
 		end
 	})
