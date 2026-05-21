@@ -1301,6 +1301,8 @@ run(function()
 	local Projectile
 	local ProjectileSpeed
 	local ProjectileGravity
+	local BulletManipulation
+	local BulletManipulationRadius
 	local BulletTracers
 	local BulletTracerColor
 	local BulletTracerTransparency
@@ -1516,6 +1518,64 @@ run(function()
 			NPCs = Target.NPCs.Enabled,
 			Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
 		})
+
+		if ent and BulletManipulation.Enabled then
+			local targetPos = ent[targetPart].Position
+			local radius = BulletManipulationRadius.Value
+			local params = RaycastParams.new()
+			local ignoreList = {gameCamera, entitylib.character, ent.Character}
+			if type(obj) == "table" then
+				for _, v in obj do 
+					if type(v) == "table" then
+						for _, v2 in v do table.insert(ignoreList, v2) end
+					else
+						table.insert(ignoreList, v) 
+					end
+				end
+			end
+			params.FilterDescendantsInstances = ignoreList
+			params.FilterType = Enum.RaycastFilterType.Exclude
+
+			local function isClear(pos)
+				return not workspace:Raycast(pos, targetPos - pos, params)
+			end
+
+			if not isClear(origin) then
+				local found = false
+				local testOffsets = {
+					Vector3.new(0, radius, 0),
+					Vector3.new(0, -radius, 0),
+					Vector3.new(radius, 0, 0),
+					Vector3.new(-radius, 0, 0),
+					Vector3.new(0, 0, radius),
+					Vector3.new(0, 0, -radius),
+				}
+				for _, offset in testOffsets do
+					local testOrigin = origin + offset
+					if isClear(testOrigin) then
+						origin = testOrigin
+						found = true
+						break
+					end
+				end
+
+				if not found then
+					for i = 1, 40 do
+						local offset = Vector3.new(
+							rand:NextNumber(-1, 1),
+							rand:NextNumber(-1, 1),
+							rand:NextNumber(-1, 1)
+						).Unit * (rand:NextNumber(0, radius))
+						
+						local testOrigin = origin + offset
+						if isClear(testOrigin) then
+							origin = testOrigin
+							break
+						end
+					end
+				end
+			end
+		end
 
 		if ent then
 			targetinfo.Targets[ent] = tick() + 1
@@ -1855,6 +1915,20 @@ run(function()
 			end
 		end,
 		Darker = true,
+		Visible = false
+	})
+	BulletManipulation = SilentAim:CreateToggle({
+		Name = 'Bullet Manipulation',
+		Function = function(callback)
+			BulletManipulationRadius.Object.Visible = callback
+		end,
+		Tooltip = 'Manipulates the start position of your bullet to bypass walls'
+	})
+	BulletManipulationRadius = SilentAim:CreateSlider({
+		Name = 'Scanning Radius',
+		Min = 1,
+		Max = 50,
+		Default = 10,
 		Visible = false
 	})
 	Projectile = SilentAim:CreateToggle({
@@ -6901,21 +6975,13 @@ run(function()
 				d.Massless = true
 				d.CastShadow = false
 				d.Material = mat
-				if d.Name == 'HumanoidRootPart' then
-					d.Transparency = 1
-				else
-					d.Transparency = 0
-				end
+				d.Transparency = 0
 				d.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
 				if VisualizerColorToggle.Enabled then
 					d.Color = customColor
 				end
 			elseif d:IsA('Decal') or d:IsA('Texture') then
-				if d.Parent and d.Parent.Name == 'HumanoidRootPart' then
-					d.Transparency = 1
-				else
-					d.Transparency = 0
-				end
+				d.Transparency = 0
 			elseif d:IsA('Humanoid') or d:IsA('Animator') or d:IsA('AnimationController') or d:IsA('Script') or d:IsA('LocalScript') then
 				d:Destroy()
 			end
@@ -6934,6 +7000,9 @@ run(function()
 		char.Archivable = oldarch
 		if not suc or not clone then return end
 		clone.Name = 'BlinkVisualizer'
+
+		local hrp = clone:FindFirstChild('HumanoidRootPart')
+		if hrp then hrp:Destroy() end
 
 		for _, part in clone:GetDescendants() do
 			if part:IsA('BasePart') then
