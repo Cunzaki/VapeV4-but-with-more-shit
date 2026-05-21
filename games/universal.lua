@@ -1622,6 +1622,84 @@ run(function()
 	local lastScanTime = 0
 	local SCAN_THROTTLE = 0.05
 
+	local currentDebugTarget = nil
+	local currentDebugScanPos = nil
+	local currentDebugRawPos = nil
+	local currentDebugPredictedPos = nil
+
+	local function updateDebugVisualization()
+		if not DebugVisualization or not DebugVisualization.Enabled then
+			clearScanDebugParts()
+			clearResolverDebugParts()
+			return
+		end
+		local now = tick()
+		if (now - lastDebugRenderTime) < DEBUG_RENDER_INTERVAL then return end
+		lastDebugRenderTime = now
+		local localChar = entitylib.character
+		if not localChar then return end
+		local localRoot = localChar.RootPart
+		if not localRoot then return end
+		local localPos = localRoot.Position
+		local maxRange = Range and Range.Value or 150
+		local bestTarget = nil
+		local bestDistance = math.huge
+		for _, ent in entitylib.List do
+			if ent == entitylib.Local then continue end
+			if not ent.Character then continue end
+			local entRoot = ent.RootPart
+			if not entRoot then continue end
+			local dist = (entRoot.Position - localPos).Magnitude
+			if dist < bestDistance and dist <= maxRange then
+				bestDistance = dist
+				bestTarget = ent
+			end
+		end
+		if not bestTarget then
+			clearScanDebugParts()
+			clearResolverDebugParts()
+			return
+		end
+		currentDebugTarget = bestTarget
+		local targetRoot = bestTarget.RootPart
+		local targetHead = bestTarget.Head
+		if not targetRoot then return end
+		local targetParts = {targetRoot}
+		if targetHead then table.insert(targetParts, targetHead) end
+		local allHitpoints = {}
+		for _, part in targetParts do
+			local hps = getPartHitpointsLight(part, localPos)
+			for _, hp in hps do
+				hp.sourcePart = part
+				table.insert(allHitpoints, hp)
+				if #allHitpoints >= 30 then break end
+			end
+			if #allHitpoints >= 30 then break end
+		end
+		if #allHitpoints == 0 then return end
+		local targetVel = Vector3.zero
+		if isVector3(targetRoot.AssemblyLinearVelocity) then
+			targetVel = safeVelocity(targetRoot.AssemblyLinearVelocity)
+		end
+		local bestPoint = nil
+		local bestScore = 0
+		for _, hp in allHitpoints do
+			local score = calculateScanScore(hp, localPos, targetVel)
+			if score > bestScore then
+				bestScore = score
+				bestPoint = hp
+			end
+		end
+		renderPositionScanDebug(allHitpoints, bestPoint, localPos)
+		if Resolver.Enabled then
+			updateResolverCache(bestTarget)
+			local resolvedPos, jitterDetected, rawPos = getResolvedPosition(bestTarget)
+			if rawPos and resolvedPos then
+				renderResolverDebug(rawPos, resolvedPos)
+			end
+		end
+	end
+
 	local function getBestScanPosition(ent, origin, wallcheckEnabled)
 		if not ent or not ent.Character then return nil, nil, 0 end
 		if not isVector3(origin) then return nil, nil, 0 end
@@ -1659,13 +1737,6 @@ run(function()
 				bestScore = score
 				bestPoint = hp
 				bestDistance = dist
-			end
-		end
-		if DebugVisualization and DebugVisualization.Enabled then
-			local now2 = tick()
-			if (now2 - lastDebugRenderTime) >= DEBUG_RENDER_INTERVAL then
-				lastDebugRenderTime = now2
-				renderPositionScanDebug(allHitpoints, bestPoint, origin)
 			end
 		end
 		return bestPoint, bestPoint and bestPoint.pos, bestDistance
@@ -2007,11 +2078,12 @@ run(function()
 						for _, ent in entitylib.List do
 							pcall(function() updateResolverCache(ent) end)
 						end
-					else
-						clearResolverDebugParts()
 					end
-					if not PositionScan.Enabled then
+					if DebugVisualization and DebugVisualization.Enabled then
+						pcall(function() updateDebugVisualization() end)
+					else
 						clearScanDebugParts()
+						clearResolverDebugParts()
 					end
 					processHitDetection()
 					if BulletTracers.Enabled then
