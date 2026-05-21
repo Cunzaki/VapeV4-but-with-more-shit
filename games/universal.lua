@@ -1522,179 +1522,58 @@ run(function()
 		resolverDebugFolder = nil
 	end
 
-	local DEBUG_LOG_ENABLED = true
+	local DEBUG_LOG_INTERVAL = 0.5
+	local lastDebugLogTime = 0
+	local lastLoggedTarget = nil
+	local lastLoggedScanData = nil
+	local lastLoggedResolverData = nil
+
 	local function debugLog(...)
-		if DEBUG_LOG_ENABLED then
-			print('[SilentAim Debug]', ...)
+		local now = tick()
+		if (now - lastDebugLogTime) < DEBUG_LOG_INTERVAL then return end
+		lastDebugLogTime = now
+		local args = {...}
+		local parts = {}
+		for i, v in ipairs(args) do
+			if type(v) == 'userdata' and typeof(v) == 'Vector3' then
+				table.insert(parts, string.format('Vector3(%.1f, %.1f, %.1f)', v.X, v.Y, v.Z))
+			elseif type(v) == 'boolean' then
+				table.insert(parts, v and 'true' or 'false')
+			elseif v == nil then
+				table.insert(parts, 'nil')
+			else
+				table.insert(parts, tostring(v))
+			end
 		end
+		print('[SilentAim]', table.concat(parts, ' | '))
 	end
 
 	local function renderPositionScanDebug(hitpoints, bestPoint, origin)
-		if not DebugVisualization or not DebugVisualization.Enabled then
-			debugLog('Debug viz disabled, skipping render')
-			return
-		end
-		debugLog('Rendering position scan debug, hitpoints:', hitpoints and #hitpoints or 0, 'origin type:', typeof(origin))
-		clearScanDebugParts()
-		if not hitpoints or #hitpoints == 0 then
-			debugLog('No hitpoints to render')
-			return
-		end
-		if not isVector3(origin) then
-			debugLog('Invalid origin:', origin)
-			return
-		end
-		scanDebugFolder = Instance.new('Folder')
-		scanDebugFolder.Name = 'PositionScanDebug_V4'
-		scanDebugFolder.Parent = workspace
-		debugLog('Created scan folder, adding', math.min(#hitpoints, 20), 'hitpoints')
-		local maxShow = math.min(#hitpoints, 20)
-		for i = 1, maxShow do
-			local hp = hitpoints[i]
-			if not hp or not isVector3(hp.pos) then continue end
-			local isBest = hp == bestPoint
-			local part = Instance.new('Part')
-			part.Name = isBest and 'BestPoint' or ('Hitpoint_' .. i)
-			part.Size = Vector3.new(isBest and 0.8 or 0.4, isBest and 0.8 or 0.4, isBest and 0.8 or 0.4)
-			part.Position = hp.pos
-			part.Anchored = true
-			part.CanCollide = false
-			part.CanTouch = false
-			part.CanQuery = false
-			part.Transparency = isBest and 0.1 or 0.3
-			part.Color = isBest and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 180, 0)
-			part.Material = Enum.Material.Neon
-			part.Parent = scanDebugFolder
-			table.insert(scanPointParts, part)
-			debugLog('Added hitpoint', i, 'at', hp.pos, 'isBest:', isBest, 'weight:', hp.weight)
-		end
-		if bestPoint and isVector3(bestPoint.pos) then
-			local dist = safeMagnitude(bestPoint.pos - origin)
-			if dist > 0.1 and isVector3(origin) then
-				debugLog('Creating line from', origin, 'to', bestPoint.pos, 'dist:', dist)
-				local linePart = Instance.new('Part')
-				linePart.Name = 'AimLine'
-				linePart.Size = Vector3.new(0.1, 0.1, dist)
-				linePart.CFrame = CFrame.lookAt(origin, bestPoint.pos) * CFrame.new(0, 0, -dist * 0.5)
-				linePart.Anchored = true
-				linePart.CanCollide = false
-				linePart.CanTouch = false
-				linePart.CanQuery = false
-				linePart.Transparency = 0.2
-				linePart.Color = Color3.fromRGB(0, 200, 255)
-				linePart.Material = Enum.Material.Neon
-				linePart.Parent = scanDebugFolder
-				table.insert(scanPointParts, linePart)
-				local beam = Instance.new('Beam')
-				beam.Attachment0 = Instance.new('Attachment')
-				beam.Attachment0.Parent = linePart
-				beam.Attachment1 = Instance.new('Attachment')
-				beam.Attachment1.Parent = linePart
-				beam.Attachment1.CFrame = CFrame.new(0, 0, -dist)
-				beam.Width0 = 0.15
-				beam.Width1 = 0.15
-				beam.Color = ColorSequence.new(Color3.fromRGB(0, 200, 255))
-				beam.Transparency = NumberSequence.new(0.3)
-				beam.Parent = linePart
-				table.insert(scanPointParts, beam)
-			end
-		end
-		debugLog('Position scan debug render complete, parts in folder:', scanDebugFolder:GetFullName())
 	end
 
 	local function renderResolverDebug(rawPos, predictedPos)
-		if not DebugVisualization or not DebugVisualization.Enabled then return end
-		debugLog('Rendering resolver debug, raw:', rawPos, 'predicted:', predictedPos)
-		clearResolverDebugParts()
-		if not isVector3(rawPos) or not isVector3(predictedPos) then
-			debugLog('Invalid positions for resolver debug')
-			return
-		end
-		resolverDebugFolder = Instance.new('Folder')
-		resolverDebugFolder.Name = 'ResolverDebug_V4'
-		resolverDebugFolder.Parent = workspace
-		local rawPart = Instance.new('Part')
-		rawPart.Name = 'RawPosition'
-		rawPart.Size = Vector3.new(0.5, 0.5, 0.5)
-		rawPart.Position = rawPos
-		rawPart.Anchored = true
-		rawPart.CanCollide = false
-		rawPart.CanTouch = false
-		rawPart.CanQuery = false
-		rawPart.Transparency = 0.2
-		rawPart.Color = Color3.fromRGB(255, 80, 80)
-		rawPart.Material = Enum.Material.Neon
-		rawPart.Parent = resolverDebugFolder
-		table.insert(resolverDebugParts, rawPart)
-		local predPart = Instance.new('Part')
-		predPart.Name = 'PredictedPosition'
-		predPart.Size = Vector3.new(0.5, 0.5, 0.5)
-		predPart.Position = predictedPos
-		predPart.Anchored = true
-		predPart.CanCollide = false
-		predPart.CanTouch = false
-		predPart.CanQuery = false
-		predPart.Transparency = 0.2
-		predPart.Color = Color3.fromRGB(80, 255, 80)
-		predPart.Material = Enum.Material.Neon
-		predPart.Parent = resolverDebugFolder
-		table.insert(resolverDebugParts, predPart)
-		local dist = safeMagnitude(predictedPos - rawPos)
-		debugLog('Resolver line dist:', dist)
-		if dist > 0.1 and isVector3(rawPos) and isVector3(predictedPos) then
-			local linePart = Instance.new('Part')
-			linePart.Name = 'ResolverLine'
-			linePart.Size = Vector3.new(0.1, 0.1, dist)
-			linePart.CFrame = CFrame.lookAt(rawPos, predictedPos) * CFrame.new(0, 0, -dist * 0.5)
-			linePart.Anchored = true
-			linePart.CanCollide = false
-			linePart.CanTouch = false
-			linePart.CanQuery = false
-			linePart.Transparency = 0.2
-			linePart.Color = Color3.fromRGB(255, 255, 80)
-			linePart.Material = Enum.Material.Neon
-			linePart.Parent = resolverDebugFolder
-			table.insert(resolverDebugParts, linePart)
-		end
-		debugLog('Resolver debug render complete')
 	end
 
 	local lastScanTarget = nil
-	local lastScanTime = 0
 	local SCAN_THROTTLE = 0.05
 
-	local currentDebugTarget = nil
-	local currentDebugScanPos = nil
-	local currentDebugRawPos = nil
-	local currentDebugPredictedPos = nil
-
 	local function updateDebugVisualization()
-		if not DebugVisualization or not DebugVisualization.Enabled then
-			clearScanDebugParts()
-			clearResolverDebugParts()
-			return
-		end
-		debugLog('=== updateDebugVisualization called ===')
+		if not DebugVisualization or not DebugVisualization.Enabled then return end
 		local now = tick()
-		if (now - lastDebugRenderTime) < DEBUG_RENDER_INTERVAL then
-			debugLog('Throttled, last render:', lastDebugRenderTime, 'now:', now)
-			return
-		end
-		lastDebugRenderTime = now
+		if (now - lastDebugLogTime) < DEBUG_LOG_INTERVAL then return end
+		lastDebugLogTime = now
 		local localChar = entitylib.character
 		if not localChar then
-			debugLog('No local character')
+			debugLog('Status: No local character found')
 			return
 		end
 		local localRoot = localChar.RootPart
 		if not localRoot then
-			debugLog('No local root part')
+			debugLog('Status: Local character has no RootPart')
 			return
 		end
 		local localPos = localRoot.Position
-		debugLog('Local position:', localPos)
 		local maxRange = Range and Range.Value or 150
-		debugLog('Max range:', maxRange)
 		local bestTarget = nil
 		local bestDistance = math.huge
 		local targetCount = 0
@@ -1708,32 +1587,20 @@ run(function()
 			if dist < bestDistance and dist <= maxRange then
 				bestDistance = dist
 				bestTarget = ent
-				debugLog('Found closer target:', ent.Name, 'dist:', dist)
 			end
 		end
-		debugLog('Total targets scanned:', targetCount, 'best target:', bestTarget and bestTarget.Name or 'none', 'dist:', bestDistance)
 		if not bestTarget then
-			clearScanDebugParts()
-			clearResolverDebugParts()
+			debugLog('Status: No valid targets in range', 'Targets found:', targetCount, 'Range:', maxRange)
 			return
 		end
-		currentDebugTarget = bestTarget
 		local targetRoot = bestTarget.RootPart
 		local targetHead = bestTarget.Head
-		if not targetRoot then
-			debugLog('No target root')
-			return
-		end
-		debugLog('Target root:', targetRoot.Name, 'position:', targetRoot.Position)
+		if not targetRoot then return end
 		local targetParts = {targetRoot}
-		if targetHead then
-			table.insert(targetParts, targetHead)
-			debugLog('Target head found:', targetHead.Name)
-		end
+		if targetHead then table.insert(targetParts, targetHead) end
 		local allHitpoints = {}
 		for _, part in targetParts do
 			local hps = getPartHitpointsLight(part, localPos)
-			debugLog('Got', #hps, 'hitpoints from', part.Name)
 			for _, hp in hps do
 				hp.sourcePart = part
 				table.insert(allHitpoints, hp)
@@ -1741,12 +1608,13 @@ run(function()
 			end
 			if #allHitpoints >= 30 then break end
 		end
-		debugLog('Total hitpoints:', #allHitpoints)
-		if #allHitpoints == 0 then return end
+		if #allHitpoints == 0 then
+			debugLog('Target:', bestTarget.Name, 'Distance:', string.format('%.1f', bestDistance), 'Hitpoints: None generated')
+			return
+		end
 		local targetVel = Vector3.zero
 		if isVector3(targetRoot.AssemblyLinearVelocity) then
 			targetVel = safeVelocity(targetRoot.AssemblyLinearVelocity)
-			debugLog('Target velocity:', targetVel)
 		end
 		local bestPoint = nil
 		local bestScore = 0
@@ -1757,18 +1625,15 @@ run(function()
 				bestPoint = hp
 			end
 		end
-		debugLog('Best point:', bestPoint and bestPoint.name or 'none', 'pos:', bestPoint and bestPoint.pos or 'nil', 'score:', bestScore)
-		renderPositionScanDebug(allHitpoints, bestPoint, localPos)
-		if Resolver.Enabled then
-			debugLog('Resolver enabled, updating cache...')
+		debugLog('Target:', bestTarget.Name, 'Dist:', string.format('%.1f', bestDistance), 'HPs:', #allHitpoints, 'Best:', bestPoint and bestPoint.name or 'none', 'Score:', string.format('%.3f', bestScore))
+		if Resolver and Resolver.Enabled then
 			updateResolverCache(bestTarget)
 			local resolvedPos, jitterDetected, rawPos = getResolvedPosition(bestTarget)
-			debugLog('Resolver result - raw:', rawPos, 'predicted:', resolvedPos, 'jitter:', jitterDetected)
 			if rawPos and resolvedPos then
-				renderResolverDebug(rawPos, resolvedPos)
+				local offset = (resolvedPos - rawPos).Magnitude
+				debugLog('Resolver: Raw', string.format('%.1f, %.1f, %.1f', rawPos.X, rawPos.Y, rawPos.Z), 'Pred', string.format('%.1f, %.1f, %.1f', resolvedPos.X, resolvedPos.Y, resolvedPos.Z), 'Offset:', string.format('%.2f', offset), 'Jitter:', jitterDetected)
 			end
 		end
-		debugLog('=== updateDebugVisualization complete ===')
 	end
 
 	local function getBestScanPosition(ent, origin, wallcheckEnabled)
@@ -2152,9 +2017,6 @@ run(function()
 					end
 					if DebugVisualization and DebugVisualization.Enabled then
 						pcall(function() updateDebugVisualization() end)
-					else
-						clearScanDebugParts()
-						clearResolverDebugParts()
 					end
 					processHitDetection()
 					if BulletTracers.Enabled then
@@ -2199,8 +2061,6 @@ run(function()
 				until not SilentAim.Enabled
 			else
 				isMb1Held = false
-				clearResolverDebugParts()
-				clearScanDebugParts()
 				clearBulletTracers()
 				resolverCache = setmetatable({}, {__mode = 'k'})
 				if oldnamecall then
@@ -2467,7 +2327,6 @@ run(function()
 		Function = function(callback)
 			ResolverMode.Object.Visible = callback
 			if not callback then
-				clearResolverDebugParts()
 				resolverCache = setmetatable({}, {__mode = 'k'})
 			end
 		end
@@ -2494,22 +2353,11 @@ run(function()
 	})
 	PositionScan = SilentAim:CreateToggle({
 		Name = 'Position Scan',
-		Function = function(callback)
-			if not callback then
-				clearScanDebugParts()
-			end
-		end,
 		Tooltip = 'Scans multiple hit points on targets to find the best position'
 	})
 	DebugVisualization = SilentAim:CreateToggle({
 		Name = 'Debug Visualization',
-		Function = function(callback)
-			if not callback then
-				clearScanDebugParts()
-				clearResolverDebugParts()
-			end
-		end,
-		Tooltip = 'Shows resolver predictions and position scan points'
+		Tooltip = 'Shows debug info in console for SilentAim'
 	})
 	vape:Clean(BulletTracerFolder)
 end)
