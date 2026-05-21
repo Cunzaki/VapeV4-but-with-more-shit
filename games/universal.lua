@@ -2898,10 +2898,17 @@ run(function()
 						if #plrs > 0 then
 							local selfpos = entitylib.character.RootPart.Position
 							local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
-	
+							if localfacing.Magnitude > 0 then 
+								localfacing = localfacing.Unit 
+							else
+								localfacing = Vector3.new(1, 0, 0)
+							end
+
 							for _, v in plrs do
 								local delta = (v.RootPart.Position - selfpos)
-								local angle = math.acos(localfacing:Dot((delta * Vector3.new(1, 0, 1)).Unit))
+								local deltaXZ = delta * Vector3.new(1, 0, 1)
+								local dir = deltaXZ.Magnitude > 0 and deltaXZ.Unit or Vector3.new(1, 0, 0)
+								local angle = math.acos(math.clamp(localfacing:Dot(dir), -1, 1))
 								if angle > (math.rad(AngleSlider.Value) / 2) then continue end
 								
 								table.insert(attacked, {
@@ -2918,7 +2925,7 @@ run(function()
 								if Lunge.Enabled and tool.GripUp.X == 0 then break end
 								if delta.Magnitude > AttackRange.Value then continue end
 								
-								Overlay.FilterDescendantsInstances = {v.Character}
+								Overlay.FilterDescendantsInstances = v.Character and {v.Character} or {}
 								for _, part in workspace:GetPartBoundsInBox(v.RootPart.CFrame, Vector3.new(4, 4, 4), Overlay) do
 									firetouchinterest(interest.Parent, part, 1)
 									firetouchinterest(interest.Parent, part, 0)
