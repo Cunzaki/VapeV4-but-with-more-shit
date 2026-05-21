@@ -1342,6 +1342,8 @@ run(function()
 	local function clearBulletTracers()
 		for _, record in bulletTracerActive do
 			pcall(function()
+				if record.StartCap then record.StartCap:Destroy() end
+				if record.EndCap then record.EndCap:Destroy() end
 				record.Part0:Destroy()
 				record.Part1:Destroy()
 			end)
@@ -1404,29 +1406,85 @@ run(function()
 		local attach1 = Instance.new('Attachment')
 		attach1.Parent = part1
 		local main = Instance.new('Beam')
-		local glow = Instance.new('Beam')
+		local glow = nil
 		local thickness = BulletTracerThickness.Value
 		main.Attachment0 = attach0
 		main.Attachment1 = attach1
-		glow.Attachment0 = attach0
-		glow.Attachment1 = attach1
 		main.FaceCamera = true
-		glow.FaceCamera = true
-		main.LightEmission = 1
-		glow.LightEmission = 1
-		main.Width0 = thickness * 0.045
-		main.Width1 = thickness * 0.045
-		glow.Width0 = (thickness + 2) * 0.045
-		glow.Width1 = (thickness + 2) * 0.045
+		main.LightEmission = BulletTracerLight.Value / 100
+		main.Width0 = thickness * 0.05
+		main.Width1 = thickness * 0.05
 		main.Color = ColorSequence.new(mainColor)
-		glow.Color = ColorSequence.new(glowColor)
+		local style = BulletTracerStyle.Value
+		if style == 'Solid' then
+			main.Style = Enum.BeamStyle.Sequential
+			main.SegmentScale = 1
+			main.SegmentPerUnit = 1
+		elseif style == 'Dotted' then
+			main.Style = Enum.BeamStyle.Periodic
+			main.SegmentScale = 0.5
+			main.SegmentPerUnit = BulletTracerSegments.Value
+		elseif style == 'Dashed' then
+			main.Style = Enum.BeamStyle.Sequential
+			main.SegmentScale = 1
+			main.SegmentPerUnit = BulletTracerSegments.Value
+		end
+		if BulletTracerGlow.Enabled then
+			glow = Instance.new('Beam')
+			glow.Attachment0 = attach0
+			glow.Attachment1 = attach1
+			glow.FaceCamera = true
+			glow.LightEmission = BulletTracerLight.Value / 100
+			local glowThickness = thickness + 2
+			glow.Width0 = glowThickness * 0.05
+			glow.Width1 = glowThickness * 0.05
+			glow.Color = ColorSequence.new(glowColor)
+			glow.Transparency = NumberSequence.new(1 - ((1 - BulletTracerTransparency.Value) * 0.5))
+		end
 		main.Parent = part0
-		glow.Parent = part0
+		if glow then glow.Parent = part0 end
+		local startCap, endCap = nil, nil
+		if BulletTracerStartCap.Enabled then
+			startCap = Instance.new('Part')
+			startCap.Shape = Enum.PartType.Ball
+			startCap.Size = Vector3.new(thickness * 0.08, thickness * 0.08, thickness * 0.08)
+			startCap.Anchored = true
+			startCap.CanCollide = false
+			startCap.CanTouch = false
+			startCap.CanQuery = false
+			startCap.Transparency = 1
+			startCap.Color = mainColor
+			startCap.Parent = BulletTracerFolder
+			local weld = Instance.new('Weld')
+			weld.Part0 = startCap
+			weld.Part1 = part0
+			weld.Parent = startCap
+		end
+		if BulletTracerEndCap.Enabled then
+			endCap = Instance.new('Part')
+			endCap.Shape = Enum.PartType.Ball
+			endCap.Size = Vector3.new(thickness * 0.08, thickness * 0.08, thickness * 0.08)
+			endCap.Anchored = true
+			endCap.CanCollide = false
+			endCap.CanTouch = false
+			endCap.CanQuery = false
+			endCap.Transparency = 1
+			endCap.Color = mainColor
+			endCap.Parent = BulletTracerFolder
+			local weld = Instance.new('Weld')
+			weld.Part0 = endCap
+			weld.Part1 = part1
+			weld.Parent = endCap
+		end
 		table.insert(bulletTracerActive, {
 			Main = main,
 			Glow = glow,
 			Part0 = part0,
 			Part1 = part1,
+			Attach0 = attach0,
+			Attach1 = attach1,
+			StartCap = startCap,
+			EndCap = endCap,
 			Entity = ent,
 			Origin = pending.Origin,
 			TargetPosition = pending.TargetPosition,
@@ -1890,6 +1948,12 @@ run(function()
 			BulletTracerTransparency.Object.Visible = callback
 			BulletTracerThickness.Object.Visible = callback
 			BulletTracerDuration.Object.Visible = callback
+			BulletTracerGlow.Object.Visible = callback
+			BulletTracerStyle.Object.Visible = callback
+			BulletTracerSegments.Object.Visible = callback
+			BulletTracerStartCap.Object.Visible = callback
+			BulletTracerEndCap.Object.Visible = callback
+			BulletTracerLight.Object.Visible = callback
 			if not callback then
 				clearBulletTracers()
 			end
@@ -1904,7 +1968,9 @@ run(function()
 			local glow = color:Lerp(Color3.new(1, 1, 1), 0.45)
 			for _, tracer in bulletTracerActive do
 				tracer.Main.Color = ColorSequence.new(color)
-				tracer.Glow.Color = ColorSequence.new(glow)
+				if tracer.Glow then tracer.Glow.Color = ColorSequence.new(glow) end
+				if tracer.StartCap then tracer.StartCap.Color = ColorSequence.new(color) end
+				if tracer.EndCap then tracer.EndCap.Color = ColorSequence.new(color) end
 			end
 		end
 	})
@@ -1919,34 +1985,192 @@ run(function()
 		Function = function(val)
 			for _, tracer in bulletTracerActive do
 				tracer.Main.Transparency = NumberSequence.new(val)
-				tracer.Glow.Transparency = NumberSequence.new(1 - ((1 - val) * 0.5))
+				if tracer.Glow then tracer.Glow.Transparency = NumberSequence.new(1 - ((1 - val) * 0.5)) end
 			end
 		end
 	})
 	BulletTracerThickness = SilentAim:CreateSlider({
 		Name = 'Tracer Thickness',
 		Min = 1,
-		Max = 5,
+		Max = 10,
 		Default = 2,
 		Darker = true,
 		Visible = false,
 		Function = function(val)
+			local glowThickness = BulletTracerGlow.Enabled and (val + 2) or 0
 			for _, tracer in bulletTracerActive do
-				tracer.Main.Width0 = val * 0.045
-				tracer.Main.Width1 = val * 0.045
-				tracer.Glow.Width0 = (val + 2) * 0.045
-				tracer.Glow.Width1 = (val + 2) * 0.045
+				tracer.Main.Width0 = val * 0.05
+				tracer.Main.Width1 = val * 0.05
+				if tracer.Glow then
+					tracer.Glow.Width0 = glowThickness * 0.05
+					tracer.Glow.Width1 = glowThickness * 0.05
+				end
+				if tracer.StartCap then
+					tracer.StartCap.Size = Vector3.new(val * 0.08, val * 0.08, val * 0.08)
+				end
+				if tracer.EndCap then
+					tracer.EndCap.Size = Vector3.new(val * 0.08, val * 0.08, val * 0.08)
+				end
 			end
 		end
 	})
 	BulletTracerDuration = SilentAim:CreateSlider({
 		Name = 'Tracer Duration',
 		Min = 0.05,
-		Max = 2,
+		Max = 3,
 		Default = 0.25,
 		Decimal = 100,
 		Darker = true,
 		Visible = false
+	})
+	BulletTracerGlow = SilentAim:CreateToggle({
+		Name = 'Tracer Glow',
+		Default = true,
+		Visible = false,
+		Function = function(callback)
+			for _, tracer in bulletTracerActive do
+				if tracer.Glow then
+					tracer.Glow:Destroy()
+					tracer.Glow = nil
+				end
+			end
+			if callback then
+				local thickness = BulletTracerThickness.Value
+				for _, tracer in bulletTracerActive do
+					local glow = Instance.new('Beam')
+					glow.Attachment0 = tracer.Attach0
+					glow.Attachment1 = tracer.Attach1
+					glow.FaceCamera = true
+					glow.LightEmission = BulletTracerLight.Value / 100
+					local glowThickness = (thickness + 2)
+					glow.Width0 = glowThickness * 0.05
+					glow.Width1 = glowThickness * 0.05
+					glow.Color = ColorSequence.new(tracer.Main.Color.Keypoints[1].Value:Lerp(Color3.new(1, 1, 1), 0.45))
+					glow.Transparency = NumberSequence.new(1 - ((1 - BulletTracerTransparency.Value) * 0.5))
+					glow.Parent = tracer.Part0
+					tracer.Glow = glow
+				end
+			end
+		end
+	})
+	BulletTracerStyle = SilentAim:CreateDropdown({
+		Name = 'Tracer Style',
+		List = {'Solid', 'Dotted', 'Dashed'},
+		Default = 'Solid',
+		Visible = false,
+		Function = function(val)
+			for _, tracer in bulletTracerActive do
+				local style = val
+				if style == 'Solid' then
+					tracer.Main.Style = Enum.BeamStyle.Sequential
+					tracer.Main.SequenceScaleFactor = Vector2.new(0, 0)
+					tracer.Main.SegmentScale = 1
+					tracer.Main.SegmentPerUnit = 1
+				elseif style == 'Dotted' then
+					tracer.Main.Style = Enum.BeamStyle.Periodic
+					tracer.Main.SegmentScale = 0.5
+					tracer.Main.SegmentPerUnit = 2
+				elseif style == 'Dashed' then
+					tracer.Main.Style = Enum.BeamStyle.Sequential
+					tracer.Main.SegmentScale = 1
+					tracer.Main.SegmentPerUnit = 4
+				end
+			end
+		end
+	})
+	BulletTracerSegments = SilentAim:CreateSlider({
+		Name = 'Tracer Segments',
+		Min = 1,
+		Max = 20,
+		Default = 4,
+		Darker = true,
+		Visible = false,
+		Function = function(val)
+			for _, tracer in bulletTracerActive do
+				tracer.Main.SegmentPerUnit = val
+			end
+		end
+	})
+	BulletTracerStartCap = SilentAim:CreateToggle({
+		Name = 'Start Cap',
+		Default = false,
+		Visible = false,
+		Function = function(callback)
+			for _, tracer in bulletTracerActive do
+				if tracer.StartCap then
+					tracer.StartCap:Destroy()
+					tracer.StartCap = nil
+				end
+			end
+			if callback then
+				local thickness = BulletTracerThickness.Value
+				for _, tracer in bulletTracerActive do
+					local cap = Instance.new('Part')
+					cap.Shape = Enum.PartType.Ball
+					cap.Size = Vector3.new(thickness * 0.08, thickness * 0.08, thickness * 0.08)
+					cap.Anchored = true
+					cap.CanCollide = false
+					cap.CanTouch = false
+					cap.CanQuery = false
+					cap.Transparency = 1
+					cap.Color = tracer.Main.Color.Keypoints[1].Value
+					cap.Parent = BulletTracerFolder
+					tracer.StartCap = cap
+					local weld = Instance.new('Weld')
+					weld.Part0 = cap
+					weld.Part1 = tracer.Part0
+					weld.Parent = cap
+				end
+			end
+		end
+	})
+	BulletTracerEndCap = SilentAim:CreateToggle({
+		Name = 'End Cap',
+		Default = false,
+		Visible = false,
+		Function = function(callback)
+			for _, tracer in bulletTracerActive do
+				if tracer.EndCap then
+					tracer.EndCap:Destroy()
+					tracer.EndCap = nil
+				end
+			end
+			if callback then
+				local thickness = BulletTracerThickness.Value
+				for _, tracer in bulletTracerActive do
+					local cap = Instance.new('Part')
+					cap.Shape = Enum.PartType.Ball
+					cap.Size = Vector3.new(thickness * 0.08, thickness * 0.08, thickness * 0.08)
+					cap.Anchored = true
+					cap.CanCollide = false
+					cap.CanTouch = false
+					cap.CanQuery = false
+					cap.Transparency = 1
+					cap.Color = tracer.Main.Color.Keypoints[1].Value
+					cap.Parent = BulletTracerFolder
+					tracer.EndCap = cap
+					local weld = Instance.new('Weld')
+					weld.Part0 = cap
+					weld.Part1 = tracer.Part1
+					weld.Parent = cap
+				end
+			end
+		end
+	})
+	BulletTracerLight = SilentAim:CreateSlider({
+		Name = 'Light Emission',
+		Min = 0,
+		Max = 100,
+		Default = 100,
+		Darker = true,
+		Visible = false,
+		Function = function(val)
+			local emission = val / 100
+			for _, tracer in bulletTracerActive do
+				tracer.Main.LightEmission = emission
+				if tracer.Glow then tracer.Glow.LightEmission = emission end
+			end
+		end
 	})
 	vape:Clean(BulletTracerFolder)
 end)
