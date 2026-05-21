@@ -38,11 +38,31 @@ local prediction = vape.Libraries.prediction
 local getfontsize = vape.Libraries.getfontsize
 local getcustomasset = vape.Libraries.getcustomasset
 
+local function getobtain(name)
+	local rs = replicatedStorage
+	local client = rs:FindFirstChild('Client')
+	if client then
+		local mod = client:FindFirstChild(name)
+		if mod and mod:IsA('ModuleScript') then
+			return require(mod)
+		end
+	end
+	local shared = rs:FindFirstChild('Shared')
+	if shared then
+		local mod = shared:FindFirstChild(name)
+		if mod and mod:IsA('ModuleScript') then
+			return require(mod)
+		end
+	end
+	return nil
+end
+
 run(function()
 	local Speed
-	local VelocityExploit
 	local BHop
 	local Teleport
+	local Fly
+	local Noclip
 
 	local function getCharacter()
 		return lplr.Character or lplr.CharacterAdded:Wait()
@@ -89,20 +109,11 @@ run(function()
 		end)
 	end
 
-	local function getMoveDirection()
-		local hrp = getHRP()
-		if not hrp then return Vector3.zero end
-		local vel = getVelocity()
-		local horizontalSpeed = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
-		if horizontalSpeed > 0.5 then
-			return Vector3.new(vel.X / horizontalSpeed, 0, vel.Z / horizontalSpeed)
-		end
-		local cam = workspaceService.CurrentCamera
-		if cam then
-			local lookVector = cam.CFrame.LookVector
-			return Vector3.new(lookVector.X, 0, lookVector.Z).Unit
-		end
-		return Vector3.zero
+	local function pressKey(key)
+		virtualInputManager:SendKeyDown(key)
+		task.delay(0.01, function()
+			virtualInputManager:SendKeyUp(key)
+		end)
 	end
 
 	Speed = vape.Categories.Blatant:CreateModule({
@@ -114,14 +125,16 @@ run(function()
 					if not hrp then return end
 					local currentVel = getVelocity()
 					local horizontalSpeed = math.sqrt(currentVel.X * currentVel.X + currentVel.Z * currentVel.Z)
-					if horizontalSpeed > 1 then
+					if horizontalSpeed > 0.5 then
 						local multiplier = Speed.Multiplier.Value
-						local verticalBoost = Speed.VerticalBoost.Value
-						local moveDir = getMoveDirection()
+						local moveDir = currentVel
+						if horizontalSpeed > 0.1 then
+							moveDir = Vector3.new(currentVel.X / horizontalSpeed, 0, currentVel.Z / horizontalSpeed)
+						end
 						local newSpeed = horizontalSpeed * multiplier
 						local newVel = Vector3.new(
 							moveDir.X * newSpeed,
-							currentVel.Y + verticalBoost,
+							currentVel.Y,
 							moveDir.Z * newSpeed
 						)
 						setVelocity(newVel)
@@ -138,87 +151,6 @@ run(function()
 		Default = 2,
 		Function = function() end
 	})
-	Speed.VerticalBoost = Speed:CreateSlider({
-		Name = 'Vertical Boost',
-		Min = 0,
-		Max = 50,
-		Default = 0,
-		Function = function() end
-	})
-
-	VelocityExploit = vape.Categories.Blatant:CreateModule({
-		Name = 'VelocityExploit',
-		Function = function(callback)
-			if callback then
-				VelocityExploit:Clean(runService.Heartbeat:Connect(function(dt)
-					local hrp = getHRP()
-					if not hrp then return end
-					local currentVel = getVelocity()
-					local isOnGround = isGrounded()
-					local tickRate = VelocityExploit.TickRate.Value
-					local dtAdjusted = math.min(dt, 1/tickRate)
-					local friction = isOnGround and VelocityExploit.GroundFriction.Value or VelocityExploit.AirFriction.Value
-					local frictionForce = currentVel * friction * dtAdjusted * tickRate * 0.1
-					local newVel = currentVel - frictionForce
-					if VelocityExploit.GravityReduce.Value > 0 and not isOnGround then
-						local gravMult = 1 - (VelocityExploit.GravityReduce.Value / 100)
-						newVel = Vector3.new(newVel.X, newVel.Y * gravMult, newVel.Z)
-					end
-					local horizontalSpeed = math.sqrt(newVel.X * newVel.X + newVel.Z * newVel.Z)
-					local baseSpeed = VelocityExploit.BaseSpeed.Value
-					local boostMult = VelocityExploit.BoostMultiplier.Value
-					if horizontalSpeed < baseSpeed then
-						local scale = (baseSpeed * boostMult) / math.max(horizontalSpeed, 0.1)
-						newVel = Vector3.new(newVel.X * scale * 0.1, newVel.Y, newVel.Z * scale * 0.1)
-					end
-					setVelocity(newVel)
-				end))
-			end
-		end,
-		Tooltip = 'Custom physics velocity manipulation'
-	})
-	VelocityExploit.BaseSpeed = VelocityExploit:CreateSlider({
-		Name = 'Base Speed',
-		Min = 10,
-		Max = 200,
-		Default = 50,
-		Function = function() end
-	})
-	VelocityExploit.BoostMultiplier = VelocityExploit:CreateSlider({
-		Name = 'Boost Multiplier',
-		Min = 1,
-		Max = 3,
-		Default = 1.2,
-		Function = function() end
-	})
-	VelocityExploit.GravityReduce = VelocityExploit:CreateSlider({
-		Name = 'Gravity Reduce %',
-		Min = 0,
-		Max = 90,
-		Default = 0,
-		Function = function() end
-	})
-	VelocityExploit.GroundFriction = VelocityExploit:CreateSlider({
-		Name = 'Ground Friction',
-		Min = 0,
-		Max = 2,
-		Default = 0.1,
-		Function = function() end
-	})
-	VelocityExploit.AirFriction = VelocityExploit:CreateSlider({
-		Name = 'Air Friction',
-		Min = 0,
-		Max = 1,
-		Default = 0.01,
-		Function = function() end
-	})
-	VelocityExploit.TickRate = VelocityExploit:CreateSlider({
-		Name = 'Tick Rate',
-		Min = 30,
-		Max = 120,
-		Default = 60,
-		Function = function() end
-	})
 
 	BHop = vape.Categories.Blatant:CreateModule({
 		Name = 'BHop',
@@ -231,10 +163,11 @@ run(function()
 					local now = tick()
 					local jumpDelay = BHop.JumpDelay.Value
 					if now - lastJumpTime < jumpDelay then return end
-					if isGrounded() then
+					local grounded = isGrounded()
+					if grounded then
 						local vel = getVelocity()
 						local speed = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
-						if speed > 3 then
+						if speed > 2 then
 							lastJumpTime = now
 							if BHop.AutoJump.Value then
 								pressSpace()
@@ -255,15 +188,83 @@ run(function()
 		Name = 'Jump Delay',
 		Min = 0,
 		Max = 0.2,
-		Default = 0,
+		Default = 0.03,
 		Function = function() end
 	})
-	BHop.JumpPower = BHop:CreateSlider({
-		Name = 'Jump Power',
-		Min = 0,
-		Max = 100,
+
+	Fly = vape.Categories.Blatant:CreateModule({
+		Name = 'Fly',
+		Function = function(callback)
+			if callback then
+				local verticalVel = 0
+				Fly:Clean(runService.Heartbeat:Connect(function(dt)
+					local hrp = getHRP()
+					if not hrp then return end
+					local speed = Fly.Speed.Value
+					local upKey = inputService:IsKeyDown(Enum.KeyCode.Space)
+					local downKey = inputService:IsKeyDown(Enum.KeyCode.LeftControl) or inputService:IsKeyDown(Enum.KeyCode.LeftShift)
+					if upKey then
+						verticalVel = speed
+					elseif downKey then
+						verticalVel = -speed
+					else
+						verticalVel = 0
+					end
+					local currentVel = getVelocity()
+					local cam = gameCamera
+					if cam then
+						local lookCFrame = CFrame.new(hrp.Position, cam.CFrame.Position)
+						local forward = lookCFrame.LookVector
+						local right = lookCFrame.RightVector
+						local moveDir = Vector3.zero
+						if inputService:IsKeyDown(Enum.KeyCode.W) then
+							moveDir = moveDir + forward
+						end
+						if inputService:IsKeyDown(Enum.KeyCode.S) then
+							moveDir = moveDir - forward
+						end
+						if inputService:IsKeyDown(Enum.KeyCode.A) then
+							moveDir = moveDir - right
+						end
+						if inputService:IsKeyDown(Enum.KeyCode.D) then
+							moveDir = moveDir + right
+						end
+						if moveDir.Magnitude > 0.1 then
+							moveDir = moveDir.Unit
+						end
+						local newVel = Vector3.new(moveDir.X * speed, verticalVel, moveDir.Z * speed)
+						setVelocity(newVel)
+					end
+				end))
+			end
+		end,
+		Tooltip = 'Fly around freely'
+	})
+	Fly.Speed = Fly:CreateSlider({
+		Name = 'Speed',
+		Min = 10,
+		Max = 200,
 		Default = 50,
 		Function = function() end
+	})
+
+	Noclip = vape.Categories.Blatant:CreateModule({
+		Name = 'Noclip',
+		Function = function(callback)
+			if callback then
+				Noclip:Clean(runService.Heartbeat:Connect(function()
+					local char = getCharacter()
+					if char then
+						for _, part in char:GetDescendants() do
+							if part:IsA('BasePart') then
+								part.CanCollide = false
+							end
+						end
+					end
+				end))
+			end
+		end,
+		Tooltip = 'Pass through walls'
 	})
 
 	Teleport = vape.Categories.Utility:CreateModule({
