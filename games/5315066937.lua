@@ -1,238 +1,293 @@
-local function getgev2()
-    local v1 = game:GetService("Players")
-    local v2 = game:GetService("RunService")
-    local v3 = game:GetService("UserInputService")
-    local v4 = game:GetService("VirtualInputManager")
-    local v5 = game:GetService("TeleportService")
-    local v6 = game:GetService("Lighting")
-    local v7 = game:GetService("ReplicatedStorage")
-    local v8 = game:GetService("Workspace")
-    local v9 = v1.LocalPlayer
-    local v10 = v9.Character or v9.CharacterAdded:Wait()
-    return {
-        Services = {
-            Players = v1,
-            RunService = v2,
-            UserInputService = v3,
-            VirtualInputManager = v4,
-            TeleportService = v5,
-            Lighting = v6,
-            ReplicatedStorage = v7,
-            Workspace = v8
-        },
-        LocalPlayer = v9,
-        Character = v10,
-        HumanoidRootPart = v10:WaitForChild("HumanoidRootPart"),
-        Humanoid = v10:WaitForChild("Humanoid")
-    }
+local run = function(func)
+	func()
 end
-
-local function createSpeedExploit()
-    local entity = getgev2()
-    local services = entity.Services
-    local SpeedExploit = {
-        Enabled = false,
-        Multiplier = 1.5,
-        VerticalBoost = 0,
-        AutoHopEnabled = false,
-        LastJumpTime = 0,
-        JumpCooldown = 0.03
-    }
-    local function getVelocity()
-        return entity.HumanoidRootPart.AssemblyLinearVelocity
-    end
-    local function setVelocity(vec3)
-        entity.HumanoidRootPart.AssemblyLinearVelocity = vec3
-    end
-    SpeedExploit.ApplySpeed = function()
-        if not SpeedExploit.Enabled then return end
-        local currentVel = getVelocity()
-        local horizontalSpeed = math.sqrt(currentVel.X * currentVel.X + currentVel.Z * currentVel.Z)
-        local targetSpeed = horizontalSpeed * SpeedExploit.Multiplier
-        if targetSpeed > 1 then
-            local scale = targetSpeed / horizontalSpeed
-            local newVel = Vector3.new(
-                currentVel.X * scale,
-                currentVel.Y + SpeedExploit.VerticalBoost,
-                currentVel.Z * scale
-            )
-            setVelocity(newVel)
-        end
-    end
-    SpeedExploit.AutoHop = function()
-        if not SpeedExploit.AutoHopEnabled then return end
-        local now = tick()
-        if now - SpeedExploit.LastJumpTime < SpeedExploit.JumpCooldown then return end
-        local hrp = entity.HumanoidRootPart
-        if hrp and hrp.IsGround then
-            SpeedExploit.LastJumpTime = now
-            return true
-        end
-        return false
-    end
-    return SpeedExploit
+local cloneref = cloneref or function(obj)
+	return obj
 end
+local vapeEvents = setmetatable({}, {
+	__index = function(self, index)
+		self[index] = Instance.new('BindableEvent')
+		return self[index]
+	end
+})
 
-local SpeedExploitModule = {
-    Name = "SpeedExploit",
-    CreateModule = function(self, api)
-        local mod = createSpeedExploit()
-        mod.Api = api
-        return mod
-    end
-}
+local playersService = cloneref(game:GetService('Players'))
+local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
+local runService = cloneref(game:GetService('RunService'))
+local inputService = cloneref(game:GetService('UserInputService'))
+local tweenService = cloneref(game:GetService('TweenService'))
+local httpService = cloneref(game:GetService('HttpService'))
+local virtualInputManager = cloneref(game:GetService('VirtualInputManager'))
+local teleportService = cloneref(game:GetService('TeleportService'))
+local lightingService = cloneref(game:GetService('Lighting'))
+local workspaceService = cloneref(game:GetService('Workspace'))
 
-local function createVelocityExploit()
-    local entity = getgev2()
-    local VelocityExploit = {
-        Enabled = false,
-        BaseSpeed = 50,
-        BoostMultiplier = 1.0,
-        GravityMultiplier = 1.0,
-        GroundFriction = 0.5,
-        AirFriction = 0.02,
-        TickRate = 60
-    }
-    VelocityExploit.ProcessTick = function(dt)
-        if not VelocityExploit.Enabled then return end
-        local hrp = entity.HumanoidRootPart
-        if not hrp then return end
-        local currentVel = hrp.AssemblyLinearVelocity
-        local isGrounded = hrp.IsGround
-        local friction = isGrounded and VelocityExploit.GroundFriction or VelocityExploit.AirFriction
-        local frictionForce = currentVel * friction * dt * VelocityExploit.TickRate
-        local newVel = currentVel - frictionForce
-        newVel = newVel + Vector3.new(0, -50 * dt * VelocityExploit.GravityMultiplier, 0)
-        local horizontalSpeed = math.sqrt(newVel.X * newVel.X + newVel.Z * newVel.Z)
-        if horizontalSpeed > VelocityExploit.BaseSpeed then
-            local scale = VelocityExploit.BaseSpeed / horizontalSpeed
-            newVel = Vector3.new(newVel.X * scale, newVel.Y, newVel.Z * scale)
-        else
-            local boost = VelocityExploit.BoostMultiplier
-            newVel = Vector3.new(newVel.X * boost, newVel.Y * boost, newVel.Z * boost)
-        end
-        hrp.AssemblyLinearVelocity = newVel
-    end
-    return VelocityExploit
-end
+local gameCamera = workspace.CurrentCamera
+local lplr = playersService.LocalPlayer
+local assetfunction = getcustomasset
 
-local VelocityExploitModule = {
-    Name = "VelocityExploit",
-    CreateModule = function(self, api)
-        local mod = createVelocityExploit()
-        mod.Api = api
-        return mod
-    end
-}
+local vape = shared.vape
+local entitylib = vape.Libraries.entity
+local targetinfo = vape.Libraries.targetinfo
+local sessioninfo = vape.Libraries.sessioninfo
+local uipallet = vape.Libraries.uipallet
+local tween = vape.Libraries.tween
+local color = vape.Libraries.color
+local whitelist = vape.Libraries.whitelist
+local prediction = vape.Libraries.prediction
+local getfontsize = vape.Libraries.getfontsize
+local getcustomasset = vape.Libraries.getcustomasset
 
-local function createBHopExploit()
-    local entity = getgev2()
-    local services = entity.Services
-    local BHopExploit = {
-        Enabled = false,
-        AutoJump = false,
-        JumpDelay = 0,
-        VelocityRetention = 1.0,
-        MinHeight = 3,
-        PerfectSync = false,
-        SyncAngle = 90,
-        LastJumpTime = 0
-    }
-    BHopExploit.ShouldJump = function()
-        if not BHopExploit.Enabled then return false end
-        local hrp = entity.HumanoidRootPart
-        if not hrp then return false end
-        local now = tick()
-        if now - BHopExploit.LastJumpTime < BHopExploit.JumpDelay then return false end
-        if hrp.IsGround then
-            local vel = hrp.AssemblyLinearVelocity
-            local speed = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
-            if speed > 5 then
-                BHopExploit.LastJumpTime = now
-                return true
-            end
-        end
-        return false
-    end
-    BHopExploit.GetStrafeAngle = function()
-        local hrp = entity.HumanoidRootPart
-        local vel = hrp.AssemblyLinearVelocity
-        local cam = services.Workspace.CurrentCamera
-        if not cam then return 0 end
-        local lookCFrame = CFrame.new((hrp.Position), cam.CFrame.Position)
-        local lookAngle = math.atan2(lookCFrame.LookVector.Z, lookCFrame.LookVector.X)
-        local moveAngle = math.atan2(vel.Z, vel.X)
-        local angleDiff = math.deg(moveAngle - lookAngle)
-        return angleDiff
-    end
-    return BHopExploit
-end
+run(function()
+	local Speed
+	local VelocityExploit
+	local BHop
+	local Teleport
 
-local BHopExploitModule = {
-    Name = "BHopExploit",
-    CreateModule = function(self, api)
-        local mod = createBHopExploit()
-        mod.Api = api
-        return mod
-    end
-}
+	local function getCharacter()
+		return lplr.Character or lplr.CharacterAdded:Wait()
+	end
 
-local function createTeleportExploit()
-    local entity = getgev2()
-    local services = entity.Services
-    local TeleportExploit = {
-        Enabled = false,
-        TargetPosition = nil,
-        SmoothTeleport = false,
-        TeleportDelay = 0
-    }
-    TeleportExploit.TeleportTo = function(pos)
-        local hrp = entity.HumanoidRootPart
-        if not hrp then return end
-        if TeleportExploit.SmoothTeleport then
-            local startPos = hrp.Position
-            local steps = 5
-            for i = 1, steps do
-                local t = i / steps
-                local newPos = startPos:Lerp(pos, t)
-                hrp.CFrame = CFrame.new(newPos)
-                services.RunService.Heartbeat:Wait()
-            end
-        else
-            hrp.CFrame = CFrame.new(pos)
-        end
-    end
-    TeleportExploit.TeleportToPlayer = function(playerName)
-        local targetPlayer = nil
-        for _, player in services.Players:GetPlayers() do
-            if player.Name:lower():find(playerName:lower()) == 1 then
-                targetPlayer = player
-                break
-            end
-        end
-        if targetPlayer and targetPlayer.Character then
-            local hrp = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                TeleportExploit.TeleportTo(hrp.Position)
-            end
-        end
-    end
-    return TeleportExploit
-end
+	local function getHRP()
+		local char = getCharacter()
+		return char and char:FindFirstChild('HumanoidRootPart')
+	end
 
-local TeleportExploitModule = {
-    Name = "TeleportExploit",
-    CreateModule = function(self, api)
-        local mod = createTeleportExploit()
-        mod.Api = api
-        return mod
-    end
-}
+	local function getVelocity()
+		local hrp = getHRP()
+		return hrp and hrp.AssemblyLinearVelocity or Vector3.zero
+	end
 
-return {
-    Name = "5315066937",
-    SpeedExploit = SpeedExploitModule,
-    VelocityExploit = VelocityExploitModule,
-    BHopExploit = BHopExploitModule,
-    TeleportExploit = TeleportExploitModule
-}
+	local function setVelocity(vec3)
+		local hrp = getHRP()
+		if hrp then
+			hrp.AssemblyLinearVelocity = vec3
+		end
+	end
+
+	local function getHorizontalSpeed()
+		local vel = getVelocity()
+		return math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
+	end
+
+	local function getGroundState()
+		local hrp = getHRP()
+		return hrp and hrp.IsGround or false
+	end
+
+	Speed = vape.Categories.Blatant:CreateModule({
+		Name = 'Speed',
+		Function = function(callback)
+			if callback then
+				Speed:Clean(runService.Heartbeat:Connect(function()
+					local hrp = getHRP()
+					if not hrp then return end
+					local currentVel = getVelocity()
+					local horizontalSpeed = math.sqrt(currentVel.X * currentVel.X + currentVel.Z * currentVel.Z)
+					if horizontalSpeed > 1 then
+						local targetSpeed = horizontalSpeed * Speed.Multiplier.Value
+						local scale = targetSpeed / horizontalSpeed
+						local newVel = Vector3.new(
+							currentVel.X * scale,
+							currentVel.Y + (Speed.VerticalBoost and Speed.VerticalBoost.Value or 0),
+							currentVel.Z * scale
+						)
+						setVelocity(newVel)
+					end
+				end))
+			end
+		end,
+		Tooltip = 'Multiply your horizontal velocity'
+	})
+	Speed.Multiplier = Speed:CreateSlider({
+		Name = 'Multiplier',
+		Min = 1,
+		Max = 5,
+		Default = 2,
+		Function = function() end
+	})
+	Speed.VerticalBoost = Speed:CreateSlider({
+		Name = 'Vertical Boost',
+		Min = 0,
+		Max = 50,
+		Default = 0,
+		Function = function() end
+	})
+
+	VelocityExploit = vape.Categories.Blatant:CreateModule({
+		Name = 'VelocityExploit',
+		Function = function(callback)
+			if callback then
+				VelocityExploit:Clean(runService.Heartbeat:Connect(function(dt)
+					local hrp = getHRP()
+					if not hrp then return end
+					local currentVel = getVelocity()
+					local isGrounded = getGroundState()
+					local friction = isGrounded and VelocityExploit.GroundFriction.Value or VelocityExploit.AirFriction.Value
+					local tickRate = VelocityExploit.TickRate.Value
+					local frictionForce = currentVel * friction * dt * tickRate
+					local newVel = currentVel - frictionForce
+					newVel = newVel + Vector3.new(0, -50 * dt * VelocityExploit.GravityMultiplier.Value, 0)
+					local horizontalSpeed = math.sqrt(newVel.X * newVel.X + newVel.Z * newVel.Z)
+					if horizontalSpeed > VelocityExploit.BaseSpeed.Value then
+						local scale = VelocityExploit.BaseSpeed.Value / horizontalSpeed
+						newVel = Vector3.new(newVel.X * scale, newVel.Y, newVel.Z * scale)
+					else
+						local boost = VelocityExploit.BoostMultiplier.Value
+						newVel = Vector3.new(newVel.X * boost, newVel.Y * boost, newVel.Z * boost)
+					end
+					hrp.AssemblyLinearVelocity = newVel
+				end))
+			end
+		end,
+		Tooltip = 'Custom physics velocity manipulation'
+	})
+	VelocityExploit.BaseSpeed = VelocityExploit:CreateSlider({
+		Name = 'Base Speed',
+		Min = 10,
+		Max = 200,
+		Default = 50,
+		Function = function() end
+	})
+	VelocityExploit.BoostMultiplier = VelocityExploit:CreateSlider({
+		Name = 'Boost Multiplier',
+		Min = 1,
+		Max = 3,
+		Default = 1.2,
+		Function = function() end
+	})
+	VelocityExploit.GravityMultiplier = VelocityExploit:CreateSlider({
+		Name = 'Gravity Multiplier',
+		Min = 0,
+		Max = 3,
+		Default = 1,
+		Function = function() end
+	})
+	VelocityExploit.GroundFriction = VelocityExploit:CreateSlider({
+		Name = 'Ground Friction',
+		Min = 0,
+		Max = 2,
+		Default = 0.5,
+		Function = function() end
+	})
+	VelocityExploit.AirFriction = VelocityExploit:CreateSlider({
+		Name = 'Air Friction',
+		Min = 0,
+		Max = 1,
+		Default = 0.02,
+		Function = function() end
+	})
+	VelocityExploit.TickRate = VelocityExploit:CreateSlider({
+		Name = 'Tick Rate',
+		Min = 30,
+		Max = 120,
+		Default = 60,
+		Function = function() end
+	})
+
+	BHop = vape.Categories.Blatant:CreateModule({
+		Name = 'BHop',
+		Function = function(callback)
+			if callback then
+				local lastJumpTime = 0
+				BHop:Clean(runService.Heartbeat:Connect(function()
+					local hrp = getHRP()
+					if not hrp then return end
+					local now = tick()
+					local jumpDelay = BHop.JumpDelay.Value
+					if now - lastJumpTime < jumpDelay then return end
+					if hrp.IsGround then
+						local vel = hrp.AssemblyLinearVelocity
+						local speed = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
+						if speed > 5 then
+							lastJumpTime = now
+							if BHop.AutoJump.Value then
+								virtualInputManager:SendLuaKeyCode(true, Enum.KeyCode.Space, false)
+							end
+						end
+					end
+				end))
+			end
+		end,
+		Tooltip = 'Auto bunny hop'
+	})
+	BHop.AutoJump = BHop:CreateToggle({
+		Name = 'Auto Jump',
+		Default = true,
+		Function = function() end
+	})
+	BHop.JumpDelay = BHop:CreateSlider({
+		Name = 'Jump Delay',
+		Min = 0,
+		Max = 0.2,
+		Default = 0,
+		Function = function() end
+	})
+	BHop.VelocityRetention = BHop:CreateSlider({
+		Name = 'Velocity Retention',
+		Min = 0.8,
+		Max = 1.5,
+		Default = 1,
+		Function = function() end
+	})
+
+	Teleport = vape.Categories.Utility:CreateModule({
+		Name = 'Teleport',
+		Function = function(callback)
+			if callback then
+			end
+		end,
+		Tooltip = 'Teleport to positions and players'
+	})
+	Teleport:CreateDropdown({
+		Name = 'Teleport Mode',
+		List = {'To Position', 'To Player'},
+		Function = function(val)
+			Teleport.PositionInput.Visible = (val == 'To Position')
+			Teleport.PlayerInput.Visible = (val == 'To Player')
+		end
+	})
+	Teleport.PositionInput = Teleport:CreateTextBox({
+		Name = 'Position (x, y, z)',
+		Default = '0, 5, 0',
+		Function = function(val)
+			local hrp = getHRP()
+			if not hrp then return end
+			local parts = {}
+			for part in val:gmatch('[^,]+') do
+				table.insert(parts, tonumber(part:gsub(' ', '')))
+			end
+			if #parts >= 3 and parts[1] and parts[2] and parts[3] then
+				hrp.CFrame = CFrame.new(Vector3.new(parts[1], parts[2], parts[3]))
+			end
+		end
+	})
+	Teleport.PlayerInput = Teleport:CreateTextBox({
+		Name = 'Player Name',
+		Default = '',
+		Function = function(val)
+			if val == '' then return end
+			local targetPlayer = nil
+			for _, player in playersService:GetPlayers() do
+				if player.Name:lower():find(val:lower(), 1, true) then
+					targetPlayer = player
+					break
+				end
+			end
+			if targetPlayer and targetPlayer.Character then
+				local hrp2 = targetPlayer.Character:FindFirstChild('HumanoidRootPart')
+				local myHRP = getHRP()
+				if hrp2 and myHRP then
+					myHRP.CFrame = CFrame.new(hrp2.Position)
+				end
+			end
+		end
+	})
+	Teleport.SmoothTeleport = Teleport:CreateToggle({
+		Name = 'Smooth Teleport',
+		Default = false,
+		Function = function() end
+	})
+end)
+
+return '5315066937'
