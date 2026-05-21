@@ -27,17 +27,20 @@ local lplr = playersService.LocalPlayer
 
 local vape = shared.vape
 
-run(function()
-	local AutoBhop
-	local Fly
-	local Noclip
-	local Teleport
-	local SpeedMult
+local function obtain(name)
+	return _G.obtain(name)
+end
 
-	local speedMult = 1
-	local bhopDelay = 0.03
-	local flySpeed = 50
-	local noclipActive = false
+run(function()
+	local SpeedHack
+	local FlyHack
+	local NoclipHack
+	local TeleportHack
+	local BhopHack
+
+	local speedCoeff = 1
+	local flyEnabled = false
+	local noclipEnabled = false
 
 	local function getCharacter()
 		return lplr.Character or lplr.CharacterAdded:Wait()
@@ -54,6 +57,13 @@ run(function()
 		return char:FindFirstChild('RootPart') or char:FindFirstChild('Torso') or char:FindFirstChild('UpperTorso')
 	end
 
+	local function setCharacterCFrame(pos)
+		local posChar = obtain("PositionCharacter")
+		if posChar and posChar.SetCharacterCFrameFromPlayer then
+			posChar.SetCharacterCFrameFromPlayer("Local", pos)
+		end
+	end
+
 	local function pressSpace()
 		virtualInputManager:SendKeyDown(Enum.KeyCode.Space)
 		task.delay(0.01, function()
@@ -61,16 +71,55 @@ run(function()
 		end)
 	end
 
-	AutoBhop = vape.Categories.Blatant:CreateModule({
-		Name = 'AutoBhop',
+	SpeedHack = vape.Categories.Blatant:CreateModule({
+		Name = 'SpeedHack',
+		Function = function(callback)
+			if callback then
+				speedCoeff = SpeedHack.SpeedValue.Value
+				local visMgr = obtain("VisibilityManager")
+				if visMgr and visMgr.SetSpeedCoeff then
+					visMgr.SetSpeedCoeff(speedCoeff)
+				end
+				SpeedHack:Clean(runService.Heartbeat:Connect(function()
+					speedCoeff = SpeedHack.SpeedValue.Value
+					if visMgr and visMgr.SetSpeedCoeff then
+						visMgr.SetSpeedCoeff(speedCoeff)
+					end
+				end))
+			else
+				local visMgr = obtain("VisibilityManager")
+				if visMgr and visMgr.SetSpeedCoeff then
+					visMgr.SetSpeedCoeff(1)
+				end
+			end
+		end,
+		Tooltip = 'Modify game speed coefficient'
+	})
+	SpeedHack.SpeedValue = SpeedHack:CreateSlider({
+		Name = 'Speed',
+		Min = 1,
+		Max = 10,
+		Default = 2,
+		Function = function(val)
+			speedCoeff = val
+			local visMgr = obtain("VisibilityManager")
+			if visMgr and visMgr.SetSpeedCoeff then
+				visMgr.SetSpeedCoeff(val)
+			end
+		end
+	})
+
+	BhopHack = vape.Categories.Blatant:CreateModule({
+		Name = 'BhopHack',
 		Function = function(callback)
 			if callback then
 				local lastJump = 0
-				AutoBhop:Clean(runService.Heartbeat:Connect(function()
+				BhopHack:Clean(runService.Heartbeat:Connect(function()
 					local rootPart = getRootPart()
 					if not rootPart then return end
 					local now = tick()
-					if now - lastJump < bhopDelay then return end
+					local delay = BhopHack.Delay.Value
+					if now - lastJump < delay then return end
 					local rayOrigin = rootPart.Position
 					local rayDir = Vector3.new(0, -3.5, 0)
 					local params = RaycastParams.new()
@@ -90,30 +139,25 @@ run(function()
 		end,
 		Tooltip = 'Auto bunny hop'
 	})
-	AutoBhop.Delay = AutoBhop:CreateSlider({
+	BhopHack.Delay = BhopHack:CreateSlider({
 		Name = 'Jump Delay',
 		Min = 0,
 		Max = 0.2,
 		Default = 0.03,
-		Function = function(val)
-			bhopDelay = val
-		end
+		Function = function() end
 	})
 
-	Fly = vape.Categories.Blatant:CreateModule({
-		Name = 'Fly',
+	FlyHack = vape.Categories.Blatant:CreateModule({
+		Name = 'FlyHack',
 		Function = function(callback)
 			if callback then
-				Fly:Clean(runService.Heartbeat:Connect(function()
+				flyEnabled = true
+				local flySpeed = FlyHack.SpeedValue.Value
+				FlyHack:Clean(runService.Heartbeat:Connect(function()
+					flySpeed = FlyHack.SpeedValue.Value
 					local rootPart = getRootPart()
 					if not rootPart then return end
 					local vel = Vector3.zero
-					if inputService:IsKeyDown(Enum.KeyCode.Space) then
-						vel = vel + Vector3.new(0, flySpeed, 0)
-					end
-					if inputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-						vel = vel + Vector3.new(0, -flySpeed, 0)
-					end
 					local cam = gameCamera
 					if cam then
 						local lookCFrame = CFrame.new(rootPart.Position, cam.CFrame.Position)
@@ -131,29 +175,35 @@ run(function()
 						if inputService:IsKeyDown(Enum.KeyCode.D) then
 							vel = vel + right * flySpeed
 						end
+						if inputService:IsKeyDown(Enum.KeyCode.Space) then
+							vel = vel + Vector3.new(0, flySpeed, 0)
+						end
+						if inputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+							vel = vel - Vector3.new(0, flySpeed, 0)
+						end
 					end
 					rootPart.AssemblyLinearVelocity = vel
 				end))
+			else
+				flyEnabled = false
 			end
 		end,
 		Tooltip = 'Fly with WASD + Space/Ctrl'
 	})
-	Fly.Speed = Fly:CreateSlider({
+	FlyHack.SpeedValue = FlyHack:CreateSlider({
 		Name = 'Speed',
 		Min = 10,
 		Max = 200,
 		Default = 50,
-		Function = function(val)
-			flySpeed = val
-		end
+		Function = function() end
 	})
 
-	Noclip = vape.Categories.Blatant:CreateModule({
-		Name = 'Noclip',
+	NoclipHack = vape.Categories.Blatant:CreateModule({
+		Name = 'NoclipHack',
 		Function = function(callback)
 			if callback then
-				noclipActive = true
-				Noclip:Clean(runService.Heartbeat:Connect(function()
+				noclipEnabled = true
+				NoclipHack:Clean(runService.Heartbeat:Connect(function()
 					local char = getCharacter()
 					if char then
 						for _, part in char:GetDescendants() do
@@ -164,58 +214,34 @@ run(function()
 					end
 				end))
 			else
-				noclipActive = false
+				noclipEnabled = false
 			end
 		end,
 		Tooltip = 'No collision'
 	})
 
-	SpeedMult = vape.Categories.Blatant:CreateModule({
-		Name = 'SpeedMult',
-		Function = function(callback)
-			if callback then
-				SpeedMult:Clean(runService.Heartbeat:Connect(function()
-					local rootPart = getRootPart()
-					if not rootPart then return end
-					local vel = rootPart.AssemblyLinearVelocity
-					local hSpeed = math.sqrt(vel.X * vel.X + vel.Z * vel.Z)
-					if hSpeed > 0.5 then
-						local dir = Vector3.new(vel.X / hSpeed, 0, vel.Z / hSpeed)
-						rootPart.AssemblyLinearVelocity = Vector3.new(dir.X * hSpeed * speedMult, vel.Y, dir.Z * hSpeed * speedMult)
-					end
-				end))
-			end
-		end,
-		Tooltip = 'Speed multiplier (works with movement)'
-	})
-	SpeedMult.Value = SpeedMult:CreateSlider({
-		Name = 'Multiplier',
-		Min = 1,
-		Max = 10,
-		Default = 2,
-		Function = function(val)
-			speedMult = val
-		end
-	})
-
-	Teleport = vape.Categories.Utility:CreateModule({
-		Name = 'Teleport',
+	TeleportHack = vape.Categories.Utility:CreateModule({
+		Name = 'TeleportHack',
 		Function = function(callback)
 		end,
-		Tooltip = 'Teleport'
+		Tooltip = 'Teleport to position or player'
 	})
-	Teleport:CreateTextBox({
-		Name = 'Position (x, y, z)',
+	TeleportHack:CreateDropdown({
+		Name = 'Mode',
+		List = {'Position', 'Player'},
+		Function = function() end
+	})
+	TeleportHack:CreateTextBox({
+		Name = 'Value',
 		Default = '0, 5, 0',
 		Function = function(val)
-			local rootPart = getRootPart()
-			if not rootPart then return end
 			local parts = {}
 			for p in val:gmatch('[^,]+') do
 				table.insert(parts, tonumber(p:gsub(' ', '')))
 			end
 			if #parts >= 3 and parts[1] and parts[2] and parts[3] then
-				rootPart.CFrame = CFrame.new(parts[1], parts[2], parts[3])
+				local pos = Vector3.new(parts[1], parts[2], parts[3])
+				setCharacterCFrame(pos)
 			end
 		end
 	})
