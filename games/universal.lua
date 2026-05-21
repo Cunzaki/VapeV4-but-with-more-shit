@@ -735,7 +735,7 @@ run(function()
 			end
 
 			if whitelist.textdata ~= whitelist.olddata then
-				if whitelist.data.Announcement.expiretime > os.time() then
+				if whitelist.data.Announcement and whitelist.data.Announcement.expiretime and whitelist.data.Announcement.expiretime > os.time() then
 					local targets = whitelist.data.Announcement.targets == 'all' and {tostring(lplr.UserId)} or targets:split(',')
 					if table.find(targets, tostring(lplr.UserId)) then
 						local hint = Instance.new('Hint')
