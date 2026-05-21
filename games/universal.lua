@@ -6935,9 +6935,6 @@ run(function()
 		if not suc or not clone then return end
 		clone.Name = 'BlinkVisualizer'
 
-		local hrp = clone:FindFirstChild('HumanoidRootPart')
-		if hrp then hrp:Destroy() end
-
 		for _, part in clone:GetDescendants() do
 			if part:IsA('BasePart') then
 				part.CanCollide = false
