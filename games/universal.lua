@@ -1301,8 +1301,6 @@ run(function()
 	local Projectile
 	local ProjectileSpeed
 	local ProjectileGravity
-	local BulletManipulation
-	local BulletManipulationRadius
 	local BulletTracers
 	local BulletTracerColor
 	local BulletTracerTransparency
@@ -1482,45 +1480,6 @@ run(function()
 		end
 	end
 
-	local BulletManipulationColor = { Hue = 0, Sat = 1, Value = 1 }
-	local BulletManipulationRadiusSphere = nil
-	local function renderBulletManipulationSphere()
-		if not BulletManipulation.Enabled or not BulletManipulationVis.Enabled then
-			if BulletManipulationRadiusSphere then
-				BulletManipulationRadiusSphere:Destroy()
-				BulletManipulationRadiusSphere = nil
-			end
-			return
-		end
-		
-		if not entitylib.isAlive then
-			if BulletManipulationRadiusSphere then
-				BulletManipulationRadiusSphere:Destroy()
-				BulletManipulationRadiusSphere = nil
-			end
-			return
-		end
-		
-		local root = entitylib.character.RootPart
-		local radius = BulletManipulationRadius.Value
-		
-		if not BulletManipulationRadiusSphere then
-			BulletManipulationRadiusSphere = Instance.new('Part')
-			BulletManipulationRadiusSphere.Shape = Enum.PartType.Ball
-			BulletManipulationRadiusSphere.Anchored = true
-			BulletManipulationRadiusSphere.CanCollide = false
-			BulletManipulationRadiusSphere.CanQuery = false
-			BulletManipulationRadiusSphere.CanTouch = false
-			BulletManipulationRadiusSphere.Parent = workspace
-		end
-		
-		BulletManipulationRadiusSphere.Size = Vector3.new(radius * 2, radius * 2, radius * 2)
-		BulletManipulationRadiusSphere.CFrame = CFrame.new(root.Position)
-		BulletManipulationRadiusSphere.Material = Enum.Material[BulletManipulationMat.Value]
-		BulletManipulationRadiusSphere.Color = Color3.fromHSV(BulletManipulationColor.Hue, BulletManipulationColor.Sat, BulletManipulationColor.Value)
-		BulletManipulationRadiusSphere.Transparency = BulletManipulationTrans.Value / 100
-	end
-
 	local function renderBulletTracers()
 		local now = tick()
 
@@ -1545,82 +1504,18 @@ run(function()
 		end
 	end
 
-	local function getManipulatedOrigin(origin, targetPos, radius, ignoreList)
-		local params = RaycastParams.new()
-		params.FilterDescendantsInstances = ignoreList
-		params.FilterType = Enum.RaycastFilterType.Exclude
-
-		local function isClear(startPos, endPos)
-			return not workspace:Raycast(startPos, endPos - startPos, params)
-		end
-
-		if isClear(origin, targetPos) then
-			return origin
-		end
-
-		local step = math.max(0.5, radius / 6)
-		local bestPos = nil
-		local bestDist = math.huge
-
-		for x = -radius, radius, step do
-			for y = -radius, radius, step do
-				for z = -radius, radius, step do
-					local offset = Vector3.new(x, y, z)
-					if offset.Magnitude <= radius then
-						local testPos = origin + offset
-						if isClear(testPos, targetPos) then
-							local dist = offset.Magnitude
-							if dist < bestDist then
-								bestDist = dist
-								bestPos = testPos
-							end
-						end
-					end
-				end
-			end
-		end
-
-		return bestPos
-	end
-
 	local function getTarget(origin, obj)
 		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then return end
 		local targetPart = (rand.NextNumber(rand, 0, 100) < (AutoFire.Enabled and 100 or HeadshotChance.Value)) and 'Head' or 'RootPart'
-		local isWallcheck = Target.Walls.Enabled and (obj or true) or nil
-		local isTargetingBehindWalls = BulletManipulation.Enabled and Target.Walls.Enabled
-		
 		local ent = entitylib['Entity'..Mode.Value]({
 			Range = Range.Value,
-			Wallcheck = isTargetingBehindWalls and nil or isWallcheck,
+			Wallcheck = Target.Walls.Enabled and (obj or true) or nil,
 			Part = targetPart,
 			Origin = origin,
 			Players = Target.Players.Enabled,
 			NPCs = Target.NPCs.Enabled,
 			Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
 		})
-
-		if ent and BulletManipulation.Enabled then
-			local targetPos = ent[targetPart].Position
-			local radius = BulletManipulationRadius.Value
-			local ignoreList = {gameCamera, entitylib.character, ent.Character}
-			if type(obj) == "table" then
-				for _, v in obj do 
-					if type(v) == "table" then
-						for _, v2 in v do table.insert(ignoreList, v2) end
-					else
-						table.insert(ignoreList, v) 
-					end
-				end
-			end
-			
-			local bestOrigin = getManipulatedOrigin(origin, targetPos, radius, ignoreList)
-			
-			if bestOrigin then
-				origin = bestOrigin
-			elseif Target.Walls.Enabled then
-				return nil
-			end
-		end
 
 		if ent then
 			targetinfo.Targets[ent] = tick() + 1
@@ -1634,7 +1529,6 @@ run(function()
 		return ent, ent and ent[targetPart], origin
 	end
 
-	local HookingRecursion = false
 	local Hooks = {
 		FindPartOnRayWithIgnoreList = function(args)
 			local ent, targetPart, origin = getTarget(args[1].Origin, {args[2]})
@@ -1648,7 +1542,6 @@ run(function()
 			if MethodRay.Value ~= 'All' and args[3] and args[3].FilterType ~= Enum.RaycastFilterType[MethodRay.Value] then return end
 			local ent, targetPart, origin = getTarget(args[1])
 			if not ent then return end
-			args[1] = origin
 			args[2] = CFrame.lookAt(origin, targetPart.Position).LookVector * args[2].Magnitude
 			if Wallbang.Enabled then
 				RaycastWhitelist.FilterDescendantsInstances = {targetPart}
@@ -1672,10 +1565,8 @@ run(function()
 			if Projectile.Enabled then
 				local calc = prediction.SolveTrajectory(origin, ProjectileSpeed.Value, ProjectileGravity.Value, targetPart.Position, targetPart.Velocity, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
 				if not calc then return end
-				args[1] = origin
 				args[2] = CFrame.lookAt(origin, calc).LookVector * args[2].Magnitude
 			else
-				args[1] = origin
 				args[2] = CFrame.lookAt(origin, targetPart.Position).LookVector * args[2].Magnitude
 			end
 		end
@@ -1708,23 +1599,20 @@ run(function()
 				SilentAim:Clean(entitylib.Events.LocalAdded:Connect(resetTracerTracking))
 				if Method.Value == 'Ray' then
 					oldray = hookfunction(Ray.new, function(origin, direction)
-						if checkcaller() or HookingRecursion then
+						if checkcaller() then
 							return oldray(origin, direction)
 						end
-						HookingRecursion = true
 						local calling = getcallingscript()
 
 						if calling then
 							local list = #IgnoredScripts.ListEnabled > 0 and IgnoredScripts.ListEnabled or {'ControlScript', 'ControlModule'}
 							if table.find(list, tostring(calling)) then
-								HookingRecursion = false
 								return oldray(origin, direction)
 							end
 						end
 
 						local args = {origin, direction}
 						Hooks.Ray(args)
-						HookingRecursion = false
 						return oldray(unpack(args))
 					end)
 				else
@@ -1732,23 +1620,20 @@ run(function()
 						if getnamecallmethod() ~= Method.Value then
 							return oldnamecall(...)
 						end
-						if checkcaller() or HookingRecursion then
+						if checkcaller() then
 							return oldnamecall(...)
 						end
-						HookingRecursion = true
 
 						local calling = getcallingscript()
 						if calling then
 							local list = #IgnoredScripts.ListEnabled > 0 and IgnoredScripts.ListEnabled or {'ControlScript', 'ControlModule'}
 							if table.find(list, tostring(calling)) then
-								HookingRecursion = false
 								return oldnamecall(...)
 							end
 						end
 
 						local self, args = ..., {select(2, ...)}
 						local res = Hooks[Method.Value](args)
-						HookingRecursion = false
 						if res then
 							return unpack(res)
 						end
@@ -1764,50 +1649,23 @@ run(function()
 					if BulletTracers.Enabled then
 						renderBulletTracers()
 					end
-					if BulletManipulation.Enabled and BulletManipulationVis.Enabled then
-						renderBulletManipulationSphere()
-					elseif BulletManipulationRadiusSphere then
-						BulletManipulationRadiusSphere:Destroy()
-						BulletManipulationRadiusSphere = nil
-					end
 					if AutoFire.Enabled then
 						local origin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
-						
-						local isWallcheck = Target.Walls.Enabled or nil
-						local isTargetingBehindWalls = BulletManipulation.Enabled and Target.Walls.Enabled
-						
 						local ent = entitylib['Entity'..Mode.Value]({
 							Range = Range.Value,
-							Wallcheck = isTargetingBehindWalls and nil or isWallcheck,
+							Wallcheck = Target.Walls.Enabled or nil,
 							Part = 'Head',
 							Origin = (origin * fireoffset).Position,
 							Players = Target.Players.Enabled,
 							NPCs = Target.NPCs.Enabled,
 							Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
 						})
-						
-						local hasClearShot = false
-						local finalOrigin = (origin * fireoffset).Position
-						if ent and BulletManipulation.Enabled then
-							local targetPos = (ent.Head or ent.RootPart).Position
-							local radius = BulletManipulationRadius.Value
-							local ignoreList = {gameCamera, entitylib.character, ent.Character}
-							
-							local bestOrigin = getManipulatedOrigin(finalOrigin, targetPos, radius, ignoreList)
-							if bestOrigin then
-								hasClearShot = true
-								finalOrigin = bestOrigin
-							end
-						else
-							hasClearShot = ent ~= nil
-						end
-						
-						if ent and hasClearShot then
-							registerShot(ent, ent.Head or ent.RootPart, finalOrigin)
+						if ent then
+							registerShot(ent, ent.Head or ent.RootPart, (origin * fireoffset).Position)
 						end
 
 						if mouse1click and (isrbxactive or iswindowactive)() then
-							if ent and hasClearShot and canClick() then
+							if ent and canClick() then
 								if delayCheck < tick() then
 									if mouseClicked then
 										mouse1release()
@@ -1998,60 +1856,6 @@ run(function()
 		end,
 		Darker = true,
 		Visible = false
-	})
-	BulletManipulation = SilentAim:CreateToggle({
-		Name = 'Bullet Manipulation',
-		Function = function(callback)
-			BulletManipulationRadius.Object.Visible = callback
-			BulletManipulationVis.Object.Visible = callback
-			BulletManipulationMat.Object.Visible = callback
-			BulletManipulationTrans.Object.Visible = callback
-			BulletManipulationColor.Object.Visible = callback
-		end,
-		Tooltip = 'Manipulates the start position of your bullet to bypass walls'
-	})
-	BulletManipulationRadius = SilentAim:CreateSlider({
-		Name = 'Scanning Radius',
-		Min = 1,
-		Max = 50,
-		Default = 10,
-		Visible = false
-	})
-	BulletManipulationVis = SilentAim:CreateToggle({
-		Name = 'Show Radius',
-		Default = true,
-		Visible = false
-	})
-	local bulletmanipMatList = {}
-	for _, v in Enum.Material:GetEnumItems() do
-		if v.Name ~= 'ForceField' then
-			table.insert(bulletmanipMatList, v.Name)
-		end
-	end
-	BulletManipulationMat = SilentAim:CreateDropdown({
-		Name = 'Material',
-		List = bulletmanipMatList,
-		Default = 'Neon',
-		Visible = false,
-		Function = function(val) end
-	})
-	BulletManipulationTrans = SilentAim:CreateSlider({
-		Name = 'Transparency',
-		Min = 0,
-		Max = 95,
-		Default = 50,
-		Visible = false,
-		Function = function(val) end
-	})
-	BulletManipulationColor = SilentAim:CreateColorSlider({
-		Name = 'Radius Color',
-		Default = Color3.fromHSV(0, 1, 1),
-		Visible = false,
-		Function = function(hue, sat, val)
-			BulletManipulationColor.Hue = hue
-			BulletManipulationColor.Sat = sat
-			BulletManipulationColor.Value = val
-		end
 	})
 	Projectile = SilentAim:CreateToggle({
 		Name = 'Projectile',
