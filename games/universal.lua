@@ -1482,6 +1482,45 @@ run(function()
 		end
 	end
 
+	local BulletManipulationColor = { Hue = 0, Sat = 1, Value = 1 }
+	local BulletManipulationRadiusSphere = nil
+	local function renderBulletManipulationSphere()
+		if not BulletManipulation.Enabled or not BulletManipulationVis.Enabled then
+			if BulletManipulationRadiusSphere then
+				BulletManipulationRadiusSphere:Destroy()
+				BulletManipulationRadiusSphere = nil
+			end
+			return
+		end
+		
+		if not entitylib.isAlive then
+			if BulletManipulationRadiusSphere then
+				BulletManipulationRadiusSphere:Destroy()
+				BulletManipulationRadiusSphere = nil
+			end
+			return
+		end
+		
+		local root = entitylib.character.RootPart
+		local radius = BulletManipulationRadius.Value
+		
+		if not BulletManipulationRadiusSphere then
+			BulletManipulationRadiusSphere = Instance.new('Part')
+			BulletManipulationRadiusSphere.Shape = Enum.PartType.Ball
+			BulletManipulationRadiusSphere.Anchored = true
+			BulletManipulationRadiusSphere.CanCollide = false
+			BulletManipulationRadiusSphere.CanQuery = false
+			BulletManipulationRadiusSphere.CanTouch = false
+			BulletManipulationRadiusSphere.Parent = workspace
+		end
+		
+		BulletManipulationRadiusSphere.Size = Vector3.new(radius * 2, radius * 2, radius * 2)
+		BulletManipulationRadiusSphere.CFrame = CFrame.new(root.Position)
+		BulletManipulationRadiusSphere.Material = Enum.Material[BulletManipulationMat.Value]
+		BulletManipulationRadiusSphere.Color = Color3.fromHSV(BulletManipulationColor.Hue, BulletManipulationColor.Sat, BulletManipulationColor.Value)
+		BulletManipulationRadiusSphere.Transparency = BulletManipulationTrans.Value / 100
+	end
+
 	local function renderBulletTracers()
 		local now = tick()
 
@@ -1519,7 +1558,7 @@ run(function()
 			return origin
 		end
 
-		local step = math.max(1, radius / 3) 
+		local step = math.max(0.5, radius / 6)
 		local bestPos = nil
 		local bestDist = math.huge
 
@@ -1724,6 +1763,12 @@ run(function()
 					processHitDetection()
 					if BulletTracers.Enabled then
 						renderBulletTracers()
+					end
+					if BulletManipulation.Enabled and BulletManipulationVis.Enabled then
+						renderBulletManipulationSphere()
+					elseif BulletManipulationRadiusSphere then
+						BulletManipulationRadiusSphere:Destroy()
+						BulletManipulationRadiusSphere = nil
 					end
 					if AutoFire.Enabled then
 						local origin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
@@ -1958,6 +2003,10 @@ run(function()
 		Name = 'Bullet Manipulation',
 		Function = function(callback)
 			BulletManipulationRadius.Object.Visible = callback
+			BulletManipulationVis.Object.Visible = callback
+			BulletManipulationMat.Object.Visible = callback
+			BulletManipulationTrans.Object.Visible = callback
+			BulletManipulationColor.Object.Visible = callback
 		end,
 		Tooltip = 'Manipulates the start position of your bullet to bypass walls'
 	})
@@ -1967,6 +2016,42 @@ run(function()
 		Max = 50,
 		Default = 10,
 		Visible = false
+	})
+	BulletManipulationVis = SilentAim:CreateToggle({
+		Name = 'Show Radius',
+		Default = true,
+		Visible = false
+	})
+	local bulletmanipMatList = {}
+	for _, v in Enum.Material:GetEnumItems() do
+		if v.Name ~= 'ForceField' then
+			table.insert(bulletmanipMatList, v.Name)
+		end
+	end
+	BulletManipulationMat = SilentAim:CreateDropdown({
+		Name = 'Material',
+		List = bulletmanipMatList,
+		Default = 'Neon',
+		Visible = false,
+		Function = function(val) end
+	})
+	BulletManipulationTrans = SilentAim:CreateSlider({
+		Name = 'Transparency',
+		Min = 0,
+		Max = 95,
+		Default = 50,
+		Visible = false,
+		Function = function(val) end
+	})
+	BulletManipulationColor = SilentAim:CreateColorSlider({
+		Name = 'Radius Color',
+		Default = Color3.fromHSV(0, 1, 1),
+		Visible = false,
+		Function = function(hue, sat, val)
+			BulletManipulationColor.Hue = hue
+			BulletManipulationColor.Sat = sat
+			BulletManipulationColor.Value = val
+		end
 	})
 	Projectile = SilentAim:CreateToggle({
 		Name = 'Projectile',
