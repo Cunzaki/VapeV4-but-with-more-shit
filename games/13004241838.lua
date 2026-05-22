@@ -49,7 +49,7 @@ local teamColors = {
     Blue = Color3.fromRGB(13, 105, 172)
 }
 
--- Get player's team color from their Torso
+-- Get player's team color from their Torso (or HumanoidRootPart for same-team check per gun_rules.lua)
 local function getPlayerTeamColor(player)
     if not player then return nil end
     local char = player.Character
@@ -62,6 +62,14 @@ local function getPlayerTeamColor(player)
     return torso.Color
 end
 
+-- Check if player has ForceField (spawn protection)
+local function playerHasForceField(player)
+    if not player then return false end
+    local char = player.Character
+    if not char then return false end
+    return char:FindFirstChild("ForceField") ~= nil
+end
+
 -- Check if two colors are similar (with tolerance for lighting/lighting effects)
 local function colorsMatch(color1, color2, tolerance)
     tolerance = tolerance or 0.15
@@ -70,37 +78,25 @@ local function colorsMatch(color1, color2, tolerance)
         and math.abs(color1.B - color2.B) < tolerance
 end
 
--- Track if Team Check is active globally
+-- Track active modules
 local teamCheckActive = false
+local noForceFieldActive = false
+local rapidFireActive = false
+local noSpreadActive = false
+local noRecoilActive = false
+local infiniteAmmoActive = false
 
--- Team Check
-local teamCheck = {Enabled = false}
-teamCheck = minigames:CreateModule({
-    Name = 'Team Check',
+-- Store original functions to restore
+local originalGetEntityColor = entitylib.getEntityColor
+local originalTargetCheck = entitylib.targetCheck
+
+-- Combined module that handles team check and no forcefield
+local teamAndForcefield = minigames:CreateModule({
+    Name = 'Team + ForceField Check',
     Function = function(callback)
         if callback then
             teamCheckActive = true
-            
-            -- Store original functions
-            local oldTargetCheck = entitylib.targetCheck
-            local oldGetEntityColor = entitylib.getEntityColor
-            
-            -- Override target check to use torso colors
-            entitylib.targetCheck = function(ent)
-                -- First check if both players have torso colors
-                local myColor = getPlayerTeamColor(lplr)
-                local theirColor = getPlayerTeamColor(ent.Player)
-                
-                if myColor and theirColor then
-                    -- Don't target same-color players
-                    if colorsMatch(myColor, theirColor, 0.2) then
-                        return false
-                    end
-                end
-                
-                -- If different or colors not available, use original check
-                return oldTargetCheck(ent)
-            end
+            noForceFieldActive = true
             
             -- Override entity color to use torso colors
             entitylib.getEntityColor = function(ent)
@@ -110,31 +106,58 @@ teamCheck = minigames:CreateModule({
                         return playerColor
                     end
                 end
-                
-                -- Fall back to original if no torso color
-                return oldGetEntityColor(ent)
+                return originalGetEntityColor(ent)
             end
             
-            teamCheck:Clean(function()
-                entitylib.targetCheck = oldTargetCheck
-                entitylib.getEntityColor = oldGetEntityColor
+            -- Override target check to use torso colors and skip forcefield players
+            entitylib.targetCheck = function(ent)
+                -- First check forcefield
+                if noForceFieldActive and ent.Player and playerHasForceField(ent.Player) then
+                    return false
+                end
+                
+                -- Then check team
+                if teamCheckActive then
+                    local myColor = getPlayerTeamColor(lplr)
+                    local theirColor = getPlayerTeamColor(ent.Player)
+                    if myColor and theirColor then
+                        if colorsMatch(myColor, theirColor, 0.2) then
+                            return false
+                        end
+                    end
+                end
+                
+                -- If different or colors not available, use original check
+                return originalTargetCheck(ent)
+            end
+            
+            teamAndForcefield:Clean(function()
+                entitylib.getEntityColor = originalGetEntityColor
+                entitylib.targetCheck = originalTargetCheck
                 teamCheckActive = false
+                noForceFieldActive = false
             end)
         else
             teamCheckActive = false
+            noForceFieldActive = false
         end
     end,
-    Tooltip = 'Prevents targeting players with same torso color (yellow/red/blue) and shows team colors in ESP/Chams.'
+    Tooltip = 'Skips targeting same-team (torso color) and ForceField (spawn protection) players, uses team colors in ESP/Chams.'
 })
 
--- Gun Rapid Fire Module
-local rapidFire = {Enabled = false}
-rapidFire = minigames:CreateModule({
-    Name = 'Rapid Fire',
+-- Gun exploits combined module - using debug library to modify original settings!
+local gunExploits = minigames:CreateModule({
+    Name = 'Gun Exploits',
     Function = function(callback)
         if callback then
+            rapidFireActive = true
+            noSpreadActive = true
+            noRecoilActive = true
+            infiniteAmmoActive = true
+            
             local activeGuns = {}
-            local connections = {}
+            local ammoConnections = {}
+            local childConnections = {}
             
             local function hookGun(gun)
                 if not gun or activeGuns[gun] then return end
@@ -142,312 +165,179 @@ rapidFire = minigames:CreateModule({
                 local settingsModule = gun:FindFirstChild("settings")
                 if not settingsModule then return end
                 
-                local success, settings = pcall(function() return require(settingsModule) end)
-                if not success or not settings or not settings.gun_data then return end
-                
-                activeGuns[gun] = true
-                
-                -- Store original values
-                local originalCooldown = settings.gun_data.cooldown
-                
-                -- Set cooldown to near zero for rapid fire
-                settings.gun_data.cooldown = 0.001
-                
-                -- Also try to hook the gun framework's register remote if possible
-                local framework = gun:FindFirstChild("framework")
-                if framework then
-                    local event = framework:FindFirstChild("event")
-                    if event then
-                        local register = event:FindFirstChild("register")
-                        if register and register:IsA("RemoteEvent") then
-                            -- We could hook FireServer here but it's already very fast with cooldown 0
-                        end
+                local success, env = pcall(function()
+                    -- Require the module to get the return table
+                    local settingsReturn = require(settingsModule)
+                    
+                    if not settingsReturn or not settingsReturn.returnclientcopy then
+                        return nil
                     end
-                end
-                
-                rapidFire:Clean(function()
-                    -- Restore original values when disabled
-                    if settings and settings.gun_data then
-                        settings.gun_data.cooldown = originalCooldown
+                    
+                    -- Now use debug library to get the original internal table (u1) from returnclientcopy's upvalues!
+                    local originalReturnClientCopy = settingsReturn.returnclientcopy
+                    local upvalues = {}
+                    
+                    -- Get all upvalues from returnclientcopy
+                    for i = 1, 100 do
+                        local name, value = debug.getupvalue(originalReturnClientCopy, i)
+                        if not name then break end
+                        upvalues[name] = value
+                        upvalues[i] = value
                     end
-                end)
-            end
-            
-            -- Hook existing guns
-            for _, tool in ipairs(lplr.Backpack:GetChildren()) do
-                if tool:IsA("Tool") then
-                    hookGun(tool)
-                end
-            end
-            if lplr.Character then
-                for _, tool in ipairs(lplr.Character:GetChildren()) do
-                    if tool:IsA("Tool") then
-                        hookGun(tool)
-                    end
-                end
-            end
-            
-            -- Hook new guns
-            table.insert(connections, lplr.Backpack.ChildAdded:Connect(function(child)
-                if child:IsA("Tool") then
-                    task.wait(0.1)
-                    hookGun(child)
-                end
-            end))
-            
-            table.insert(connections, lplr.CharacterAdded:Connect(function(char)
-                char.ChildAdded:Connect(function(child)
-                    if child:IsA("Tool") then
-                        task.wait(0.1)
-                        hookGun(child)
-                    end
-                end)
-            end))
-            
-            rapidFire:Clean(function()
-                for _, conn in ipairs(connections) do
-                    conn:Disconnect()
-                end
-                activeGuns = {}
-            end)
-        end
-    end,
-    Tooltip = 'Makes all guns fire extremely quickly by reducing cooldown.'
-})
-
--- No Spread Module
-local noSpread = {Enabled = false}
-noSpread = minigames:CreateModule({
-    Name = 'No Spread',
-    Function = function(callback)
-        if callback then
-            local activeGuns = {}
-            local connections = {}
-            
-            local function hookGun(gun)
-                if not gun or activeGuns[gun] then return end
-                
-                local settingsModule = gun:FindFirstChild("settings")
-                if not settingsModule then return end
-                
-                local success, settings = pcall(function() return require(settingsModule) end)
-                if not success or not settings or not settings.gun_data then return end
-                
-                activeGuns[gun] = true
-                
-                -- Store original values
-                local originalSpreadX = settings.gun_data.SpreadX
-                local originalSpreadY = settings.gun_data.SpreadY
-                
-                -- Remove spread
-                settings.gun_data.SpreadX = 0
-                settings.gun_data.SpreadY = 0
-                
-                noSpread:Clean(function()
-                    if settings and settings.gun_data then
-                        settings.gun_data.SpreadX = originalSpreadX
-                        settings.gun_data.SpreadY = originalSpreadY
-                    end
-                end)
-            end
-            
-            -- Hook existing guns
-            for _, tool in ipairs(lplr.Backpack:GetChildren()) do
-                if tool:IsA("Tool") then
-                    hookGun(tool)
-                end
-            end
-            if lplr.Character then
-                for _, tool in ipairs(lplr.Character:GetChildren()) do
-                    if tool:IsA("Tool") then
-                        hookGun(tool)
-                    end
-                end
-            end
-            
-            -- Hook new guns
-            table.insert(connections, lplr.Backpack.ChildAdded:Connect(function(child)
-                if child:IsA("Tool") then
-                    task.wait(0.1)
-                    hookGun(child)
-                end
-            end))
-            
-            table.insert(connections, lplr.CharacterAdded:Connect(function(char)
-                char.ChildAdded:Connect(function(child)
-                    if child:IsA("Tool") then
-                        task.wait(0.1)
-                        hookGun(child)
-                    end
-                end)
-            end))
-            
-            noSpread:Clean(function()
-                for _, conn in ipairs(connections) do
-                    conn:Disconnect()
-                end
-                activeGuns = {}
-            end)
-        end
-    end,
-    Tooltip = 'Removes all bullet spread from guns.'
-})
-
--- No Recoil Module
-local noRecoil = {Enabled = false}
-noRecoil = minigames:CreateModule({
-    Name = 'No Recoil',
-    Function = function(callback)
-        if callback then
-            local activeGuns = {}
-            local connections = {}
-            
-            local function hookGun(gun)
-                if not gun or activeGuns[gun] then return end
-                
-                local settingsModule = gun:FindFirstChild("settings")
-                if not settingsModule then return end
-                
-                local success, settings = pcall(function() return require(settingsModule) end)
-                if not success or not settings or not settings.gun_data then return end
-                
-                activeGuns[gun] = true
-                
-                -- Store original value
-                local originalCamRecoil = settings.gun_data.cam_recoil
-                
-                -- Remove recoil
-                settings.gun_data.cam_recoil = 0
-                
-                noRecoil:Clean(function()
-                    if settings and settings.gun_data then
-                        settings.gun_data.cam_recoil = originalCamRecoil
-                    end
-                end)
-            end
-            
-            -- Hook existing guns
-            for _, tool in ipairs(lplr.Backpack:GetChildren()) do
-                if tool:IsA("Tool") then
-                    hookGun(tool)
-                end
-            end
-            if lplr.Character then
-                for _, tool in ipairs(lplr.Character:GetChildren()) do
-                    if tool:IsA("Tool") then
-                        hookGun(tool)
-                    end
-                end
-            end
-            
-            -- Hook new guns
-            table.insert(connections, lplr.Backpack.ChildAdded:Connect(function(child)
-                if child:IsA("Tool") then
-                    task.wait(0.1)
-                    hookGun(child)
-                end
-            end))
-            
-            table.insert(connections, lplr.CharacterAdded:Connect(function(char)
-                char.ChildAdded:Connect(function(child)
-                    if child:IsA("Tool") then
-                        task.wait(0.1)
-                        hookGun(child)
-                    end
-                end)
-            end))
-            
-            noRecoil:Clean(function()
-                for _, conn in ipairs(connections) do
-                    conn:Disconnect()
-                end
-                activeGuns = {}
-            end)
-        end
-    end,
-    Tooltip = 'Removes camera recoil when shooting.'
-})
-
--- Infinite Ammo Module
-local infiniteAmmo = {Enabled = false}
-infiniteAmmo = minigames:CreateModule({
-    Name = 'Infinite Ammo',
-    Function = function(callback)
-        if callback then
-            local connections = {}
-            
-            -- Hook ammo Value objects
-            local function hookAmmo(tool)
-                if not tool then return end
-                local ammo = tool:FindFirstChild("ammo")
-                if ammo and ammo:IsA("IntValue") then
-                    -- Store original max ammo from settings
-                    local maxAmmo = 30 -- Default
-                    local settingsModule = tool:FindFirstChild("settings")
-                    if settingsModule then
-                        local success, settings = pcall(function() return require(settingsModule) end)
-                        if success and settings and settings.gun_data and settings.gun_data.maxammo then
-                            maxAmmo = settings.gun_data.maxammo
+                    
+                    -- Find the u1 table (the internal settings table)
+                    local u1Table = nil
+                    for name, value in pairs(upvalues) do
+                        if type(value) == "table" and value.gun_data then
+                            u1Table = value
+                            break
                         end
                     end
                     
-                    -- Keep ammo at max
-                    ammo.Value = maxAmmo
+                    -- If we couldn't find via upvalues, try to modify the gun_data inside the returned table
+                    -- and also hook returnclientcopy!
+                    if not u1Table then
+                        u1Table = settingsReturn
+                    end
                     
-                    local conn = ammo.Changed:Connect(function()
-                        if infiniteAmmo.Enabled then
-                            ammo.Value = maxAmmo
+                    activeGuns[gun] = {
+                        settingsReturn = settingsReturn,
+                        u1Table = u1Table,
+                        originalReturnClientCopy = originalReturnClientCopy,
+                        originalCooldown = u1Table.gun_data.cooldown,
+                        originalSpreadX = u1Table.gun_data.SpreadX,
+                        originalSpreadY = u1Table.gun_data.SpreadY,
+                        originalCamRecoil = u1Table.gun_data.cam_recoil,
+                        originalMaxAmmo = u1Table.gun_data.maxammo
+                    }
+                    
+                    -- 1. Modify the gun_data directly in the u1 table
+                    if rapidFireActive then
+                        u1Table.gun_data.cooldown = 0.001
+                    end
+                    if noSpreadActive then
+                        u1Table.gun_data.SpreadX = 0
+                        u1Table.gun_data.SpreadY = 0
+                    end
+                    if noRecoilActive then
+                        u1Table.gun_data.cam_recoil = 0
+                    end
+                    
+                    -- 2. ALSO HOOK returnclientcopy to ALWAYS return modified data when gun_data is requested!
+                    u1Table.returnclientcopy = function(self, key)
+                        local data = originalReturnClientCopy(self, key)
+                        if key == "gun_data" then
+                            if rapidFireActive then data.cooldown = 0.001 end
+                            if noSpreadActive then data.SpreadX = 0; data.SpreadY = 0 end
+                            if noRecoilActive then data.cam_recoil = 0 end
                         end
+                        return data
+                    end
+                    
+                    gunExploits:Clean(function()
+                        u1Table.returnclientcopy = originalReturnClientCopy
                     end)
                     
-                    table.insert(connections, conn)
+                    return activeGuns[gun]
+                end)
+                
+                if not success or not env then return end
+                
+                -- Handle infinite ammo
+                if infiniteAmmoActive then
+                    local ammo = gun:FindFirstChild("ammo")
+                    if ammo and ammo:IsA("IntValue") then
+                        local maxAmmo = env.originalMaxAmmo or 30
+                        ammo.Value = maxAmmo
+                        
+                        local conn = ammo.Changed:Connect(function()
+                            if infiniteAmmoActive then
+                                ammo.Value = maxAmmo
+                            end
+                        end)
+                        table.insert(ammoConnections, conn)
+                    end
                 end
             end
             
-            -- Hook existing tools
+            -- Hook existing guns
             for _, tool in ipairs(lplr.Backpack:GetChildren()) do
                 if tool:IsA("Tool") then
-                    hookAmmo(tool)
+                    hookGun(tool)
                 end
             end
             if lplr.Character then
                 for _, tool in ipairs(lplr.Character:GetChildren()) do
                     if tool:IsA("Tool") then
-                        hookAmmo(tool)
+                        hookGun(tool)
                     end
                 end
             end
             
-            -- Hook new tools
-            table.insert(connections, lplr.Backpack.ChildAdded:Connect(function(child)
+            -- Hook new guns
+            local backpackConn = lplr.Backpack.ChildAdded:Connect(function(child)
                 if child:IsA("Tool") then
                     task.wait(0.1)
-                    hookAmmo(child)
+                    hookGun(child)
                 end
-            end))
+            end)
+            table.insert(childConnections, backpackConn)
             
-            table.insert(connections, lplr.CharacterAdded:Connect(function(char)
-                char.ChildAdded:Connect(function(child)
+            if lplr.Character then
+                local charConn = lplr.Character.ChildAdded:Connect(function(child)
                     if child:IsA("Tool") then
                         task.wait(0.1)
-                        hookAmmo(child)
+                        hookGun(child)
                     end
                 end)
-            end))
+                table.insert(childConnections, charConn)
+            end
             
-            infiniteAmmo:Clean(function()
-                for _, conn in ipairs(connections) do
+            local charAddedConn = lplr.CharacterAdded:Connect(function(char)
+                local charConn = char.ChildAdded:Connect(function(child)
+                    if child:IsA("Tool") then
+                        task.wait(0.1)
+                        hookGun(child)
+                    end
+                end)
+                table.insert(childConnections, charConn)
+            end)
+            table.insert(childConnections, charAddedConn)
+            
+            gunExploits:Clean(function()
+                -- Restore all original gun data
+                for gun, data in pairs(activeGuns) do
+                    if data.u1Table and data.u1Table.gun_data then
+                        data.u1Table.gun_data.cooldown = data.originalCooldown
+                        data.u1Table.gun_data.SpreadX = data.originalSpreadX
+                        data.u1Table.gun_data.SpreadY = data.originalSpreadY
+                        data.u1Table.gun_data.cam_recoil = data.originalCamRecoil
+                    end
+                    if data.settingsReturn and data.originalReturnClientCopy then
+                        data.settingsReturn.returnclientcopy = data.originalReturnClientCopy
+                    end
+                end
+                
+                -- Disconnect all connections
+                for _, conn in ipairs(ammoConnections) do
                     conn:Disconnect()
                 end
+                for _, conn in ipairs(childConnections) do
+                    conn:Disconnect()
+                end
+                
+                activeGuns = {}
+                ammoConnections = {}
+                childConnections = {}
+                
+                rapidFireActive = false
+                noSpreadActive = false
+                noRecoilActive = false
+                infiniteAmmoActive = false
             end)
         end
     end,
-    Tooltip = 'Keeps your ammo at maximum capacity.'
+    Tooltip = 'Rapid Fire, No Spread, No Recoil, Infinite Ammo all in one (uses debug library to modify original settings).'
 })
-
--- Expose team check state and helper functions to other modules if needed
-shared.StreetsTeamCheckActive = function() return teamCheckActive end
-shared.StreetsGetTeamColor = getPlayerTeamColor
-shared.StreetsColorsMatch = colorsMatch
 
 vape:CreateNotification('Vape', 'Loaded custom script for game 13004241838', 5)
