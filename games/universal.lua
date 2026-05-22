@@ -7309,7 +7309,24 @@ run(function()
 		local customColor = Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value)
 		for _, d in visualClone:GetDescendants() do
 			if d:IsA('BasePart') then
-				d.Anchored = true
+				local isAccessoryPart = false
+				local parent = d.Parent
+				while parent and parent ~= visualClone do
+					if parent:IsA('Accessory') then
+						isAccessoryPart = true
+						break
+					end
+					parent = parent.Parent
+				end
+				
+				if d.Name == 'HumanoidRootPart' then
+					d.Anchored = true
+				elseif isAccessoryPart then
+					d.Anchored = true
+				else
+					d.Anchored = false
+				end
+				
 				d.CanCollide = false
 				d.CanTouch = false
 				d.CanQuery = false
@@ -7373,12 +7390,29 @@ run(function()
 		-- FIRST: Disable ALL collisions BEFORE parenting
 		for _, part in clone:GetDescendants() do
 			if part:IsA('BasePart') then
+				local isAccessoryPart = false
+				local parent = part.Parent
+				while parent and parent ~= clone do
+					if parent:IsA('Accessory') then
+						isAccessoryPart = true
+						break
+					end
+					parent = parent.Parent
+				end
+				
 				part.CanCollide = false
 				part.CanTouch = false
 				part.CanQuery = false
 				part.Massless = true
 				part.CastShadow = false
-				part.Anchored = true
+				
+				if part.Name == 'HumanoidRootPart' then
+					part.Anchored = true
+				elseif isAccessoryPart then
+					part.Anchored = true
+				else
+					part.Anchored = false
+				end
 			elseif part:IsA('Humanoid') then
 				part:Destroy()
 			elseif part:IsA('Weld') or part:IsA('WeldConstraint') then
@@ -7687,9 +7721,8 @@ run(function()
 		if not desyncClone then return end
 		
 		desyncClone.Name = "DesyncVisualizer"
-		desyncClone.Parent = workspace
-		
-		-- Map motors for animation syncing
+
+		-- Map motors for animation syncing FIRST (like Blink)
 		desyncMotorMap = {}
 		local realMotors = {}
 		for _, v in ipairs(char:GetDescendants()) do
@@ -7697,13 +7730,51 @@ run(function()
 				realMotors[v.Name] = v
 			end
 		end
-		
-		-- Clean up unnecessary objects but KEEP Motor6Ds and accessory welds
+
+		for _, d in ipairs(desyncClone:GetDescendants()) do
+			if d:IsA("Motor6D") then
+				local realMotor = realMotors[d.Name]
+				if realMotor then
+					desyncMotorMap[d] = realMotor
+				end
+			end
+		end
+
+		local torso = desyncClone:FindFirstChild('UpperTorso') or desyncClone:FindFirstChild('Torso') or desyncClone:FindFirstChild('HumanoidRootPart')
+		local hrp = desyncClone:FindFirstChild('HumanoidRootPart')
+		if hrp then
+			desyncClone.PrimaryPart = hrp
+		elseif torso then
+			desyncClone.PrimaryPart = torso
+		end
+
+		-- FIRST: Disable ALL collisions BEFORE parenting (like Blink)
 		for _, obj in ipairs(desyncClone:GetDescendants()) do
-			if obj:IsA("Humanoid")
-			or obj:IsA("Script")
-			or obj:IsA("LocalScript")
-			or obj:IsA("Tool") then
+			if obj:IsA("BasePart") then
+				local isAccessoryPart = false
+				local parent = obj.Parent
+				while parent and parent ~= desyncClone do
+					if parent:IsA('Accessory') then
+						isAccessoryPart = true
+						break
+					end
+					parent = parent.Parent
+				end
+				
+				if obj.Name == "HumanoidRootPart" then
+					obj.Anchored = true
+				elseif isAccessoryPart then
+					obj.Anchored = true
+				else
+					obj.Anchored = false
+				end
+				
+				obj.CanCollide = false
+				obj.CanTouch = false
+				obj.CanQuery = false
+				obj.Massless = true
+				obj.CastShadow = false
+			elseif obj:IsA("Humanoid") then
 				obj:Destroy()
 			elseif obj:IsA("WeldConstraint") or obj:IsA("Weld") then
 				-- Check if this weld is part of an accessory - keep it!
@@ -7719,18 +7790,17 @@ run(function()
 				if not isAccessoryWeld then
 					obj:Destroy()
 				end
-			elseif obj:IsA("Motor6D") then
-				local realMotor = realMotors[obj.Name]
-				if realMotor then
-					desyncMotorMap[obj] = realMotor
-				end
-			elseif obj:IsA("BasePart") then
-				obj.Anchored = true
-				obj.CanCollide = false
-				obj.CanTouch = false
-				obj.CanQuery = false
-				obj.Massless = true
-				obj.CastShadow = false
+			elseif obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("Tool") then
+				obj:Destroy()
+			end
+		end
+
+		-- Parent to workspace ONLY after all physics are disabled
+		desyncClone.Parent = workspace
+
+		-- Apply materials/colors AFTER parenting
+		for _, obj in ipairs(desyncClone:GetDescendants()) do
+			if obj:IsA("BasePart") then
 				obj.Material = Enum.Material[VisualizerMaterial.Value] or Enum.Material.ForceField
 				obj.Transparency = 0.4
 				
@@ -7747,8 +7817,6 @@ run(function()
 			cleanupDesyncClone()
 			return
 		end
-		
-		desyncClone.PrimaryPart = desyncCloneRoot
 	end
 	
 	-- Calculate desync rotation for a specific axis
