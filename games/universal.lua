@@ -7307,24 +7307,9 @@ run(function()
 		if not visualClone then return end
 		local mat = Enum.Material[VisualizerMaterial.Value]
 		local customColor = Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value)
-		
-		-- Handle Humanoid replacement for animation without collision management
-		local hum = visualClone:FindFirstChildWhichIsA("Humanoid")
-		if hum then
-			local animController = Instance.new("AnimationController")
-			animController.Name = "BlinkAnimController"
-			animController.Parent = visualClone
-			
-			local animator = hum:FindFirstChildWhichIsA("Animator")
-			if animator then
-				animator.Parent = animController
-			end
-			hum:Destroy()
-		end
-
 		for _, d in visualClone:GetDescendants() do
 			if d:IsA('BasePart') then
-				d.Anchored = true
+				d.Anchored = (d.Name == 'HumanoidRootPart')
 				d.CanCollide = false
 				d.CanTouch = false
 				d.CanQuery = false
@@ -7332,14 +7317,12 @@ run(function()
 				d.CastShadow = false
 				d.Material = mat
 				d.Transparency = 0
-				d.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
+				d.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0, 0, 0, 0)
 				if VisualizerColorToggle.Enabled then
 					d.Color = customColor
 				end
 			elseif d:IsA('Decal') or d:IsA('Texture') then
 				d.Transparency = 0
-			elseif d:IsA('TouchTransmitter') then
-				d:Destroy()
 			elseif d:IsA('Motor6D') or d:IsA('Animator') or d:IsA('AnimationController') then
 				-- Keep these for animation
 			elseif d:IsA('Script') or d:IsA('LocalScript') then
@@ -7707,10 +7690,8 @@ run(function()
 					desyncMotorMap[obj] = realMotor
 				end
 			elseif obj:IsA("BasePart") then
-				obj.Anchored = true
+				obj.Anchored = (obj.Name == "HumanoidRootPart")
 				obj.CanCollide = false
-				obj.CanTouch = false
-				obj.CanQuery = false
 				obj.Material = Enum.Material[VisualizerMaterial.Value] or Enum.Material.ForceField
 				obj.Transparency = 0.4
 				
