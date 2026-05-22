@@ -7748,7 +7748,7 @@ run(function()
 			desyncClone.PrimaryPart = torso
 		end
 
-		-- FIRST: Disable ALL collisions BEFORE parenting (like Blink)
+		-- FIRST: Disable ALL collisions, set materials BEFORE parenting (like Blink)
 		for _, obj in ipairs(desyncClone:GetDescendants()) do
 			if obj:IsA("BasePart") then
 				local isAccessoryPart = false
@@ -7774,6 +7774,14 @@ run(function()
 				obj.CanQuery = false
 				obj.Massless = true
 				obj.CastShadow = false
+				obj.Material = Enum.Material[VisualizerMaterial.Value] or Enum.Material.ForceField
+				obj.Transparency = 0.4
+				
+				-- Apply custom color if enabled
+				if VisualizerColorToggle.Enabled then
+					local color = Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value)
+					obj.Color = color
+				end
 			elseif obj:IsA("Humanoid") then
 				obj:Destroy()
 			elseif obj:IsA("WeldConstraint") or obj:IsA("Weld") then
@@ -7795,22 +7803,8 @@ run(function()
 			end
 		end
 
-		-- Parent to workspace ONLY after all physics are disabled
+		-- Parent to workspace ONLY after all setup is COMPLETE
 		desyncClone.Parent = workspace
-
-		-- Apply materials/colors AFTER parenting
-		for _, obj in ipairs(desyncClone:GetDescendants()) do
-			if obj:IsA("BasePart") then
-				obj.Material = Enum.Material[VisualizerMaterial.Value] or Enum.Material.ForceField
-				obj.Transparency = 0.4
-				
-				-- Apply custom color if enabled
-				if VisualizerColorToggle.Enabled then
-					local color = Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value)
-					obj.Color = color
-				end
-			end
-		end
 		
 		desyncCloneRoot = desyncClone:FindFirstChild("HumanoidRootPart")
 		if not desyncCloneRoot then
