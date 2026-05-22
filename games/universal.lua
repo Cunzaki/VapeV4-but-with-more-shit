@@ -7622,7 +7622,7 @@ run(function()
 		
 		local char = entitylib.character and entitylib.character.Character
 		local hum = char and char:FindFirstChild("Humanoid")
-		if not hum then return end
+		if not hum or hum.Health <= 0 then return end
 		
 		originalCameraSubject = cam.CameraSubject
 		
@@ -7631,8 +7631,9 @@ run(function()
 		cameraProxy.Transparency = 1
 		cameraProxy.CanCollide = false
 		cameraProxy.CanQuery = false
+		cameraProxy.CanTouch = false
 		cameraProxy.Anchored = true
-		cameraProxy.Size = Vector3.new(1, 1, 1)
+		cameraProxy.Size = Vector3.new(0.1, 0.1, 0.1)
 		cameraProxy.Parent = workspace
 		
 		cam.CameraSubject = cameraProxy
@@ -7803,12 +7804,24 @@ run(function()
 	-- Visualizer loop
 	local function onRenderStepped()
 		local char = entitylib.character and entitylib.character.Character
+		local hum = char and char:FindFirstChild("Humanoid")
 		local root = char and char:FindFirstChild("HumanoidRootPart")
-		if not root then return end
 		
-		-- Stabilize camera proxy position
+		-- Handle camera proxy
 		if cameraProxy then
-			cameraProxy.CFrame = (returnthis or root.CFrame) * CFrame.new(0, 1.5, 0)
+			if not hum or hum.Health <= 0 then
+				cleanupCameraProxy()
+			elseif root then
+				local camPos = (returnthis or root.CFrame).Position
+				local camOffset = hum.CameraOffset
+				
+				-- If sitting, follow the seat instead to prevent bugs
+				if hum.Sit and hum.SeatPart then
+					camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
+				end
+				
+				cameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
+			end
 		end
 		
 		if not Visualizer.Enabled or not desyncCloneRoot then return end
