@@ -73,149 +73,6 @@ end
 -- Track if Team Check is active globally
 local teamCheckActive = false
 
--- Anticheat Bypass
-local anticheatBypass = {Enabled = false}
-anticheatBypass = minigames:CreateModule({
-    Name = 'Anticheat Bypass',
-    Function = function(callback)
-        if callback then
-            -- 1. Hook FindFirstChild for recursive malicious object checks
-            local oldFFC
-            oldFFC = hookinstancemethod(game, "FindFirstChild", function(self, name, recursive)
-                if not checkcaller() and recursive and (name == "SentinelSpy" or name == "ScriptDumper" or name == "SimpleSpy" or name == "SimpleSpyV2" or name == "SimpleSpyV3") then
-                    return nil
-                end
-                return oldFFC(self, name, recursive)
-            end)
-            
-            -- 2. Hook GetRealPhysicsFPS for speed check bypass
-            local oldFPS
-            oldFPS = hookinstancemethod(workspace, "GetRealPhysicsFPS", function(self)
-                return 60
-            end)
-            
-            -- 3. Hook Lighting changed to prevent lock lighting detections
-            local lightingProperties = {}
-            local function saveLightingState()
-                lightingProperties.Ambient = lightingService.Ambient
-                lightingProperties.Brightness = lightingService.Brightness
-                lightingProperties.ColorShift_Bottom = lightingService.ColorShift_Bottom
-                lightingProperties.ColorShift_Top = lightingService.ColorShift_Top
-                lightingProperties.GlobalShadows = lightingService.GlobalShadows
-                lightingProperties.OutdoorAmbient = lightingService.OutdoorAmbient
-                lightingProperties.Outlines = lightingService.Outlines
-                lightingProperties.ShadowColor = lightingService.ShadowColor
-                lightingProperties.GeographicLatitude = lightingService.GeographicLatitude
-                lightingProperties.TimeOfDay = lightingService.TimeOfDay
-                lightingProperties.FogColor = lightingService.FogColor
-                lightingProperties.FogEnd = lightingService.FogEnd
-                lightingProperties.FogStart = lightingService.FogStart
-            end
-            saveLightingState()
-            
-            -- Hook index/newindex for Lighting
-            local lightingMeta = getmetatable(lightingService)
-            local oldLightingIndex = lightingMeta.__index
-            local oldLightingNewindex = lightingMeta.__newindex
-            lightingMeta.__index = function(self, idx)
-                if lightingProperties[idx] ~= nil then
-                    return lightingProperties[idx]
-                end
-                return oldLightingIndex(self, idx)
-            end
-            lightingMeta.__newindex = function(self, idx, value)
-                if lightingProperties[idx] ~= nil then
-                    return
-                end
-                return oldLightingNewindex(self, idx, value)
-            end
-            
-            -- 4. Advanced Remote Hooking for ALL Adonis traffic
-            local oldNamecall
-            oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-                local args = {...}
-                local method = getnamecallmethod()
-                
-                if not checkcaller() and (method == "FireServer" or method == "InvokeServer") then
-                    -- Detect Adonis Remote Pattern
-                    if typeof(args[1]) == "table" and args[1].Mode and args[1].Sent and args[1].Received then
-                        -- If it's a "Fire" or "Get" mode call, block it silently
-                        return nil
-                    end
-                end
-                return oldNamecall(self, ...)
-            end)
-            
-            -- 5. Try to find and hook Adonis client table via GC for deep hooks
-            task.spawn(function()
-                for _, v in pairs(getgc(true)) do
-                    if type(v) == "table" and rawget(v, "Remote") and rawget(v, "Anti") and rawget(v, "Core") then
-                        -- Found Adonis client table!
-                        local oldSend = v.Remote.Send
-                        v.Remote.Send = function(p1, ...)
-                            if p1 == "Detected" or p1 == "LogError" or p1 == "Log" or p1 == "AddReplication" then
-                                return nil
-                            end
-                            return oldSend(p1, ...)
-                        end
-                        
-                        -- Hook the detection reporter directly in the Anti table
-                        if v.Anti and type(v.Anti) == "table" then
-                            -- Try to find any detection function in Anti
-                            for k, _ in pairs(v.Anti) do
-                                if type(k) == "string" and (k:lower():find("detect") or k:lower():find("log")) then
-                                    local oldFunc = v.Anti[k]
-                                    if type(oldFunc) == "function" then
-                                        v.Anti[k] = function(...)
-                                            return true
-                                        end
-                                        anticheatBypass:Clean(function()
-                                            v.Anti[k] = oldFunc
-                                        end)
-                                    end
-                                end
-                            end
-                        end
-                        
-                        -- Hook Disconnect and Kill to prevent local kicks/crashes
-                        if v.Disconnect then
-                            local oldDisconnect = v.Disconnect
-                            v.Disconnect = function(...) return nil end
-                            anticheatBypass:Clean(function()
-                                v.Disconnect = oldDisconnect
-                            end)
-                        end
-
-                        if v.Kill then
-                            local oldKill = v.Kill
-                            v.Kill = function(...) return nil end
-                            anticheatBypass:Clean(function()
-                                v.Kill = oldKill
-                            end)
-                        end
-
-                        anticheatBypass:Clean(function()
-                            v.Remote.Send = oldSend
-                        end)
-                        break
-                    end
-                end
-            end)
-            
-            anticheatBypass:Clean(function()
-                hookinstancemethod(game, "FindFirstChild", oldFFC)
-                hookinstancemethod(workspace, "GetRealPhysicsFPS", oldFPS)
-                hookmetamethod(game, "__namecall", oldNamecall)
-                lightingMeta.__index = oldLightingIndex
-                lightingMeta.__newindex = oldLightingNewindex
-            end)
-        else
-            -- Cleanup handled by :Clean()
-        end
-    end,
-    Tooltip = 'Comprehensive bypass for all Adonis anticheat detections.'
-})
-
 -- Team Check
 local teamCheck = {Enabled = false}
 teamCheck = minigames:CreateModule({
@@ -268,6 +125,324 @@ teamCheck = minigames:CreateModule({
         end
     end,
     Tooltip = 'Prevents targeting players with same torso color (yellow/red/blue) and shows team colors in ESP/Chams.'
+})
+
+-- Gun Rapid Fire Module
+local rapidFire = {Enabled = false}
+rapidFire = minigames:CreateModule({
+    Name = 'Rapid Fire',
+    Function = function(callback)
+        if callback then
+            local activeGuns = {}
+            local connections = {}
+            
+            local function hookGun(gun)
+                if not gun or activeGuns[gun] then return end
+                
+                local settingsModule = gun:FindFirstChild("settings")
+                if not settingsModule then return end
+                
+                local success, settings = pcall(function() return require(settingsModule) end)
+                if not success or not settings or not settings.gun_data then return end
+                
+                activeGuns[gun] = true
+                
+                -- Store original values
+                local originalCooldown = settings.gun_data.cooldown
+                
+                -- Set cooldown to near zero for rapid fire
+                settings.gun_data.cooldown = 0.001
+                
+                -- Also try to hook the gun framework's register remote if possible
+                local framework = gun:FindFirstChild("framework")
+                if framework then
+                    local event = framework:FindFirstChild("event")
+                    if event then
+                        local register = event:FindFirstChild("register")
+                        if register and register:IsA("RemoteEvent") then
+                            -- We could hook FireServer here but it's already very fast with cooldown 0
+                        end
+                    end
+                end
+                
+                rapidFire:Clean(function()
+                    -- Restore original values when disabled
+                    if settings and settings.gun_data then
+                        settings.gun_data.cooldown = originalCooldown
+                    end
+                end)
+            end
+            
+            -- Hook existing guns
+            for _, tool in ipairs(lplr.Backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    hookGun(tool)
+                end
+            end
+            if lplr.Character then
+                for _, tool in ipairs(lplr.Character:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        hookGun(tool)
+                    end
+                end
+            end
+            
+            -- Hook new guns
+            table.insert(connections, lplr.Backpack.ChildAdded:Connect(function(child)
+                if child:IsA("Tool") then
+                    task.wait(0.1)
+                    hookGun(child)
+                end
+            end))
+            
+            table.insert(connections, lplr.CharacterAdded:Connect(function(char)
+                char.ChildAdded:Connect(function(child)
+                    if child:IsA("Tool") then
+                        task.wait(0.1)
+                        hookGun(child)
+                    end
+                end)
+            end))
+            
+            rapidFire:Clean(function()
+                for _, conn in ipairs(connections) do
+                    conn:Disconnect()
+                end
+                activeGuns = {}
+            end)
+        end
+    end,
+    Tooltip = 'Makes all guns fire extremely quickly by reducing cooldown.'
+})
+
+-- No Spread Module
+local noSpread = {Enabled = false}
+noSpread = minigames:CreateModule({
+    Name = 'No Spread',
+    Function = function(callback)
+        if callback then
+            local activeGuns = {}
+            local connections = {}
+            
+            local function hookGun(gun)
+                if not gun or activeGuns[gun] then return end
+                
+                local settingsModule = gun:FindFirstChild("settings")
+                if not settingsModule then return end
+                
+                local success, settings = pcall(function() return require(settingsModule) end)
+                if not success or not settings or not settings.gun_data then return end
+                
+                activeGuns[gun] = true
+                
+                -- Store original values
+                local originalSpreadX = settings.gun_data.SpreadX
+                local originalSpreadY = settings.gun_data.SpreadY
+                
+                -- Remove spread
+                settings.gun_data.SpreadX = 0
+                settings.gun_data.SpreadY = 0
+                
+                noSpread:Clean(function()
+                    if settings and settings.gun_data then
+                        settings.gun_data.SpreadX = originalSpreadX
+                        settings.gun_data.SpreadY = originalSpreadY
+                    end
+                end)
+            end
+            
+            -- Hook existing guns
+            for _, tool in ipairs(lplr.Backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    hookGun(tool)
+                end
+            end
+            if lplr.Character then
+                for _, tool in ipairs(lplr.Character:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        hookGun(tool)
+                    end
+                end
+            end
+            
+            -- Hook new guns
+            table.insert(connections, lplr.Backpack.ChildAdded:Connect(function(child)
+                if child:IsA("Tool") then
+                    task.wait(0.1)
+                    hookGun(child)
+                end
+            end))
+            
+            table.insert(connections, lplr.CharacterAdded:Connect(function(char)
+                char.ChildAdded:Connect(function(child)
+                    if child:IsA("Tool") then
+                        task.wait(0.1)
+                        hookGun(child)
+                    end
+                end)
+            end))
+            
+            noSpread:Clean(function()
+                for _, conn in ipairs(connections) do
+                    conn:Disconnect()
+                end
+                activeGuns = {}
+            end)
+        end
+    end,
+    Tooltip = 'Removes all bullet spread from guns.'
+})
+
+-- No Recoil Module
+local noRecoil = {Enabled = false}
+noRecoil = minigames:CreateModule({
+    Name = 'No Recoil',
+    Function = function(callback)
+        if callback then
+            local activeGuns = {}
+            local connections = {}
+            
+            local function hookGun(gun)
+                if not gun or activeGuns[gun] then return end
+                
+                local settingsModule = gun:FindFirstChild("settings")
+                if not settingsModule then return end
+                
+                local success, settings = pcall(function() return require(settingsModule) end)
+                if not success or not settings or not settings.gun_data then return end
+                
+                activeGuns[gun] = true
+                
+                -- Store original value
+                local originalCamRecoil = settings.gun_data.cam_recoil
+                
+                -- Remove recoil
+                settings.gun_data.cam_recoil = 0
+                
+                noRecoil:Clean(function()
+                    if settings and settings.gun_data then
+                        settings.gun_data.cam_recoil = originalCamRecoil
+                    end
+                end)
+            end
+            
+            -- Hook existing guns
+            for _, tool in ipairs(lplr.Backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    hookGun(tool)
+                end
+            end
+            if lplr.Character then
+                for _, tool in ipairs(lplr.Character:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        hookGun(tool)
+                    end
+                end
+            end
+            
+            -- Hook new guns
+            table.insert(connections, lplr.Backpack.ChildAdded:Connect(function(child)
+                if child:IsA("Tool") then
+                    task.wait(0.1)
+                    hookGun(child)
+                end
+            end))
+            
+            table.insert(connections, lplr.CharacterAdded:Connect(function(char)
+                char.ChildAdded:Connect(function(child)
+                    if child:IsA("Tool") then
+                        task.wait(0.1)
+                        hookGun(child)
+                    end
+                end)
+            end))
+            
+            noRecoil:Clean(function()
+                for _, conn in ipairs(connections) do
+                    conn:Disconnect()
+                end
+                activeGuns = {}
+            end)
+        end
+    end,
+    Tooltip = 'Removes camera recoil when shooting.'
+})
+
+-- Infinite Ammo Module
+local infiniteAmmo = {Enabled = false}
+infiniteAmmo = minigames:CreateModule({
+    Name = 'Infinite Ammo',
+    Function = function(callback)
+        if callback then
+            local connections = {}
+            
+            -- Hook ammo Value objects
+            local function hookAmmo(tool)
+                if not tool then return end
+                local ammo = tool:FindFirstChild("ammo")
+                if ammo and ammo:IsA("IntValue") then
+                    -- Store original max ammo from settings
+                    local maxAmmo = 30 -- Default
+                    local settingsModule = tool:FindFirstChild("settings")
+                    if settingsModule then
+                        local success, settings = pcall(function() return require(settingsModule) end)
+                        if success and settings and settings.gun_data and settings.gun_data.maxammo then
+                            maxAmmo = settings.gun_data.maxammo
+                        end
+                    end
+                    
+                    -- Keep ammo at max
+                    ammo.Value = maxAmmo
+                    
+                    local conn = ammo.Changed:Connect(function()
+                        if infiniteAmmo.Enabled then
+                            ammo.Value = maxAmmo
+                        end
+                    end)
+                    
+                    table.insert(connections, conn)
+                end
+            end
+            
+            -- Hook existing tools
+            for _, tool in ipairs(lplr.Backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    hookAmmo(tool)
+                end
+            end
+            if lplr.Character then
+                for _, tool in ipairs(lplr.Character:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        hookAmmo(tool)
+                    end
+                end
+            end
+            
+            -- Hook new tools
+            table.insert(connections, lplr.Backpack.ChildAdded:Connect(function(child)
+                if child:IsA("Tool") then
+                    task.wait(0.1)
+                    hookAmmo(child)
+                end
+            end))
+            
+            table.insert(connections, lplr.CharacterAdded:Connect(function(char)
+                char.ChildAdded:Connect(function(child)
+                    if child:IsA("Tool") then
+                        task.wait(0.1)
+                        hookAmmo(child)
+                    end
+                end)
+            end))
+            
+            infiniteAmmo:Clean(function()
+                for _, conn in ipairs(connections) do
+                    conn:Disconnect()
+                end
+            end)
+        end
+    end,
+    Tooltip = 'Keeps your ammo at maximum capacity.'
 })
 
 -- Expose team check state and helper functions to other modules if needed
