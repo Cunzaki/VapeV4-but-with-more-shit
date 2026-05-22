@@ -7515,7 +7515,11 @@ run(function()
 	local Mode
 	local AngleX
 	local AngleY
-	local InvertKey
+	local Invert
+	local JitterSpeed
+	local SpinSpeed
+	local RandomMin
+	local RandomMax
 	local Visualizer
 	local VisualizerMaterial
 	local VisualizerColor
@@ -7527,11 +7531,10 @@ run(function()
 	
 	-- Desync variables
 	local desyncEnabled = false
-	local inverted = false
 	local anglX = 0
 	local lastjittick = 0
 	local jitflip = false
-	local jitdelay = 0.1
+	local spinAngle = 0
 	local returnthis = nil
 	
 	-- Clone system for visualization
@@ -7622,17 +7625,31 @@ run(function()
 		local yaw = 0
 		
 		if mode == "Static" then
-			yaw = inverted and -AngleY.Value or AngleX.Value
+			yaw = Invert.Enabled and -AngleY.Value or AngleX.Value
 		elseif mode == "Jitter" then
 			local now = os.clock()
-			if now - lastjittick >= jitdelay then
+			local delay = 1 / (JitterSpeed.Value * 2)
+			if now - lastjittick >= delay then
 				jitflip = not jitflip
 				lastjittick = now
 			end
 			yaw = jitflip and AngleX.Value or -AngleY.Value
+		elseif mode == "Spin" then
+			spinAngle = (spinAngle + SpinSpeed.Value) % 360
+			yaw = spinAngle
+		elseif mode == "Random" then
+			local now = os.clock()
+			local delay = 1 / (JitterSpeed.Value * 2)
+			if now - lastjittick >= delay then
+				anglX = math.random(RandomMin.Value, RandomMax.Value)
+				lastjittick = now
+			end
+			yaw = anglX
 		end
 		
-		anglX = yaw
+		if mode ~= "Random" then
+			anglX = yaw
+		end
 		return yaw
 	end
 	
@@ -7669,7 +7686,7 @@ run(function()
 		local baseCF = entitylib.character and entitylib.character.RootPart and entitylib.character.RootPart.CFrame
 		if not baseCF then return end
 		
-		local yaw = calculateYaw()
+		local yaw = anglX -- Use the last calculated angle
 		local fakeCF = baseCF * OFFSET
 		if typeof(yaw) == "number" then
 			fakeCF = fakeCF * CFrame.Angles(0, math.rad(-yaw), 0)
@@ -7686,15 +7703,6 @@ run(function()
 		end
 	end
 	
-	-- Keybind handler for inverter
-	local function onInputBegan(input, gameProcessed)
-		if gameProcessed then return end
-		local keyName = InvertKey.Value or 'F'
-		if input.KeyCode.Name == keyName then
-			inverted = not inverted
-		end
-	end
-	
 	-- Create the module
 	Desync = vape.Categories.Utility:CreateModule({
 		Name = 'Desync',
@@ -7703,7 +7711,6 @@ run(function()
 				desyncEnabled = true
 				Desync:Clean(RunService.Heartbeat:Connect(onHeartbeat))
 				Desync:Clean(RunService.RenderStepped:Connect(onRenderStepped))
-				Desync:Clean(UserInputService.InputBegan:Connect(onInputBegan))
 				
 				if Visualizer.Enabled then
 					setupDesyncClone()
@@ -7726,9 +7733,18 @@ run(function()
 	-- Mode selection
 	Mode = Desync:CreateDropdown({
 		Name = 'Mode',
-		List = {'Static', 'Jitter'},
+		List = {'Static', 'Jitter', 'Spin', 'Random'},
 		Default = 'Static',
-		Tooltip = 'Static - Fixed angle\nJitter - Alternating angles'
+		Tooltip = 'Static - Fixed angle\nJitter - Alternating angles\nSpin - Rotating angle\nRandom - Randomized angle',
+		Function = function(val)
+			AngleX.Object.Visible = (val == 'Static' or val == 'Jitter')
+			AngleY.Object.Visible = (val == 'Static' or val == 'Jitter')
+			Invert.Object.Visible = (val == 'Static')
+			JitterSpeed.Object.Visible = (val == 'Jitter' or val == 'Random')
+			SpinSpeed.Object.Visible = (val == 'Spin')
+			RandomMin.Object.Visible = (val == 'Random')
+			RandomMax.Object.Visible = (val == 'Random')
+		end
 	})
 	
 	-- Angle sliders
@@ -7748,11 +7764,49 @@ run(function()
 		Tooltip = 'Secondary/Inverted desync angle'
 	})
 	
-	-- Inverter keybind
-	InvertKey = Desync:CreateTextBox({
-		Name = 'Invert Key',
-		Default = 'F',
-		Tooltip = 'Key to toggle angle inversion (e.g., F, G, H)'
+	-- Speed sliders
+	JitterSpeed = Desync:CreateSlider({
+		Name = 'Jitter Speed',
+		Min = 1,
+		Max = 30,
+		Default = 10,
+		Visible = false,
+		Tooltip = 'Speed of jitter/randomization updates'
+	})
+	
+	SpinSpeed = Desync:CreateSlider({
+		Name = 'Spin Speed',
+		Min = 1,
+		Max = 50,
+		Default = 15,
+		Visible = false,
+		Tooltip = 'Speed of rotation in Spin mode'
+	})
+	
+	-- Randomization sliders
+	RandomMin = Desync:CreateSlider({
+		Name = 'Random Min',
+		Min = 0,
+		Max = 180,
+		Default = 0,
+		Visible = false,
+		Tooltip = 'Minimum angle for Random mode'
+	})
+	
+	RandomMax = Desync:CreateSlider({
+		Name = 'Random Max',
+		Min = 0,
+		Max = 180,
+		Default = 180,
+		Visible = false,
+		Tooltip = 'Maximum angle for Random mode'
+	})
+	
+	-- Invert toggle
+	Invert = Desync:CreateToggle({
+		Name = 'Invert',
+		Default = false,
+		Tooltip = 'Invert the desync angle'
 	})
 	
 	-- Visualizer toggle
@@ -7761,6 +7815,9 @@ run(function()
 		Default = false,
 		Tooltip = 'Show visual representation of desync',
 		Function = function(enabled)
+			VisualizerMaterial.Object.Visible = enabled
+			VisualizerColorToggle.Object.Visible = enabled
+			VisualizerColor.Object.Visible = enabled and VisualizerColorToggle.Enabled
 			if enabled then
 				if Desync.Enabled then
 					setupDesyncClone()
@@ -7776,6 +7833,7 @@ run(function()
 		Name = 'Material',
 		List = {'ForceField', 'Neon', 'Glass', 'Plastic'},
 		Default = 'ForceField',
+		Visible = false,
 		Tooltip = 'Material for visualizer clone',
 		Function = function()
 			if Visualizer.Enabled and Desync.Enabled then
@@ -7788,7 +7846,14 @@ run(function()
 	VisualizerColorToggle = Desync:CreateToggle({
 		Name = 'Custom Color',
 		Default = false,
-		Tooltip = 'Use custom color for visualizer'
+		Visible = false,
+		Tooltip = 'Use custom color for visualizer',
+		Function = function(enabled)
+			VisualizerColor.Object.Visible = enabled and Visualizer.Enabled
+			if Visualizer.Enabled and Desync.Enabled then
+				setupDesyncClone()
+			end
+		end
 	})
 	
 	-- Visualizer color slider
@@ -7802,14 +7867,6 @@ run(function()
 			end
 		end
 	})
-	
-	-- Connect color toggle visibility
-	VisualizerColorToggle.Function = function(enabled)
-		VisualizerColor.Object.Visible = enabled and Visualizer.Enabled
-		if Visualizer.Enabled and Desync.Enabled then
-			setupDesyncClone()
-		end
-	end
 end)
 
 run(function()
