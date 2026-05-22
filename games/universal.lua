@@ -7685,7 +7685,8 @@ run(function()
 	-- Keybind handler for inverter
 	local function onInputBegan(input, gameProcessed)
 		if gameProcessed then return end
-		if input.KeyCode == InvertKey.Value then
+		local keyName = InvertKey.Value or 'F'
+		if input.KeyCode.Name == keyName then
 			inverted = not inverted
 		end
 	end
@@ -7744,10 +7745,10 @@ run(function()
 	})
 	
 	-- Inverter keybind
-	InvertKey = Desync:CreateBind({
+	InvertKey = Desync:CreateTextBox({
 		Name = 'Invert Key',
-		Default = Enum.KeyCode.F,
-		Tooltip = 'Key to toggle angle inversion'
+		Default = 'F',
+		Tooltip = 'Key to toggle angle inversion (e.g., F, G, H)'
 	})
 	
 	-- Visualizer toggle
