@@ -4407,11 +4407,19 @@ run(function()
 		Minimal = 'newvape/assets/new/arrowmodule.png'
 	}
 	
+	local function countTable(tbl)
+		local count = 0
+		for _ in pairs(tbl) do
+			count = count + 1
+		end
+		return count
+	end
+	
 	local function Added(ent)
 		if not Targets.Players.Enabled and ent.Player then return end
 		if not Targets.NPCs.Enabled and ent.NPC then return end
 		if Teammates.Enabled and (not ent.Targetable) and (not ent.Friend) and (not ent.Friend) then return end
-		if MaxArrowsLimit.Enabled and table.count(Reference) >= MaxArrowsLimit.Value then return end
+		if MaxArrowsLimit.Enabled and countTable(Reference) >= MaxArrowsLimit.Value then return end
 		if vape.ThreadFix then
 			setthreadidentity(8)
 		end
@@ -7853,7 +7861,14 @@ run(function()
 	
 	-- Character disabler function
 	local function characterAdded(char)
-		local rootPart = char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('RootPart')
+		-- Handle both table (from entitylib) and Instance (Character model)
+		local characterModel = char
+		if typeof(char) == 'table' and char.Character then
+			characterModel = char.Character
+		end
+		if typeof(characterModel) ~= 'Instance' then return end
+		
+		local rootPart = characterModel:FindFirstChild('HumanoidRootPart') or characterModel:FindFirstChild('RootPart')
 		if not rootPart then return end
 		
 		-- Hook CFrame changed signals
