@@ -7309,24 +7309,7 @@ run(function()
 		local customColor = Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value)
 		for _, d in visualClone:GetDescendants() do
 			if d:IsA('BasePart') then
-				local isAccessoryPart = false
-				local parent = d.Parent
-				while parent and parent ~= visualClone do
-					if parent:IsA('Accessory') then
-						isAccessoryPart = true
-						break
-					end
-					parent = parent.Parent
-				end
-				
-				if d.Name == 'HumanoidRootPart' then
-					d.Anchored = true
-				elseif isAccessoryPart then
-					d.Anchored = true
-				else
-					d.Anchored = false
-				end
-				
+				d.Anchored = true
 				d.CanCollide = false
 				d.CanTouch = false
 				d.CanQuery = false
@@ -7390,29 +7373,12 @@ run(function()
 		-- FIRST: Disable ALL collisions BEFORE parenting
 		for _, part in clone:GetDescendants() do
 			if part:IsA('BasePart') then
-				local isAccessoryPart = false
-				local parent = part.Parent
-				while parent and parent ~= clone do
-					if parent:IsA('Accessory') then
-						isAccessoryPart = true
-						break
-					end
-					parent = parent.Parent
-				end
-				
 				part.CanCollide = false
 				part.CanTouch = false
 				part.CanQuery = false
 				part.Massless = true
 				part.CastShadow = false
-				
-				if part.Name == 'HumanoidRootPart' then
-					part.Anchored = true
-				elseif isAccessoryPart then
-					part.Anchored = true
-				else
-					part.Anchored = false
-				end
+				part.Anchored = true
 			elseif part:IsA('Humanoid') then
 				part:Destroy()
 			elseif part:IsA('Weld') or part:IsA('WeldConstraint') then
@@ -7759,24 +7725,7 @@ run(function()
 					desyncMotorMap[obj] = realMotor
 				end
 			elseif obj:IsA("BasePart") then
-				local isAccessoryPart = false
-				local parent = obj.Parent
-				while parent and parent ~= desyncClone do
-					if parent:IsA('Accessory') then
-						isAccessoryPart = true
-						break
-					end
-					parent = parent.Parent
-				end
-				
-				if obj.Name == "HumanoidRootPart" then
-					obj.Anchored = true
-				elseif isAccessoryPart then
-					obj.Anchored = true
-				else
-					obj.Anchored = false
-				end
-				
+				obj.Anchored = true
 				obj.CanCollide = false
 				obj.CanTouch = false
 				obj.CanQuery = false
