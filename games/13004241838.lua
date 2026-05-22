@@ -42,6 +42,34 @@ end
 
 local minigames = vape.Categories.Minigames
 
+-- Team color definitions from the user
+local teamColors = {
+    Yellow = Color3.fromRGB(251, 255, 11),
+    Red = Color3.fromRGB(151, 0, 0),
+    Blue = Color3.fromRGB(13, 105, 172)
+}
+
+-- Get player's team color from their Torso
+local function getPlayerTeamColor(player)
+    if not player then return nil end
+    local char = player.Character
+    if not char then return nil end
+    
+    -- Try Torso first, then UpperTorso
+    local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+    if not torso or not torso:IsA("BasePart") then return nil end
+    
+    return torso.Color
+end
+
+-- Check if two colors are similar (with tolerance for lighting/lighting effects)
+local function colorsMatch(color1, color2, tolerance)
+    tolerance = tolerance or 0.15
+    return math.abs(color1.R - color2.R) < tolerance
+        and math.abs(color1.G - color2.G) < tolerance
+        and math.abs(color1.B - color2.B) < tolerance
+end
+
 -- Track if Team Check is active globally
 local teamCheckActive = false
 
@@ -67,9 +95,7 @@ anticheatBypass = minigames:CreateModule({
             end)
             
             -- 3. Hook Lighting changed to prevent lock lighting detections
-            local oldLightingGet = nil
             local lightingProperties = {}
-            local lightingChangedConn = nil
             local function saveLightingState()
                 lightingProperties.Ambient = lightingService.Ambient
                 lightingProperties.Brightness = lightingService.Brightness
@@ -198,31 +224,55 @@ teamCheck = minigames:CreateModule({
         if callback then
             teamCheckActive = true
             
+            -- Store original functions
             local oldTargetCheck = entitylib.targetCheck
+            local oldGetEntityColor = entitylib.getEntityColor
+            
+            -- Override target check to use torso colors
             entitylib.targetCheck = function(ent)
-                -- First check if ent.Player and lplr.Team exist
-                if ent.Player and lplr.Team and ent.Player.Team then
-                    -- Don't target same team members
-                    if ent.Player.Team == lplr.Team then
+                -- First check if both players have torso colors
+                local myColor = getPlayerTeamColor(lplr)
+                local theirColor = getPlayerTeamColor(ent.Player)
+                
+                if myColor and theirColor then
+                    -- Don't target same-color players
+                    if colorsMatch(myColor, theirColor, 0.2) then
                         return false
                     end
                 end
-                -- If not same team, use original check
+                
+                -- If different or colors not available, use original check
                 return oldTargetCheck(ent)
+            end
+            
+            -- Override entity color to use torso colors
+            entitylib.getEntityColor = function(ent)
+                if teamCheckActive then
+                    local playerColor = getPlayerTeamColor(ent.Player)
+                    if playerColor then
+                        return playerColor
+                    end
+                end
+                
+                -- Fall back to original if no torso color
+                return oldGetEntityColor(ent)
             end
             
             teamCheck:Clean(function()
                 entitylib.targetCheck = oldTargetCheck
+                entitylib.getEntityColor = oldGetEntityColor
                 teamCheckActive = false
             end)
         else
             teamCheckActive = false
         end
     end,
-    Tooltip = 'Prevents targeting players on your team and shows team colors in ESP/Chams.'
+    Tooltip = 'Prevents targeting players with same torso color (yellow/red/blue) and shows team colors in ESP/Chams.'
 })
 
--- Expose team check state to other modules if needed
+-- Expose team check state and helper functions to other modules if needed
 shared.StreetsTeamCheckActive = function() return teamCheckActive end
+shared.StreetsGetTeamColor = getPlayerTeamColor
+shared.StreetsColorsMatch = colorsMatch
 
 vape:CreateNotification('Vape', 'Loaded custom script for game 13004241838', 5)
