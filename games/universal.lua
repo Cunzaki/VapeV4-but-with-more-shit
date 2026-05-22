@@ -7309,7 +7309,24 @@ run(function()
 		local customColor = Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value)
 		for _, d in visualClone:GetDescendants() do
 			if d:IsA('BasePart') then
-				d.Anchored = (d.Name == 'HumanoidRootPart')
+				local isAccessoryPart = false
+				local parent = d.Parent
+				while parent and parent ~= visualClone do
+					if parent:IsA('Accessory') then
+						isAccessoryPart = true
+						break
+					end
+					parent = parent.Parent
+				end
+				
+				if d.Name == 'HumanoidRootPart' then
+					d.Anchored = true
+				elseif isAccessoryPart then
+					d.Anchored = true
+				else
+					d.Anchored = false
+				end
+				
 				d.CanCollide = false
 				d.CanTouch = false
 				d.CanQuery = false
@@ -7325,7 +7342,7 @@ run(function()
 				d.Transparency = 0
 			elseif d:IsA('Motor6D') or d:IsA('Animator') or d:IsA('AnimationController') then
 				-- Keep these for animation
-			elseif d:IsA('Script') or d:IsA('LocalScript') or d:IsA('Weld') or d:IsA('WeldConstraint') then
+			elseif d:IsA('Script') or d:IsA('LocalScript') then
 				d:Destroy()
 			end
 		end
@@ -7373,14 +7390,45 @@ run(function()
 		-- FIRST: Disable ALL collisions BEFORE parenting
 		for _, part in clone:GetDescendants() do
 			if part:IsA('BasePart') then
+				local isAccessoryPart = false
+				local parent = part.Parent
+				while parent and parent ~= clone do
+					if parent:IsA('Accessory') then
+						isAccessoryPart = true
+						break
+					end
+					parent = parent.Parent
+				end
+				
 				part.CanCollide = false
 				part.CanTouch = false
 				part.CanQuery = false
-				part.Anchored = (part.Name == 'HumanoidRootPart')
 				part.Massless = true
 				part.CastShadow = false
-			elseif part:IsA('Weld') or part:IsA('WeldConstraint') or part:IsA('Humanoid') then
+				
+				if part.Name == 'HumanoidRootPart' then
+					part.Anchored = true
+				elseif isAccessoryPart then
+					part.Anchored = true
+				else
+					part.Anchored = false
+				end
+			elseif part:IsA('Humanoid') then
 				part:Destroy()
+			elseif part:IsA('Weld') or part:IsA('WeldConstraint') then
+				-- Check if this weld is part of an accessory - keep it!
+				local isAccessoryWeld = false
+				local parent = part.Parent
+				while parent and parent ~= clone do
+					if parent:IsA('Accessory') then
+						isAccessoryWeld = true
+						break
+					end
+					parent = parent.Parent
+				end
+				if not isAccessoryWeld then
+					part:Destroy()
+				end
 			end
 		end
 
@@ -7684,22 +7732,56 @@ run(function()
 			end
 		end
 		
-		-- Clean up unnecessary objects but KEEP Motor6Ds
+		-- Clean up unnecessary objects but KEEP Motor6Ds and accessory welds
 		for _, obj in ipairs(desyncClone:GetDescendants()) do
 			if obj:IsA("Humanoid")
 			or obj:IsA("Script")
 			or obj:IsA("LocalScript")
-			or obj:IsA("Tool")
-			or obj:IsA("WeldConstraint") then
+			or obj:IsA("Tool") then
 				obj:Destroy()
+			elseif obj:IsA("WeldConstraint") or obj:IsA("Weld") then
+				-- Check if this weld is part of an accessory - keep it!
+				local isAccessoryWeld = false
+				local parent = obj.Parent
+				while parent and parent ~= desyncClone do
+					if parent:IsA('Accessory') then
+						isAccessoryWeld = true
+						break
+					end
+					parent = parent.Parent
+				end
+				if not isAccessoryWeld then
+					obj:Destroy()
+				end
 			elseif obj:IsA("Motor6D") then
 				local realMotor = realMotors[obj.Name]
 				if realMotor then
 					desyncMotorMap[obj] = realMotor
 				end
 			elseif obj:IsA("BasePart") then
-				obj.Anchored = (obj.Name == "HumanoidRootPart")
+				local isAccessoryPart = false
+				local parent = obj.Parent
+				while parent and parent ~= desyncClone do
+					if parent:IsA('Accessory') then
+						isAccessoryPart = true
+						break
+					end
+					parent = parent.Parent
+				end
+				
+				if obj.Name == "HumanoidRootPart" then
+					obj.Anchored = true
+				elseif isAccessoryPart then
+					obj.Anchored = true
+				else
+					obj.Anchored = false
+				end
+				
 				obj.CanCollide = false
+				obj.CanTouch = false
+				obj.CanQuery = false
+				obj.Massless = true
+				obj.CastShadow = false
 				obj.Material = Enum.Material[VisualizerMaterial.Value] or Enum.Material.ForceField
 				obj.Transparency = 0.4
 				
