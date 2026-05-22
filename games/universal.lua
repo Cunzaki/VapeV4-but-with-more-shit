@@ -7512,14 +7512,19 @@ end)
 
 run(function()
 	local Desync
-	local Mode
+	local ModeX
+	local ModeY
 	local AngleX
 	local AngleY
 	local Invert
-	local JitterSpeed
-	local SpinSpeed
-	local RandomMin
-	local RandomMax
+	local JitterSpeedX
+	local JitterSpeedY
+	local SpinSpeedX
+	local SpinSpeedY
+	local RandomMinX
+	local RandomMaxX
+	local RandomMinY
+	local RandomMaxY
 	local Visualizer
 	local VisualizerMaterial
 	local VisualizerColor
@@ -7531,29 +7536,22 @@ run(function()
 	
 	-- Desync variables
 	local desyncEnabled = false
-	local anglX = 0
-	local lastjittick = 0
-	local jitflip = false
-	local spinAngle = 0
+	local lastjittickX = 0
+	local lastjittickY = 0
+	local jitflipX = false
+	local jitflipY = false
+	local spinAngleX = 0
+	local spinAngleY = 0
+	local randAngleX = 0
+	local randAngleY = 0
+	local currentRot = CFrame.identity
 	local returnthis = nil
 	
 	-- Clone system for visualization
 	local desyncClone
 	local desyncCloneRoot
 	local desyncRealRoot
-	local desyncPartMap = {}
-	local OFFSET = CFrame.new()
-	
-	-- Build part mapping for clone
-	local function buildPartMap(clone, root)
-		local map = {}
-		for _, part in ipairs(clone:GetDescendants()) do
-			if part:IsA("BasePart") and part ~= root then
-				map[part] = root.CFrame:ToObjectSpace(part.CFrame)
-			end
-		end
-		return map
-	end
+	local desyncMotorMap = {}
 	
 	-- Cleanup desync clone
 	local function cleanupDesyncClone()
@@ -7563,7 +7561,7 @@ run(function()
 		desyncClone = nil
 		desyncCloneRoot = nil
 		desyncRealRoot = nil
-		desyncPartMap = {}
+		desyncMotorMap = {}
 	end
 	
 	-- Setup desync clone for visualization
@@ -7583,18 +7581,30 @@ run(function()
 		desyncClone.Name = "DesyncVisualizer"
 		desyncClone.Parent = workspace
 		
-		-- Clean up unnecessary objects
+		-- Map motors for animation syncing
+		desyncMotorMap = {}
+		local realMotors = {}
+		for _, v in ipairs(char:GetDescendants()) do
+			if v:IsA("Motor6D") then
+				realMotors[v.Name] = v
+			end
+		end
+		
+		-- Clean up unnecessary objects but KEEP Motor6Ds
 		for _, obj in ipairs(desyncClone:GetDescendants()) do
 			if obj:IsA("Humanoid")
 			or obj:IsA("Script")
 			or obj:IsA("LocalScript")
-			or obj:IsA("Motor6D")
-			or obj:IsA("Weld")
 			or obj:IsA("Tool")
 			or obj:IsA("WeldConstraint") then
 				obj:Destroy()
+			elseif obj:IsA("Motor6D") then
+				local realMotor = realMotors[obj.Name]
+				if realMotor then
+					desyncMotorMap[obj] = realMotor
+				end
 			elseif obj:IsA("BasePart") then
-				obj.Anchored = true
+				obj.Anchored = (obj.Name == "HumanoidRootPart")
 				obj.CanCollide = false
 				obj.Material = Enum.Material[VisualizerMaterial.Value] or Enum.Material.ForceField
 				obj.Transparency = 0.4
@@ -7614,49 +7624,69 @@ run(function()
 		end
 		
 		desyncClone.PrimaryPart = desyncCloneRoot
-		desyncPartMap = buildPartMap(desyncClone, desyncCloneRoot)
 	end
 	
-	-- Calculate desync rotation
+	-- Calculate desync rotation for a specific axis
+	local function calculateAxisAngle(mode, angle, jitterSpeed, spinSpeed, randMin, randMax, lastTick, jitFlip, spinAngle, randVal)
+		local resultAngle = 0
+		local newTick = lastTick
+		local newFlip = jitFlip
+		local newSpin = spinAngle
+		local newRand = randVal
+		
+		if mode == "Static" then
+			resultAngle = angle
+		elseif mode == "Jitter" then
+			local now = os.clock()
+			local delay = 1 / (jitterSpeed * 2)
+			if now - lastTick >= delay then
+				newFlip = not jitFlip
+				newTick = now
+			end
+			resultAngle = newFlip and angle or -angle
+		elseif mode == "Spin" then
+			newSpin = (spinAngle + spinSpeed) % 360
+			resultAngle = newSpin
+		elseif mode == "Random" then
+			local now = os.clock()
+			local delay = 1 / (jitterSpeed * 2)
+			if now - lastTick >= delay then
+				newRand = math.random(randMin, randMax)
+				newTick = now
+			end
+			resultAngle = newRand
+		end
+		
+		return resultAngle, newTick, newFlip, newSpin, newRand
+	end
+	
+	-- Calculate total desync rotation
 	local function calculateRotation()
 		if not desyncEnabled then return CFrame.identity end
 		
-		local mode = Mode.Value
-		local yaw = 0
-		local pitch = AngleX.Value
+		local xAng, nextTickX, nextFlipX, nextSpinX, nextRandX = calculateAxisAngle(
+			ModeX.Value, AngleX.Value, JitterSpeedX.Value, SpinSpeedX.Value, RandomMinX.Value, RandomMaxX.Value,
+			lastjittickX, jitflipX, spinAngleX, randAngleX
+		)
 		
-		if mode == "Static" then
-			yaw = AngleY.Value
-		elseif mode == "Jitter" then
-			local now = os.clock()
-			local delay = 1 / (JitterSpeed.Value * 2)
-			if now - lastjittick >= delay then
-				jitflip = not jitflip
-				lastjittick = now
-			end
-			yaw = jitflip and AngleY.Value or -AngleY.Value
-		elseif mode == "Spin" then
-			spinAngle = (spinAngle + SpinSpeed.Value) % 360
-			yaw = spinAngle
-		elseif mode == "Random" then
-			local now = os.clock()
-			local delay = 1 / (JitterSpeed.Value * 2)
-			if now - lastjittick >= delay then
-				anglX = math.random(RandomMin.Value, RandomMax.Value)
-				lastjittick = now
-			end
-			yaw = anglX
-		end
+		local yAng, nextTickY, nextFlipY, nextSpinY, nextRandY = calculateAxisAngle(
+			ModeY.Value, AngleY.Value, JitterSpeedY.Value, SpinSpeedY.Value, RandomMinY.Value, RandomMaxY.Value,
+			lastjittickY, jitflipY, spinAngleY, randAngleY
+		)
+		
+		-- Update state
+		lastjittickX, jitflipX, spinAngleX, randAngleX = nextTickX, nextFlipX, nextSpinX, nextRandX
+		lastjittickY, jitflipY, spinAngleY, randAngleY = nextTickY, nextFlipY, nextSpinY, nextRandY
 		
 		-- Combine Pitch (X) and Yaw (Y)
-		local rot = CFrame.Angles(math.rad(pitch), math.rad(yaw), 0)
+		local rot = CFrame.Angles(math.rad(xAng), math.rad(yAng), 0)
 		
 		-- Apply 180 flip if Invert is enabled
 		if Invert.Enabled then
 			rot = rot * CFrame.Angles(math.rad(180), 0, 0)
 		end
 		
-		anglX = yaw -- Store last yaw for visualizer
+		currentRot = rot
 		return rot
 	end
 	
@@ -7691,19 +7721,33 @@ run(function()
 		local baseCF = entitylib.character and entitylib.character.RootPart and entitylib.character.RootPart.CFrame
 		if not baseCF then return end
 		
-		-- Re-calculate rotation for smooth visualization
-		local rot = calculateRotation()
-		local fakeCF = baseCF * rot
-		
-		-- Apply to clone
-		desyncCloneRoot.CFrame = fakeCF
-		for part, relCF in pairs(desyncPartMap) do
-			if part and part.Parent then
-				part.CFrame = fakeCF * relCF
-				part.Anchored = true
-				part.CanCollide = false
+		-- Sync animations by copying motor transforms
+		for cloneMotor, realMotor in pairs(desyncMotorMap) do
+			if cloneMotor and realMotor and cloneMotor.Parent and realMotor.Parent then
+				cloneMotor.Transform = realMotor.Transform
 			end
 		end
+		
+		-- Apply rotation to clone root
+		desyncCloneRoot.CFrame = baseCF * currentRot
+	end
+	
+	-- Function to update visibility
+	local function updateUIVisibility()
+		local valX = ModeX.Value
+		local valY = ModeY.Value
+		
+		AngleX.Object.Visible = (valX == 'Static' or valX == 'Jitter')
+		JitterSpeedX.Object.Visible = (valX == 'Jitter' or valX == 'Random')
+		SpinSpeedX.Object.Visible = (valX == 'Spin')
+		RandomMinX.Object.Visible = (valX == 'Random')
+		RandomMaxX.Object.Visible = (valX == 'Random')
+		
+		AngleY.Object.Visible = (valY == 'Static' or valY == 'Jitter')
+		JitterSpeedY.Object.Visible = (valY == 'Jitter' or valY == 'Random')
+		SpinSpeedY.Object.Visible = (valY == 'Spin')
+		RandomMinY.Object.Visible = (valY == 'Random')
+		RandomMaxY.Object.Visible = (valY == 'Random')
 	end
 	
 	-- Create the module
@@ -7730,27 +7774,28 @@ run(function()
 				cleanupDesyncClone()
 			end
 		end,
-		Tooltip = 'Advanced desync with CFrame spoofing and visualizer'
+		Tooltip = 'Advanced desync with CFrame spoofing and animated visualizer'
 	})
 	
-	-- Mode selection
-	Mode = Desync:CreateDropdown({
-		Name = 'Mode',
+	-- Mode selection X
+	ModeX = Desync:CreateDropdown({
+		Name = 'Mode X (Pitch)',
 		List = {'Static', 'Jitter', 'Spin', 'Random'},
 		Default = 'Static',
 		Tooltip = 'Static - Fixed angle\nJitter - Alternating angles\nSpin - Rotating angle\nRandom - Randomized angle',
-		Function = function(val)
-			AngleX.Object.Visible = true
-			AngleY.Object.Visible = (val == 'Static' or val == 'Jitter')
-			Invert.Object.Visible = true
-			JitterSpeed.Object.Visible = (val == 'Jitter' or val == 'Random')
-			SpinSpeed.Object.Visible = (val == 'Spin')
-			RandomMin.Object.Visible = (val == 'Random')
-			RandomMax.Object.Visible = (val == 'Random')
-		end
+		Function = updateUIVisibility
 	})
 	
-	-- Angle sliders
+	-- Mode selection Y
+	ModeY = Desync:CreateDropdown({
+		Name = 'Mode Y (Yaw)',
+		List = {'Static', 'Jitter', 'Spin', 'Random'},
+		Default = 'Static',
+		Tooltip = 'Static - Fixed angle\nJitter - Alternating angles\nSpin - Rotating angle\nRandom - Randomized angle',
+		Function = updateUIVisibility
+	})
+	
+	-- Angle sliders X
 	AngleX = Desync:CreateSlider({
 		Name = 'Pitch (Angle X)',
 		Min = 0,
@@ -7767,42 +7812,82 @@ run(function()
 		Tooltip = 'Horizontal desync angle (rotates character)'
 	})
 	
-	-- Speed sliders
-	JitterSpeed = Desync:CreateSlider({
-		Name = 'Jitter Speed',
+	-- Speed sliders X
+	JitterSpeedX = Desync:CreateSlider({
+		Name = 'Jitter Speed X',
 		Min = 1,
 		Max = 30,
 		Default = 10,
 		Visible = false,
-		Tooltip = 'Speed of jitter/randomization updates'
+		Tooltip = 'Speed of jitter/randomization for Pitch'
 	})
 	
-	SpinSpeed = Desync:CreateSlider({
-		Name = 'Spin Speed',
+	-- Speed sliders Y
+	JitterSpeedY = Desync:CreateSlider({
+		Name = 'Jitter Speed Y',
+		Min = 1,
+		Max = 30,
+		Default = 10,
+		Visible = false,
+		Tooltip = 'Speed of jitter/randomization for Yaw'
+	})
+	
+	-- Spin Speed X
+	SpinSpeedX = Desync:CreateSlider({
+		Name = 'Spin Speed X',
 		Min = 1,
 		Max = 50,
 		Default = 15,
 		Visible = false,
-		Tooltip = 'Speed of rotation in Spin mode'
+		Tooltip = 'Speed of rotation for Pitch'
 	})
 	
-	-- Randomization sliders
-	RandomMin = Desync:CreateSlider({
-		Name = 'Random Min',
+	-- Spin Speed Y
+	SpinSpeedY = Desync:CreateSlider({
+		Name = 'Spin Speed Y',
+		Min = 1,
+		Max = 50,
+		Default = 15,
+		Visible = false,
+		Tooltip = 'Speed of rotation for Yaw'
+	})
+	
+	-- Randomization sliders X
+	RandomMinX = Desync:CreateSlider({
+		Name = 'Random Min X',
 		Min = 0,
 		Max = 180,
 		Default = 0,
 		Visible = false,
-		Tooltip = 'Minimum angle for Random mode'
+		Tooltip = 'Minimum Pitch for Random mode'
 	})
 	
-	RandomMax = Desync:CreateSlider({
-		Name = 'Random Max',
+	RandomMaxX = Desync:CreateSlider({
+		Name = 'Random Max X',
 		Min = 0,
 		Max = 180,
 		Default = 180,
 		Visible = false,
-		Tooltip = 'Maximum angle for Random mode'
+		Tooltip = 'Maximum Pitch for Random mode'
+	})
+	
+	-- Randomization sliders Y
+	RandomMinY = Desync:CreateSlider({
+		Name = 'Random Min Y',
+		Min = 0,
+		Max = 180,
+		Default = 0,
+		Visible = false,
+		Tooltip = 'Minimum Yaw for Random mode'
+	})
+	
+	RandomMaxY = Desync:CreateSlider({
+		Name = 'Random Max Y',
+		Min = 0,
+		Max = 180,
+		Default = 180,
+		Visible = false,
+		Tooltip = 'Maximum Yaw for Random mode'
 	})
 	
 	-- Invert toggle
