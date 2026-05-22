@@ -7277,7 +7277,7 @@ run(function()
 	local VisualizerColor
 	local VisualizerColorToggle
 	local oldphys, oldsend
-	local visualClone, visualServerCFrame, visualCloneOffset
+	local visualClone, visualServerCFrame
 	local lastFlagApply = 0
 	local function applyBlinkRates(physicsrate, senderrate)
 		pcall(function()
@@ -7297,7 +7297,6 @@ run(function()
 			visualClone = nil
 		end
 		visualServerCFrame = nil
-		visualCloneOffset = nil
 	end
 
 	local function applyVisualizerStyle()
@@ -7330,12 +7329,6 @@ run(function()
 		clearVisualizer()
 		if not (entitylib.isAlive and entitylib.character and entitylib.character.Character) then return end
 		local char = entitylib.character.Character
-		local hrp = entitylib.character.RootPart
-		if not hrp then return end
-		local head = char:FindFirstChild('Head')
-		local torso = char:FindFirstChild('Torso') or char:FindFirstChild('UpperTorso')
-		local referencePart = head or torso or hrp
-		local offsetCFrame = hrp.CFrame:ToObjectSpace(referencePart.CFrame)
 		local oldarch = char.Archivable
 		char.Archivable = true
 		local suc, clone = pcall(function()
@@ -7344,10 +7337,16 @@ run(function()
 		char.Archivable = oldarch
 		if not suc or not clone then return end
 		clone.Name = 'BlinkVisualizer'
-		local cloneHrp = clone:FindFirstChild('HumanoidRootPart')
-		if cloneHrp then cloneHrp:Destroy() end
-		local cloneHead = clone:FindFirstChild('Head')
-		local cloneTorso = clone:FindFirstChild('Torso') or clone:FindFirstChild('UpperTorso')
+
+		local torso = clone:FindFirstChild('UpperTorso') or clone:FindFirstChild('Torso') or clone:FindFirstChild('HumanoidRootPart')
+		local hrp = clone:FindFirstChild('HumanoidRootPart')
+		if hrp then
+			hrp:Destroy()
+		end
+		if torso then
+			clone.PrimaryPart = torso
+		end
+
 		for _, part in clone:GetDescendants() do
 			if part:IsA('BasePart') then
 				part.CanCollide = false
@@ -7355,13 +7354,21 @@ run(function()
 				part.CanQuery = false
 			end
 		end
+
 		visualClone = clone
-		visualCloneOffset = offsetCFrame
 		applyVisualizerStyle()
 		clone.Parent = workspace
-		visualServerCFrame = hrp.CFrame
-		local targetCFrame = visualServerCFrame * visualCloneOffset:Inverse()
-		clone:PivotTo(targetCFrame)
+
+		local charRoot = entitylib.character.RootPart
+		local charTorso = entitylib.character.Character and (entitylib.character.Character:FindFirstChild('UpperTorso') or entitylib.character.Character:FindFirstChild('Torso'))
+		if charTorso and torso then
+			local rootPos = charRoot and charRoot.CFrame or charTorso.CFrame
+			local torsoOffset = charTorso.CFrame.Position - rootPos.Position
+			visualServerCFrame = CFrame.new(rootPos.Position + torsoOffset) * (charRoot and charRoot.CFrame - charRoot.CFrame.Position or CFrame.identity)
+		else
+			visualServerCFrame = charRoot and charRoot.CFrame or charTorso and charTorso.CFrame or CFrame.identity
+		end
+		clone:PivotTo(visualServerCFrame)
 	end
 	
 	Blink = vape.Categories.Utility:CreateModule({
@@ -7407,21 +7414,17 @@ run(function()
 						createVisualizer()
 					end
 					if visualClone and entitylib.isAlive and entitylib.character and entitylib.character.RootPart then
-						local currentRootCFrame = entitylib.character.RootPart.CFrame
 						if not AutoSend.Enabled then
-							visualServerCFrame = visualServerCFrame or currentRootCFrame
+							visualServerCFrame = visualServerCFrame or entitylib.character.RootPart.CFrame
 						elseif sendingNow and not wasSending then
-							visualServerCFrame = currentRootCFrame
+							visualServerCFrame = entitylib.character.RootPart.CFrame
 							createVisualizer()
 						elseif sendingNow then
-							visualServerCFrame = currentRootCFrame
+							visualServerCFrame = entitylib.character.RootPart.CFrame
 						elseif wasSending and not sendingNow then
-							visualServerCFrame = visualServerCFrame or currentRootCFrame
+							visualServerCFrame = visualServerCFrame or entitylib.character.RootPart.CFrame
 						end
-						if visualServerCFrame and visualCloneOffset then
-							local targetCFrame = visualServerCFrame * visualCloneOffset:Inverse()
-							visualClone:PivotTo(targetCFrame)
-						elseif visualServerCFrame then
+						if visualServerCFrame then
 							visualClone:PivotTo(visualServerCFrame)
 						end
 					end
