@@ -63,6 +63,7 @@ local getfontsize = vape.Libraries.getfontsize
 local getcustomasset = vape.Libraries.getcustomasset
 
 local TargetStrafeVector, SpiderShift, WaypointFolder
+local currentDesyncRotation = CFrame.identity
 local Spider = {Enabled = false}
 local Phase = {Enabled = false}
 
@@ -7279,6 +7280,7 @@ run(function()
 	local VisualizerColorToggle
 	local oldphys, oldsend
 	local visualClone, visualServerCFrame
+	local blinkMotorMap = {}
 	local lastFlagApply = 0
 	local function applyBlinkRates(physicsrate, senderrate)
 		pcall(function()
@@ -7298,6 +7300,7 @@ run(function()
 			visualClone = nil
 		end
 		visualServerCFrame = nil
+		blinkMotorMap = {}
 	end
 
 	local function applyVisualizerStyle()
@@ -7306,7 +7309,7 @@ run(function()
 		local customColor = Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value)
 		for _, d in visualClone:GetDescendants() do
 			if d:IsA('BasePart') then
-				d.Anchored = true
+				d.Anchored = (d.Name == 'HumanoidRootPart')
 				d.CanCollide = false
 				d.CanTouch = false
 				d.CanQuery = false
@@ -7320,7 +7323,9 @@ run(function()
 				end
 			elseif d:IsA('Decal') or d:IsA('Texture') then
 				d.Transparency = 0
-			elseif d:IsA('Humanoid') or d:IsA('Animator') or d:IsA('AnimationController') or d:IsA('Script') or d:IsA('LocalScript') then
+			elseif d:IsA('Motor6D') or d:IsA('Animator') or d:IsA('AnimationController') then
+				-- Keep these for animation
+			elseif d:IsA('Script') or d:IsA('LocalScript') then
 				d:Destroy()
 			end
 		end
@@ -7339,12 +7344,29 @@ run(function()
 		if not suc or not clone then return end
 		clone.Name = 'BlinkVisualizer'
 
+		-- Map motors
+		blinkMotorMap = {}
+		local realMotors = {}
+		for _, v in ipairs(char:GetDescendants()) do
+			if v:IsA("Motor6D") then
+				realMotors[v.Name] = v
+			end
+		end
+
+		for _, d in ipairs(clone:GetDescendants()) do
+			if d:IsA("Motor6D") then
+				local realMotor = realMotors[d.Name]
+				if realMotor then
+					blinkMotorMap[d] = realMotor
+				end
+			end
+		end
+
 		local torso = clone:FindFirstChild('UpperTorso') or clone:FindFirstChild('Torso') or clone:FindFirstChild('HumanoidRootPart')
 		local hrp = clone:FindFirstChild('HumanoidRootPart')
 		if hrp then
-			hrp:Destroy()
-		end
-		if torso then
+			clone.PrimaryPart = hrp
+		elseif torso then
 			clone.PrimaryPart = torso
 		end
 
@@ -7369,6 +7391,12 @@ run(function()
 		else
 			visualServerCFrame = charRoot and charRoot.CFrame or charTorso and charTorso.CFrame or CFrame.identity
 		end
+
+		-- Apply desync rotation if active
+		if currentDesyncRotation ~= CFrame.identity then
+			visualServerCFrame = visualServerCFrame * currentDesyncRotation
+		end
+
 		clone:PivotTo(visualServerCFrame)
 	end
 	
@@ -7388,6 +7416,15 @@ run(function()
 					end))
 					Blink:Clean(entitylib.Events.LocalRemoved:Connect(clearVisualizer))
 				end
+				Blink:Clean(runService.RenderStepped:Connect(function()
+					if visualClone then
+						for cloneMotor, realMotor in pairs(blinkMotorMap) do
+							if cloneMotor and realMotor and cloneMotor.Parent and realMotor.Parent then
+								cloneMotor.Transform = realMotor.Transform
+							end
+						end
+					end
+				end))
 				Blink:Clean(lplr.OnTeleport:Connect(function()
 					applyBlinkRates('15', '60')
 					teleported = true
@@ -7425,8 +7462,13 @@ run(function()
 						elseif wasSending and not sendingNow then
 							visualServerCFrame = visualServerCFrame or entitylib.character.RootPart.CFrame
 						end
+						
 						if visualServerCFrame then
-							visualClone:PivotTo(visualServerCFrame)
+							local finalCF = visualServerCFrame
+							if currentDesyncRotation ~= CFrame.identity then
+								finalCF = finalCF * currentDesyncRotation
+							end
+							visualClone:PivotTo(finalCF)
 						end
 					end
 					wasSending = sendingNow
@@ -7730,6 +7772,7 @@ run(function()
 		end
 		
 		currentRot = rot
+		currentDesyncRotation = rot
 		return rot
 	end
 	
@@ -7825,6 +7868,7 @@ run(function()
 				end))
 			else
 				desyncEnabled = false
+				currentDesyncRotation = CFrame.identity
 				cleanupCameraProxy()
 				cleanupDesyncClone()
 			end
