@@ -7309,7 +7309,7 @@ run(function()
 		local customColor = Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value)
 		for _, d in visualClone:GetDescendants() do
 			if d:IsA('BasePart') then
-				d.Anchored = (d.Name == 'HumanoidRootPart')
+				d.Anchored = true
 				d.CanCollide = false
 				d.CanTouch = false
 				d.CanQuery = false
@@ -7325,7 +7325,7 @@ run(function()
 				d.Transparency = 0
 			elseif d:IsA('Motor6D') or d:IsA('Animator') or d:IsA('AnimationController') then
 				-- Keep these for animation
-			elseif d:IsA('Script') or d:IsA('LocalScript') then
+			elseif d:IsA('Script') or d:IsA('LocalScript') or d:IsA('Weld') or d:IsA('WeldConstraint') then
 				d:Destroy()
 			end
 		end
@@ -7395,6 +7395,16 @@ run(function()
 		-- Apply desync rotation if active
 		if currentDesyncRotation ~= CFrame.identity then
 			visualServerCFrame = visualServerCFrame * currentDesyncRotation
+		end
+
+		-- Final collision disable just to be safe
+		for _, part in ipairs(clone:GetDescendants()) do
+			if part:IsA('BasePart') then
+				part.CanCollide = false
+				part.CanTouch = false
+				part.CanQuery = false
+				part.Anchored = true
+			end
 		end
 
 		clone:PivotTo(visualServerCFrame)
@@ -7469,6 +7479,16 @@ run(function()
 								finalCF = finalCF * currentDesyncRotation
 							end
 							visualClone:PivotTo(finalCF)
+							
+							-- Continuous collision check - every frame disable collisions
+							for _, part in ipairs(visualClone:GetDescendants()) do
+								if part:IsA('BasePart') then
+									part.CanCollide = false
+									part.CanTouch = false
+									part.CanQuery = false
+									part.Anchored = true
+								end
+							end
 						end
 					end
 					wasSending = sendingNow
