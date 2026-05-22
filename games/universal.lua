@@ -7416,7 +7416,7 @@ run(function()
 			elseif part:IsA('Humanoid') then
 				part:Destroy()
 			elseif part:IsA('Weld') or part:IsA('WeldConstraint') then
-				-- Check if this weld is part of an accessory - keep it!
+				-- Keep welds that connect body parts or are part of accessories
 				local isAccessoryWeld = false
 				local parent = part.Parent
 				while parent and parent ~= clone do
@@ -7426,7 +7426,10 @@ run(function()
 					end
 					parent = parent.Parent
 				end
-				if not isAccessoryWeld then
+				
+				local isBodyWeld = (part.Part0 and (part.Part0.Name == 'Head' or part.Part0.Name == 'Torso' or part.Part0.Name == 'UpperTorso' or part.Part0.Name == 'HumanoidRootPart'))
+				
+				if not (isAccessoryWeld or isBodyWeld) then
 					part:Destroy()
 				end
 			end
@@ -7761,10 +7764,16 @@ run(function()
 					parent = parent.Parent
 				end
 				
+				local isBodyPart = (obj.Name == 'Head' or obj.Name == 'UpperTorso' or obj.Name == 'LowerTorso' or obj.Name == 'Torso' or obj.Name == 'LeftUpperArm' or obj.Name == 'LeftLowerArm' or obj.Name == 'LeftHand' or obj.Name == 'RightUpperArm' or obj.Name == 'RightLowerArm' or obj.Name == 'RightHand' or obj.Name == 'LeftUpperLeg' or obj.Name == 'LeftLowerLeg' or obj.Name == 'LeftFoot' or obj.Name == 'RightUpperLeg' or obj.Name == 'RightLowerLeg' or obj.Name == 'RightFoot')
+				
 				if obj.Name == "HumanoidRootPart" then
 					obj.Anchored = true
+				elseif obj.Name == "Head" then
+					obj.Anchored = false
 				elseif isAccessoryPart then
 					obj.Anchored = true
+				elseif isBodyPart then
+					obj.Anchored = false
 				else
 					obj.Anchored = false
 				end
@@ -7785,7 +7794,7 @@ run(function()
 			elseif obj:IsA("Humanoid") then
 				obj:Destroy()
 			elseif obj:IsA("WeldConstraint") or obj:IsA("Weld") then
-				-- Check if this weld is part of an accessory - keep it!
+				-- Keep welds that connect body parts or are part of accessories
 				local isAccessoryWeld = false
 				local parent = obj.Parent
 				while parent and parent ~= desyncClone do
@@ -7795,7 +7804,10 @@ run(function()
 					end
 					parent = parent.Parent
 				end
-				if not isAccessoryWeld then
+				
+				local isBodyWeld = (obj.Part0 and (obj.Part0.Name == 'Head' or obj.Part0.Name == 'Torso' or obj.Part0.Name == 'UpperTorso' or obj.Part0.Name == 'HumanoidRootPart'))
+				
+				if not (isAccessoryWeld or isBodyWeld) then
 					obj:Destroy()
 				end
 			elseif obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("Tool") then
@@ -7937,8 +7949,8 @@ run(function()
 			end
 		end
 		
-		-- Apply rotation to clone root
-		desyncCloneRoot.CFrame = baseCF * currentRot
+		-- Apply rotation to clone model
+		desyncClone:PivotTo(baseCF * currentRot)
 	end
 	
 	-- Function to update visibility
