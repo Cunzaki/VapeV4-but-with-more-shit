@@ -4374,85 +4374,39 @@ run(function()
 	local Teammates
 	local Distance
 	local DistanceLimit
-	local ArrowScale
-	local ScaleWithDistance
-	local MinScale
-	local MaxScale
-	local FadeWithDistance
-	local MaxFadeDistance
-	local ShowDistance
-	local DistanceTextSize
-	local DistanceTextColor
-	local DistanceTextOutline
-	local ArrowStyle
-	local ArrowRotationOffset
-	local ArrowYOffset
-	local PulseEffect
-	local PulseSpeed
-	local PulseMinScale
-	local PulseMaxScale
-	local ShowOnlyWhenBehind
-	local MaxArrowsLimit
-	local ArrowTransparency
+	local BoxThickness
+	local BoxOutline
+	local BoxOutlineThickness
+	local NameSize
+	local NameOutline
+	local NameYOffset
+	local HealthBarWidth
+	local DynamicHealthColor
+	local HeldItem
+	local HeldItemSize
+	local HeldItemOffset
 	local Reference = {}
-	local DistanceLabels = {}
 	local Folder = Instance.new('Folder')
 	Folder.Parent = vape.gui
-	local pulseTime = 0
-	
-	-- Arrow style assets
-	local arrowStyles = {
-		Default = 'newvape/assets/new/arrowmodule.png',
-		Solid = 'newvape/assets/new/arrowmodule.png',
-		Minimal = 'newvape/assets/new/arrowmodule.png'
-	}
-	
-	local function countTable(tbl)
-		local count = 0
-		for _ in pairs(tbl) do
-			count = count + 1
-		end
-		return count
-	end
 	
 	local function Added(ent)
 		if not Targets.Players.Enabled and ent.Player then return end
 		if not Targets.NPCs.Enabled and ent.NPC then return end
 		if Teammates.Enabled and (not ent.Targetable) and (not ent.Friend) and (not ent.Friend) then return end
-		if MaxArrowsLimit.Enabled and countTable(Reference) >= MaxArrowsLimit.Value then return end
 		if vape.ThreadFix then
 			setthreadidentity(8)
 		end
-		
 		local EntityArrow = Instance.new('ImageLabel')
-		EntityArrow.Size = UDim2.fromOffset(256 * ArrowScale.Value, 256 * ArrowScale.Value)
+		EntityArrow.Size = UDim2.fromOffset(256, 256)
 		EntityArrow.Position = UDim2.fromScale(0.5, 0.5)
 		EntityArrow.AnchorPoint = Vector2.new(0.5, 0.5)
 		EntityArrow.BackgroundTransparency = 1
 		EntityArrow.BorderSizePixel = 0
 		EntityArrow.Visible = false
-		EntityArrow.Image = getcustomasset(arrowStyles[ArrowStyle.Value] or arrowStyles.Default)
+		EntityArrow.Image = getcustomasset('newvape/assets/new/arrowmodule.png')
 		EntityArrow.ImageColor3 = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
-		EntityArrow.ImageTransparency = ArrowTransparency.Value
 		EntityArrow.Parent = Folder
 		Reference[ent] = EntityArrow
-		
-		if ShowDistance.Enabled then
-			local distLabel = Instance.new('TextLabel')
-			distLabel.Size = UDim2.fromOffset(100, 20)
-			distLabel.Position = UDim2.fromScale(0.5, 0.7)
-			distLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-			distLabel.BackgroundTransparency = 1
-			distLabel.Text = '0m'
-			distLabel.TextSize = DistanceTextSize.Value
-			distLabel.TextColor3 = Color3.fromHSV(DistanceTextColor.Hue, DistanceTextColor.Sat, DistanceTextColor.Value)
-			distLabel.TextStrokeTransparency = DistanceTextOutline.Enabled and 0 or 1
-			distLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-			distLabel.Font = Enum.Font.SourceSansBold
-			distLabel.Visible = false
-			distLabel.Parent = EntityArrow
-			DistanceLabels[ent] = distLabel
-		end
 	end
 	
 	local function Removed(ent)
@@ -4462,7 +4416,6 @@ run(function()
 				setthreadidentity(8)
 			end
 			Reference[ent] = nil
-			DistanceLabels[ent] = nil
 			v:Destroy()
 		end
 	end
@@ -4474,62 +4427,22 @@ run(function()
 		end
 	end
 	
-	local function Loop(dt)
-		pulseTime = pulseTime + dt
-		local pulseScale = 1
-		if PulseEffect.Enabled then
-			local pulseProgress = (math.sin(pulseTime * PulseSpeed.Value * math.pi * 2) + 1) / 2
-			pulseScale = PulseMinScale.Value + (PulseMaxScale.Value - PulseMinScale.Value) * pulseProgress
-		end
-		
+	local function Loop()
 		for ent, EntityArrow in Reference do
 			if Distance.Enabled then
 				local distance = entitylib.isAlive and (entitylib.character.RootPart.Position - ent.RootPart.Position).Magnitude or math.huge
 				if distance < DistanceLimit.ValueMin or distance > DistanceLimit.ValueMax then
 					EntityArrow.Visible = false
-					if DistanceLabels[ent] then
-						DistanceLabels[ent].Visible = false
-					end
 					continue
 				end
-				
-				local distanceAlpha = 1
-				if FadeWithDistance.Enabled then
-					distanceAlpha = math.clamp(1 - (distance / MaxFadeDistance.Value), 0.1, 1)
-				end
-				EntityArrow.ImageTransparency = 1 - (ArrowTransparency.Value * distanceAlpha)
-				
-				if ScaleWithDistance.Enabled then
-					local scaleFactor = math.clamp(MinScale.Value / math.max(distance * 0.1, 1), MinScale.Value, MaxScale.Value)
-					EntityArrow.Size = UDim2.fromOffset(256 * ArrowScale.Value * scaleFactor * pulseScale, 256 * ArrowScale.Value * scaleFactor * pulseScale)
-				else
-					EntityArrow.Size = UDim2.fromOffset(256 * ArrowScale.Value * pulseScale, 256 * ArrowScale.Value * pulseScale)
-				end
-				
-				if DistanceLabels[ent] then
-					DistanceLabels[ent].Text = math.floor(distance) .. 'm'
-				end
-			else
-				EntityArrow.Size = UDim2.fromOffset(256 * ArrowScale.Value * pulseScale, 256 * ArrowScale.Value * pulseScale)
 			end
 	
 			local _, rootVis = gameCamera:WorldToScreenPoint(ent.RootPart.Position)
-			if ShowOnlyWhenBehind.Enabled and rootVis then
-				EntityArrow.Visible = false
-				if DistanceLabels[ent] then
-					DistanceLabels[ent].Visible = false
-				end
-				continue
-			end
-			
 			EntityArrow.Visible = not rootVis
-			if DistanceLabels[ent] then
-				DistanceLabels[ent].Visible = not rootVis
-			end
 			if rootVis then continue end
 			
 			local dir = (gameCamera.CFrame:PointToObjectSpace(ent.RootPart.Position) * Vector3.new(1, 0, 1)).Unit
-			EntityArrow.Rotation = math.deg(math.atan2(dir.Z, dir.X)) + ArrowRotationOffset.Value + ArrowYOffset.Value
+			EntityArrow.Rotation = math.deg(math.atan2(dir.Z, dir.X))
 		end
 	end
 	
@@ -4537,7 +4450,6 @@ run(function()
 		Name = 'Arrows',
 		Function = function(callback)
 			if callback then
-				pulseTime = 0
 				Arrows:Clean(entitylib.Events.EntityRemoved:Connect(Removed))
 				for _, v in entitylib.List do
 					if Reference[v] then Removed(v) end
@@ -4552,7 +4464,6 @@ run(function()
 				end))
 				Arrows:Clean(runService.RenderStepped:Connect(Loop))
 			else
-				pulseTime = 0
 				for i in Reference do
 					Removed(i)
 				end
@@ -4602,152 +4513,6 @@ run(function()
 		DefaultMax = 64,
 		Darker = true,
 		Visible = false
-	})
-	ArrowScale = Arrows:CreateSlider({
-		Name = 'Arrow Scale',
-		Min = 0.1,
-		Max = 2,
-		Default = 1,
-		Decimal = 10,
-		Tooltip = 'Base scale multiplier for all arrows'
-	})
-	ArrowTransparency = Arrows:CreateSlider({
-		Name = 'Arrow Opacity',
-		Min = 0,
-		Max = 1,
-		Default = 1,
-		Decimal = 10,
-		Tooltip = 'Base opacity of the arrows'
-	})
-	ArrowStyle = Arrows:CreateDropdown({
-		Name = 'Arrow Style',
-		List = {'Default', 'Solid', 'Minimal'},
-		Default = 'Default',
-		Tooltip = 'Visual style of the arrow'
-	})
-	ArrowRotationOffset = Arrows:CreateSlider({
-		Name = 'Rotation Offset',
-		Min = -180,
-		Max = 180,
-		Default = 0,
-		Tooltip = 'Additional rotation offset for arrows'
-	})
-	ArrowYOffset = Arrows:CreateSlider({
-		Name = 'Y Offset',
-		Min = -100,
-		Max = 100,
-		Default = 0,
-		Tooltip = 'Vertical position offset for arrows'
-	})
-	ShowOnlyWhenBehind = Arrows:CreateToggle({
-		Name = 'Hide When Visible',
-		Default = false,
-		Tooltip = 'Only show arrows when entity is behind you'
-	})
-	MaxArrowsLimit = Arrows:CreateSlider({
-		Name = 'Max Arrows',
-		Min = 1,
-		Max = 50,
-		Default = 50,
-		Tooltip = 'Maximum number of arrows to display'
-	})
-	
-	-- Distance-based features
-	ScaleWithDistance = Arrows:CreateToggle({
-		Name = 'Scale With Distance',
-		Default = false,
-		Tooltip = 'Arrows get smaller as entities get farther away'
-	})
-	MinScale = Arrows:CreateSlider({
-		Name = 'Min Distance Scale',
-		Min = 0.1,
-		Max = 1,
-		Default = 0.3,
-		Decimal = 10,
-		Darker = true,
-		Tooltip = 'Minimum scale when far away'
-	})
-	MaxScale = Arrows:CreateSlider({
-		Name = 'Max Distance Scale',
-		Min = 1,
-		Max = 3,
-		Default = 1.5,
-		Decimal = 10,
-		Darker = true,
-		Tooltip = 'Maximum scale when close'
-	})
-	FadeWithDistance = Arrows:CreateToggle({
-		Name = 'Fade With Distance',
-		Default = false,
-		Tooltip = 'Arrows fade out as entities get farther away'
-	})
-	MaxFadeDistance = Arrows:CreateSlider({
-		Name = 'Fade Distance',
-		Min = 10,
-		Max = 500,
-		Default = 200,
-		Darker = true,
-		Tooltip = 'Distance at which arrows fully fade out'
-	})
-	
-	-- Distance text display
-	ShowDistance = Arrows:CreateToggle({
-		Name = 'Show Distance Text',
-		Default = false,
-		Tooltip = 'Display distance in meters next to arrows'
-	})
-	DistanceTextSize = Arrows:CreateSlider({
-		Name = 'Text Size',
-		Min = 8,
-		Max = 32,
-		Default = 14,
-		Darker = true,
-		Tooltip = 'Size of the distance text'
-	})
-	DistanceTextColor = Arrows:CreateColorSlider({
-		Name = 'Text Color',
-		Darker = true,
-		Tooltip = 'Color of the distance text'
-	})
-	DistanceTextOutline = Arrows:CreateToggle({
-		Name = 'Text Outline',
-		Default = true,
-		Darker = true,
-		Tooltip = 'Add outline to distance text for better visibility'
-	})
-	
-	-- Pulse animation effect
-	PulseEffect = Arrows:CreateToggle({
-		Name = 'Pulse Animation',
-		Default = false,
-		Tooltip = 'Arrows pulse/beat with an animation'
-	})
-	PulseSpeed = Arrows:CreateSlider({
-		Name = 'Pulse Speed',
-		Min = 0.1,
-		Max = 5,
-		Default = 1,
-		Decimal = 10,
-		Darker = true,
-		Tooltip = 'Speed of the pulse animation'
-	})
-	PulseMinScale = Arrows:CreateSlider({
-		Name = 'Pulse Min Scale',
-		Min = 0.5,
-		Max = 1,
-		Default = 0.9,
-		Decimal = 10,
-		Darker = true,
-		Tooltip = 'Minimum scale during pulse'
-	})
-	PulseMaxScale = Arrows:CreateSlider({
-		Name = 'Pulse Max Scale',
-		Min = 1,
-		Max = 2,
-		Default = 1.1,
-		Decimal = 10,
-		Darker = true,
-		Tooltip = 'Maximum scale during pulse'
 	})
 end)
 	
@@ -7861,14 +7626,7 @@ run(function()
 	
 	-- Character disabler function
 	local function characterAdded(char)
-		-- Handle both table (from entitylib) and Instance (Character model)
-		local characterModel = char
-		if typeof(char) == 'table' and char.Character then
-			characterModel = char.Character
-		end
-		if typeof(characterModel) ~= 'Instance' then return end
-		
-		local rootPart = characterModel:FindFirstChild('HumanoidRootPart') or characterModel:FindFirstChild('RootPart')
+		local rootPart = char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('RootPart')
 		if not rootPart then return end
 		
 		-- Hook CFrame changed signals
