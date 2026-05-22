@@ -7509,7 +7509,304 @@ run(function()
 		Function = applyVisualizerStyle
 	})
 end)
+
+run(function()
+	local Desync
+	local Mode
+	local AngleX
+	local AngleY
+	local InvertKey
+	local Visualizer
+	local VisualizerMaterial
+	local VisualizerColor
+	local VisualizerColorToggle
 	
+	-- Desync variables
+	local desyncEnabled = false
+	local inverted = false
+	local anglX = 0
+	local lastjittick = 0
+	local jitflip = false
+	local jitdelay = 0.1
+	local returnthis = nil
+	
+	-- Clone system for visualization
+	local desyncClone
+	local desyncCloneRoot
+	local desyncRealRoot
+	local desyncPartMap = {}
+	local OFFSET = CFrame.new()
+	
+	-- Build part mapping for clone
+	local function buildPartMap(clone, root)
+		local map = {}
+		for _, part in ipairs(clone:GetDescendants()) do
+			if part:IsA("BasePart") and part ~= root then
+				map[part] = root.CFrame:ToObjectSpace(part.CFrame)
+			end
+		end
+		return map
+	end
+	
+	-- Cleanup desync clone
+	local function cleanupDesyncClone()
+		if desyncClone then
+			desyncClone:Destroy()
+		end
+		desyncClone = nil
+		desyncCloneRoot = nil
+		desyncRealRoot = nil
+		desyncPartMap = {}
+	end
+	
+	-- Setup desync clone for visualization
+	local function setupDesyncClone()
+		cleanupDesyncClone()
+		
+		local char = entitylib.character and entitylib.character.Character
+		if not char then return end
+		
+		char.Archivable = true
+		desyncRealRoot = char:FindFirstChild("HumanoidRootPart")
+		if not desyncRealRoot then return end
+		
+		desyncClone = char:Clone()
+		if not desyncClone then return end
+		
+		desyncClone.Name = "DesyncVisualizer"
+		desyncClone.Parent = workspace
+		
+		-- Clean up unnecessary objects
+		for _, obj in ipairs(desyncClone:GetDescendants()) do
+			if obj:IsA("Humanoid")
+			or obj:IsA("Script")
+			or obj:IsA("LocalScript")
+			or obj:IsA("Motor6D")
+			or obj:IsA("Weld")
+			or obj:IsA("Tool")
+			or obj:IsA("WeldConstraint") then
+				obj:Destroy()
+			elseif obj:IsA("BasePart") then
+				obj.Anchored = true
+				obj.CanCollide = false
+				obj.Material = Enum.Material[VisualizerMaterial.Value] or Enum.Material.ForceField
+				obj.Transparency = 0.4
+				
+				-- Apply custom color if enabled
+				if VisualizerColorToggle.Enabled then
+					local color = Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value)
+					obj.Color = color
+				end
+			end
+		end
+		
+		desyncCloneRoot = desyncClone:FindFirstChild("HumanoidRootPart")
+		if not desyncCloneRoot then
+			cleanupDesyncClone()
+			return
+		end
+		
+		desyncClone.PrimaryPart = desyncCloneRoot
+		desyncPartMap = buildPartMap(desyncClone, desyncCloneRoot)
+	end
+	
+	-- Calculate desync yaw
+	local function calculateYaw()
+		if not desyncEnabled then return 0 end
+		
+		local mode = Mode.Value
+		local yaw = 0
+		
+		if mode == "Static" then
+			yaw = inverted and -AngleY.Value or AngleX.Value
+		elseif mode == "Jitter" then
+			local now = os.clock()
+			if now - lastjittick >= jitdelay then
+				jitflip = not jitflip
+				lastjittick = now
+			end
+			yaw = jitflip and AngleX.Value or -AngleY.Value
+		end
+		
+		anglX = yaw
+		return yaw
+	end
+	
+	-- Main desync loop
+	local function onHeartbeat()
+		if not Desync.Enabled then return end
+		
+		local char = entitylib.character and entitylib.character.Character
+		local hum = char and char:FindFirstChild("Humanoid")
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		
+		if not (hum and root) then return end
+		
+		-- Calculate and apply desync
+		if desyncEnabled and hum.Health > 0 then
+			local yaw = calculateYaw()
+			returnthis = root.CFrame
+			
+			-- Apply desync CFrame spoof
+			local spoofCF = root.CFrame
+			spoofCF = spoofCF * CFrame.Angles(0, math.rad(-yaw), 0)
+			root.CFrame = spoofCF
+			
+			-- Restore after a frame
+			RunService.RenderStepped:Wait()
+			root.CFrame = returnthis
+		end
+	end
+	
+	-- Visualizer loop
+	local function onRenderStepped()
+		if not Visualizer.Enabled or not desyncCloneRoot then return end
+		
+		local baseCF = entitylib.character and entitylib.character.RootPart and entitylib.character.RootPart.CFrame
+		if not baseCF then return end
+		
+		local yaw = calculateYaw()
+		local fakeCF = baseCF * OFFSET
+		if typeof(yaw) == "number" then
+			fakeCF = fakeCF * CFrame.Angles(0, math.rad(-yaw), 0)
+		end
+		
+		-- Apply to clone
+		desyncCloneRoot.CFrame = fakeCF
+		for part, relCF in pairs(desyncPartMap) do
+			if part and part.Parent then
+				part.CFrame = fakeCF * relCF
+				part.Anchored = true
+				part.CanCollide = false
+			end
+		end
+	end
+	
+	-- Keybind handler for inverter
+	local function onInputBegan(input, gameProcessed)
+		if gameProcessed then return end
+		if input.KeyCode == InvertKey.Value then
+			inverted = not inverted
+		end
+	end
+	
+	-- Create the module
+	Desync = vape.Categories.Utility:CreateModule({
+		Name = 'Desync',
+		Function = function(callback)
+			if callback then
+				desyncEnabled = true
+				Desync:Clean(RunService.Heartbeat:Connect(onHeartbeat))
+				Desync:Clean(RunService.RenderStepped:Connect(onRenderStepped))
+				Desync:Clean(UserInputService.InputBegan:Connect(onInputBegan))
+				
+				if Visualizer.Enabled then
+					setupDesyncClone()
+				end
+				
+				-- Connect to character changes
+				Desync:Clean(entitylib.Events.LocalAdded:Connect(function()
+					if Visualizer.Enabled then
+						setupDesyncClone()
+					end
+				end))
+			else
+				desyncEnabled = false
+				cleanupDesyncClone()
+			end
+		end,
+		Tooltip = 'Advanced desync with CFrame spoofing and visualizer'
+	})
+	
+	-- Mode selection
+	Mode = Desync:CreateDropdown({
+		Name = 'Mode',
+		List = {'Static', 'Jitter'},
+		Default = 'Static',
+		Tooltip = 'Static - Fixed angle\nJitter - Alternating angles'
+	})
+	
+	-- Angle sliders
+	AngleX = Desync:CreateSlider({
+		Name = 'Angle X',
+		Min = 0,
+		Max = 180,
+		Default = 60,
+		Tooltip = 'Primary desync angle'
+	})
+	
+	AngleY = Desync:CreateSlider({
+		Name = 'Angle Y',
+		Min = 0,
+		Max = 180,
+		Default = 60,
+		Tooltip = 'Secondary/Inverted desync angle'
+	})
+	
+	-- Inverter keybind
+	InvertKey = Desync:CreateBind({
+		Name = 'Invert Key',
+		Default = Enum.KeyCode.F,
+		Tooltip = 'Key to toggle angle inversion'
+	})
+	
+	-- Visualizer toggle
+	Visualizer = Desync:CreateToggle({
+		Name = 'Visualizer',
+		Default = false,
+		Tooltip = 'Show visual representation of desync',
+		Function = function(enabled)
+			if enabled then
+				if Desync.Enabled then
+					setupDesyncClone()
+				end
+			else
+				cleanupDesyncClone()
+			end
+		end
+	})
+	
+	-- Visualizer material
+	VisualizerMaterial = Desync:CreateDropdown({
+		Name = 'Material',
+		List = {'ForceField', 'Neon', 'Glass', 'Plastic'},
+		Default = 'ForceField',
+		Tooltip = 'Material for visualizer clone',
+		Function = function()
+			if Visualizer.Enabled and Desync.Enabled then
+				setupDesyncClone()
+			end
+		end
+	})
+	
+	-- Visualizer color toggle
+	VisualizerColorToggle = Desync:CreateToggle({
+		Name = 'Custom Color',
+		Default = false,
+		Tooltip = 'Use custom color for visualizer'
+	})
+	
+	-- Visualizer color slider
+	VisualizerColor = Desync:CreateColorSlider({
+		Name = 'Color',
+		Visible = false,
+		Darker = true,
+		Function = function()
+			if Visualizer.Enabled and VisualizerColorToggle.Enabled and Desync.Enabled then
+				setupDesyncClone()
+			end
+		end
+	})
+	
+	-- Connect color toggle visibility
+	VisualizerColorToggle.Function = function(enabled)
+		VisualizerColor.Object.Visible = enabled and Visualizer.Enabled
+		if Visualizer.Enabled and Desync.Enabled then
+			setupDesyncClone()
+		end
+	end
+end)
+
 run(function()
 	local ChatSpammer
 	local Lines
