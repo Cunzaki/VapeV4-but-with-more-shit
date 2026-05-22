@@ -1869,6 +1869,7 @@ run(function()
 		})
 
 		if ent then
+			registerShot(ent, ent[targetPart], origin)
 			targetinfo.Targets[ent] = tick() + 1
 			local resolvedPos, jitterDetected, rawPos = nil, false, nil
 			if Resolver.Enabled then
