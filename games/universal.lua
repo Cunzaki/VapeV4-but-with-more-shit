@@ -7596,28 +7596,273 @@ end)
 	
 run(function()
 	local Disabler
+	local Method
+	local AntiKickToggle
+	local AntiBanToggle
 	
+	-- Adonis anticheat detection patterns
+	local adonisPatterns = {
+		'ADONIS',
+		'Adonis',
+		'adonis',
+		'Scyte',
+		'RemoteEvent',
+		'__adonis',
+		'_ADONIS',
+		'GetTable',
+		'Loadstring',
+		'RobloxLocked',
+		'ScriptContext',
+		'LocalScript Detected'
+	}
+	
+	-- Storage for original functions
+	local originalKick
+	local originalDestroy
+	local originalDisconnect
+	local hookedFunctions = {}
+	local antiKickActive = false
+	local antiBanActive = false
+	
+	-- Character disabler function
 	local function characterAdded(char)
-		print('yes')
-		for _, v in getconnections(char.RootPart:GetPropertyChangedSignal('CFrame')) do
-			hookfunction(v.Function, function() end)
+		local rootPart = char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('RootPart')
+		if not rootPart then return end
+		
+		-- Hook CFrame changed signals
+		for _, v in getconnections(rootPart:GetPropertyChangedSignal('CFrame')) do
+			local func = v.Function
+			if func and typeof(func) == 'function' then
+				local success, err = pcall(function()
+					hookfunction(func, function() end)
+				end)
+				if not success then
+					v:Disable()
+				end
+			end
 		end
-		for _, v in getconnections(char.RootPart:GetPropertyChangedSignal('Velocity')) do
-			hookfunction(v.Function, function() end)
+		
+		-- Hook Velocity changed signals
+		for _, v in getconnections(rootPart:GetPropertyChangedSignal('Velocity')) do
+			local func = v.Function
+			if func and typeof(func) == 'function' then
+				local success, err = pcall(function()
+					hookfunction(func, function() end)
+				end)
+				if not success then
+					v:Disable()
+				end
+			end
 		end
+		
+		-- Hook Position changed signals (Adonis uses this)
+		for _, v in getconnections(rootPart:GetPropertyChangedSignal('Position')) do
+			local func = v.Function
+			if func and typeof(func) == 'function' then
+				local success, err = pcall(function()
+					hookfunction(func, function() end)
+				end)
+				if not success then
+					v:Disable()
+				end
+			end
+		end
+	end
+	
+	-- Adonis specific disabler
+	local function disableAdonis()
+		-- Hook RemoteEvent FireServer to block Adonis detection
+		for _, obj in ipairs(game:GetDescendants()) do
+			if obj:IsA('RemoteEvent') and obj.Name:match('ADONIS') or obj.Name:match('Adonis') then
+				local oldFire = obj.FireServer
+				obj.FireServer = function(self, ...)
+					local args = {...}
+					-- Block detection packets
+					if #args > 0 and typeof(args[1]) == 'string' then
+						for _, pattern in ipairs(adonisPatterns) do
+							if args[1]:find(pattern) then
+								return nil
+							end
+						end
+					end
+					return oldFire(self, ...)
+				end
+			end
+		end
+		
+		-- Hook BindableEvent for Adonis internal communication
+		for _, obj in ipairs(game:GetDescendants()) do
+			if obj:IsA('BindableEvent') and obj.Name:match('ADONIS') then
+				local oldFire = obj.Fire
+				obj.Fire = function(self, ...)
+					return nil -- Block internal signals
+				end
+			end
+		end
+		
+		-- Hook Player.Kick
+		if not originalKick then
+			originalKick = hookfunction(lplr.Kick, function(self, reason)
+				if antiKickActive and self == lplr then
+					-- Log the kick attempt but don't kick
+					print('[Disabler] Blocked kick: ' .. tostring(reason))
+					return nil
+				end
+				return originalKick(self, reason)
+			end)
+		end
+	end
+	
+	-- Universal AntiKick
+	local function enableAntiKick()
+		antiKickActive = true
+		
+		-- Hook Player.Kick if not already hooked
+		if not originalKick then
+			local oldKick = lplr.Kick
+			originalKick = function(self, reason)
+				if antiKickActive and self == lplr then
+					print('[Disabler] Blocked kick attempt: ' .. tostring(reason))
+					return nil
+				end
+				return oldKick(self, reason)
+			end
+			
+			-- Use hookfunction if available
+			if hookfunction then
+				local success = pcall(function()
+					hookfunction(lplr.Kick, originalKick)
+				end)
+			end
+		end
+		
+		-- Hook Player.Destroy to prevent forced player destruction
+		if not originalDestroy then
+			local oldDestroy = lplr.Destroy
+			originalDestroy = function(self)
+				if antiKickActive and self == lplr then
+					print('[Disabler] Blocked destroy attempt on LocalPlayer')
+					return nil
+				end
+				return oldDestroy(self)
+			end
+			
+			if hookfunction then
+				pcall(function()
+					hookfunction(lplr.Destroy, originalDestroy)
+				end)
+			end
+		end
+		
+		print('[Disabler] AntiKick enabled')
+	end
+	
+	-- Universal AntiBan
+	local function enableAntiBan()
+		antiBanActive = true
+		
+		-- Hook TeleportService to prevent forced server hops (common ban method)
+		if not hookedFunctions['TeleportService'] then
+			local ts = game:GetService('TeleportService')
+			local oldTeleport = ts.Teleport
+			
+			local newTeleport = function(self, placeId, player, ...)
+				if antiBanActive and player == lplr then
+					-- Check if this looks like a ban teleport
+					local stack = debug and debug.traceback and debug.traceback() or ''
+					if stack:find('ban') or stack:find('Ban') or stack:find('punish') or stack:find('Punish') then
+						print('[Disabler] Blocked ban teleport to place: ' .. tostring(placeId))
+						return nil
+					end
+				end
+				return oldTeleport(self, placeId, player, ...)
+			end
+			
+			if hookfunction then
+				pcall(function()
+					hookfunction(ts.Teleport, newTeleport)
+				end)
+			end
+			
+			hookedFunctions['TeleportService'] = true
+		end
+		
+		-- Hook network client disconnect
+		local networkClient = game:FindFirstChild('NetworkClient')
+		if networkClient and not hookedFunctions['NetworkClient'] then
+			local oldChildRemoved = networkClient.ChildRemoved
+			if hookfunction then
+				pcall(function()
+					hookfunction(networkClient.ChildRemoved, function(child)
+						if antiBanActive then
+							print('[Disabler] Blocked network disconnect')
+							return nil
+						end
+						return oldChildRemoved(child)
+					end)
+				end)
+			end
+			hookedFunctions['NetworkClient'] = true
+		end
+		
+		print('[Disabler] AntiBan enabled')
+	end
+	
+	-- Disable all protections
+	local function disableAll()
+		antiKickActive = false
+		antiBanActive = false
+		print('[Disabler] All protections disabled')
 	end
 	
 	Disabler = vape.Categories.Utility:CreateModule({
 		Name = 'Disabler',
 		Function = function(callback)
 			if callback then
-				Disabler:Clean(entitylib.Events.LocalAdded:Connect(characterAdded))
-				if entitylib.isAlive then
-					characterAdded(entitylib.character)
+				local method = Method and Method.Value or 'Current'
+				
+				if method == 'Current' or method == 'Both' then
+					Disabler:Clean(entitylib.Events.LocalAdded:Connect(characterAdded))
+					if entitylib.isAlive then
+						characterAdded(entitylib.character)
+					end
 				end
+				
+				if method == 'Adonis' or method == 'Both' then
+					disableAdonis()
+				end
+				
+				if AntiKickToggle and AntiKickToggle.Enabled then
+					enableAntiKick()
+				end
+				
+				if AntiBanToggle and AntiBanToggle.Enabled then
+					enableAntiBan()
+				end
+			else
+				disableAll()
 			end
 		end,
-		Tooltip = 'Disables GetPropertyChangedSignal detections for movement'
+		Tooltip = 'Advanced disabler with Adonis support, AntiKick, and AntiBan'
+	})
+	
+	Method = Disabler:CreateDropdown({
+		Name = 'Method',
+		List = {'Current', 'Adonis', 'Both'},
+		Default = 'Current',
+		Tooltip = 'Current - Original disabler method\nAdonis - Target Adonis anticheat specifically\nBoth - Apply both methods'
+	})
+	
+	AntiKickToggle = Disabler:CreateToggle({
+		Name = 'AntiKick',
+		Default = false,
+		Tooltip = 'Blocks all kick attempts from the server'
+	})
+	
+	AntiBanToggle = Disabler:CreateToggle({
+		Name = 'AntiBan',
+		Default = false,
+		Tooltip = 'Blocks ban attempts including forced teleports and network disconnects'
 	})
 end)
 	
