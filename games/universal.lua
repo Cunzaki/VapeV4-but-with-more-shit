@@ -7617,15 +7617,16 @@ run(function()
 		desyncPartMap = buildPartMap(desyncClone, desyncCloneRoot)
 	end
 	
-	-- Calculate desync yaw
-	local function calculateYaw()
-		if not desyncEnabled then return 0 end
+	-- Calculate desync rotation
+	local function calculateRotation()
+		if not desyncEnabled then return CFrame.identity end
 		
 		local mode = Mode.Value
 		local yaw = 0
+		local pitch = AngleX.Value
 		
 		if mode == "Static" then
-			yaw = Invert.Enabled and -AngleY.Value or AngleX.Value
+			yaw = AngleY.Value
 		elseif mode == "Jitter" then
 			local now = os.clock()
 			local delay = 1 / (JitterSpeed.Value * 2)
@@ -7633,7 +7634,7 @@ run(function()
 				jitflip = not jitflip
 				lastjittick = now
 			end
-			yaw = jitflip and AngleX.Value or -AngleY.Value
+			yaw = jitflip and AngleY.Value or -AngleY.Value
 		elseif mode == "Spin" then
 			spinAngle = (spinAngle + SpinSpeed.Value) % 360
 			yaw = spinAngle
@@ -7647,10 +7648,16 @@ run(function()
 			yaw = anglX
 		end
 		
-		if mode ~= "Random" then
-			anglX = yaw
+		-- Combine Pitch (X) and Yaw (Y)
+		local rot = CFrame.Angles(math.rad(pitch), math.rad(yaw), 0)
+		
+		-- Apply 180 flip if Invert is enabled
+		if Invert.Enabled then
+			rot = rot * CFrame.Angles(math.rad(180), 0, 0)
 		end
-		return yaw
+		
+		anglX = yaw -- Store last yaw for visualizer
+		return rot
 	end
 	
 	-- Main desync loop
@@ -7665,13 +7672,11 @@ run(function()
 		
 		-- Calculate and apply desync
 		if desyncEnabled and hum.Health > 0 then
-			local yaw = calculateYaw()
+			local rot = calculateRotation()
 			returnthis = root.CFrame
 			
 			-- Apply desync CFrame spoof
-			local spoofCF = root.CFrame
-			spoofCF = spoofCF * CFrame.Angles(0, math.rad(-yaw), 0)
-			root.CFrame = spoofCF
+			root.CFrame = root.CFrame * rot
 			
 			-- Restore after a frame
 			RunService.RenderStepped:Wait()
@@ -7686,11 +7691,9 @@ run(function()
 		local baseCF = entitylib.character and entitylib.character.RootPart and entitylib.character.RootPart.CFrame
 		if not baseCF then return end
 		
-		local yaw = anglX -- Use the last calculated angle
-		local fakeCF = baseCF * OFFSET
-		if typeof(yaw) == "number" then
-			fakeCF = fakeCF * CFrame.Angles(0, math.rad(-yaw), 0)
-		end
+		-- Re-calculate rotation for smooth visualization
+		local rot = calculateRotation()
+		local fakeCF = baseCF * rot
 		
 		-- Apply to clone
 		desyncCloneRoot.CFrame = fakeCF
@@ -7737,9 +7740,9 @@ run(function()
 		Default = 'Static',
 		Tooltip = 'Static - Fixed angle\nJitter - Alternating angles\nSpin - Rotating angle\nRandom - Randomized angle',
 		Function = function(val)
-			AngleX.Object.Visible = (val == 'Static' or val == 'Jitter')
+			AngleX.Object.Visible = true
 			AngleY.Object.Visible = (val == 'Static' or val == 'Jitter')
-			Invert.Object.Visible = (val == 'Static')
+			Invert.Object.Visible = true
 			JitterSpeed.Object.Visible = (val == 'Jitter' or val == 'Random')
 			SpinSpeed.Object.Visible = (val == 'Spin')
 			RandomMin.Object.Visible = (val == 'Random')
@@ -7749,19 +7752,19 @@ run(function()
 	
 	-- Angle sliders
 	AngleX = Desync:CreateSlider({
-		Name = 'Angle X',
+		Name = 'Pitch (Angle X)',
 		Min = 0,
 		Max = 180,
-		Default = 60,
-		Tooltip = 'Primary desync angle'
+		Default = 0,
+		Tooltip = 'Vertical desync angle (tilts character)'
 	})
 	
 	AngleY = Desync:CreateSlider({
-		Name = 'Angle Y',
+		Name = 'Yaw (Angle Y)',
 		Min = 0,
 		Max = 180,
 		Default = 60,
-		Tooltip = 'Secondary/Inverted desync angle'
+		Tooltip = 'Horizontal desync angle (rotates character)'
 	})
 	
 	-- Speed sliders
