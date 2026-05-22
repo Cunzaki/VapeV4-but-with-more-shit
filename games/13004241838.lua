@@ -12,113 +12,146 @@ end
 
 local minigames = vape.Categories.Minigames
 
--- First: Comprehensive, stealthy anticheat bypass
-local bypassActive = false
-local originalFindFirstChild = nil
-local originalGetRealPhysicsFPS = nil
-local originalNamecall = nil
-local savedEnv = nil
+-- 1. First: Adonis Bypass using user's method
+local function BypassAdonis()
+    local getinfo = getinfo or debug.getinfo
+    local DEBUG = false
+    local Hooked = {}
+    local Detected, Kill
+
+    -- Set thread identity to access internal tables (if supported)
+    pcall(function() setthreadidentity(2) end)
+
+    -- Scan Garbage Collection for the Adonis Client Table
+    for i, v in pairs(getgc(true)) do
+        if typeof(v) == "table" then
+            local DetectFunc = rawget(v, "Detected")
+            local KillFunc = rawget(v, "Kill")
+            local RemoteSend = rawget(v, "Send")
+
+            -- Hook the 'Detected' function (Reporting)
+            if typeof(DetectFunc) == "function" and not Detected then
+                Detected = DetectFunc
+                local Old
+                Old = hookfunction(Detected, function(Action, Info, NoCrash)
+                    if Action ~= "_" and DEBUG then
+                        -- print("Blocked detection:", Action)
+                    end
+                    return true
+                end)
+                table.insert(Hooked, { Detected, Old })
+            end
+
+            -- Hook the 'Kill' function (The Kick/Crash mechanism)
+            if typeof(KillFunc) == "function" and not Kill then
+                Kill = KillFunc
+                local Old
+                Old = hookfunction(Kill, function(Info)
+                    if DEBUG then
+                        -- print("Blocked kill:", Info)
+                    end
+                end)
+                table.insert(Hooked, { Kill, Old })
+            end
+
+            -- Also hook Remote.Send if available
+            if typeof(RemoteSend) == "function" and v.Remote then
+                local OldSend
+                OldSend = hookfunction(RemoteSend, function(p1, ...)
+                    if p1 == "Detected" or p1 == "LogError" or p1 == "Log" then
+                        return nil
+                    end
+                    return OldSend(p1, ...)
+                end)
+                table.insert(Hooked, { RemoteSend, OldSend })
+            end
+        end
+    end
+
+    -- Hook debug.info to bypass integrity checks
+    if debug and debug.info then
+        local OldInfo
+        OldInfo = hookfunction(debug.info, newcclosure(function(...)
+            local LevelOrFunc, Info = ...
+            if Detected and LevelOrFunc == Detected then
+                return coroutine.yield(coroutine.running())
+            end
+            return OldInfo(...)
+        end))
+        table.insert(Hooked, { debug.info, OldInfo })
+    end
+
+    -- Also block remote traffic
+    local originalNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local args = {...}
+        local method = getnamecallmethod()
+        if not checkcaller() and (method == "FireServer" or method == "InvokeServer") then
+            if typeof(args[1]) == "table" and args[1].Mode and args[1].Sent and args[1].Received then
+                return nil
+            end
+        end
+        return originalNamecall(self, ...)
+    end)
+    table.insert(Hooked, { "__namecall", originalNamecall })
+
+    -- And block speed checks
+    if workspace.GetRealPhysicsFPS then
+        local oldFPS = hookinstancemethod(workspace, "GetRealPhysicsFPS", function()
+            return 60
+        end)
+        table.insert(Hooked, { "GetRealPhysicsFPS", oldFPS })
+    end
+
+    -- And block exploit object detection
+    local oldFFC = hookinstancemethod(game, "FindFirstChild", function(self, name, recursive)
+        if not checkcaller() and recursive then
+            if name:find("Spy") or name:find("Exploit") or name:find("Dumper") then
+                return nil
+            end
+        end
+        return oldFFC(self, name, recursive)
+    end)
+    table.insert(Hooked, { "FindFirstChild", oldFFC })
+
+    pcall(function() setthreadidentity(7) end)
+
+    -- Return cleanup function
+    return function()
+        for _, h in ipairs(Hooked) do
+            if h[1] == "__namecall" then
+                hookmetamethod(game, "__namecall", h[2])
+            elseif typeof(h[1]) == "function" and h[2] then
+                hookfunction(h[1], h[2])
+            elseif h[1] == "GetRealPhysicsFPS" then
+                hookinstancemethod(workspace, "GetRealPhysicsFPS", h[2])
+            elseif h[1] == "FindFirstChild" then
+                hookinstancemethod(game, "FindFirstChild", h[2])
+            end
+        end
+    end
+end
 
 minigames:CreateModule({
     Name = 'Anticheat Bypass',
     Function = function(enabled)
-        if enabled and not bypassActive then
-            bypassActive = true
-            
-            -- 1. Hook FindFirstChild to hide exploit objects
-            originalFindFirstChild = hookinstancemethod(game, "FindFirstChild", function(self, name, recursive)
-                if not checkcaller() and recursive then
-                    if name == "SentinelSpy"
-                    or name == "ScriptDumper"
-                    or name == "SimpleSpy"
-                    or name == "SimpleSpyV2"
-                    or name == "SimpleSpyV3"
-                    or name:find("Spy")
-                    or name:find("Exploit") then
-                        return nil
-                    end
-                end
-                return originalFindFirstChild(self, name, recursive)
-            end)
-            
-            -- 2. Hook GetRealPhysicsFPS for speed check bypass
-            originalGetRealPhysicsFPS = hookinstancemethod(workspace, "GetRealPhysicsFPS", function(self)
-                return 60
-            end)
-            
-            -- 3. Hook __namecall to block all Adonis remote traffic
-            originalNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-                local args = {...}
-                local method = getnamecallmethod()
-                
-                if not checkcaller() and (method == "FireServer" or method == "InvokeServer") then
-                    -- Block Adonis-style remote packets
-                    if typeof(args[1]) == "table" and args[1].Mode and args[1].Sent and args[1].Received then
-                        return nil
-                    end
-                end
-                
-                return originalNamecall(self, ...)
-            end)
-            
-            -- 4. Try to hook the Adonis client table if it exists
-            task.spawn(function()
-                for _, v in pairs(getgc(true)) do
-                    if type(v) == "table" and rawget(v, "Anti") and rawget(v, "Remote") and rawget(v, "Core") then
-                        -- Found Adonis!
-                        if v.Anti.Detected then
-                            local oldDetect = v.Anti.Detected
-                            v.Anti.Detected = function(...)
-                                return true
-                            end
-                        end
-                        if v.Disconnect then
-                            local oldDisc = v.Disconnect
-                            v.Disconnect = function() end
-                        end
-                        if v.Kill then
-                            local oldKill = v.Kill
-                            v.Kill = function() end
-                        end
-                        if v.Remote.Send then
-                            local oldSend = v.Remote.Send
-                            v.Remote.Send = function(p1, ...)
-                                if p1 == "Detected" or p1 == "LogError" or p1 == "Log" then
-                                    return
-                                end
-                                return oldSend(p1, ...)
-                            end
-                        end
-                        break
-                    end
-                end
-            end)
-            
-            return function()
-                bypassActive = false
-                hookinstancemethod(game, "FindFirstChild", originalFindFirstChild)
-                hookinstancemethod(workspace, "GetRealPhysicsFPS", originalGetRealPhysicsFPS)
-                hookmetamethod(game, "__namecall", originalNamecall)
-            end
+        if enabled then
+            return BypassAdonis()
         end
     end,
-    Tooltip = 'Comprehensive bypass for Adonis anticheat.'
+    Tooltip = 'Comprehensive Adonis bypass using GC scanning.'
 })
 
--- Fast-updating team check
+-- 2. Fast-updating team check
 local origGetColor = entitylib.getEntityColor
 local origTargetCheck = entitylib.targetCheck
-local lastUpdate = 0
 
 minigames:CreateModule({
     Name = 'Team Check',
     Function = function(enabled)
         if enabled then
-            -- Fast update loop for colors
-            local conn = game:GetService('RunService').Heartbeat:Connect(function()
-                lastUpdate = tick()
-            end)
-            
+            -- Fast update every frame
+            local conn = game:GetService('RunService').Heartbeat:Connect(function() end)
+
             entitylib.getEntityColor = function(ent)
                 if ent.Player and ent.Player.Character then
                     local torso = ent.Player.Character:FindFirstChild("Torso") or ent.Player.Character:FindFirstChild("UpperTorso")
@@ -128,18 +161,18 @@ minigames:CreateModule({
                 end
                 return origGetColor(ent)
             end
-            
+
             entitylib.targetCheck = function(ent)
-                -- Check forcefield first
+                -- Check forcefield
                 if ent.Player and ent.Player.Character and ent.Player.Character:FindFirstChild("ForceField") then
                     return false
                 end
-                
+
                 -- Check team color
                 if lplr.Character and ent.Player and ent.Player.Character then
                     local myTorso = lplr.Character:FindFirstChild("Torso") or lplr.Character:FindFirstChild("UpperTorso")
                     local theirTorso = ent.Player.Character:FindFirstChild("Torso") or ent.Player.Character:FindFirstChild("UpperTorso")
-                    
+
                     if myTorso and theirTorso then
                         local t = 0.2
                         local mc = myTorso.Color
@@ -149,11 +182,10 @@ minigames:CreateModule({
                         end
                     end
                 end
-                
-                -- Fallback
+
                 return origTargetCheck(ent)
             end
-            
+
             return function()
                 conn:Disconnect()
                 entitylib.getEntityColor = origGetColor
@@ -161,10 +193,10 @@ minigames:CreateModule({
             end
         end
     end,
-    Tooltip = 'Fast-updating team check with forcefield support.'
+    Tooltip = 'Fast-updating team/forcefield check.'
 })
 
--- Stealthy gun exploits
+-- 3. Stealthy gun exploits
 minigames:CreateModule({
     Name = 'Gun Exploits',
     Function = function(enabled)
@@ -172,17 +204,17 @@ minigames:CreateModule({
             local activeGuns = {}
             local ammoConns = {}
             local childConns = {}
-            
+
             local function hookGun(gun)
                 if not gun or activeGuns[gun] then return end
                 local setts = gun:FindFirstChild("settings")
                 if not setts then return end
-                
+
                 local s, r = pcall(function()
                     local ret = require(setts)
                     if not ret or not ret.returnclientcopy then return nil end
                     local origCopy = ret.returnclientcopy
-                    
+
                     activeGuns[gun] = {
                         ret = ret,
                         origCopy = origCopy,
@@ -192,14 +224,14 @@ minigames:CreateModule({
                         origRecoil = ret.gun_data and ret.gun_data.cam_recoil or 0,
                         origMaxAmmo = ret.gun_data and ret.gun_data.maxammo or 30
                     }
-                    
+
                     if ret.gun_data then
                         ret.gun_data.cooldown = 0.001
                         ret.gun_data.SpreadX = 0
                         ret.gun_data.SpreadY = 0
                         ret.gun_data.cam_recoil = 0
                     end
-                    
+
                     ret.returnclientcopy = function(self, k)
                         local d = origCopy(self, k)
                         if k == "gun_data" then
@@ -210,12 +242,12 @@ minigames:CreateModule({
                         end
                         return d
                     end
-                    
+
                     return activeGuns[gun]
                 end)
-                
+
                 if not s or not r then return end
-                
+
                 -- Infinite ammo
                 local ammo = gun:FindFirstChild("ammo")
                 if ammo and ammo:IsA("IntValue") then
@@ -227,7 +259,7 @@ minigames:CreateModule({
                     table.insert(ammoConns, conn)
                 end
             end
-            
+
             -- Hook existing
             for _, t in ipairs(lplr.Backpack:GetChildren()) do
                 if t:IsA("Tool") then hookGun(t) end
@@ -237,20 +269,20 @@ minigames:CreateModule({
                     if t:IsA("Tool") then hookGun(t) end
                 end
             end
-            
+
             -- Hook new
             local bpConn = lplr.Backpack.ChildAdded:Connect(function(child)
                 if child:IsA("Tool") then task.wait(0.1); hookGun(child) end
             end)
             table.insert(childConns, bpConn)
-            
+
             if lplr.Character then
                 local charConn = lplr.Character.ChildAdded:Connect(function(child)
                     if child:IsA("Tool") then task.wait(0.1); hookGun(child) end
                 end)
                 table.insert(childConns, charConn)
             end
-            
+
             local charAddConn = lplr.CharacterAdded:Connect(function(char)
                 local cConn = char.ChildAdded:Connect(function(child)
                     if child:IsA("Tool") then task.wait(0.1); hookGun(child) end
@@ -258,7 +290,7 @@ minigames:CreateModule({
                 table.insert(childConns, cConn)
             end)
             table.insert(childConns, charAddConn)
-            
+
             return function()
                 for gun, d in pairs(activeGuns) do
                     if d.ret and d.ret.gun_data then
