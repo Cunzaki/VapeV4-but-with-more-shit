@@ -7547,11 +7547,53 @@ run(function()
 	local currentRot = CFrame.identity
 	local returnthis = nil
 	
+	-- Camera stabilization
+	local cameraProxy
+	local originalCameraSubject
+	
 	-- Clone system for visualization
 	local desyncClone
 	local desyncCloneRoot
 	local desyncRealRoot
 	local desyncMotorMap = {}
+	
+	-- Cleanup camera proxy
+	local function cleanupCameraProxy()
+		if cameraProxy then
+			cameraProxy:Destroy()
+			cameraProxy = nil
+		end
+		local cam = workspace.CurrentCamera
+		if cam and originalCameraSubject then
+			cam.CameraSubject = originalCameraSubject
+			originalCameraSubject = nil
+		end
+	end
+	
+	-- Setup camera proxy
+	local function setupCameraProxy()
+		cleanupCameraProxy()
+		
+		local cam = workspace.CurrentCamera
+		if not cam then return end
+		
+		local char = entitylib.character and entitylib.character.Character
+		local hum = char and char:FindFirstChild("Humanoid")
+		if not hum then return end
+		
+		originalCameraSubject = cam.CameraSubject
+		
+		cameraProxy = Instance.new("Part")
+		cameraProxy.Name = "VapeDesyncCameraProxy"
+		cameraProxy.Transparency = 1
+		cameraProxy.CanCollide = false
+		cameraProxy.CanQuery = false
+		cameraProxy.Anchored = true
+		cameraProxy.Size = Vector3.new(1, 1, 1)
+		cameraProxy.Parent = workspace
+		
+		cam.CameraSubject = cameraProxy
+	end
 	
 	-- Cleanup desync clone
 	local function cleanupDesyncClone()
@@ -7716,6 +7758,15 @@ run(function()
 	
 	-- Visualizer loop
 	local function onRenderStepped()
+		local char = entitylib.character and entitylib.character.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		if not root then return end
+		
+		-- Stabilize camera proxy position
+		if cameraProxy then
+			cameraProxy.CFrame = (returnthis or root.CFrame) * CFrame.new(0, 1.5, 0)
+		end
+		
 		if not Visualizer.Enabled or not desyncCloneRoot then return end
 		
 		local baseCF = entitylib.character and entitylib.character.RootPart and entitylib.character.RootPart.CFrame
@@ -7756,6 +7807,7 @@ run(function()
 		Function = function(callback)
 			if callback then
 				desyncEnabled = true
+				setupCameraProxy()
 				Desync:Clean(RunService.Heartbeat:Connect(onHeartbeat))
 				Desync:Clean(RunService.RenderStepped:Connect(onRenderStepped))
 				
@@ -7765,12 +7817,14 @@ run(function()
 				
 				-- Connect to character changes
 				Desync:Clean(entitylib.Events.LocalAdded:Connect(function()
+					setupCameraProxy()
 					if Visualizer.Enabled then
 						setupDesyncClone()
 					end
 				end))
 			else
 				desyncEnabled = false
+				cleanupCameraProxy()
 				cleanupDesyncClone()
 			end
 		end,
