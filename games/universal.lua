@@ -7309,7 +7309,7 @@ run(function()
 		local customColor = Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value)
 		for _, d in visualClone:GetDescendants() do
 			if d:IsA('BasePart') then
-				d.Anchored = true
+				d.Anchored = (d.Name == 'HumanoidRootPart')
 				d.CanCollide = false
 				d.CanTouch = false
 				d.CanQuery = false
@@ -7370,16 +7370,24 @@ run(function()
 			clone.PrimaryPart = torso
 		end
 
+		-- FIRST: Disable ALL collisions BEFORE parenting
 		for _, part in clone:GetDescendants() do
 			if part:IsA('BasePart') then
 				part.CanCollide = false
 				part.CanTouch = false
 				part.CanQuery = false
+				part.Anchored = (part.Name == 'HumanoidRootPart')
+				part.Massless = true
+				part.CastShadow = false
+			elseif part:IsA('Weld') or part:IsA('WeldConstraint') or part:IsA('Humanoid') then
+				part:Destroy()
 			end
 		end
 
 		visualClone = clone
 		applyVisualizerStyle()
+
+		-- Parent to workspace ONLY after all physics are disabled
 		clone.Parent = workspace
 
 		local charRoot = entitylib.character.RootPart
@@ -7395,16 +7403,6 @@ run(function()
 		-- Apply desync rotation if active
 		if currentDesyncRotation ~= CFrame.identity then
 			visualServerCFrame = visualServerCFrame * currentDesyncRotation
-		end
-
-		-- Final collision disable just to be safe
-		for _, part in ipairs(clone:GetDescendants()) do
-			if part:IsA('BasePart') then
-				part.CanCollide = false
-				part.CanTouch = false
-				part.CanQuery = false
-				part.Anchored = true
-			end
 		end
 
 		clone:PivotTo(visualServerCFrame)
@@ -7479,16 +7477,6 @@ run(function()
 								finalCF = finalCF * currentDesyncRotation
 							end
 							visualClone:PivotTo(finalCF)
-							
-							-- Continuous collision check - every frame disable collisions
-							for _, part in ipairs(visualClone:GetDescendants()) do
-								if part:IsA('BasePart') then
-									part.CanCollide = false
-									part.CanTouch = false
-									part.CanQuery = false
-									part.Anchored = true
-								end
-							end
 						end
 					end
 					wasSending = sendingNow
