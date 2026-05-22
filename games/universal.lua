@@ -7626,6 +7626,11 @@ run(function()
 	
 	-- Character disabler function
 	local function characterAdded(char)
+		-- Validate char is a valid Instance
+		if not char or typeof(char) ~= 'Instance' then
+			return
+		end
+		
 		local rootPart = char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('RootPart')
 		if not rootPart then return end
 		
