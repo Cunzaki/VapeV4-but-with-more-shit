@@ -7521,6 +7521,10 @@ run(function()
 	local VisualizerColor
 	local VisualizerColorToggle
 	
+	-- Get RunService
+	local RunService = game:GetService('RunService')
+	local UserInputService = game:GetService('UserInputService')
+	
 	-- Desync variables
 	local desyncEnabled = false
 	local inverted = false
