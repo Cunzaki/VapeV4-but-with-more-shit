@@ -46,10 +46,10 @@ anticheatBypass = minigames:CreateModule({
     Name = 'Anticheat Bypass',
     Function = function(callback)
         if callback then
-            -- 1. Hook FindFirstChild for recursive malicious object checks
+            -- 1. Hook FindFirstChild more broadly
             local oldFFC
             oldFFC = hookinstancemethod(game, "FindFirstChild", function(self, name, recursive)
-                if recursive and (name == "SentinelSpy" or name == "ScriptDumper" or name == "SimpleSpy") then
+                if not checkcaller() and recursive and (name == "SentinelSpy" or name == "ScriptDumper" or name == "SimpleSpy" or name == "SimpleSpyV2" or name == "SimpleSpyV3") then
                     return nil
                 end
                 return oldFFC(self, name, recursive)
@@ -61,20 +61,79 @@ anticheatBypass = minigames:CreateModule({
                 return 60
             end)
             
-            -- 3. Hook RemoteEvent for "Detected" reports
+            -- 3. Advanced Remote Hooking
             local oldNamecall
             oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                 local args = {...}
                 local method = getnamecallmethod()
-                if not checkcaller() and method == "FireServer" and self.Parent == jointsService then
-                    if typeof(args[1]) == "table" and args[1].Mode == "Fire" then
-                        -- Adonis usually sends "Detected" as the command name.
-                        -- Since it's encrypted, we block all "Fire" calls from these scripts to be safe.
-                        return nil
+                
+                if not checkcaller() and (method == "FireServer" or method == "InvokeServer") then
+                    -- Detect Adonis Remote Pattern
+                    if typeof(args[1]) == "table" and args[1].Mode and args[1].Sent and args[1].Received then
+                        -- We can't easily decrypt the second argument without the key, 
+                        -- but we can block suspicious calls or block all "Fire" calls if they are not heartbeat
+                        
+                        -- If it's a "Fire" mode call, it's likely a command or detection
+                        if args[1].Mode == "Fire" then
+                            -- Heartbeats usually happen every 55+ seconds. 
+                            -- Detections happen immediately.
+                            -- For now, let's block all "Fire" calls that look like Adonis reports.
+                            return nil
+                        end
                     end
                 end
                 return oldNamecall(self, ...)
             end)
+            
+            -- 4. Try to find and hook Adonis client table via GC
+             task.spawn(function()
+                 for _, v in pairs(getgc(true)) do
+                     if type(v) == "table" and rawget(v, "Remote") and rawget(v, "Anti") and rawget(v, "Core") then
+                         -- Found Adonis client table!
+                         local oldSend = v.Remote.Send
+                         v.Remote.Send = function(p1, ...)
+                             if p1 == "Detected" or p1 == "LogError" or p1 == "Log" then
+                                 return nil
+                             end
+                             return oldSend(p1, ...)
+                         end
+                         
+                         -- Hook the detection reporter directly in the Anti table
+                          if v.Anti and v.Anti.Detected then
+                              local oldDetected = v.Anti.Detected
+                              v.Anti.Detected = function(p1, p2, p3)
+                                  if p1 == "_" then return oldDetected(p1, p2, p3) end
+                                  return true
+                              end
+                              anticheatBypass:Clean(function()
+                                  v.Anti.Detected = oldDetected
+                              end)
+                          end
+
+                          -- Hook Disconnect and Kill to prevent local kicks/crashes
+                          if v.Disconnect then
+                              local oldDisconnect = v.Disconnect
+                              v.Disconnect = function(...) return nil end
+                              anticheatBypass:Clean(function()
+                                  v.Disconnect = oldDisconnect
+                              end)
+                          end
+
+                          if v.Kill then
+                              local oldKill = v.Kill
+                              v.Kill = function(...) return nil end
+                              anticheatBypass:Clean(function()
+                                  v.Kill = oldKill
+                              end)
+                          end
+
+                          anticheatBypass:Clean(function()
+                              v.Remote.Send = oldSend
+                          end)
+                         break
+                     end
+                 end
+             end)
             
             anticheatBypass:Clean(function()
                 hookinstancemethod(game, "FindFirstChild", oldFFC)
