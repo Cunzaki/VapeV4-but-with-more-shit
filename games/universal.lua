@@ -374,7 +374,7 @@ run(function()
 	entitylib.getupdatedconnections = entitylib.getUpdateConnections
 
 	entitylib.targetCheck = function(ent)
-		if vape.Categories.Main.Options['Health check'].Enabled and ent.Health <= 0 then
+		if ent.Health <= 0 then
 			return false
 		end
 		if ent.NPC then return true end
@@ -4568,6 +4568,7 @@ run(function()
 		if not Targets.Players.Enabled and ent.Player then return end
 		if not Targets.NPCs.Enabled and ent.NPC then return end
 		if Teammates.Enabled and (not ent.Targetable) and (not ent.Friend) then return end
+		if ent.Health <= 0 then return end
 		if vape.ThreadFix then
 			setthreadidentity(8)
 		end
@@ -4631,6 +4632,17 @@ run(function()
 						Removed(ent)
 					end
 					Added(ent)
+				end))
+				Chams:Clean(entitylib.Events.EntityUpdated:Connect(function(ent)
+					if ent.Health <= 0 then
+						if Reference[ent] then
+							Removed(ent)
+						end
+					else
+						if not Reference[ent] then
+							Added(ent)
+						end
+					end
 				end))
 				Chams:Clean(vape.Categories.Friends.ColorUpdate.Event:Connect(function()
 					for i, v in Reference do
