@@ -9231,6 +9231,9 @@ run(function()
 					return murderer == ent and Color3.new(1, 0.3, 0.3) or sheriff == ent and Color3.new(0, 0.5, 1) or nil
 				end
 				entitylib.targetCheck = function(ent)
+					if ent.Health <= 0 then
+						return false
+					end
 					if ent.Player and isFriend(ent.Player) then return false end
 					if murderer == lplr then return true end
 					return murderer == ent.Player or sheriff == ent.Player
