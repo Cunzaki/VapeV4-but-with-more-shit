@@ -8767,6 +8767,100 @@ run(function()
 		end
 	})
 end)
+
+run(function()
+	local PurchaseFaker
+	local ProductIDBox
+
+	PurchaseFaker = vape.Categories.Utility:CreateModule({
+		Name = 'PurchaseFaker',
+		Function = function(callback)
+			if callback then
+				PurchaseFaker:Clean(marketplaceService.PromptProductPurchaseFinished:Connect(function(player, purchasedId, wasPurchased)
+					print('Hook triggered for product:', purchasedId)
+					print('Player:', player)
+					print('WasPurchased:', wasPurchased)
+					notif('PurchaseFaker', 'Product purchase: ' .. tostring(purchasedId), 5)
+				end))
+				PurchaseFaker:Clean(marketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, purchasedId, wasPurchased)
+					print('Hook triggered for gamepass:', purchasedId)
+					print('Player:', player)
+					print('WasPurchased:', wasPurchased)
+					notif('PurchaseFaker', 'Gamepass purchase: ' .. tostring(purchasedId), 5)
+				end))
+				PurchaseFaker:Clean(marketplaceService.PromptBulkPurchaseFinished:Connect(function(player, purchasedId, wasPurchased)
+					print('Hook triggered for bulk purchase:', purchasedId)
+					print('Player:', player)
+					print('WasPurchased:', wasPurchased)
+					notif('PurchaseFaker', 'Bulk purchase: ' .. tostring(purchasedId), 5)
+				end))
+				PurchaseFaker:Clean(marketplaceService.PromptPurchaseFinished:Connect(function(player, purchasedId, wasPurchased)
+					print('Hook triggered for purchase:', purchasedId)
+					print('Player:', player)
+					print('WasPurchased:', wasPurchased)
+					notif('PurchaseFaker', 'Purchase: ' .. tostring(purchasedId), 5)
+				end))
+			end
+		end,
+		Tooltip = 'Fakes product purchases and listens to real purchase events'
+	})
+	ProductIDBox = PurchaseFaker:CreateTextBox({
+		Name = 'Product ID',
+		Placeholder = 'Enter Product ID',
+	})
+	PurchaseFaker:CreateButton({
+		Name = 'Signal Product',
+		Function = function()
+			local productID = tonumber(ProductIDBox.Value)
+			if not productID then
+				notif('PurchaseFaker', 'Invalid Product ID', 5, 'warning')
+				return
+			end
+			print('Falsely Bought product:', productID)
+			marketplaceService:SignalPromptProductPurchaseFinished(lplr.UserId, productID, true)
+			notif('PurchaseFaker', 'Signaled product purchase: ' .. tostring(productID), 5)
+		end
+	})
+	PurchaseFaker:CreateButton({
+		Name = 'Signal Gamepass',
+		Function = function()
+			local productID = tonumber(ProductIDBox.Value)
+			if not productID then
+				notif('PurchaseFaker', 'Invalid Product ID', 5, 'warning')
+				return
+			end
+			print('Falsely Bought gamepass:', productID)
+			marketplaceService:SignalPromptGamePassPurchaseFinished(lplr, productID, true)
+			notif('PurchaseFaker', 'Signaled gamepass purchase: ' .. tostring(productID), 5)
+		end
+	})
+	PurchaseFaker:CreateButton({
+		Name = 'Signal Bulk',
+		Function = function()
+			local productID = tonumber(ProductIDBox.Value)
+			if not productID then
+				notif('PurchaseFaker', 'Invalid Product ID', 5, 'warning')
+				return
+			end
+			print('Falsely Bought bulk:', productID)
+			marketplaceService:SignalPromptBulkPurchaseFinished(lplr.UserId, productID, true)
+			notif('PurchaseFaker', 'Signaled bulk purchase: ' .. tostring(productID), 5)
+		end
+	})
+	PurchaseFaker:CreateButton({
+		Name = 'Signal Purchase',
+		Function = function()
+			local productID = tonumber(ProductIDBox.Value)
+			if not productID then
+				notif('PurchaseFaker', 'Invalid Product ID', 5, 'warning')
+				return
+			end
+			print('Falsely Bought purchase:', productID)
+			marketplaceService:SignalPromptPurchaseFinished(lplr.UserId, productID, true)
+			notif('PurchaseFaker', 'Signaled purchase: ' .. tostring(productID), 5)
+		end
+	})
+end)
 	
 run(function()
 	local StaffDetector
