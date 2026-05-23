@@ -116,7 +116,7 @@ local function healthCheckEnabled()
 end
 
 entitylib.targetCheck = function(ent)
-	if healthCheckEnabled() and ent.Health <= 0 then
+	if ent.Health <= 0 then
 		return false
 	end
 	if ent.TeamCheck then
@@ -168,7 +168,7 @@ local function hasInvincibility(ent)
 end
 
 entitylib.isVulnerable = function(ent, forcefieldCheck)
-	if healthCheckEnabled() and ent.Health <= 0 then
+	if ent.Health <= 0 then
 		return false
 	end
 	if forcefieldCheck == false then
