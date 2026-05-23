@@ -8771,11 +8771,22 @@ end)
 run(function()
 	local PurchaseFaker
 	local ProductIDBox
+	local lastPromptedID
 
 	PurchaseFaker = vape.Categories.Utility:CreateModule({
 		Name = 'PurchaseFaker',
 		Function = function(callback)
 			if callback then
+				PurchaseFaker:Clean(marketplaceService.PromptGamePassPurchase:Connect(function(player, gamePassId)
+					lastPromptedID = gamePassId
+					print('Gamepass prompted:', gamePassId)
+					notif('PurchaseFaker', 'Gamepass prompted: ' .. tostring(gamePassId), 5)
+				end))
+				PurchaseFaker:Clean(marketplaceService.PromptProductPurchase:Connect(function(player, productId)
+					lastPromptedID = productId
+					print('Product prompted:', productId)
+					notif('PurchaseFaker', 'Product prompted: ' .. tostring(productId), 5)
+				end))
 				PurchaseFaker:Clean(marketplaceService.PromptProductPurchaseFinished:Connect(function(player, purchasedId, wasPurchased)
 					print('Hook triggered for product:', purchasedId)
 					print('Player:', player)
@@ -8800,6 +8811,8 @@ run(function()
 					print('WasPurchased:', wasPurchased)
 					notif('PurchaseFaker', 'Purchase: ' .. tostring(purchasedId), 5)
 				end))
+			else
+				lastPromptedID = nil
 			end
 		end,
 		Tooltip = 'Fakes product purchases and listens to real purchase events'
@@ -8807,6 +8820,18 @@ run(function()
 	ProductIDBox = PurchaseFaker:CreateTextBox({
 		Name = 'Product ID',
 		Placeholder = 'Enter Product ID',
+	})
+	PurchaseFaker:CreateButton({
+		Name = 'Grab Last Prompted ID',
+		Function = function()
+			if lastPromptedID then
+				ProductIDBox:ChangeValue(tostring(lastPromptedID))
+				setclipboard(tostring(lastPromptedID))
+				notif('PurchaseFaker', 'Last prompted ID (' .. tostring(lastPromptedID) .. ') copied to clipboard and set in text box!', 5)
+			else
+				notif('PurchaseFaker', 'No prompted ID found yet!', 5, 'warning')
+			end
+		end
 	})
 	PurchaseFaker:CreateButton({
 		Name = 'Signal Product',
