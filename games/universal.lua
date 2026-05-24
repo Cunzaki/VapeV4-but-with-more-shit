@@ -4531,9 +4531,10 @@ run(function()
 	local Teammates
 	local Walls
 	local Reference = {}
-	local OriginalProperties = {}
 	local Folder = Instance.new('Folder')
 	Folder.Parent = vape.gui
+	local ViewportGui = nil
+	local ViewportFrame = nil
 	local VisibilityCheck = RaycastParams.new()
 	VisibilityCheck.FilterType = Enum.RaycastFilterType.Exclude
 	VisibilityCheck.RespectCanCollide = true
@@ -4558,10 +4559,53 @@ run(function()
 		local color = getChamColor(ent, fallbackColor)
 		if type(obj) == 'table' then
 			for _, v2 in obj do
-				v2.Color3 = color
+				if v2:IsA('BasePart') then
+					v2.Color = color
+				else
+					v2.Color3 = color
+				end
 			end
-		else
+		elseif obj:IsA('Highlight') then
 			obj.FillColor = color
+		else
+			for _, pair in obj.Parts do
+				if pair.Clone then
+					pair.Clone.Color = color
+				end
+			end
+		end
+	end
+	
+	local function SetupViewport()
+		if ViewportGui then return end
+		ViewportGui = Instance.new('ScreenGui')
+		ViewportGui.Name = 'VapeV4_ViewportChams'
+		ViewportGui.IgnoreGuiInset = true
+		if gethui then
+			ViewportGui.Parent = gethui()
+		elseif syn and syn.protect_gui then
+			syn.protect_gui(ViewportGui)
+			ViewportGui.Parent = coreGui
+		else
+			ViewportGui.Parent = coreGui
+		end
+		
+		ViewportFrame = Instance.new('ViewportFrame')
+		ViewportFrame.Name = 'ChamsViewport'
+		ViewportFrame.Size = UDim2.new(1, 0, 1, 0)
+		ViewportFrame.BackgroundTransparency = 1
+		ViewportFrame.CurrentCamera = gameCamera
+		ViewportFrame.Ambient = Color3.new(1, 1, 1)
+		ViewportFrame.LightColor = Color3.new(1, 1, 1)
+		ViewportFrame.ZIndex = 1
+		ViewportFrame.Parent = ViewportGui
+	end
+	
+	local function CleanupViewport()
+		if ViewportGui then
+			ViewportGui:Destroy()
+			ViewportGui = nil
+			ViewportFrame = nil
 		end
 	end
 	
@@ -4603,22 +4647,40 @@ run(function()
 				end
 			end
 			Reference[ent] = chams
-		elseif Mode.Value == 'Ghost' then
-			local originalProps = {}
-			for _, v in ent.Character:GetChildren() do
-				if v:IsA('BasePart') and (ent.NPC or v.Name:find('Arm') or v.Name:find('Leg') or v.Name:find('Hand') or v.Name:find('Feet') or v.Name:find('Torso') or v.Name == 'Head') then
-					originalProps[v] = {
-						Material = v.Material,
-						Color = v.Color,
-						Transparency = v.Transparency
-					}
-					v.Material = Enum.Material.ForceField
-					v.Color = getChamColor(ent, entitylib.getEntityColor(ent) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value))
-					v.Transparency = FillTransparency.Value
+		elseif Mode.Value == 'Viewport' then
+			SetupViewport()
+			local chamsData = {
+				Parts = {}
+			}
+			for _, v in ent.Character:GetDescendants() do
+				if v:IsA('BasePart') and v.Transparency < 1 and v.Name ~= 'HumanoidRootPart' then
+					local clone = v:Clone()
+					clone.Parent = ViewportFrame
+					clone.Material = Enum.Material.Neon
+					clone.Transparency = FillTransparency.Value
+					clone.CanCollide = false
+					clone.Anchored = true
+					
+					for _, child in pairs(clone:GetChildren()) do
+						if child:IsA('Texture') or child:IsA('Decal') then
+							child:Destroy()
+						elseif child:IsA('SpecialMesh') then
+							child.TextureId = ''
+						end
+					end
+					if clone:IsA('MeshPart') then
+						clone.TextureID = ''
+					end
+					
+					clone.Color = getChamColor(ent, entitylib.getEntityColor(ent) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value))
+					
+					table.insert(chamsData.Parts, {
+						Real = v,
+						Clone = clone
+					})
 				end
 			end
-			OriginalProperties[ent] = originalProps
-			Reference[ent] = true
+			Reference[ent] = chamsData
 		end
 	end
 	
@@ -4627,22 +4689,20 @@ run(function()
 			if vape.ThreadFix then
 				setthreadidentity(8)
 			end
-			if Mode.Value == 'Ghost' or OriginalProperties[ent] then
-				if OriginalProperties[ent] then
-					for part, props in pairs(OriginalProperties[ent]) do
-						if part and part.Parent then
-							part.Material = props.Material
-							part.Color = props.Color
-							part.Transparency = props.Transparency
+			if type(Reference[ent]) == 'table' then
+				if Reference[ent].Parts then
+					for _, pair in Reference[ent].Parts do
+						if pair.Clone then
+							pair.Clone:Destroy()
 						end
 					end
-					OriginalProperties[ent] = nil
+					table.clear(Reference[ent].Parts)
+				else
+					for _, v in Reference[ent] do
+						v:Destroy()
+					end
+					table.clear(Reference[ent])
 				end
-			elseif type(Reference[ent]) == 'table' then
-				for _, v in Reference[ent] do
-					v:Destroy()
-				end
-				table.clear(Reference[ent])
 			else
 				Reference[ent]:Destroy()
 			end
@@ -4675,29 +4735,30 @@ run(function()
 				Chams:Clean(vape.Categories.Friends.ColorUpdate.Event:Connect(function()
 					for i, v in Reference do
 						local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
-						if Mode.Value == 'Ghost' and OriginalProperties[i] then
-							for part in pairs(OriginalProperties[i]) do
-								if part and part.Parent then
-									part.Color = color
-								end
-							end
-						else
-							applyColor(i, v, color)
-						end
+						applyColor(i, v, color)
 					end
 				end))
 				Chams:Clean(runService.RenderStepped:Connect(function()
-					if not VisibleOverride.Enabled then return end
+					if ViewportFrame then
+						ViewportFrame.CurrentCamera = gameCamera
+					end
 					for i, v in Reference do
-						local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
-						if Mode.Value == 'Ghost' and OriginalProperties[i] then
-							for part in pairs(OriginalProperties[i]) do
-								if part and part.Parent then
-									part.Color = color
+						if VisibleOverride.Enabled then
+							local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
+							applyColor(i, v, color)
+						end
+						if type(v) == 'table' and v.Parts then
+							for idx, pair in ipairs(v.Parts) do
+								if pair.Real and pair.Real.Parent then
+									pair.Clone.CFrame = pair.Real.CFrame
+									pair.Clone.Transparency = FillTransparency.Value
+								else
+									if pair.Clone then
+										pair.Clone:Destroy()
+									end
+									table.remove(v.Parts, idx)
 								end
 							end
-						else
-							applyColor(i, v, color)
 						end
 					end
 				end))
@@ -4711,6 +4772,7 @@ run(function()
 				for i in Reference do
 					Removed(i)
 				end
+				CleanupViewport()
 			end
 		end,
 		Tooltip = 'Render players through walls'
@@ -4726,7 +4788,7 @@ run(function()
 		})
 	Mode = Chams:CreateDropdown({
 		Name = 'Mode',
-		List = {'Highlight', 'BoxHandles', 'Ghost'},
+		List = {'Highlight', 'BoxHandles', 'Viewport'},
 		Function = function(val)
 			OutlineColor.Object.Visible = val == 'Highlight'
 			OutlineTransparency.Object.Visible = val == 'Highlight'
@@ -4741,15 +4803,7 @@ run(function()
 		Function = function(hue, sat, val)
 			for i, v in Reference do
 				local color = entitylib.getEntityColor(i) or Color3.fromHSV(hue, sat, val)
-				if Mode.Value == 'Ghost' and OriginalProperties[i] then
-					for part in pairs(OriginalProperties[i]) do
-						if part and part.Parent then
-							part.Color = color
-						end
-					end
-				else
-					applyColor(i, v, color)
-				end
+				applyColor(i, v, color)
 			end
 		end
 	})
@@ -4795,15 +4849,17 @@ run(function()
 		Max = 1,
 		Default = 0.5,
 		Function = function(val)
-			for i, v in Reference do
-				if Mode.Value == 'Ghost' and OriginalProperties[i] then
-					for part in pairs(OriginalProperties[i]) do
-						if part and part.Parent then
-							part.Transparency = val
+			for _, v in Reference do
+				if type(v) == 'table' then
+					if v.Parts then
+						for _, pair in v.Parts do
+							if pair.Clone then
+								pair.Clone.Transparency = val
+							end
 						end
+					else
+						for _, v2 in v do v2.Transparency = val end
 					end
-				elseif type(v) == 'table' then
-					for _, v2 in v do v2.Transparency = val end
 				else
 					v.FillTransparency = val
 				end
@@ -4834,7 +4890,7 @@ run(function()
 					for _, v2 in v do
 						v2.AlwaysOnTop = callback
 					end
-				elseif type(v) ~= 'boolean' then
+				else
 					v.DepthMode = Enum.HighlightDepthMode[callback and 'AlwaysOnTop' or 'Occluded']
 				end
 			end
