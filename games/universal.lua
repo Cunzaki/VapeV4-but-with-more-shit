@@ -4342,6 +4342,7 @@ end)
 
 run(function()
 	local NoJumpCooldown
+	local Connections = {}
 
 	NoJumpCooldown = vape.Categories.Blatant:CreateModule({
 		Name = 'No Jump Cooldown',
@@ -4351,18 +4352,35 @@ run(function()
 					if not char then return end
 					local humanoid = char:FindFirstChildOfClass('Humanoid')
 					if not humanoid then return end
-					
-					if pcall(function() return humanoid.JumpPower end) then
-						humanoid.JumpPower = math.huge
-						humanoid.UseJumpPower = true
-					end
+					local rootPart = char:FindFirstChild('HumanoidRootPart')
+					if not rootPart then return end
+
+					local JumpConn = inputService.JumpRequest:Connect(function()
+						if humanoid and humanoid.Health > 0 and humanoid.Parent == char then
+							humanoid.Jump = true
+							local vel = rootPart.Velocity
+							rootPart.Velocity = Vector3.new(vel.X, (humanoid.JumpPower or 50), vel.Z)
+						end
+					end)
+
+					table.insert(Connections, JumpConn)
 				end
 				
 				if lplr.Character then
 					handleCharacter(lplr.Character)
 				end
 				
-				NoJumpCooldown:Clean(lplr.CharacterAdded:Connect(handleCharacter))
+				local CharAddedConn = lplr.CharacterAdded:Connect(handleCharacter)
+				table.insert(Connections, CharAddedConn)
+				
+				NoJumpCooldown:Clean(function()
+					for _, conn in ipairs(Connections) do
+						if conn then
+							conn:Disconnect()
+						end
+					end
+					table.clear(Connections)
+				end)
 			end
 		end,
 		Tooltip = 'Removes the jump cooldown.'
