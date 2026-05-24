@@ -4351,23 +4351,9 @@ run(function()
 					if not char then return end
 					local humanoid = char:FindFirstChildOfClass('Humanoid')
 					if not humanoid then return end
-					
-					local oldGetStateEnabled = humanoid.GetStateEnabled
-					humanoid.GetStateEnabled = function(self, state)
-						if state == Enum.HumanoidStateType.Jumping then
-							return false
-						end
-						return oldGetStateEnabled(self, state)
-					end
-					
-					local oldGetState = humanoid.GetState
-					humanoid.GetState = function(self)
-						local state = oldGetState(self)
-						if state == Enum.HumanoidStateType.Jumping then
-							return Enum.HumanoidStateType.RunningNoPhysics
-						end
-						return state
-					end
+					pcall(function()
+						humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+					end)
 				end
 				
 				if lplr.Character then
@@ -4378,126 +4364,6 @@ run(function()
 			end
 		end,
 		Tooltip = 'Removes the jump cooldown.'
-	})
-end)
-
-run(function()
-	local InstanceProtection
-	local ProtectedInstances = {}
-	local SpoofedInstances = {}
-	local SpoofedProperties = {}
-	local MethodsToHook = {
-		"FindFirstChild",
-		"FindFirstChildWhichIsA",
-		"FindFirstChildOfClass",
-		"IsA"
-	}
-	local mt = getmetatable(game)
-	local oldIndex, oldNewIndex, oldNamecall
-
-	InstanceProtection = vape.Categories.Blatant:CreateModule({
-		Name = 'Instance Protection',
-		Function = function(callback)
-			if callback then
-				local function isProtected(inst)
-					for _, p in ipairs(ProtectedInstances) do
-						if p == inst or (inst.IsDescendantOf and inst:IsDescendantOf(p)) then
-							return true
-						end
-					end
-					return false
-				end
-
-				local oldGetChildren = game.GetChildren
-				game.GetChildren = function(...)
-					local children = oldGetChildren(...)
-					if not checkcaller then
-						local filtered = {}
-						for _, child in ipairs(children) do
-							if not isProtected(child) then
-								table.insert(filtered, child)
-							end
-						end
-						return filtered
-					end
-					return children
-				end
-
-				local oldGetDescendants = game.GetDescendants
-				game.GetDescendants = function(...)
-					local descendants = oldGetDescendants(...)
-					if not checkcaller then
-						local filtered = {}
-						for _, d in ipairs(descendants) do
-							if not isProtected(d) then
-								table.insert(filtered, d)
-							end
-						end
-						return filtered
-					end
-					return descendants
-				end
-
-				local oldFindFirstChild = game.FindFirstChild
-				game.FindFirstChild = function(...)
-					local result = oldFindFirstChild(...)
-					if not checkcaller and result and isProtected(result) then
-						return nil
-					end
-					return result
-				end
-
-				local oldFindFirstChildOfClass = game.FindFirstChildOfClass
-				game.FindFirstChildOfClass = function(...)
-					local result = oldFindFirstChildOfClass(...)
-					if not checkcaller and result and isProtected(result) then
-						return nil
-					end
-					return result
-				end
-
-				local oldFindFirstChildWhichIsA = game.FindFirstChildWhichIsA
-				game.FindFirstChildWhichIsA = function(...)
-					local result = oldFindFirstChildWhichIsA(...)
-					if not checkcaller and result and isProtected(result) then
-						return nil
-					end
-					return result
-				end
-
-				local oldIsA = game.IsA
-				game.IsA = function(...)
-					local args = {...}
-					if not checkcaller and args[1] and isProtected(args[1]) then
-						return false
-					end
-					return oldIsA(...)
-				end
-
-				local function protectInstance(inst)
-					if not table.find(ProtectedInstances, inst) then
-						table.insert(ProtectedInstances, inst)
-					end
-				end
-
-				if vape.gui then
-					protectInstance(vape.gui)
-				end
-
-				InstanceProtection:Clean(function()
-					game.GetChildren = oldGetChildren
-					game.GetDescendants = oldGetDescendants
-					game.FindFirstChild = oldFindFirstChild
-					game.FindFirstChildOfClass = oldFindFirstChildOfClass
-					game.FindFirstChildWhichIsA = oldFindFirstChildWhichIsA
-					game.IsA = oldIsA
-					table.clear(ProtectedInstances)
-					table.clear(SpoofedInstances)
-					table.clear(SpoofedProperties)
-				end)
-			end
-		end,
-		Tooltip = 'Protects Vape GUI and instances from being found by GetChildren/GetDescendants.'
 	})
 end)
 	
@@ -4528,6 +4394,150 @@ run(function()
 		Max = 3,
 		Decimal = 10
 	})
+end)
+
+run(function()
+	local Fling
+	local TargetPlayer
+	local FlingMethod
+	local FlingPower
+	local OriginalPosition
+	local Flinging = false
+
+	local function getPlayerList()
+		local list = {}
+		for _, p in ipairs(players:GetPlayers()) do
+			if p ~= lplr then
+				table.insert(list, p.Name)
+			end
+		end
+		if #list == 0 then
+			table.insert(list, "No Players")
+		end
+		return list
+	end
+
+	Fling = vape.Categories.Blatant:CreateModule({
+		Name = 'Fling',
+		Function = function(callback)
+			if callback then
+				OriginalPosition = nil
+				Flinging = false
+			end
+		end,
+		Tooltip = 'Fling other players.'
+	})
+
+	TargetPlayer = Fling:CreateDropdown({
+		Name = 'Target',
+		List = getPlayerList(),
+		Function = function()
+			if Fling.Enabled then
+				Fling:Toggle()
+				Fling:Toggle()
+			end
+		end
+	})
+
+	FlingMethod = Fling:CreateDropdown({
+		Name = 'Method',
+		List = {'Velocity', 'CFrame Spin', 'Impulse'},
+		Function = function()
+			if Fling.Enabled then
+				Fling:Toggle()
+				Fling:Toggle()
+			end
+		end
+	})
+
+	FlingPower = Fling:CreateSlider({
+		Name = 'Power',
+		Min = 1000,
+		Max = 100000,
+		Default = 50000,
+		Suffix = ' studs/s²'
+	})
+
+	Fling:CreateButton({
+		Name = 'Fling',
+		Function = function()
+			if Flinging then return end
+			local targetName = TargetPlayer.Value
+			local target = nil
+			for _, p in ipairs(players:GetPlayers()) do
+				if p.Name == targetName then
+					target = p
+					break
+				end
+			end
+			if not target or not target.Character or not lplr.Character then return end
+
+			local myHumanoid = lplr.Character:FindFirstChildOfClass('Humanoid')
+			local myRoot = myHumanoid and myHumanoid.RootPart
+			local tHumanoid = target.Character:FindFirstChildOfClass('Humanoid')
+			local tRoot = tHumanoid and tHumanoid.RootPart
+
+			if not myRoot or not tRoot then return end
+
+			OriginalPosition = myRoot.CFrame
+			Flinging = true
+
+			local method = FlingMethod.Value
+			local power = FlingPower.Value
+
+			if method == 'Velocity' then
+				myRoot.Velocity = Vector3.new(power, power * 2, power)
+				myRoot.RotVelocity = Vector3.new(power / 10, power / 10, power / 10)
+			elseif method == 'CFrame Spin' then
+				local angle = 0
+				local thread = task.spawn(function()
+					while Flinging and myRoot and tRoot and myRoot.Parent and tRoot.Parent do
+						angle = angle + 100
+						myRoot.CFrame = CFrame.new(tRoot.Position) * CFrame.new(0, 1.5, 0) * CFrame.Angles(math.rad(angle), 0, 0)
+						myRoot.Velocity = Vector3.new(power, power * 2, power)
+						myRoot.RotVelocity = Vector3.new(power / 10, power / 10, power / 10)
+						task.wait()
+					end
+				end)
+			elseif method == 'Impulse' then
+				if myRoot.ApplyImpulse then
+					myRoot:ApplyImpulse(Vector3.new(power, power * 2, power))
+				else
+					myRoot.Velocity = Vector3.new(power, power * 2, power)
+				end
+			end
+
+			task.wait(2)
+			if OriginalPosition and myRoot then
+				myRoot.CFrame = OriginalPosition
+			end
+			Flinging = false
+		end
+	})
+
+	Fling:CreateButton({
+		Name = 'Stop',
+		Function = function()
+			Flinging = false
+			if OriginalPosition and lplr.Character then
+				local humanoid = lplr.Character:FindFirstChildOfClass('Humanoid')
+				local root = humanoid and humanoid.RootPart
+				if root then
+					root.CFrame = OriginalPosition
+					root.Velocity = Vector3.zero
+					root.RotVelocity = Vector3.zero
+				end
+			end
+		end
+	})
+
+	local function refreshPlayerList()
+		TargetPlayer:SetList(getPlayerList())
+	end
+
+	refreshPlayerList()
+	Fling:Clean(players.PlayerAdded:Connect(refreshPlayerList))
+	Fling:Clean(players.PlayerRemoving:Connect(refreshPlayerList))
 end)
 	
 run(function()
