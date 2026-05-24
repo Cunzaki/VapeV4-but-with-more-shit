@@ -4558,21 +4558,19 @@ run(function()
 	local function applyColor(ent, obj, fallbackColor)
 		local color = getChamColor(ent, fallbackColor)
 		if type(obj) == 'table' then
-			for _, v2 in obj do
-				if v2:IsA('BasePart') then
-					v2.Color = color
-				else
+			if obj.Parts then
+				for _, pair in obj.Parts do
+					if pair.Clone then
+						pair.Clone.Color = color
+					end
+				end
+			else
+				for _, v2 in obj do
 					v2.Color3 = color
 				end
 			end
-		elseif obj:IsA('Highlight') then
-			obj.FillColor = color
 		else
-			for _, pair in obj.Parts do
-				if pair.Clone then
-					pair.Clone.Color = color
-				end
-			end
+			obj.FillColor = color
 		end
 	end
 	
