@@ -4352,21 +4352,9 @@ run(function()
 					local humanoid = char:FindFirstChildOfClass('Humanoid')
 					if not humanoid then return end
 					
-					local oldGetStateEnabled = humanoid.GetStateEnabled
-					humanoid.GetStateEnabled = function(self, state)
-						if state == Enum.HumanoidStateType.Jumping then
-							return false
-						end
-						return oldGetStateEnabled(self, state)
-					end
-					
-					local oldGetState = humanoid.GetState
-					humanoid.GetState = function(self)
-						local state = oldGetState(self)
-						if state == Enum.HumanoidStateType.Jumping then
-							return Enum.HumanoidStateType.RunningNoPhysics
-						end
-						return state
+					if pcall(function() return humanoid.JumpPower end) then
+						humanoid.JumpPower = math.huge
+						humanoid.UseJumpPower = true
 					end
 				end
 				
@@ -4384,16 +4372,8 @@ end)
 run(function()
 	local InstanceProtection
 	local ProtectedInstances = {}
-	local SpoofedInstances = {}
-	local SpoofedProperties = {}
-	local MethodsToHook = {
-		"FindFirstChild",
-		"FindFirstChildWhichIsA",
-		"FindFirstChildOfClass",
-		"IsA"
-	}
+	local OldNamecall, OldIndex, OldNewIndex
 	local mt = getmetatable(game)
-	local oldIndex, oldNewIndex, oldNamecall
 
 	InstanceProtection = vape.Categories.Blatant:CreateModule({
 		Name = 'Instance Protection',
@@ -4401,77 +4381,11 @@ run(function()
 			if callback then
 				local function isProtected(inst)
 					for _, p in ipairs(ProtectedInstances) do
-						if p == inst or (inst.IsDescendantOf and inst:IsDescendantOf(p)) then
+						if rawequal(p, inst) or (pcall(function() return inst:IsDescendantOf(p) end)) then
 							return true
 						end
 					end
 					return false
-				end
-
-				local oldGetChildren = game.GetChildren
-				game.GetChildren = function(...)
-					local children = oldGetChildren(...)
-					if not checkcaller then
-						local filtered = {}
-						for _, child in ipairs(children) do
-							if not isProtected(child) then
-								table.insert(filtered, child)
-							end
-						end
-						return filtered
-					end
-					return children
-				end
-
-				local oldGetDescendants = game.GetDescendants
-				game.GetDescendants = function(...)
-					local descendants = oldGetDescendants(...)
-					if not checkcaller then
-						local filtered = {}
-						for _, d in ipairs(descendants) do
-							if not isProtected(d) then
-								table.insert(filtered, d)
-							end
-						end
-						return filtered
-					end
-					return descendants
-				end
-
-				local oldFindFirstChild = game.FindFirstChild
-				game.FindFirstChild = function(...)
-					local result = oldFindFirstChild(...)
-					if not checkcaller and result and isProtected(result) then
-						return nil
-					end
-					return result
-				end
-
-				local oldFindFirstChildOfClass = game.FindFirstChildOfClass
-				game.FindFirstChildOfClass = function(...)
-					local result = oldFindFirstChildOfClass(...)
-					if not checkcaller and result and isProtected(result) then
-						return nil
-					end
-					return result
-				end
-
-				local oldFindFirstChildWhichIsA = game.FindFirstChildWhichIsA
-				game.FindFirstChildWhichIsA = function(...)
-					local result = oldFindFirstChildWhichIsA(...)
-					if not checkcaller and result and isProtected(result) then
-						return nil
-					end
-					return result
-				end
-
-				local oldIsA = game.IsA
-				game.IsA = function(...)
-					local args = {...}
-					if not checkcaller and args[1] and isProtected(args[1]) then
-						return false
-					end
-					return oldIsA(...)
 				end
 
 				local function protectInstance(inst)
@@ -4484,16 +4398,56 @@ run(function()
 					protectInstance(vape.gui)
 				end
 
+				OldNamecall = hookmetamethod(game, '__namecall', function(self, ...)
+					local args = {...}
+					local method = getnamecallmethod()
+					if not checkcaller then
+						if method == 'GetChildren' then
+							local children = OldNamecall(self, ...)
+							local filtered = {}
+							for _, child in ipairs(children) do
+								if not isProtected(child) then
+									table.insert(filtered, child)
+								end
+							end
+							return filtered
+						elseif method == 'GetDescendants' then
+							local descendants = OldNamecall(self, ...)
+							local filtered = {}
+							for _, d in ipairs(descendants) do
+								if not isProtected(d) then
+									table.insert(filtered, d)
+								end
+							end
+							return filtered
+						elseif method == 'FindFirstChild' or method == 'FindFirstChildOfClass' or method == 'FindFirstChildWhichIsA' then
+							local result = OldNamecall(self, ...)
+							if result and isProtected(result) then
+								return nil
+							end
+							return result
+						elseif method == 'IsA' then
+							if isProtected(self) then
+								return false
+							end
+						end
+					end
+					return OldNamecall(self, ...)
+				end)
+
+				OldIndex = hookmetamethod(game, '__index', function(self, key)
+					if not checkcaller and (key == 'FindFirstChild' or key == 'FindFirstChildOfClass' or key == 'FindFirstChildWhichIsA' or key == 'IsA' or key == 'GetChildren' or key == 'GetDescendants') then
+						return function(...)
+							return OldIndex(self, key)(...)
+						end
+					end
+					return OldIndex(self, key)
+				end)
+
 				InstanceProtection:Clean(function()
-					game.GetChildren = oldGetChildren
-					game.GetDescendants = oldGetDescendants
-					game.FindFirstChild = oldFindFirstChild
-					game.FindFirstChildOfClass = oldFindFirstChildOfClass
-					game.FindFirstChildWhichIsA = oldFindFirstChildWhichIsA
-					game.IsA = oldIsA
+					if OldNamecall then hookmetamethod(game, '__namecall', OldNamecall) end
+					if OldIndex then hookmetamethod(game, '__index', OldIndex) end
 					table.clear(ProtectedInstances)
-					table.clear(SpoofedInstances)
-					table.clear(SpoofedProperties)
 				end)
 			end
 		end,
