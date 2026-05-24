@@ -4650,7 +4650,7 @@ run(function()
 			local chamsData = {
 				Parts = {}
 			}
-			for _, v in ent.Character:GetDescendants() do
+			for _, v in ent.Character:GetChildren() do
 				if v:IsA('BasePart') and v.Transparency < 1 and v.Name ~= 'HumanoidRootPart' then
 					local clone = v:Clone()
 					clone.Parent = ViewportFrame
@@ -4746,7 +4746,8 @@ run(function()
 							applyColor(i, v, color)
 						end
 						if type(v) == 'table' and v.Parts then
-							for idx, pair in ipairs(v.Parts) do
+							for idx = #v.Parts, 1, -1 do
+								local pair = v.Parts[idx]
 								if pair.Real and pair.Real.Parent then
 									pair.Clone.CFrame = pair.Real.CFrame
 									pair.Clone.Transparency = FillTransparency.Value
@@ -4885,8 +4886,10 @@ run(function()
 		Function = function(callback)
 			for _, v in Reference do
 				if type(v) == 'table' then
-					for _, v2 in v do
-						v2.AlwaysOnTop = callback
+					if not v.Parts then
+						for _, v2 in v do
+							v2.AlwaysOnTop = callback
+						end
 					end
 				else
 					v.DepthMode = Enum.HighlightDepthMode[callback and 'AlwaysOnTop' or 'Occluded']
