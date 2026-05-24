@@ -4571,6 +4571,10 @@ run(function()
 			end
 		else
 			obj.FillColor = color
+			local s, _ = pcall(function()
+				obj.OutlineColor = Color3.fromHSV(OutlineColor.Hue, OutlineColor.Sat, OutlineColor.Value)
+				obj.OutlineTransparency = OutlineTransparency.Value
+			end)
 		end
 	end
 	
@@ -4834,10 +4838,9 @@ run(function()
 		Name = 'Outline Color',
 		DefaultSat = 0,
 		Function = function(hue, sat, val)
-			for i, v in Reference do
-				if type(v) ~= 'table' then
-					local s, _ = pcall(function() v.OutlineColor = Color3.fromHSV(hue, sat, val) end)
-				end
+			if Chams.Enabled then
+				Chams:Toggle()
+				Chams:Toggle()
 			end
 		end,
 		Darker = true
@@ -4872,10 +4875,9 @@ run(function()
 		Max = 1,
 		Default = 0.5,
 		Function = function(val)
-			for _, v in Reference do
-				if type(v) ~= 'table' then
-					local s, _ = pcall(function() v.OutlineTransparency = val end)
-				end
+			if Chams.Enabled then
+				Chams:Toggle()
+				Chams:Toggle()
 			end
 		end,
 		Decimal = 10,
