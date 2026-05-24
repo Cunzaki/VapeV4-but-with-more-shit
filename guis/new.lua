@@ -6490,7 +6490,7 @@ targetinfoobj = mainapi:CreateOverlay({
 })
 
 local targetinfobkg = Instance.new('Frame')
-targetinfobkg.Size = UDim2.fromOffset(240, 200)
+targetinfobkg.Size = UDim2.fromOffset(250, 210)
 targetinfobkg.BackgroundColor3 = color.Dark(uipallet.Main, 0.1)
 targetinfobkg.BackgroundTransparency = 0.5
 targetinfobkg.Parent = targetinfoobj.Children
@@ -6498,8 +6498,8 @@ local targetinfoblurobj = addBlur(targetinfobkg)
 targetinfoblurobj.Visible = false
 addCorner(targetinfobkg)
 local targetinfoshot = Instance.new('ImageLabel')
-targetinfoshot.Size = UDim2.fromOffset(26, 27)
-targetinfoshot.Position = UDim2.fromOffset(19, 17)
+targetinfoshot.Size = UDim2.fromOffset(32, 32)
+targetinfoshot.Position = UDim2.fromOffset(15, 12)
 targetinfoshot.BackgroundColor3 = uipallet.Main
 targetinfoshot.Image = 'rbxthumb://type=AvatarHeadShot&id=1&w=420&h=420'
 targetinfoshot.Parent = targetinfobkg
@@ -6513,18 +6513,18 @@ local targetinfoshotblur = addBlur(targetinfoshot)
 targetinfoshotblur.Visible = false
 addCorner(targetinfoshot)
 local targetinfoname = Instance.new('TextLabel')
-targetinfoname.Size = UDim2.fromOffset(145, 20)
-targetinfoname.Position = UDim2.fromOffset(54, 20)
+targetinfoname.Size = UDim2.fromOffset(180, 18)
+targetinfoname.Position = UDim2.fromOffset(55, 14)
 targetinfoname.BackgroundTransparency = 1
 targetinfoname.Text = 'Target name'
 targetinfoname.TextXAlignment = Enum.TextXAlignment.Left
 targetinfoname.TextYAlignment = Enum.TextYAlignment.Top
 targetinfoname.TextScaled = true
-targetinfoname.TextColor3 = color.Light(uipallet.Text, 0.4)
+targetinfoname.TextColor3 = color.Light(uipallet.Text, 0.35)
 targetinfoname.TextStrokeTransparency = 1
-targetinfoname.FontFace = uipallet.Font
+targetinfoname.FontFace = uipallet.FontSemiBold
 local targetinfoshadow = targetinfoname:Clone()
-targetinfoshadow.Position = UDim2.fromOffset(55, 21)
+targetinfoshadow.Position = UDim2.fromOffset(56, 15)
 targetinfoshadow.TextColor3 = Color3.new()
 targetinfoshadow.TextTransparency = 0.65
 targetinfoshadow.Visible = false
@@ -6542,60 +6542,60 @@ targetinfoname.Parent = targetinfobkg
 
 local targetinfodistance = Instance.new('TextLabel')
 targetinfodistance.Name = 'Distance'
-targetinfodistance.Size = UDim2.fromOffset(200, 15)
-targetinfodistance.Position = UDim2.fromOffset(20, 75)
+targetinfodistance.Size = UDim2.fromOffset(220, 16)
+targetinfodistance.Position = UDim2.fromOffset(15, 52)
 targetinfodistance.BackgroundTransparency = 1
-targetinfodistance.Text = 'Distance: 0'
+targetinfodistance.Text = 'Distance: 0 studs'
 targetinfodistance.TextXAlignment = Enum.TextXAlignment.Left
 targetinfodistance.TextYAlignment = Enum.TextYAlignment.Top
 targetinfodistance.TextScaled = false
-targetinfodistance.TextSize = 12
-targetinfodistance.TextColor3 = color.Light(uipallet.Text, 0.5)
+targetinfodistance.TextSize = 13
+targetinfodistance.TextColor3 = color.Light(uipallet.Text, 0.45)
 targetinfodistance.TextStrokeTransparency = 1
 targetinfodistance.FontFace = uipallet.Font
 targetinfodistance.Parent = targetinfobkg
 
 local targetinfospeed = Instance.new('TextLabel')
 targetinfospeed.Name = 'Speed'
-targetinfospeed.Size = UDim2.fromOffset(200, 15)
-targetinfospeed.Position = UDim2.fromOffset(20, 95)
+targetinfospeed.Size = UDim2.fromOffset(220, 16)
+targetinfospeed.Position = UDim2.fromOffset(15, 72)
 targetinfospeed.BackgroundTransparency = 1
-targetinfospeed.Text = 'Speed: 0'
+targetinfospeed.Text = 'Speed: 0 studs/s'
 targetinfospeed.TextXAlignment = Enum.TextXAlignment.Left
 targetinfospeed.TextYAlignment = Enum.TextYAlignment.Top
 targetinfospeed.TextScaled = false
-targetinfospeed.TextSize = 12
-targetinfospeed.TextColor3 = color.Light(uipallet.Text, 0.5)
+targetinfospeed.TextSize = 13
+targetinfospeed.TextColor3 = color.Light(uipallet.Text, 0.45)
 targetinfospeed.TextStrokeTransparency = 1
 targetinfospeed.FontFace = uipallet.Font
 targetinfospeed.Parent = targetinfobkg
 
 local targetinfohelditem = Instance.new('TextLabel')
 targetinfohelditem.Name = 'HeldItem'
-targetinfohelditem.Size = UDim2.fromOffset(200, 15)
-targetinfohelditem.Position = UDim2.fromOffset(20, 115)
+targetinfohelditem.Size = UDim2.fromOffset(220, 16)
+targetinfohelditem.Position = UDim2.fromOffset(15, 92)
 targetinfohelditem.BackgroundTransparency = 1
 targetinfohelditem.Text = 'Held: None'
 targetinfohelditem.TextXAlignment = Enum.TextXAlignment.Left
 targetinfohelditem.TextYAlignment = Enum.TextYAlignment.Top
 targetinfohelditem.TextScaled = false
-targetinfohelditem.TextSize = 12
-targetinfohelditem.TextColor3 = color.Light(uipallet.Text, 0.5)
+targetinfohelditem.TextSize = 13
+targetinfohelditem.TextColor3 = color.Light(uipallet.Text, 0.45)
 targetinfohelditem.TextStrokeTransparency = 1
 targetinfohelditem.FontFace = uipallet.Font
 targetinfohelditem.Parent = targetinfobkg
 
 local targetinfoinventory = Instance.new('TextLabel')
 targetinfoinventory.Name = 'Inventory'
-targetinfoinventory.Size = UDim2.fromOffset(200, 60)
-targetinfoinventory.Position = UDim2.fromOffset(20, 135)
+targetinfoinventory.Size = UDim2.fromOffset(220, 70)
+targetinfoinventory.Position = UDim2.fromOffset(15, 112)
 targetinfoinventory.BackgroundTransparency = 1
-targetinfoinventory.Text = 'Inventory: '
+targetinfoinventory.Text = 'Inventory: Empty'
 targetinfoinventory.TextXAlignment = Enum.TextXAlignment.Left
 targetinfoinventory.TextYAlignment = Enum.TextYAlignment.Top
 targetinfoinventory.TextScaled = false
 targetinfoinventory.TextSize = 12
-targetinfoinventory.TextColor3 = color.Light(uipallet.Text, 0.5)
+targetinfoinventory.TextColor3 = color.Light(uipallet.Text, 0.45)
 targetinfoinventory.TextStrokeTransparency = 1
 targetinfoinventory.TextWrapped = true
 targetinfoinventory.FontFace = uipallet.Font
@@ -6603,8 +6603,8 @@ targetinfoinventory.Parent = targetinfobkg
 
 local targetinfohealthbkg = Instance.new('Frame')
 targetinfohealthbkg.Name = 'HealthBKG'
-targetinfohealthbkg.Size = UDim2.fromOffset(200, 9)
-targetinfohealthbkg.Position = UDim2.fromOffset(20, 56)
+targetinfohealthbkg.Size = UDim2.fromOffset(220, 9)
+targetinfohealthbkg.Position = UDim2.fromOffset(15, 190)
 targetinfohealthbkg.BackgroundColor3 = uipallet.Main
 targetinfohealthbkg.BorderSizePixel = 0
 targetinfohealthbkg.Parent = targetinfobkg
@@ -6751,6 +6751,7 @@ local ShowInventory = targetinfoobj:CreateToggle({
 	end
 })
 
+local playersService = cloneref(game:GetService('Players'))
 local lasthealth = 0
 local lastmaxhealth = 0
 targetinfo = {
@@ -6760,6 +6761,7 @@ targetinfo = {
 		local entitylib = mainapi.Libraries
 		if not entitylib then return end
 		local camera = workspace.CurrentCamera
+		local lplr = playersService.LocalPlayer
 		local myChar = lplr and lplr.Character
 
 		for i, v in self.Targets do
@@ -6810,20 +6812,27 @@ targetinfo = {
 				local myHRP = myChar and myChar:FindFirstChild('HumanoidRootPart')
 				local humanoid = v.Character:FindFirstChildOfClass('Humanoid')
 
-				if ShowDistance.Enabled and myHRP and targetHRP then
-					local dist = (myHRP.Position - targetHRP.Position).Magnitude
-					targetinfodistance.Text = string.format('Distance: %.1f', dist)
+				if ShowDistance.Enabled then
+					if myHRP and targetHRP then
+						local dist = (myHRP.Position - targetHRP.Position).Magnitude
+						targetinfodistance.Text = string.format('Distance: %.1f studs', dist)
+					else
+						targetinfodistance.Text = 'Distance: N/A'
+					end
 				end
 
-				if ShowSpeed.Enabled and targetHRP then
-					local speed = targetHRP.AssemblyLinearVelocity.Magnitude
-					targetinfospeed.Text = string.format('Speed: %.1f', speed)
+				if ShowSpeed.Enabled then
+					if targetHRP then
+						local speed = targetHRP.AssemblyLinearVelocity.Magnitude
+						targetinfospeed.Text = string.format('Speed: %.1f studs/s', speed)
+					else
+						targetinfospeed.Text = 'Speed: N/A'
+					end
 				end
 
 				if ShowHeldItem.Enabled then
 					local heldTool = nil
 					if v.Player then
-						local backpack = v.Player:FindFirstChild('Backpack')
 						local tool = v.Character:FindFirstChildWhichIsA('Tool')
 						if tool then
 							heldTool = tool.Name
