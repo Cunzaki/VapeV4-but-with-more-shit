@@ -4406,7 +4406,7 @@ run(function()
 
 	local function getPlayerList()
 		local list = {}
-		for _, p in ipairs(players:GetPlayers()) do
+		for _, p in ipairs(playersService:GetPlayers()) do
 			if p ~= lplr then
 				table.insert(list, p.Name)
 			end
@@ -4464,7 +4464,7 @@ run(function()
 			if Flinging then return end
 			local targetName = TargetPlayer.Value
 			local target = nil
-			for _, p in ipairs(players:GetPlayers()) do
+			for _, p in ipairs(playersService:GetPlayers()) do
 				if p.Name == targetName then
 					target = p
 					break
@@ -4536,8 +4536,8 @@ run(function()
 	end
 
 	refreshPlayerList()
-	Fling:Clean(players.PlayerAdded:Connect(refreshPlayerList))
-	Fling:Clean(players.PlayerRemoving:Connect(refreshPlayerList))
+	Fling:Clean(playersService.PlayerAdded:Connect(refreshPlayerList))
+	Fling:Clean(playersService.PlayerRemoving:Connect(refreshPlayerList))
 end)
 	
 run(function()
