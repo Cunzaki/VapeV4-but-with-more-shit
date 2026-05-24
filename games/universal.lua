@@ -10738,4 +10738,147 @@ run(function()
 	})
 	
 end)
+
+run(function()
+	local Fling
+	local TargetPlayer
+	local FlingMethod
+	local FlingPower
+	local OriginalPosition
+	local Flinging = false
 	
+	local function getPlayerList()
+		local list = {}
+		for _, p in ipairs(players:GetPlayers()) do
+			if p ~= lplr then
+				table.insert(list, p.Name)
+			end
+		end
+		if #list == 0 then
+			table.insert(list, "No Players")
+		end
+		return list
+	end
+	
+	Fling = vape.Categories.Blatant:CreateModule({
+		Name = 'Fling',
+		Function = function(callback)
+			if callback then
+				OriginalPosition = nil
+				Flinging = false
+			end
+		end,
+		Tooltip = 'Fling other players.'
+	})
+	
+	TargetPlayer = Fling:CreateDropdown({
+		Name = 'Target',
+		List = getPlayerList(),
+		Function = function()
+			if Fling.Enabled then
+				Fling:Toggle()
+				Fling:Toggle()
+			end
+		end
+	})
+	
+	FlingMethod = Fling:CreateDropdown({
+		Name = 'Method',
+		List = {'Velocity', 'CFrame Spin', 'Impulse'},
+		Function = function()
+			if Fling.Enabled then
+				Fling:Toggle()
+				Fling:Toggle()
+			end
+		end
+	})
+	
+	FlingPower = Fling:CreateSlider({
+		Name = 'Power',
+		Min = 1000,
+		Max = 100000,
+		Default = 50000,
+		Suffix = ' studs/s²'
+	})
+	
+	Fling:CreateButton({
+		Name = 'Fling',
+		Function = function()
+			if Flinging then return end
+			local targetName = TargetPlayer.Value
+			local target = nil
+			for _, p in ipairs(players:GetPlayers()) do
+				if p.Name == targetName then
+					target = p
+					break
+				end
+			end
+			if not target or not target.Character or not lplr.Character then return end
+			
+			local myHumanoid = lplr.Character:FindFirstChildOfClass('Humanoid')
+			local myRoot = myHumanoid and myHumanoid.RootPart
+			local tHumanoid = target.Character:FindFirstChildOfClass('Humanoid')
+			local tRoot = tHumanoid and tHumanoid.RootPart
+			
+			if not myRoot or not tRoot then return end
+			
+			OriginalPosition = myRoot.CFrame
+			Flinging = true
+			
+			local method = FlingMethod.Value
+			local power = FlingPower.Value
+			
+			if method == 'Velocity' then
+				myRoot.Velocity = Vector3.new(power, power * 2, power)
+				myRoot.RotVelocity = Vector3.new(power / 10, power / 10, power / 10)
+			elseif method == 'CFrame Spin' then
+				local angle = 0
+				local thread = task.spawn(function()
+					while Flinging and myRoot and tRoot and myRoot.Parent and tRoot.Parent do
+						angle = angle + 100
+						myRoot.CFrame = CFrame.new(tRoot.Position) * CFrame.new(0, 1.5, 0) * CFrame.Angles(math.rad(angle), 0, 0)
+						myRoot.Velocity = Vector3.new(power, power * 2, power)
+						myRoot.RotVelocity = Vector3.new(power / 10, power / 10, power / 10)
+						task.wait()
+					end
+				end)
+			elseif method == 'Impulse' then
+				if myRoot.ApplyImpulse then
+					myRoot:ApplyImpulse(Vector3.new(power, power * 2, power))
+				else
+					myRoot.Velocity = Vector3.new(power, power * 2, power)
+				end
+			end
+			
+			task.wait(2)
+			if OriginalPosition and myRoot then
+				myRoot.CFrame = OriginalPosition
+			end
+			Flinging = false
+		end
+	})
+	
+	Fling:CreateButton({
+		Name = 'Stop',
+		Function = function()
+			Flinging = false
+			if OriginalPosition and lplr.Character then
+				local humanoid = lplr.Character:FindFirstChildOfClass('Humanoid')
+				local root = humanoid and humanoid.RootPart
+				if root then
+					root.CFrame = OriginalPosition
+					root.Velocity = Vector3.zero
+					root.RotVelocity = Vector3.zero
+				end
+			end
+		end
+	})
+	
+	local function refreshPlayerList()
+		TargetPlayer:SetList(getPlayerList())
+	end
+	
+	refreshPlayerList()
+	Fling:Clean(players.PlayerAdded:Connect(refreshPlayerList))
+	Fling:Clean(players.PlayerRemoving:Connect(refreshPlayerList))
+end)
