@@ -4530,14 +4530,6 @@ run(function()
 			end
 		end
 	})
-
-	local function refreshPlayerList()
-		TargetPlayer:SetList(getPlayerList())
-	end
-
-	refreshPlayerList()
-	Fling:Clean(playersService.PlayerAdded:Connect(refreshPlayerList))
-	Fling:Clean(playersService.PlayerRemoving:Connect(refreshPlayerList))
 end)
 	
 run(function()
