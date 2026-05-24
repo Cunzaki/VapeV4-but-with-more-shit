@@ -6490,7 +6490,7 @@ targetinfoobj = mainapi:CreateOverlay({
 })
 
 local targetinfobkg = Instance.new('Frame')
-targetinfobkg.Size = UDim2.fromOffset(240, 89)
+targetinfobkg.Size = UDim2.fromOffset(240, 200)
 targetinfobkg.BackgroundColor3 = color.Dark(uipallet.Main, 0.1)
 targetinfobkg.BackgroundTransparency = 0.5
 targetinfobkg.Parent = targetinfoobj.Children
@@ -6539,6 +6539,68 @@ targetinfoname:GetPropertyChangedSignal('FontFace'):Connect(function()
 	targetinfoshadow.FontFace = targetinfoname.FontFace
 end)
 targetinfoname.Parent = targetinfobkg
+
+local targetinfodistance = Instance.new('TextLabel')
+targetinfodistance.Name = 'Distance'
+targetinfodistance.Size = UDim2.fromOffset(200, 15)
+targetinfodistance.Position = UDim2.fromOffset(20, 75)
+targetinfodistance.BackgroundTransparency = 1
+targetinfodistance.Text = 'Distance: 0'
+targetinfodistance.TextXAlignment = Enum.TextXAlignment.Left
+targetinfodistance.TextYAlignment = Enum.TextYAlignment.Top
+targetinfodistance.TextScaled = false
+targetinfodistance.TextSize = 12
+targetinfodistance.TextColor3 = color.Light(uipallet.Text, 0.5)
+targetinfodistance.TextStrokeTransparency = 1
+targetinfodistance.FontFace = uipallet.Font
+targetinfodistance.Parent = targetinfobkg
+
+local targetinfospeed = Instance.new('TextLabel')
+targetinfospeed.Name = 'Speed'
+targetinfospeed.Size = UDim2.fromOffset(200, 15)
+targetinfospeed.Position = UDim2.fromOffset(20, 95)
+targetinfospeed.BackgroundTransparency = 1
+targetinfospeed.Text = 'Speed: 0'
+targetinfospeed.TextXAlignment = Enum.TextXAlignment.Left
+targetinfospeed.TextYAlignment = Enum.TextYAlignment.Top
+targetinfospeed.TextScaled = false
+targetinfospeed.TextSize = 12
+targetinfospeed.TextColor3 = color.Light(uipallet.Text, 0.5)
+targetinfospeed.TextStrokeTransparency = 1
+targetinfospeed.FontFace = uipallet.Font
+targetinfospeed.Parent = targetinfobkg
+
+local targetinfohelditem = Instance.new('TextLabel')
+targetinfohelditem.Name = 'HeldItem'
+targetinfohelditem.Size = UDim2.fromOffset(200, 15)
+targetinfohelditem.Position = UDim2.fromOffset(20, 115)
+targetinfohelditem.BackgroundTransparency = 1
+targetinfohelditem.Text = 'Held: None'
+targetinfohelditem.TextXAlignment = Enum.TextXAlignment.Left
+targetinfohelditem.TextYAlignment = Enum.TextYAlignment.Top
+targetinfohelditem.TextScaled = false
+targetinfohelditem.TextSize = 12
+targetinfohelditem.TextColor3 = color.Light(uipallet.Text, 0.5)
+targetinfohelditem.TextStrokeTransparency = 1
+targetinfohelditem.FontFace = uipallet.Font
+targetinfohelditem.Parent = targetinfobkg
+
+local targetinfoinventory = Instance.new('TextLabel')
+targetinfoinventory.Name = 'Inventory'
+targetinfoinventory.Size = UDim2.fromOffset(200, 60)
+targetinfoinventory.Position = UDim2.fromOffset(20, 135)
+targetinfoinventory.BackgroundTransparency = 1
+targetinfoinventory.Text = 'Inventory: '
+targetinfoinventory.TextXAlignment = Enum.TextXAlignment.Left
+targetinfoinventory.TextYAlignment = Enum.TextYAlignment.Top
+targetinfoinventory.TextScaled = false
+targetinfoinventory.TextSize = 12
+targetinfoinventory.TextColor3 = color.Light(uipallet.Text, 0.5)
+targetinfoinventory.TextStrokeTransparency = 1
+targetinfoinventory.TextWrapped = true
+targetinfoinventory.FontFace = uipallet.Font
+targetinfoinventory.Parent = targetinfobkg
+
 local targetinfohealthbkg = Instance.new('Frame')
 targetinfohealthbkg.Name = 'HealthBKG'
 targetinfohealthbkg.Size = UDim2.fromOffset(200, 9)
@@ -6657,6 +6719,38 @@ targetinfobcolor = targetinfoobj:CreateColorSlider({
 	Visible = false
 })
 
+local ShowDistance = targetinfoobj:CreateToggle({
+	Name = 'Show Distance',
+	Default = true,
+	Function = function(callback)
+		targetinfodistance.Visible = callback
+	end
+})
+
+local ShowSpeed = targetinfoobj:CreateToggle({
+	Name = 'Show Speed',
+	Default = true,
+	Function = function(callback)
+		targetinfospeed.Visible = callback
+	end
+})
+
+local ShowHeldItem = targetinfoobj:CreateToggle({
+	Name = 'Show Held Item',
+	Default = true,
+	Function = function(callback)
+		targetinfohelditem.Visible = callback
+	end
+})
+
+local ShowInventory = targetinfoobj:CreateToggle({
+	Name = 'Show Inventory',
+	Default = true,
+	Function = function(callback)
+		targetinfoinventory.Visible = callback
+	end
+})
+
 local lasthealth = 0
 local lastmaxhealth = 0
 targetinfo = {
@@ -6665,6 +6759,8 @@ targetinfo = {
 	UpdateInfo = function(self)
 		local entitylib = mainapi.Libraries
 		if not entitylib then return end
+		local camera = workspace.CurrentCamera
+		local myChar = lplr and lplr.Character
 
 		for i, v in self.Targets do
 			if v < tick() then
@@ -6707,6 +6803,49 @@ targetinfo = {
 				end
 				lasthealth = v.Health
 				lastmaxhealth = v.MaxHealth
+			end
+
+			if v.Character then
+				local targetHRP = v.Character:FindFirstChild('HumanoidRootPart')
+				local myHRP = myChar and myChar:FindFirstChild('HumanoidRootPart')
+				local humanoid = v.Character:FindFirstChildOfClass('Humanoid')
+
+				if ShowDistance.Enabled and myHRP and targetHRP then
+					local dist = (myHRP.Position - targetHRP.Position).Magnitude
+					targetinfodistance.Text = string.format('Distance: %.1f', dist)
+				end
+
+				if ShowSpeed.Enabled and targetHRP then
+					local speed = targetHRP.AssemblyLinearVelocity.Magnitude
+					targetinfospeed.Text = string.format('Speed: %.1f', speed)
+				end
+
+				if ShowHeldItem.Enabled then
+					local heldTool = nil
+					if v.Player then
+						local backpack = v.Player:FindFirstChild('Backpack')
+						local tool = v.Character:FindFirstChildWhichIsA('Tool')
+						if tool then
+							heldTool = tool.Name
+						end
+					end
+					targetinfohelditem.Text = string.format('Held: %s', heldTool or 'None')
+				end
+
+				if ShowInventory.Enabled then
+					local invItems = {}
+					if v.Player then
+						local backpack = v.Player:FindFirstChild('Backpack')
+						if backpack then
+							for _, child in ipairs(backpack:GetChildren()) do
+								if child:IsA('Tool') then
+									table.insert(invItems, child.Name)
+								end
+							end
+						end
+					end
+					targetinfoinventory.Text = string.format('Inventory: %s', #invItems > 0 and table.concat(invItems, ', ') or 'Empty')
+				end
 			end
 
 			if not v.Character then table.clear(v) end
