@@ -4531,6 +4531,7 @@ run(function()
 	local Teammates
 	local Walls
 	local Reference = {}
+	local OriginalProperties = {}
 	local Folder = Instance.new('Folder')
 	Folder.Parent = vape.gui
 	local VisibilityCheck = RaycastParams.new()
@@ -4582,7 +4583,7 @@ run(function()
 			cham.OutlineTransparency = OutlineTransparency.Value
 			cham.Parent = Folder
 			Reference[ent] = cham
-		else
+		elseif Mode.Value == 'BoxHandles' then
 			local chams = {}
 			for _, v in ent.Character:GetChildren() do
 				if v:IsA('BasePart') and (ent.NPC or v.Name:find('Arm') or v.Name:find('Leg') or v.Name:find('Hand') or v.Name:find('Feet') or v.Name:find('Torso') or v.Name == 'Head') then
@@ -4602,6 +4603,22 @@ run(function()
 				end
 			end
 			Reference[ent] = chams
+		elseif Mode.Value == 'Ghost' then
+			local originalProps = {}
+			for _, v in ent.Character:GetChildren() do
+				if v:IsA('BasePart') and (ent.NPC or v.Name:find('Arm') or v.Name:find('Leg') or v.Name:find('Hand') or v.Name:find('Feet') or v.Name:find('Torso') or v.Name == 'Head') then
+					originalProps[v] = {
+						Material = v.Material,
+						Color = v.Color,
+						Transparency = v.Transparency
+					}
+					v.Material = Enum.Material.ForceField
+					v.Color = getChamColor(ent, entitylib.getEntityColor(ent) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value))
+					v.Transparency = FillTransparency.Value
+				end
+			end
+			OriginalProperties[ent] = originalProps
+			Reference[ent] = true
 		end
 	end
 	
@@ -4610,7 +4627,18 @@ run(function()
 			if vape.ThreadFix then
 				setthreadidentity(8)
 			end
-			if type(Reference[ent]) == 'table' then
+			if Mode.Value == 'Ghost' or OriginalProperties[ent] then
+				if OriginalProperties[ent] then
+					for part, props in pairs(OriginalProperties[ent]) do
+						if part and part.Parent then
+							part.Material = props.Material
+							part.Color = props.Color
+							part.Transparency = props.Transparency
+						end
+					end
+					OriginalProperties[ent] = nil
+				end
+			elseif type(Reference[ent]) == 'table' then
 				for _, v in Reference[ent] do
 					v:Destroy()
 				end
@@ -4647,14 +4675,30 @@ run(function()
 				Chams:Clean(vape.Categories.Friends.ColorUpdate.Event:Connect(function()
 					for i, v in Reference do
 						local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
-						applyColor(i, v, color)
+						if Mode.Value == 'Ghost' and OriginalProperties[i] then
+							for part in pairs(OriginalProperties[i]) do
+								if part and part.Parent then
+									part.Color = color
+								end
+							end
+						else
+							applyColor(i, v, color)
+						end
 					end
 				end))
 				Chams:Clean(runService.RenderStepped:Connect(function()
 					if not VisibleOverride.Enabled then return end
 					for i, v in Reference do
 						local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
-						applyColor(i, v, color)
+						if Mode.Value == 'Ghost' and OriginalProperties[i] then
+							for part in pairs(OriginalProperties[i]) do
+								if part and part.Parent then
+									part.Color = color
+								end
+							end
+						else
+							applyColor(i, v, color)
+						end
 					end
 				end))
 				for _, v in entitylib.List do
@@ -4682,7 +4726,7 @@ run(function()
 		})
 	Mode = Chams:CreateDropdown({
 		Name = 'Mode',
-		List = {'Highlight', 'BoxHandles'},
+		List = {'Highlight', 'BoxHandles', 'Ghost'},
 		Function = function(val)
 			OutlineColor.Object.Visible = val == 'Highlight'
 			OutlineTransparency.Object.Visible = val == 'Highlight'
@@ -4697,7 +4741,15 @@ run(function()
 		Function = function(hue, sat, val)
 			for i, v in Reference do
 				local color = entitylib.getEntityColor(i) or Color3.fromHSV(hue, sat, val)
-				applyColor(i, v, color)
+				if Mode.Value == 'Ghost' and OriginalProperties[i] then
+					for part in pairs(OriginalProperties[i]) do
+						if part and part.Parent then
+							part.Color = color
+						end
+					end
+				else
+					applyColor(i, v, color)
+				end
 			end
 		end
 	})
@@ -4743,8 +4795,14 @@ run(function()
 		Max = 1,
 		Default = 0.5,
 		Function = function(val)
-			for _, v in Reference do
-				if type(v) == 'table' then
+			for i, v in Reference do
+				if Mode.Value == 'Ghost' and OriginalProperties[i] then
+					for part in pairs(OriginalProperties[i]) do
+						if part and part.Parent then
+							part.Transparency = val
+						end
+					end
+				elseif type(v) == 'table' then
 					for _, v2 in v do v2.Transparency = val end
 				else
 					v.FillTransparency = val
@@ -4776,7 +4834,7 @@ run(function()
 					for _, v2 in v do
 						v2.AlwaysOnTop = callback
 					end
-				else
+				elseif type(v) ~= 'boolean' then
 					v.DepthMode = Enum.HighlightDepthMode[callback and 'AlwaysOnTop' or 'Occluded']
 				end
 			end
