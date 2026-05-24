@@ -4835,8 +4835,8 @@ run(function()
 		DefaultSat = 0,
 		Function = function(hue, sat, val)
 			for i, v in Reference do
-				if type(v) ~= 'table' and pcall(function() return v:IsA('Highlight') end) and v:IsA('Highlight') then
-					v.OutlineColor = Color3.fromHSV(hue, sat, val)
+				if type(v) ~= 'table' then
+					local s, _ = pcall(function() v.OutlineColor = Color3.fromHSV(hue, sat, val) end)
 				end
 			end
 		end,
@@ -4873,8 +4873,8 @@ run(function()
 		Default = 0.5,
 		Function = function(val)
 			for _, v in Reference do
-				if type(v) ~= 'table' and pcall(function() return v:IsA('Highlight') end) and v:IsA('Highlight') then
-					v.OutlineTransparency = val
+				if type(v) ~= 'table' then
+					local s, _ = pcall(function() v.OutlineTransparency = val end)
 				end
 			end
 		end,
