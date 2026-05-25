@@ -2393,17 +2393,24 @@ run(function()
 					end
 					if AutoFire.Enabled then
 						local origin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
+						local effectiveOrigin = origin
+						
+						if PositionManipulation and PositionManipulation.Enabled and pmTargetPosition then
+							effectiveOrigin = CFrame.new(pmTargetPosition) * origin.Rotation
+						end
+						
 						local ent = entitylib['Entity'..Mode.Value]({
 							Range = Range.Value,
 							Wallcheck = Target.Walls.Enabled or nil,
 							Part = 'Head',
-							Origin = (origin * fireoffset).Position,
+							Origin = (effectiveOrigin * fireoffset).Position,
 							Players = Target.Players.Enabled,
 							NPCs = Target.NPCs.Enabled,
 							Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
 						})
+						
 						if ent then
-							registerShot(ent, ent.Head or ent.RootPart, (origin * fireoffset).Position)
+							registerShot(ent, ent.Head or ent.RootPart, (effectiveOrigin * fireoffset).Position)
 						end
 
 						if mouse1click and (isrbxactive or iswindowactive)() then
