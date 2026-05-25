@@ -1918,38 +1918,15 @@ run(function()
 		local localPos = localRoot.Position
 		local radius = PositionManipulationRadius.Value
 		
-		local bestTarget = nil
-		if Mode and Target then
-			local origin = AutoFireMode and AutoFireMode.Value == 'Camera' and gameCamera.CFrame or localRoot.CFrame
-			bestTarget = entitylib['Entity'..Mode.Value]({
-				Range = Range and Range.Value or 150,
-				Wallcheck = Target.Walls and Target.Walls.Enabled or nil,
-				Part = 'Head',
-				Origin = origin.Position,
-				Players = Target.Players and Target.Players.Enabled or true,
-				NPCs = Target.NPCs and Target.NPCs.Enabled or false,
-				Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
-			})
+		local validTargets = {}
+		for _, ent in entitylib.List do
+			if ent == entitylib.Local then continue end
+			if not ent.Character or not ent.RootPart then continue end
+			if not entitylib.targetCheck(ent) then continue end
+			table.insert(validTargets, ent)
 		end
 		
-		if not bestTarget then
-			local bestTargetDistance = math.huge
-			for _, ent in entitylib.List do
-				if ent == entitylib.Local then continue end
-				if not ent.Character or not ent.RootPart then continue end
-				if not entitylib.targetCheck(ent) then continue end
-				local dist = (ent.RootPart.Position - localPos).Magnitude
-				if dist < bestTargetDistance then
-					bestTargetDistance = dist
-					bestTarget = ent
-				end
-			end
-		end
-		
-		if not bestTarget then return nil end
-		
-		local targetHead = bestTarget.Head or bestTarget.RootPart
-		if not targetHead then return nil end
+		if #validTargets == 0 then return nil end
 		
 		local bestPosition = nil
 		local bestPositionScore = math.huge
@@ -1972,17 +1949,23 @@ run(function()
 					local testPos = localPos + Vector3.new(x, yOffset, z)
 					
 					local rayOrigin = testPos + Vector3.new(0, 2, 0)
-					local rayDirection = (targetHead.Position - rayOrigin).Unit
-					local rayResult = workspace:Raycast(rayOrigin, rayDirection * 1000, pmRaycastParams)
 					
-					if rayResult then
-						local hitPart = rayResult.Instance
-						local hitChar = hitPart and hitPart:FindFirstAncestorOfClass("Model")
-						if hitChar and hitChar == bestTarget.Character then
-							local score = (testPos - localPos).Magnitude
-							if score < bestPositionScore then
-								bestPositionScore = score
-								bestPosition = testPos
+					for _, target in validTargets do
+						local targetHead = target.Head or target.RootPart
+						if not targetHead then continue end
+						
+						local rayDirection = (targetHead.Position - rayOrigin).Unit
+						local rayResult = workspace:Raycast(rayOrigin, rayDirection * 1000, pmRaycastParams)
+						
+						if rayResult then
+							local hitPart = rayResult.Instance
+							local hitChar = hitPart and hitPart:FindFirstAncestorOfClass("Model")
+							if hitChar and hitChar == target.Character then
+								local score = (testPos - localPos).Magnitude
+								if score < bestPositionScore then
+									bestPositionScore = score
+									bestPosition = testPos
+								end
 							end
 						end
 					end
