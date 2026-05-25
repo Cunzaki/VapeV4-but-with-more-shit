@@ -1919,15 +1919,30 @@ run(function()
 		local radius = PositionManipulationRadius.Value
 		
 		local bestTarget = nil
-		local bestTargetDistance = math.huge
-		for _, ent in entitylib.List do
-			if ent == entitylib.Local then continue end
-			if not ent.Character or not ent.RootPart then continue end
-			if not entitylib.targetCheck(ent) then continue end
-			local dist = (ent.RootPart.Position - localPos).Magnitude
-			if dist < bestTargetDistance then
-				bestTargetDistance = dist
-				bestTarget = ent
+		if Mode and Target then
+			local origin = AutoFireMode and AutoFireMode.Value == 'Camera' and gameCamera.CFrame or localRoot.CFrame
+			bestTarget = entitylib['Entity'..Mode.Value]({
+				Range = Range and Range.Value or 150,
+				Wallcheck = Target.Walls and Target.Walls.Enabled or nil,
+				Part = 'Head',
+				Origin = origin.Position,
+				Players = Target.Players and Target.Players.Enabled or true,
+				NPCs = Target.NPCs and Target.NPCs.Enabled or false,
+				Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
+			})
+		end
+		
+		if not bestTarget then
+			local bestTargetDistance = math.huge
+			for _, ent in entitylib.List do
+				if ent == entitylib.Local then continue end
+				if not ent.Character or not ent.RootPart then continue end
+				if not entitylib.targetCheck(ent) then continue end
+				local dist = (ent.RootPart.Position - localPos).Magnitude
+				if dist < bestTargetDistance then
+					bestTargetDistance = dist
+					bestTarget = ent
+				end
 			end
 		end
 		
@@ -1943,25 +1958,33 @@ run(function()
 		pmRaycastParams.FilterDescendantsInstances = {lplr.Character, gameCamera, pmClone, pmRadiusPart}
 		pmRaycastParams.RespectCanCollide = true
 		
-		local numSamples = 12
-		for i = 0, numSamples - 1 do
-			local angle = (i / numSamples) * math.pi * 2
-			local x = math.cos(angle) * radius
-			local z = math.sin(angle) * radius
-			local testPos = localPos + Vector3.new(x, 0, z)
-			
-			local rayOrigin = testPos + Vector3.new(0, 2, 0)
-			local rayDirection = (targetHead.Position - rayOrigin).Unit
-			local rayResult = workspace:Raycast(rayOrigin, rayDirection * 1000, pmRaycastParams)
-			
-			if rayResult then
-				local hitPart = rayResult.Instance
-				local hitChar = hitPart and hitPart:FindFirstAncestorOfClass("Model")
-				if hitChar and hitChar == bestTarget.Character then
-					local score = (testPos - localPos).Magnitude
-					if score < bestPositionScore then
-						bestPositionScore = score
-						bestPosition = testPos
+		local numAngleSamples = 16
+		local numRadiusSamples = 4
+		local numYSamples = 3
+		for ySample = 0, numYSamples - 1 do
+			local yOffset = (ySample / (numYSamples - 1)) * 4 - 2
+			for radiusSample = 0, numRadiusSamples - 1 do
+				local currentRadius = (radiusSample / numRadiusSamples) * radius
+				for angleSample = 0, numAngleSamples - 1 do
+					local angle = (angleSample / numAngleSamples) * math.pi * 2
+					local x = math.cos(angle) * currentRadius
+					local z = math.sin(angle) * currentRadius
+					local testPos = localPos + Vector3.new(x, yOffset, z)
+					
+					local rayOrigin = testPos + Vector3.new(0, 2, 0)
+					local rayDirection = (targetHead.Position - rayOrigin).Unit
+					local rayResult = workspace:Raycast(rayOrigin, rayDirection * 1000, pmRaycastParams)
+					
+					if rayResult then
+						local hitPart = rayResult.Instance
+						local hitChar = hitPart and hitPart:FindFirstAncestorOfClass("Model")
+						if hitChar and hitChar == bestTarget.Character then
+							local score = (testPos - localPos).Magnitude
+							if score < bestPositionScore then
+								bestPositionScore = score
+								bestPosition = testPos
+							end
+						end
 					end
 				end
 			end
@@ -2311,7 +2334,7 @@ run(function()
 							local char = entitylib.character and entitylib.character.Character
 							local hum = char and char:FindFirstChild("Humanoid")
 							local root = char and char:FindFirstChild("HumanoidRootPart")
-							if hum and root then
+							if hum and root and hum.Health > 0 then
 								local camPos = root.CFrame.Position
 								local camOffset = hum.CameraOffset
 								
@@ -2320,6 +2343,15 @@ run(function()
 								end
 								
 								pmCameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
+							elseif not hum or hum.Health <= 0 then
+								cleanupPMCameraProxy()
+								if SilentAim and SilentAim.Enabled then
+									task.delay(0.1, function()
+										if SilentAim and SilentAim.Enabled then
+											setupPMCameraProxy()
+										end
+									end)
+								end
 							end
 						end
 						
