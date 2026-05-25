@@ -2312,7 +2312,7 @@ run(function()
 							local hum = char and char:FindFirstChild("Humanoid")
 							local root = char and char:FindFirstChild("HumanoidRootPart")
 							if hum and root then
-								local camPos = (pmTargetPosition or root.CFrame).Position
+								local camPos = pmTargetPosition or root.CFrame.Position
 								local camOffset = hum.CameraOffset
 								
 								if hum.Sit and hum.SeatPart then
