@@ -1344,6 +1344,7 @@ run(function()
 	local PositionManipulationVisualizerColor
 	local PositionManipulationRadiusVisualizer
 	local PositionManipulationRadiusVisualizerColor
+	local PositionManipulationScanQuality
 	
 	local pmClone
 	local pmCloneRoot
@@ -1968,9 +1969,26 @@ run(function()
 			return true
 		end
 		
-		local numAngleSamples = 32
-		local numRadiusSamples = 8
-		local numYSamples = 3
+		local numAngleSamples, numRadiusSamples, numYSamples
+		local quality = PositionManipulationScanQuality and PositionManipulationScanQuality.Value or 'Medium'
+		
+		if quality == 'Low' then
+			numAngleSamples = 8
+			numRadiusSamples = 2
+			numYSamples = 2
+		elseif quality == 'Medium' then
+			numAngleSamples = 16
+			numRadiusSamples = 4
+			numYSamples = 3
+		elseif quality == 'High' then
+			numAngleSamples = 32
+			numRadiusSamples = 8
+			numYSamples = 3
+		elseif quality == 'Ultra' then
+			numAngleSamples = 48
+			numRadiusSamples = 12
+			numYSamples = 4
+		end
 		for ySample = 0, numYSamples - 1 do
 			local yOffset = (ySample / (numYSamples - 1)) * 4 - 2
 			for radiusSample = 0, numRadiusSamples - 1 do
@@ -2758,6 +2776,7 @@ run(function()
 		Function = function(callback)
 			PositionManipulationRadius.Object.Visible = callback
 			PositionManipulationVisualizer.Object.Visible = callback
+			PositionManipulationScanQuality.Object.Visible = callback
 			if PositionManipulationVisualizer.Object.Visible then
 				PositionManipulationVisualizerMaterial.Object.Visible = PositionManipulationVisualizer.Enabled
 				PositionManipulationVisualizerColorToggle.Object.Visible = PositionManipulationVisualizer.Enabled
@@ -2868,6 +2887,14 @@ run(function()
 		Name = 'Radius Color',
 		Visible = false,
 		Darker = true
+	})
+	PositionManipulationScanQuality = SilentAim:CreateDropdown({
+		Name = 'Scan Quality',
+		List = {'Low', 'Medium', 'High', 'Ultra'},
+		Default = 'Medium',
+		Visible = false,
+		Darker = true,
+		Tooltip = 'Low - Fastest, least accurate\nMedium - Balanced\nHigh - More accurate, slower\nUltra - Most accurate, slowest'
 	})
 	vape:Clean(BulletTracerFolder)
 end)
