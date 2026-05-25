@@ -2251,6 +2251,25 @@ run(function()
 							setupPMRadius()
 						end
 					end))
+					SilentAim:Clean(runService.RenderStepped:Connect(function()
+						if pmCameraProxy then
+							local char = entitylib.character and entitylib.character.Character
+							local hum = char and char:FindFirstChild("Humanoid")
+							local root = char and char:FindFirstChild("HumanoidRootPart")
+							if hum and root and hum.Health > 0 then
+								local camPos = root.CFrame.Position
+								local camOffset = hum.CameraOffset
+								
+								if hum.Sit and hum.SeatPart then
+									camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
+								end
+								
+								pmCameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
+							elseif not hum or hum.Health <= 0 then
+								cleanupPMCameraProxy()
+							end
+						end
+					end))
 				end
 				
 				if Method.Value == 'Ray' then
@@ -2312,31 +2331,6 @@ run(function()
 					
 					if PositionManipulation and PositionManipulation.Enabled then
 						pmTargetPosition = findBestPosition()
-						
-						if pmCameraProxy then
-							local char = entitylib.character and entitylib.character.Character
-							local hum = char and char:FindFirstChild("Humanoid")
-							local root = char and char:FindFirstChild("HumanoidRootPart")
-							if hum and root and hum.Health > 0 then
-								local camPos = root.CFrame.Position
-								local camOffset = hum.CameraOffset
-								
-								if hum.Sit and hum.SeatPart then
-									camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
-								end
-								
-								pmCameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
-							elseif not hum or hum.Health <= 0 then
-								cleanupPMCameraProxy()
-								if SilentAim and SilentAim.Enabled then
-									task.delay(0.1, function()
-										if SilentAim and SilentAim.Enabled then
-											setupPMCameraProxy()
-										end
-									end)
-								end
-							end
-						end
 						
 						local localChar = entitylib.character
 						if localChar and localChar.RootPart and pmTargetPosition then
