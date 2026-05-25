@@ -3637,29 +3637,31 @@ end)
 	
 run(function()
 	local Invisible
+	local InvisibleMethod
 	local clone, oldroot, hip, valid
 	local animtrack
 	local proper = true
+	local savedCharacterParent
 	
-	local function doClone()
+	local function doRootClone()
 		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
 			hip = entitylib.character.Humanoid.HipHeight
 			oldroot = entitylib.character.HumanoidRootPart
 			if not lplr.Character.Parent then
 				return false
 			end
-	
+
 			lplr.Character.Parent = game
 			clone = oldroot:Clone()
 			clone.Parent = lplr.Character
 			oldroot.Parent = gameCamera
 			clone.CFrame = oldroot.CFrame
-	
+
 			lplr.Character.PrimaryPart = clone
 			entitylib.character.HumanoidRootPart = clone
 			entitylib.character.RootPart = clone
 			lplr.Character.Parent = workspace
-	
+
 			for _, v in lplr.Character:GetDescendants() do
 				if v:IsA('Weld') or v:IsA('Motor6D') then
 					if v.Part0 == oldroot then
@@ -3670,18 +3672,18 @@ run(function()
 					end
 				end
 			end
-	
+
 			return true
 		end
-	
+
 		return false
 	end
-	
-	local function revertClone()
+
+	local function revertRootClone()
 		if not oldroot or not oldroot:IsDescendantOf(workspace) or not entitylib.isAlive then
 			return false
 		end
-	
+
 		lplr.Character.Parent = game
 		oldroot.Parent = lplr.Character
 		lplr.Character.PrimaryPart = oldroot
@@ -3689,7 +3691,7 @@ run(function()
 		entitylib.character.RootPart = oldroot
 		lplr.Character.Parent = workspace
 		oldroot.CanCollide = true
-	
+
 		for _, v in lplr.Character:GetDescendants() do
 			if v:IsA('Weld') or v:IsA('Motor6D') then
 				if v.Part0 == clone then
@@ -3700,16 +3702,52 @@ run(function()
 				end
 			end
 		end
-	
+
 		local oldpos = clone.CFrame
 		if clone then
 			clone:Destroy()
 			clone = nil
 		end
-	
+
 		oldroot.CFrame = oldpos
 		oldroot = nil
 		entitylib.character.Humanoid.HipHeight = hip or 2
+	end
+
+	local function doParentToNil()
+		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
+			savedCharacterParent = lplr.Character.Parent
+			lplr.Character.Parent = nil
+			return true
+		end
+		return false
+	end
+
+	local function revertParentToNil()
+		if savedCharacterParent and entitylib.isAlive then
+			lplr.Character.Parent = savedCharacterParent
+			savedCharacterParent = nil
+			return true
+		end
+		return false
+	end
+
+	local function doParentToCamera()
+		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
+			savedCharacterParent = lplr.Character.Parent
+			lplr.Character.Parent = gameCamera
+			return true
+		end
+		return false
+	end
+
+	local function revertParentToCamera()
+		if savedCharacterParent and entitylib.isAlive then
+			lplr.Character.Parent = savedCharacterParent
+			savedCharacterParent = nil
+			return true
+		end
+		return false
 	end
 	
 	local function animationTrickery()
@@ -3725,7 +3763,7 @@ run(function()
 					animationTrickery()
 				end
 			end)
-	
+
 			task.delay(0, function()
 				animtrack.TimePosition = 0.77
 				task.delay(1, function()
@@ -3744,54 +3782,98 @@ run(function()
 					Invisible:Toggle()
 					return
 				end
-	
-				success = doClone()
-				if not success then
-					Invisible:Toggle()
-					return
-				end
-	
-				animationTrickery()
-				Invisible:Clean(runService.PreSimulation:Connect(function(dt)
-					if entitylib.isAlive and oldroot then
-						local root = entitylib.character.RootPart
-						local cf = root.CFrame - Vector3.new(0, entitylib.character.Humanoid.HipHeight + (root.Size.Y / 2) - 1, 0)
-	
-						if not isnetworkowner(oldroot) then
-							root.CFrame = oldroot.CFrame
-							root.Velocity = oldroot.Velocity
-							return
+
+				local method = InvisibleMethod and InvisibleMethod.Value or 'Root Clone'
+				if method == 'Root Clone' then
+					success = doRootClone()
+					if not success then
+						Invisible:Toggle()
+						return
+					end
+					animationTrickery()
+					Invisible:Clean(runService.PreSimulation:Connect(function(dt)
+						if entitylib.isAlive and oldroot then
+							local root = entitylib.character.RootPart
+							local cf = root.CFrame - Vector3.new(0, entitylib.character.Humanoid.HipHeight + (root.Size.Y / 2) - 1, 0)
+
+							if not isnetworkowner(oldroot) then
+								root.CFrame = oldroot.CFrame
+								root.Velocity = oldroot.Velocity
+								return
+							end
+
+							oldroot.CFrame = cf * CFrame.Angles(math.rad(180), 0, 0)
+							oldroot.Velocity = root.Velocity
+							oldroot.CanCollide = false
 						end
-	
-						oldroot.CFrame = cf * CFrame.Angles(math.rad(180), 0, 0)
-						oldroot.Velocity = root.Velocity
-						oldroot.CanCollide = false
-					end
-				end))
-	
-				Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
-					local animator = char.Humanoid:WaitForChild('Animator', 1)
-					if animator and Invisible.Enabled then
-						oldroot = nil
+					end))
+					Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
+						local animator = char.Humanoid:WaitForChild('Animator', 1)
+						if animator and Invisible.Enabled then
+							oldroot = nil
+							Invisible:Toggle()
+							Invisible:Toggle()
+						end
+					end))
+				elseif method == 'Parent to nil' then
+					success = doParentToNil()
+					if not success then
 						Invisible:Toggle()
-						Invisible:Toggle()
+						return
 					end
-				end))
+					Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
+						if Invisible.Enabled then
+							savedCharacterParent = nil
+							Invisible:Toggle()
+							Invisible:Toggle()
+						end
+					end))
+				elseif method == 'Parent to Camera' then
+					success = doParentToCamera()
+					if not success then
+						Invisible:Toggle()
+						return
+					end
+					Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
+						if Invisible.Enabled then
+							savedCharacterParent = nil
+							Invisible:Toggle()
+							Invisible:Toggle()
+						end
+					end))
+				end
 			else
 				if animtrack then
 					animtrack:Stop()
 					animtrack:Destroy()
 				end
-	
-				if success and clone and oldroot and proper then
-					proper = true
-					if oldroot and clone then
-						revertClone()
+
+				local method = InvisibleMethod and InvisibleMethod.Value or 'Root Clone'
+				if method == 'Root Clone' then
+					if success and clone and oldroot and proper then
+						proper = true
+						if oldroot and clone then
+							revertRootClone()
+						end
+					end
+				elseif method == 'Parent to nil' then
+					if success and savedCharacterParent then
+						revertParentToNil()
+					end
+				elseif method == 'Parent to Camera' then
+					if success and savedCharacterParent then
+						revertParentToCamera()
 					end
 				end
 			end
 		end,
 		Tooltip = 'Turns you invisible.'
+	})
+	
+	InvisibleMethod = Invisible:CreateDropdown({
+		Name = 'Method',
+		List = {'Root Clone', 'Parent to nil', 'Parent to Camera'},
+		Default = 'Root Clone'
 	})
 end)
 	
