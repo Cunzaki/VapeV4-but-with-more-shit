@@ -1352,6 +1352,46 @@ run(function()
 	local pmRadiusPart
 	local pmTargetPosition = nil
 	local pmRaycastParams = RaycastParams.new()
+	
+	local pmCameraProxy
+	local pmOriginalCameraSubject
+	
+	local function cleanupPMCameraProxy()
+		if pmCameraProxy then
+			pmCameraProxy:Destroy()
+			pmCameraProxy = nil
+		end
+		local cam = workspace.CurrentCamera
+		if cam and pmOriginalCameraSubject then
+			cam.CameraSubject = pmOriginalCameraSubject
+			pmOriginalCameraSubject = nil
+		end
+	end
+	
+	local function setupPMCameraProxy()
+		cleanupPMCameraProxy()
+		
+		local cam = workspace.CurrentCamera
+		if not cam then return end
+		
+		local char = entitylib.character and entitylib.character.Character
+		local hum = char and char:FindFirstChild("Humanoid")
+		if not hum or hum.Health <= 0 then return end
+		
+		pmOriginalCameraSubject = cam.CameraSubject
+		
+		pmCameraProxy = Instance.new("Part")
+		pmCameraProxy.Name = "VapePositionManipulationCameraProxy"
+		pmCameraProxy.Transparency = 1
+		pmCameraProxy.CanCollide = false
+		pmCameraProxy.CanQuery = false
+		pmCameraProxy.CanTouch = false
+		pmCameraProxy.Anchored = true
+		pmCameraProxy.Size = Vector3.new(0.1, 0.1, 0.1)
+		pmCameraProxy.Parent = workspace
+		
+		cam.CameraSubject = pmCameraProxy
+	end
 
 	local resolverConfig = {
 		HistorySize = 6,
@@ -2189,6 +2229,7 @@ run(function()
 				SilentAim:Clean(entitylib.Events.LocalAdded:Connect(resetTracerTracking))
 				
 				if PositionManipulation and PositionManipulation.Enabled then
+					setupPMCameraProxy()
 					if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
 						setupPMClone()
 					end
@@ -2196,6 +2237,7 @@ run(function()
 						setupPMRadius()
 					end
 					SilentAim:Clean(entitylib.Events.LocalAdded:Connect(function()
+						setupPMCameraProxy()
 						if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
 							setupPMClone()
 						end
@@ -2264,6 +2306,22 @@ run(function()
 					
 					if PositionManipulation and PositionManipulation.Enabled then
 						pmTargetPosition = findBestPosition()
+						
+						if pmCameraProxy then
+							local char = entitylib.character and entitylib.character.Character
+							local hum = char and char:FindFirstChild("Humanoid")
+							local root = char and char:FindFirstChild("HumanoidRootPart")
+							if hum and root then
+								local camPos = root.CFrame.Position
+								local camOffset = hum.CameraOffset
+								
+								if hum.Sit and hum.SeatPart then
+									camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
+								end
+								
+								pmCameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
+							end
+						end
 						
 						local localChar = entitylib.character
 						if localChar and localChar.RootPart and pmTargetPosition then
@@ -2351,6 +2409,7 @@ run(function()
 				oldnamecall, oldray = nil, nil
 				cleanupPMClone()
 				cleanupPMRadius()
+				cleanupPMCameraProxy()
 			end
 		end,
 		ExtraText = function()
