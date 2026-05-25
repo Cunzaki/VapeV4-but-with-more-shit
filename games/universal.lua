@@ -3642,6 +3642,7 @@ run(function()
 	local animtrack
 	local proper = true
 	local savedCharacterParent
+	local savedCameraSubject
 	
 	local function doRootClone()
 		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
@@ -3680,7 +3681,7 @@ run(function()
 	end
 
 	local function revertRootClone()
-		if not oldroot or not oldroot:IsDescendantOf(workspace) or not entitylib.isAlive then
+		if not oldroot or not entitylib.isAlive then
 			return false
 		end
 
@@ -3703,7 +3704,7 @@ run(function()
 			end
 		end
 
-		local oldpos = clone.CFrame
+		local oldpos = clone and clone.CFrame or oldroot.CFrame
 		if clone then
 			clone:Destroy()
 			clone = nil
@@ -3717,6 +3718,7 @@ run(function()
 	local function doParentToNil()
 		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
 			savedCharacterParent = lplr.Character.Parent
+			savedCameraSubject = gameCamera.CameraSubject
 			lplr.Character.Parent = nil
 			return true
 		end
@@ -3726,7 +3728,11 @@ run(function()
 	local function revertParentToNil()
 		if savedCharacterParent and entitylib.isAlive then
 			lplr.Character.Parent = savedCharacterParent
+			if savedCameraSubject then
+				gameCamera.CameraSubject = savedCameraSubject
+			end
 			savedCharacterParent = nil
+			savedCameraSubject = nil
 			return true
 		end
 		return false
@@ -3735,6 +3741,7 @@ run(function()
 	local function doParentToCamera()
 		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
 			savedCharacterParent = lplr.Character.Parent
+			savedCameraSubject = gameCamera.CameraSubject
 			lplr.Character.Parent = gameCamera
 			return true
 		end
@@ -3744,7 +3751,11 @@ run(function()
 	local function revertParentToCamera()
 		if savedCharacterParent and entitylib.isAlive then
 			lplr.Character.Parent = savedCharacterParent
+			if savedCameraSubject then
+				gameCamera.CameraSubject = savedCameraSubject
+			end
 			savedCharacterParent = nil
+			savedCameraSubject = nil
 			return true
 		end
 		return false
@@ -3824,6 +3835,7 @@ run(function()
 					Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
 						if Invisible.Enabled then
 							savedCharacterParent = nil
+							savedCameraSubject = nil
 							Invisible:Toggle()
 							Invisible:Toggle()
 						end
@@ -3837,6 +3849,7 @@ run(function()
 					Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
 						if Invisible.Enabled then
 							savedCharacterParent = nil
+							savedCameraSubject = nil
 							Invisible:Toggle()
 							Invisible:Toggle()
 						end
@@ -3850,9 +3863,9 @@ run(function()
 
 				local method = InvisibleMethod and InvisibleMethod.Value or 'Root Clone'
 				if method == 'Root Clone' then
-					if success and clone and oldroot and proper then
+					if success and (clone or oldroot) and proper then
 						proper = true
-						if oldroot and clone then
+						if oldroot or clone then
 							revertRootClone()
 						end
 					end
