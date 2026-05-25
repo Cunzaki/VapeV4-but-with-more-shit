@@ -1335,6 +1335,23 @@ run(function()
 	local scanActiveThisFrame = false
 	local lastDebugRenderTime = 0
 	local DEBUG_RENDER_INTERVAL = 0.1
+	
+	local PositionManipulation
+	local PositionManipulationRadius
+	local PositionManipulationVisualizer
+	local PositionManipulationVisualizerMaterial
+	local PositionManipulationVisualizerColorToggle
+	local PositionManipulationVisualizerColor
+	local PositionManipulationRadiusVisualizer
+	local PositionManipulationRadiusVisualizerColor
+	
+	local pmClone
+	local pmCloneRoot
+	local pmRealRoot
+	local pmMotorMap = {}
+	local pmRadiusPart
+	local pmTargetPosition = nil
+	local pmRaycastParams = RaycastParams.new()
 
 	local resolverConfig = {
 		HistorySize = 6,
@@ -1706,6 +1723,212 @@ run(function()
 		clearBulletTracers()
 		healthCache = setmetatable({}, {__mode = 'k'})
 	end
+	
+	local function cleanupPMClone()
+		if pmClone then
+			pmClone:Destroy()
+		end
+		pmClone = nil
+		pmCloneRoot = nil
+		pmRealRoot = nil
+		pmMotorMap = {}
+	end
+	
+	local function setupPMClone()
+		cleanupPMClone()
+		
+		local char = entitylib.character and entitylib.character.Character
+		if not char then return end
+		
+		char.Archivable = true
+		pmRealRoot = char:FindFirstChild("HumanoidRootPart")
+		if not pmRealRoot then return end
+		
+		pmClone = char:Clone()
+		if not pmClone then return end
+		
+		pmClone.Name = "PositionManipulationVisualizer"
+		
+		pmMotorMap = {}
+		local realMotors = {}
+		for _, v in ipairs(char:GetDescendants()) do
+			if v:IsA("Motor6D") then
+				realMotors[v.Name] = v
+			end
+		end
+		
+		for _, d in ipairs(pmClone:GetDescendants()) do
+			if d:IsA("Motor6D") then
+				local realMotor = realMotors[d.Name]
+				if realMotor then
+					pmMotorMap[d] = realMotor
+				end
+			end
+		end
+		
+		local torso = pmClone:FindFirstChild('UpperTorso') or pmClone:FindFirstChild('Torso') or pmClone:FindFirstChild('HumanoidRootPart')
+		local hrp = pmClone:FindFirstChild('HumanoidRootPart')
+		if hrp then
+			pmClone.PrimaryPart = hrp
+		elseif torso then
+			pmClone.PrimaryPart = torso
+		end
+		
+		for _, obj in ipairs(pmClone:GetDescendants()) do
+			if obj:IsA("BasePart") then
+				local isAccessoryPart = false
+				local parent = obj.Parent
+				while parent and parent ~= pmClone do
+					if parent:IsA('Accessory') then
+						isAccessoryPart = true
+						break
+					end
+					parent = parent.Parent
+				end
+				
+				local isBodyPart = (obj.Name == 'Head' or obj.Name == 'UpperTorso' or obj.Name == 'LowerTorso' or obj.Name == 'Torso' or obj.Name == 'LeftUpperArm' or obj.Name == 'LeftLowerArm' or obj.Name == 'LeftHand' or obj.Name == 'RightUpperArm' or obj.Name == 'RightLowerArm' or obj.Name == 'RightHand' or obj.Name == 'LeftUpperLeg' or obj.Name == 'LeftLowerLeg' or obj.Name == 'LeftFoot' or obj.Name == 'RightUpperLeg' or obj.Name == 'RightLowerLeg' or obj.Name == 'RightFoot')
+				
+				if obj.Name == "HumanoidRootPart" then
+					obj.Anchored = true
+				elseif obj.Name == "Head" then
+					obj.Anchored = false
+				elseif isAccessoryPart then
+					obj.Anchored = true
+				elseif isBodyPart then
+					obj.Anchored = false
+				else
+					obj.Anchored = false
+				end
+				
+				obj.CanCollide = false
+				obj.CanTouch = false
+				obj.CanQuery = false
+				obj.Massless = true
+				obj.CastShadow = false
+				obj.Material = Enum.Material[PositionManipulationVisualizerMaterial.Value] or Enum.Material.ForceField
+				obj.Transparency = 0.4
+				
+				if PositionManipulationVisualizerColorToggle.Enabled then
+					local color = Color3.fromHSV(PositionManipulationVisualizerColor.Hue, PositionManipulationVisualizerColor.Sat, PositionManipulationVisualizerColor.Value)
+					obj.Color = color
+				end
+			elseif obj:IsA("Humanoid") then
+				obj:Destroy()
+			elseif obj:IsA("WeldConstraint") or obj:IsA("Weld") then
+				local isAccessoryWeld = false
+				local parent = obj.Parent
+				while parent and parent ~= pmClone do
+					if parent:IsA('Accessory') then
+						isAccessoryWeld = true
+						break
+					end
+					parent = parent.Parent
+				end
+				
+				local isBodyWeld = (obj.Part0 and (obj.Part0.Name == 'Head' or obj.Part0.Name == 'Torso' or obj.Part0.Name == 'UpperTorso' or obj.Part0.Name == 'HumanoidRootPart'))
+				
+				if not (isAccessoryWeld or isBodyWeld) then
+					obj:Destroy()
+				end
+			elseif obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("Tool") then
+				obj:Destroy()
+			end
+		end
+		
+		pmClone.Parent = workspace
+		
+		pmCloneRoot = pmClone:FindFirstChild("HumanoidRootPart")
+		if not pmCloneRoot then
+			cleanupPMClone()
+			return
+		end
+	end
+	
+	local function cleanupPMRadius()
+		if pmRadiusPart then
+			pmRadiusPart:Destroy()
+		end
+		pmRadiusPart = nil
+	end
+	
+	local function setupPMRadius()
+		cleanupPMRadius()
+		
+		pmRadiusPart = Instance.new("Part")
+		pmRadiusPart.Name = "PositionManipulationRadius"
+		pmRadiusPart.Shape = Enum.PartType.Ball
+		pmRadiusPart.Anchored = true
+		pmRadiusPart.CanCollide = false
+		pmRadiusPart.CanTouch = false
+		pmRadiusPart.CanQuery = false
+		pmRadiusPart.CastShadow = false
+		pmRadiusPart.Material = Enum.Material.ForceField
+		pmRadiusPart.Transparency = 0.7
+		pmRadiusPart.Color = Color3.fromHSV(PositionManipulationRadiusVisualizerColor.Hue, PositionManipulationRadiusVisualizerColor.Sat, PositionManipulationRadiusVisualizerColor.Value)
+		pmRadiusPart.Parent = workspace
+	end
+	
+	local function findBestPosition()
+		if not PositionManipulation or not PositionManipulation.Enabled then return nil end
+		
+		local localChar = entitylib.character
+		if not localChar or not localChar.RootPart then return nil end
+		
+		local localRoot = localChar.RootPart
+		local localPos = localRoot.Position
+		local radius = PositionManipulationRadius.Value
+		
+		local bestTarget = nil
+		local bestTargetDistance = math.huge
+		for _, ent in entitylib.List do
+			if ent == entitylib.Local then continue end
+			if not ent.Character or not ent.RootPart then continue end
+			if not entitylib.targetCheck(ent) then continue end
+			local dist = (ent.RootPart.Position - localPos).Magnitude
+			if dist < bestTargetDistance then
+				bestTargetDistance = dist
+				bestTarget = ent
+			end
+		end
+		
+		if not bestTarget then return nil end
+		
+		local targetHead = bestTarget.Head or bestTarget.RootPart
+		if not targetHead then return nil end
+		
+		local bestPosition = nil
+		local bestPositionScore = math.huge
+		
+		pmRaycastParams.FilterType = Enum.RaycastFilterType.Exclude
+		pmRaycastParams.FilterDescendantsInstances = {lplr.Character, gameCamera, pmClone, pmRadiusPart}
+		pmRaycastParams.RespectCanCollide = true
+		
+		local numSamples = 12
+		for i = 0, numSamples - 1 do
+			local angle = (i / numSamples) * math.pi * 2
+			local x = math.cos(angle) * radius
+			local z = math.sin(angle) * radius
+			local testPos = localPos + Vector3.new(x, 0, z)
+			
+			local rayOrigin = testPos + Vector3.new(0, 2, 0)
+			local rayDirection = (targetHead.Position - rayOrigin).Unit
+			local rayResult = workspace:Raycast(rayOrigin, rayDirection * 1000, pmRaycastParams)
+			
+			if rayResult then
+				local hitPart = rayResult.Instance
+				local hitChar = hitPart and hitPart:FindFirstAncestorOfClass("Model")
+				if hitChar and hitChar == bestTarget.Character then
+					local score = (testPos - localPos).Magnitude
+					if score < bestPositionScore then
+						bestPositionScore = score
+						bestPosition = testPos
+					end
+				end
+			end
+		end
+		
+		return bestPosition
+	end
 
 	local function registerShot(ent, targetPart, origin)
 		local wantsTracers = BulletTracers and BulletTracers.Enabled
@@ -1964,6 +2187,24 @@ run(function()
 				end))
 				SilentAim:Clean(entitylib.Events.LocalRemoved:Connect(resetTracerTracking))
 				SilentAim:Clean(entitylib.Events.LocalAdded:Connect(resetTracerTracking))
+				
+				if PositionManipulation and PositionManipulation.Enabled then
+					if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
+						setupPMClone()
+					end
+					if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled then
+						setupPMRadius()
+					end
+					SilentAim:Clean(entitylib.Events.LocalAdded:Connect(function()
+						if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
+							setupPMClone()
+						end
+						if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled then
+							setupPMRadius()
+						end
+					end))
+				end
+				
 				if Method.Value == 'Ray' then
 					oldray = hookfunction(Ray.new, function(origin, direction)
 						if checkcaller() then
@@ -2020,6 +2261,42 @@ run(function()
 					if DebugVisualization and DebugVisualization.Enabled then
 						pcall(function() updateDebugVisualization() end)
 					end
+					
+					if PositionManipulation and PositionManipulation.Enabled then
+						pmTargetPosition = findBestPosition()
+						
+						local localChar = entitylib.character
+						if localChar and localChar.RootPart and pmTargetPosition then
+							local root = localChar.RootPart
+							local originalCF = root.CFrame
+							root.CFrame = CFrame.new(pmTargetPosition) * originalCF.Rotation
+							runService.RenderStepped:Wait()
+							root.CFrame = originalCF
+						end
+						
+						if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled and pmCloneRoot then
+							local baseCF = entitylib.character and entitylib.character.RootPart and entitylib.character.RootPart.CFrame
+							if baseCF then
+								for cloneMotor, realMotor in pairs(pmMotorMap) do
+									if cloneMotor and realMotor and cloneMotor.Parent and realMotor.Parent then
+										cloneMotor.Transform = realMotor.Transform
+									end
+								end
+								local targetCF = pmTargetPosition and CFrame.new(pmTargetPosition) * baseCF.Rotation or baseCF
+								pmClone:PivotTo(targetCF)
+							end
+						end
+						
+						if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled and pmRadiusPart then
+							local localRoot = entitylib.character and entitylib.character.RootPart
+							if localRoot then
+								pmRadiusPart.Position = localRoot.Position
+								pmRadiusPart.Size = Vector3.new(PositionManipulationRadius.Value * 2, PositionManipulationRadius.Value * 2, PositionManipulationRadius.Value * 2)
+								pmRadiusPart.Color = Color3.fromHSV(PositionManipulationRadiusVisualizerColor.Hue, PositionManipulationRadiusVisualizerColor.Sat, PositionManipulationRadiusVisualizerColor.Value)
+							end
+						end
+					end
+					
 					processHitDetection()
 					if BulletTracers.Enabled then
 						renderBulletTracers()
@@ -2072,6 +2349,8 @@ run(function()
 					hookfunction(Ray.new, oldray)
 				end
 				oldnamecall, oldray = nil, nil
+				cleanupPMClone()
+				cleanupPMRadius()
 			end
 		end,
 		ExtraText = function()
@@ -2360,6 +2639,90 @@ run(function()
 	DebugVisualization = SilentAim:CreateToggle({
 		Name = 'Debug Visualization',
 		Tooltip = 'Shows debug info in console for SilentAim'
+	})
+	PositionManipulation = SilentAim:CreateToggle({
+		Name = 'Position Manipulation',
+		Tooltip = 'Manipulates your position to make targets visible',
+		Function = function(callback)
+			PositionManipulationRadius.Object.Visible = callback
+			PositionManipulationVisualizer.Object.Visible = callback
+			if PositionManipulationVisualizer.Object.Visible then
+				PositionManipulationVisualizerMaterial.Object.Visible = PositionManipulationVisualizer.Enabled
+				PositionManipulationVisualizerColorToggle.Object.Visible = PositionManipulationVisualizer.Enabled
+				PositionManipulationVisualizerColor.Object.Visible = PositionManipulationVisualizer.Enabled
+			end
+			PositionManipulationRadiusVisualizer.Object.Visible = callback
+			if PositionManipulationRadiusVisualizer.Object.Visible then
+				PositionManipulationRadiusVisualizerColor.Object.Visible = PositionManipulationRadiusVisualizer.Enabled
+			end
+		end
+	})
+	PositionManipulationRadius = SilentAim:CreateSlider({
+		Name = 'Scan Radius',
+		Min = 5,
+		Max = 50,
+		Default = 20,
+		Visible = false,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
+	})
+	PositionManipulationVisualizer = SilentAim:CreateToggle({
+		Name = 'Visualizer',
+		Visible = false,
+		Tooltip = 'Shows a clone indicating your manipulated position',
+		Function = function(callback)
+			PositionManipulationVisualizerMaterial.Object.Visible = callback
+			PositionManipulationVisualizerColorToggle.Object.Visible = callback
+			PositionManipulationVisualizerColor.Object.Visible = callback
+			if SilentAim and SilentAim.Enabled then
+				if callback then
+					setupPMClone()
+				else
+					cleanupPMClone()
+				end
+			end
+		end
+	})
+	PositionManipulationVisualizerMaterial = SilentAim:CreateDropdown({
+		Name = 'Visualizer Material',
+		List = {'ForceField', 'Neon', 'Glass', 'SmoothPlastic'},
+		Default = 'ForceField',
+		Visible = false,
+		Darker = true
+	})
+	PositionManipulationVisualizerColorToggle = SilentAim:CreateToggle({
+		Name = 'Custom Color',
+		Visible = false,
+		Darker = true,
+		Function = function(callback)
+			PositionManipulationVisualizerColor.Object.Visible = callback
+		end
+	})
+	PositionManipulationVisualizerColor = SilentAim:CreateColorSlider({
+		Name = 'Visualizer Color',
+		Visible = false,
+		Darker = true
+	})
+	PositionManipulationRadiusVisualizer = SilentAim:CreateToggle({
+		Name = 'Radius Visualizer',
+		Visible = false,
+		Tooltip = 'Shows the scan radius',
+		Function = function(callback)
+			PositionManipulationRadiusVisualizerColor.Object.Visible = callback
+			if SilentAim and SilentAim.Enabled then
+				if callback then
+					setupPMRadius()
+				else
+					cleanupPMRadius()
+				end
+			end
+		end
+	})
+	PositionManipulationRadiusVisualizerColor = SilentAim:CreateColorSlider({
+		Name = 'Radius Color',
+		Visible = false,
+		Darker = true
 	})
 	vape:Clean(BulletTracerFolder)
 end)
