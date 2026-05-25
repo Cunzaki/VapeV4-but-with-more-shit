@@ -3637,32 +3637,29 @@ end)
 	
 run(function()
 	local Invisible
-	local InvisibleMethod
 	local clone, oldroot, hip, valid
 	local animtrack
 	local proper = true
-	local savedCharacterParent
-	local savedCameraSubject
 	
-	local function doRootClone()
+	local function doClone()
 		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
 			hip = entitylib.character.Humanoid.HipHeight
 			oldroot = entitylib.character.HumanoidRootPart
 			if not lplr.Character.Parent then
 				return false
 			end
-
+	
 			lplr.Character.Parent = game
 			clone = oldroot:Clone()
 			clone.Parent = lplr.Character
 			oldroot.Parent = gameCamera
 			clone.CFrame = oldroot.CFrame
-
+	
 			lplr.Character.PrimaryPart = clone
 			entitylib.character.HumanoidRootPart = clone
 			entitylib.character.RootPart = clone
 			lplr.Character.Parent = workspace
-
+	
 			for _, v in lplr.Character:GetDescendants() do
 				if v:IsA('Weld') or v:IsA('Motor6D') then
 					if v.Part0 == oldroot then
@@ -3673,18 +3670,18 @@ run(function()
 					end
 				end
 			end
-
+	
 			return true
 		end
-
+	
 		return false
 	end
-
-	local function revertRootClone()
-		if not oldroot or not entitylib.isAlive then
+	
+	local function revertClone()
+		if not oldroot or not oldroot:IsDescendantOf(workspace) or not entitylib.isAlive then
 			return false
 		end
-
+	
 		lplr.Character.Parent = game
 		oldroot.Parent = lplr.Character
 		lplr.Character.PrimaryPart = oldroot
@@ -3692,7 +3689,7 @@ run(function()
 		entitylib.character.RootPart = oldroot
 		lplr.Character.Parent = workspace
 		oldroot.CanCollide = true
-
+	
 		for _, v in lplr.Character:GetDescendants() do
 			if v:IsA('Weld') or v:IsA('Motor6D') then
 				if v.Part0 == clone then
@@ -3703,62 +3700,16 @@ run(function()
 				end
 			end
 		end
-
-		local oldpos = clone and clone.CFrame or oldroot.CFrame
+	
+		local oldpos = clone.CFrame
 		if clone then
 			clone:Destroy()
 			clone = nil
 		end
-
+	
 		oldroot.CFrame = oldpos
 		oldroot = nil
 		entitylib.character.Humanoid.HipHeight = hip or 2
-	end
-
-	local function doParentToNil()
-		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
-			savedCharacterParent = lplr.Character.Parent
-			savedCameraSubject = gameCamera.CameraSubject
-			lplr.Character.Parent = nil
-			return true
-		end
-		return false
-	end
-
-	local function revertParentToNil()
-		if savedCharacterParent and entitylib.isAlive then
-			lplr.Character.Parent = savedCharacterParent
-			if savedCameraSubject then
-				gameCamera.CameraSubject = savedCameraSubject
-			end
-			savedCharacterParent = nil
-			savedCameraSubject = nil
-			return true
-		end
-		return false
-	end
-
-	local function doParentToCamera()
-		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
-			savedCharacterParent = lplr.Character.Parent
-			savedCameraSubject = gameCamera.CameraSubject
-			lplr.Character.Parent = gameCamera
-			return true
-		end
-		return false
-	end
-
-	local function revertParentToCamera()
-		if savedCharacterParent and entitylib.isAlive then
-			lplr.Character.Parent = savedCharacterParent
-			if savedCameraSubject then
-				gameCamera.CameraSubject = savedCameraSubject
-			end
-			savedCharacterParent = nil
-			savedCameraSubject = nil
-			return true
-		end
-		return false
 	end
 	
 	local function animationTrickery()
@@ -3774,7 +3725,7 @@ run(function()
 					animationTrickery()
 				end
 			end)
-
+	
 			task.delay(0, function()
 				animtrack.TimePosition = 0.77
 				task.delay(1, function()
@@ -3793,100 +3744,54 @@ run(function()
 					Invisible:Toggle()
 					return
 				end
-
-				local method = InvisibleMethod and InvisibleMethod.Value or 'Root Clone'
-				if method == 'Root Clone' then
-					success = doRootClone()
-					if not success then
-						Invisible:Toggle()
-						return
-					end
-					animationTrickery()
-					Invisible:Clean(runService.PreSimulation:Connect(function(dt)
-						if entitylib.isAlive and oldroot then
-							local root = entitylib.character.RootPart
-							local cf = root.CFrame - Vector3.new(0, entitylib.character.Humanoid.HipHeight + (root.Size.Y / 2) - 1, 0)
-
-							if not isnetworkowner(oldroot) then
-								root.CFrame = oldroot.CFrame
-								root.Velocity = oldroot.Velocity
-								return
-							end
-
-							oldroot.CFrame = cf * CFrame.Angles(math.rad(180), 0, 0)
-							oldroot.Velocity = root.Velocity
-							oldroot.CanCollide = false
-						end
-					end))
-					Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
-						local animator = char.Humanoid:WaitForChild('Animator', 1)
-						if animator and Invisible.Enabled then
-							oldroot = nil
-							Invisible:Toggle()
-							Invisible:Toggle()
-						end
-					end))
-				elseif method == 'Parent to nil' then
-					success = doParentToNil()
-					if not success then
-						Invisible:Toggle()
-						return
-					end
-					Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
-						if Invisible.Enabled then
-							savedCharacterParent = nil
-							savedCameraSubject = nil
-							Invisible:Toggle()
-							Invisible:Toggle()
-						end
-					end))
-				elseif method == 'Parent to Camera' then
-					success = doParentToCamera()
-					if not success then
-						Invisible:Toggle()
-						return
-					end
-					Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
-						if Invisible.Enabled then
-							savedCharacterParent = nil
-							savedCameraSubject = nil
-							Invisible:Toggle()
-							Invisible:Toggle()
-						end
-					end))
+	
+				success = doClone()
+				if not success then
+					Invisible:Toggle()
+					return
 				end
+	
+				animationTrickery()
+				Invisible:Clean(runService.PreSimulation:Connect(function(dt)
+					if entitylib.isAlive and oldroot then
+						local root = entitylib.character.RootPart
+						local cf = root.CFrame - Vector3.new(0, entitylib.character.Humanoid.HipHeight + (root.Size.Y / 2) - 1, 0)
+	
+						if not isnetworkowner(oldroot) then
+							root.CFrame = oldroot.CFrame
+							root.Velocity = oldroot.Velocity
+							return
+						end
+	
+						oldroot.CFrame = cf * CFrame.Angles(math.rad(180), 0, 0)
+						oldroot.Velocity = root.Velocity
+						oldroot.CanCollide = false
+					end
+				end))
+	
+				Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
+					local animator = char.Humanoid:WaitForChild('Animator', 1)
+					if animator and Invisible.Enabled then
+						oldroot = nil
+						Invisible:Toggle()
+						Invisible:Toggle()
+					end
+				end))
 			else
 				if animtrack then
 					animtrack:Stop()
 					animtrack:Destroy()
 				end
-
-				local method = InvisibleMethod and InvisibleMethod.Value or 'Root Clone'
-				if method == 'Root Clone' then
-					if success and (clone or oldroot) and proper then
-						proper = true
-						if oldroot or clone then
-							revertRootClone()
-						end
-					end
-				elseif method == 'Parent to nil' then
-					if success and savedCharacterParent then
-						revertParentToNil()
-					end
-				elseif method == 'Parent to Camera' then
-					if success and savedCharacterParent then
-						revertParentToCamera()
+	
+				if success and clone and oldroot and proper then
+					proper = true
+					if oldroot and clone then
+						revertClone()
 					end
 				end
 			end
 		end,
 		Tooltip = 'Turns you invisible.'
-	})
-	
-	InvisibleMethod = Invisible:CreateDropdown({
-		Name = 'Method',
-		List = {'Root Clone', 'Parent to nil', 'Parent to Camera'},
-		Default = 'Root Clone'
 	})
 end)
 	
@@ -10327,6 +10232,89 @@ run(function()
 			end
 		end,
 		Tooltip = 'Forces bright lighting and keeps it from being changed by the game'
+	})
+end)
+
+run(function()
+	local ThirdPerson
+	local Distance
+	local originalMaxZoom
+	local originalMinZoom
+
+	ThirdPerson = vape.Categories.Render:CreateModule({
+		Name = 'ThirdPerson',
+		Function = function(callback)
+			if callback then
+				local playerScripts = lplr and lplr:FindFirstChild('PlayerScripts')
+				if playerScripts then
+					local playerModule = playerScripts:FindFirstChild('PlayerModule')
+					if playerModule then
+						local cameraModule = playerModule:FindFirstChild('CameraModule')
+						if cameraModule then
+							pcall(function()
+								local cameraScript = require(cameraModule)
+								if cameraScript and cameraScript.SetCameraMode then
+									cameraScript:SetCameraMode('Follow')
+								end
+							end)
+						end
+					end
+				end
+				
+				originalMaxZoom = lplr.CameraMaxZoomDistance
+				originalMinZoom = lplr.CameraMinZoomDistance
+				
+				ThirdPerson:Clean(runService.Heartbeat:Connect(function()
+					if lplr then
+						lplr.CameraMaxZoomDistance = Distance and Distance.Value or 100
+						lplr.CameraMinZoomDistance = Distance and Distance.Value or 100
+					end
+				end))
+				
+				if entitylib.isAlive then
+					local char = entitylib.character.Character
+					for _, v in char:GetDescendants() do
+						if v:IsA('BasePart') and v.Parent == char then
+							v.LocalTransparencyModifier = 0
+						end
+					end
+				end
+				
+				ThirdPerson:Clean(entitylib.Events.LocalAdded:Connect(function(ent)
+					for _, v in ent.Character:GetDescendants() do
+						if v:IsA('BasePart') and v.Parent == ent.Character then
+							v.LocalTransparencyModifier = 0
+						end
+					end
+				end))
+			else
+				if lplr then
+					if originalMaxZoom then
+						lplr.CameraMaxZoomDistance = originalMaxZoom
+					end
+					if originalMinZoom then
+						lplr.CameraMinZoomDistance = originalMinZoom
+					end
+				end
+				
+				if entitylib.isAlive then
+					local char = entitylib.character.Character
+					for _, v in char:GetDescendants() do
+						if v:IsA('BasePart') and v.Parent == char then
+							v.LocalTransparencyModifier = 1
+						end
+					end
+				end
+			end
+		end,
+		Tooltip = 'Forces third person and lets you scroll out'
+	})
+	
+	Distance = ThirdPerson:CreateSlider({
+		Name = 'Distance',
+		Min = 5,
+		Max = 100,
+		Default = 15
 	})
 end)
 
