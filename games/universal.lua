@@ -1935,8 +1935,41 @@ run(function()
 		pmRaycastParams.FilterDescendantsInstances = {lplr.Character, gameCamera, pmClone, pmRadiusPart}
 		pmRaycastParams.RespectCanCollide = true
 		
-		local numAngleSamples = 16
-		local numRadiusSamples = 4
+		local function isPositionValid(pos)
+			local checkParams = RaycastParams.new()
+			checkParams.FilterType = Enum.RaycastFilterType.Exclude
+			checkParams.FilterDescendantsInstances = {lplr.Character, gameCamera, pmClone, pmRadiusPart}
+			checkParams.RespectCanCollide = true
+			
+			local checkRay = workspace:Raycast(pos, Vector3.new(0, 0.1, 0), checkParams)
+			if checkRay then
+				return false
+			end
+			
+			checkRay = workspace:Raycast(pos, Vector3.new(0, -0.1, 0), checkParams)
+			if checkRay then
+				return false
+			end
+			
+			local directions = {
+				Vector3.new(1, 0, 0),
+				Vector3.new(-1, 0, 0),
+				Vector3.new(0, 0, 1),
+				Vector3.new(0, 0, -1)
+			}
+			
+			for _, dir in directions do
+				checkRay = workspace:Raycast(pos, dir * 0.6, checkParams)
+				if checkRay then
+					return false
+				end
+			end
+			
+			return true
+		end
+		
+		local numAngleSamples = 32
+		local numRadiusSamples = 8
 		local numYSamples = 3
 		for ySample = 0, numYSamples - 1 do
 			local yOffset = (ySample / (numYSamples - 1)) * 4 - 2
@@ -1947,6 +1980,10 @@ run(function()
 					local x = math.cos(angle) * currentRadius
 					local z = math.sin(angle) * currentRadius
 					local testPos = localPos + Vector3.new(x, yOffset, z)
+					
+					if not isPositionValid(testPos) then
+						continue
+					end
 					
 					local rayOrigin = testPos + Vector3.new(0, 2, 0)
 					
