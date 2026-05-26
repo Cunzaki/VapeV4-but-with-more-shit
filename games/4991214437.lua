@@ -57,7 +57,15 @@ local hasForcefieldMaterial = function(ent)
 	local torso = character:FindFirstChild('Torso') or character:FindFirstChild('UpperTorso')
 	if not torso then return false end
 	
-	if torso.Material == Enum.Material.Forcefield then
+	-- Check both enum and string name (case insensitive)
+	local materialName = tostring(torso.Material):lower()
+	
+	-- Check if Forcefield enum exists
+	local forcefieldEnumExists, forcefieldMaterial = pcall(function()
+		return Enum.Material.Forcefield
+	end)
+	
+	if (forcefieldEnumExists and torso.Material == forcefieldMaterial) or materialName:find('forcefield') or materialName:find('force field') then
 		return true
 	end
 	
