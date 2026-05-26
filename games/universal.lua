@@ -8653,6 +8653,7 @@ end)
 
 run(function()
 	local Desync
+	local Mode
 	local ModeX
 	local ModeY
 	local AngleX
@@ -8670,6 +8671,7 @@ run(function()
 	local VisualizerMaterial
 	local VisualizerColor
 	local VisualizerColorToggle
+	local serverDesyncHook
 	
 	-- Get RunService
 	local RunService = game:GetService('RunService')
@@ -8994,20 +8996,49 @@ run(function()
 	
 	-- Function to update visibility
 	local function updateUIVisibility()
-		local valX = ModeX.Value
-		local valY = ModeY.Value
-		
-		AngleX.Object.Visible = (valX == 'Static' or valX == 'Jitter')
-		JitterSpeedX.Object.Visible = (valX == 'Jitter' or valX == 'Random')
-		SpinSpeedX.Object.Visible = (valX == 'Spin')
-		RandomMinX.Object.Visible = (valX == 'Random')
-		RandomMaxX.Object.Visible = (valX == 'Random')
-		
-		AngleY.Object.Visible = (valY == 'Static' or valY == 'Jitter')
-		JitterSpeedY.Object.Visible = (valY == 'Jitter' or valY == 'Random')
-		SpinSpeedY.Object.Visible = (valY == 'Spin')
-		RandomMinY.Object.Visible = (valY == 'Random')
-		RandomMaxY.Object.Visible = (valY == 'Random')
+		local isServerMode = Mode and Mode.Value == 'Server Desync'
+		if isServerMode then
+			ModeX.Object.Visible = false
+			ModeY.Object.Visible = false
+			AngleX.Object.Visible = false
+			JitterSpeedX.Object.Visible = false
+			SpinSpeedX.Object.Visible = false
+			RandomMinX.Object.Visible = false
+			RandomMaxX.Object.Visible = false
+			AngleY.Object.Visible = false
+			JitterSpeedY.Object.Visible = false
+			SpinSpeedY.Object.Visible = false
+			RandomMinY.Object.Visible = false
+			RandomMaxY.Object.Visible = false
+			Invert.Object.Visible = false
+			Visualizer.Object.Visible = false
+			VisualizerMaterial.Object.Visible = false
+			VisualizerColorToggle.Object.Visible = false
+			VisualizerColor.Object.Visible = false
+		else
+			local valX = ModeX.Value
+			local valY = ModeY.Value
+			
+			ModeX.Object.Visible = true
+			ModeY.Object.Visible = true
+			AngleX.Object.Visible = (valX == 'Static' or valX == 'Jitter')
+			JitterSpeedX.Object.Visible = (valX == 'Jitter' or valX == 'Random')
+			SpinSpeedX.Object.Visible = (valX == 'Spin')
+			RandomMinX.Object.Visible = (valX == 'Random')
+			RandomMaxX.Object.Visible = (valX == 'Random')
+			
+			AngleY.Object.Visible = (valY == 'Static' or valY == 'Jitter')
+			JitterSpeedY.Object.Visible = (valY == 'Jitter' or valY == 'Random')
+			SpinSpeedY.Object.Visible = (valY == 'Spin')
+			RandomMinY.Object.Visible = (valY == 'Random')
+			RandomMaxY.Object.Visible = (valY == 'Random')
+			
+			Invert.Object.Visible = true
+			Visualizer.Object.Visible = true
+			VisualizerMaterial.Object.Visible = Visualizer.Enabled
+			VisualizerColorToggle.Object.Visible = Visualizer.Enabled
+			VisualizerColor.Object.Visible = Visualizer.Enabled and VisualizerColorToggle.Enabled
+		end
 	end
 	
 	-- Create the module
@@ -9015,30 +9046,75 @@ run(function()
 		Name = 'Desync',
 		Function = function(callback)
 			if callback then
-				desyncEnabled = true
-				setupCameraProxy()
-				Desync:Clean(RunService.Heartbeat:Connect(onHeartbeat))
-				Desync:Clean(RunService.RenderStepped:Connect(onRenderStepped))
-				
-				if Visualizer.Enabled then
-					setupDesyncClone()
-				end
-				
-				-- Connect to character changes
-				Desync:Clean(entitylib.Events.LocalAdded:Connect(function()
+				if Mode.Value == 'Server Desync' then
+					local function rakNetCheck()
+						if not (raknet and raknet.add_send_hook and pcall(raknet.add_send_hook, function() end)) then
+							vape:CreateNotification('Desync', 'This feature requires raknet! (risky feature, please do not use on mains.)', 10, 'warning')
+							return false
+						end
+						return true
+					end
+					
+					if not rakNetCheck() then
+						Desync:Toggle()
+						return
+					end
+					
+					serverDesyncHook = function(packet)
+						if packet.AsArray and packet.AsArray[1] == 0x1b then
+							local data = packet.AsBuffer
+							if data then
+								buffer.writeu32(data, 1, 0xFFFFFFFF)
+								packet:SetData(data)
+							end
+						end
+					end
+					
+					raknet.add_send_hook(serverDesyncHook)
+				else
+					desyncEnabled = true
 					setupCameraProxy()
+					Desync:Clean(RunService.Heartbeat:Connect(onHeartbeat))
+					Desync:Clean(RunService.RenderStepped:Connect(onRenderStepped))
+					
 					if Visualizer.Enabled then
 						setupDesyncClone()
 					end
-				end))
+					
+					-- Connect to character changes
+					Desync:Clean(entitylib.Events.LocalAdded:Connect(function()
+						setupCameraProxy()
+						if Visualizer.Enabled then
+							setupDesyncClone()
+						end
+					end))
+				end
 			else
-				desyncEnabled = false
-				currentDesyncRotation = CFrame.identity
-				cleanupCameraProxy()
-				cleanupDesyncClone()
+				if Mode.Value == 'Server Desync' and serverDesyncHook then
+					raknet.remove_send_hook(serverDesyncHook)
+					serverDesyncHook = nil
+				else
+					desyncEnabled = false
+					currentDesyncRotation = CFrame.identity
+					cleanupCameraProxy()
+					cleanupDesyncClone()
+				end
 			end
 		end,
 		Tooltip = 'Advanced desync with CFrame spoofing and animated visualizer'
+	})
+	
+	Mode = Desync:CreateDropdown({
+		Name = 'Mode',
+		List = {'CFrame Desync', 'Server Desync'},
+		Default = 'CFrame Desync',
+		Function = function(val)
+			updateUIVisibility()
+			if Desync.Enabled then
+				Desync:Toggle()
+				Desync:Toggle()
+			end
+		end
 	})
 	
 	-- Mode selection X
@@ -9219,6 +9295,8 @@ run(function()
 			end
 		end
 	})
+	
+	updateUIVisibility()
 end)
 
 run(function()
