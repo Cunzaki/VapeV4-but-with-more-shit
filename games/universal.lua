@@ -10439,7 +10439,7 @@ run(function()
 	local function getParts()
 		local parts = {}
 		for _, v in workspace:GetDescendants() do
-			if v:IsA("BasePart") and not v.Anchored then
+			if v:IsA("BasePart") and not v.Anchored and v:CanSetNetworkOwnership() then
 				table.insert(parts, v)
 			end
 		end
@@ -10448,7 +10448,7 @@ run(function()
 	
 	local function selectPartByName()
 		for _, v in workspace:GetDescendants() do
-			if v:IsA("BasePart") and v.Name == PartName.Value and not v.Anchored then
+			if v:IsA("BasePart") and v.Name == PartName.Value and not v.Anchored and v:CanSetNetworkOwnership() then
 				return v
 			end
 		end
@@ -10488,6 +10488,11 @@ run(function()
 						if not originalCFrames[part] then
 							originalCFrames[part] = part.CFrame
 							originalAnchors[part] = part.Anchored
+							if part:CanSetNetworkOwnership() then
+								pcall(function()
+									part:SetNetworkOwner(lplr)
+								end)
+							end
 						end
 						
 						local mode = Mode.Value
