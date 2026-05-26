@@ -9141,11 +9141,8 @@ run(function()
 	
 	-- Create the module
 	-- Variables for Raknet Method 2
-	local uis
-	local hooked = false
-	local toggle = Enum.KeyCode.F
-	local send_hook
-	local recv_hook
+	local raknet2SendHook
+	local raknet2RecvHook
 	
 	Desync = vape.Categories.Utility:CreateModule({
 		Name = 'Desync',
@@ -9197,18 +9194,13 @@ run(function()
 						return
 					end
 					
-					uis = game:GetService('UserInputService')
-					
-					local function send_hook_func(packet)
-						if packet.PacketId == 0x1B then
-							local buf = packet.AsBuffer
-							if buf then
-								buffer.writeu32(buf, 1, 0xFFFFFFFF)
-								buffer.writeu32(buf, 5, 0xFFFFFFFF)
-								buffer.writeu32(buf, 9, 0xFFFFFFFF)
-								packet:SetData(buf)
-							end
-						elseif packet.AsArray and packet.AsArray[1] == 0x1B then
+					raknet2SendHook = function(packet)
+						local is0x1B = packet.PacketId and packet.PacketId == 0x1B
+						if not is0x1B and packet.AsArray then
+							is0x1B = packet.AsArray[1] == 0x1B or packet.AsArray[1] == 27
+						end
+						
+						if is0x1B then
 							local buf = packet.AsBuffer
 							if buf then
 								buffer.writeu32(buf, 1, 0xFFFFFFFF)
@@ -9219,35 +9211,21 @@ run(function()
 						end
 					end
 					
-					local function recv_hook_func(packet)
-						if packet.PacketId == 0x1B or packet.PacketId == 0x86 then
-							packet:Drop()
-						elseif packet.AsArray and (packet.AsArray[1] == 0x1B or packet.AsArray[1] == 0x86) then
+					raknet2RecvHook = function(packet)
+						local isTargetPacket = false
+						if packet.PacketId then
+							isTargetPacket = packet.PacketId == 0x1B or packet.PacketId == 0x86
+						elseif packet.AsArray then
+							isTargetPacket = packet.AsArray[1] == 0x1B or packet.AsArray[1] == 27 or packet.AsArray[1] == 0x86 or packet.AsArray[1] == 134
+						end
+						
+						if isTargetPacket then
 							packet:Drop()
 						end
 					end
 					
-					send_hook = send_hook_func
-					recv_hook = recv_hook_func
-					
-					Desync:Clean(uis.InputBegan:Connect(function(obj)
-						if obj.KeyCode ~= toggle then return end
-						if hooked then
-							raknet.remove_send_hook(send_hook)
-							raknet.remove_recv_hook(recv_hook)
-							vape:CreateNotification('Desync', 'Raknet Method 2 disabled!', 5, 'info')
-						else
-							raknet.add_send_hook(send_hook)
-							raknet.add_recv_hook(recv_hook)
-							vape:CreateNotification('Desync', 'Raknet Method 2 enabled! (Press F to toggle)', 5, 'info')
-						end
-						hooked = not hooked
-					end))
-					
-					-- Enable by default without initial notification
-					raknet.add_send_hook(send_hook)
-					raknet.add_recv_hook(recv_hook)
-					hooked = true
+					raknet.add_send_hook(raknet2SendHook)
+					raknet.add_recv_hook(raknet2RecvHook)
 				else
 					desyncEnabled = true
 					setupCameraProxy()
@@ -9271,11 +9249,12 @@ run(function()
 					raknet.remove_send_hook(serverDesyncHook)
 					serverDesyncHook = nil
 				elseif Mode.Value == 'Raknet Method 2' then
-					if hooked then
-						pcall(function() raknet.remove_send_hook(send_hook) end)
-						pcall(function() raknet.remove_recv_hook(recv_hook) end)
+					if raknet2SendHook then
+						pcall(function() raknet.remove_send_hook(raknet2SendHook) end)
 					end
-					hooked = false
+					if raknet2RecvHook then
+						pcall(function() raknet.remove_recv_hook(raknet2RecvHook) end)
+					end
 				else
 					desyncEnabled = false
 					currentDesyncRotation = CFrame.identity
