@@ -8672,6 +8672,12 @@ run(function()
 	local VisualizerColor
 	local VisualizerColorToggle
 	local serverDesyncHook
+	local PositionDesync
+	local PositionDesyncMode
+	local PositionDesyncRadius
+	local PositionDesyncSpeed
+	local PositionDesyncMinOffset
+	local PositionDesyncMaxOffset
 	
 	-- Get RunService
 	local RunService = game:GetService('RunService')
@@ -8689,6 +8695,13 @@ run(function()
 	local randAngleY = 0
 	local currentRot = CFrame.identity
 	local returnthis = nil
+	
+	-- Position desync variables
+	local lastposjittick = 0
+	local posjitflip = false
+	local posspinangle = 0
+	local posrandval = 0
+	local currentPosOffset = Vector3.zero
 	
 	-- Camera stabilization
 	local cameraProxy
@@ -8900,6 +8913,74 @@ run(function()
 		return resultAngle, newTick, newFlip, newSpin, newRand
 	end
 	
+	-- Calculate position desync offset
+	local function calculatePositionOffset()
+		if not PositionDesync or not PositionDesync.Enabled then return Vector3.zero end
+		
+		local mode = PositionDesyncMode.Value
+		local radius = PositionDesyncRadius.Value
+		local speed = PositionDesyncSpeed.Value
+		local minOffset = PositionDesyncMinOffset.Value
+		local maxOffset = PositionDesyncMaxOffset.Value
+		
+		local result = Vector3.zero
+		local newPosTick = lastposjittick
+		local newPosFlip = posjitflip
+		local newPosSpin = posspinangle
+		local newPosRand = posrandval
+		
+		if mode == "Static" then
+			result = Vector3.new(radius, 0, 0)
+		elseif mode == "Jitter" then
+			local now = os.clock()
+			local delay = 1 / (speed * 2)
+			if now - lastposjittick >= delay then
+				newPosFlip = not posjitflip
+				newPosTick = now
+			end
+			result = Vector3.new(newPosFlip and radius or -radius, 0, 0)
+		elseif mode == "Spin" then
+			newPosSpin = (posspinangle + speed) % 360
+			local rad = math.rad(newPosSpin)
+			result = Vector3.new(math.cos(rad) * radius, 0, math.sin(rad) * radius)
+		elseif mode == "Random" then
+			local now = os.clock()
+			local delay = 1 / (speed * 2)
+			if now - lastposjittick >= delay then
+				newPosRand = Vector3.new(
+					math.random() * (maxOffset - minOffset) + minOffset,
+					math.random() * (maxOffset - minOffset) + minOffset,
+					math.random() * (maxOffset - minOffset) + minOffset
+				)
+				newPosTick = now
+			end
+			result = newPosRand
+		elseif mode == "Circle" then
+			newPosSpin = (posspinangle + speed) % 360
+			local rad = math.rad(newPosSpin)
+			result = Vector3.new(math.cos(rad) * radius, 0, math.sin(rad) * radius)
+		elseif mode == "Sphere" then
+			local now = os.clock()
+			local delay = 1 / (speed * 2)
+			if now - lastposjittick >= delay then
+				local theta = math.random() * 2 * math.pi
+				local phi = math.acos(2 * math.random() - 1)
+				newPosRand = Vector3.new(
+					math.sin(phi) * math.cos(theta) * radius,
+					math.cos(phi) * radius,
+					math.sin(phi) * math.sin(theta) * radius
+				)
+				newPosTick = now
+			end
+			result = newPosRand
+		end
+		
+		-- Update state
+		lastposjittick, posjitflip, posspinangle, posrandval = newPosTick, newPosFlip, newPosSpin, newPosRand
+		currentPosOffset = result
+		return result
+	end
+	
 	-- Calculate total desync rotation
 	local function calculateRotation()
 		if not desyncEnabled then return CFrame.identity end
@@ -8944,10 +9025,11 @@ run(function()
 		-- Calculate and apply desync
 		if desyncEnabled and hum.Health > 0 then
 			local rot = calculateRotation()
+			local posOffset = calculatePositionOffset()
 			returnthis = root.CFrame
 			
-			-- Apply desync CFrame spoof
-			root.CFrame = root.CFrame * rot
+			-- Apply desync CFrame spoof (both rotation and position)
+			root.CFrame = (root.CFrame + posOffset) * rot
 			
 			-- Restore after a frame
 			RunService.RenderStepped:Wait()
@@ -8990,8 +9072,8 @@ run(function()
 			end
 		end
 		
-		-- Apply rotation to clone model
-		desyncClone:PivotTo(baseCF * currentRot)
+		-- Apply both rotation and position offset to clone model
+		desyncClone:PivotTo((baseCF + currentPosOffset) * currentRot)
 	end
 	
 	-- Function to update visibility
@@ -9015,6 +9097,12 @@ run(function()
 			VisualizerMaterial.Object.Visible = false
 			VisualizerColorToggle.Object.Visible = false
 			VisualizerColor.Object.Visible = false
+			PositionDesync.Object.Visible = false
+			PositionDesyncMode.Object.Visible = false
+			PositionDesyncRadius.Object.Visible = false
+			PositionDesyncSpeed.Object.Visible = false
+			PositionDesyncMinOffset.Object.Visible = false
+			PositionDesyncMaxOffset.Object.Visible = false
 		else
 			local valX = ModeX.Value
 			local valY = ModeY.Value
@@ -9038,6 +9126,16 @@ run(function()
 			VisualizerMaterial.Object.Visible = Visualizer.Enabled
 			VisualizerColorToggle.Object.Visible = Visualizer.Enabled
 			VisualizerColor.Object.Visible = Visualizer.Enabled and VisualizerColorToggle.Enabled
+			
+			-- Position desync options
+			PositionDesync.Object.Visible = true
+			local posEnabled = PositionDesync.Enabled
+			PositionDesyncMode.Object.Visible = posEnabled
+			local posMode = PositionDesyncMode.Value
+			PositionDesyncRadius.Object.Visible = posEnabled and (posMode ~= 'Random')
+			PositionDesyncSpeed.Object.Visible = posEnabled and (posMode ~= 'Static')
+			PositionDesyncMinOffset.Object.Visible = posEnabled and posMode == 'Random'
+			PositionDesyncMaxOffset.Object.Visible = posEnabled and posMode == 'Random'
 		end
 	end
 	
@@ -9235,6 +9333,71 @@ run(function()
 		Name = 'Invert',
 		Default = false,
 		Tooltip = 'Invert the desync angle'
+	})
+	
+	-- Position desync toggle
+	PositionDesync = Desync:CreateToggle({
+		Name = 'Position Desync',
+		Default = false,
+		Tooltip = 'Desync your character position as well',
+		Function = function()
+			updateUIVisibility()
+		end
+	})
+	
+	-- Position desync mode
+	PositionDesyncMode = Desync:CreateDropdown({
+		Name = 'Position Mode',
+		List = {'Static', 'Jitter', 'Spin', 'Circle', 'Sphere', 'Random'},
+		Default = 'Static',
+		Tooltip = 'Static - Fixed offset\nJitter - Alternating offset\nSpin/Circle - Rotating offset (2D)\nSphere - Random 3D offset\nRandom - Random 3D offset',
+		Visible = false,
+		Function = updateUIVisibility
+	})
+	
+	-- Position desync radius
+	PositionDesyncRadius = Desync:CreateSlider({
+		Name = 'Radius',
+		Min = 0,
+		Max = 50,
+		Default = 5,
+		Visible = false,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
+	})
+	
+	-- Position desync speed
+	PositionDesyncSpeed = Desync:CreateSlider({
+		Name = 'Speed',
+		Min = 1,
+		Max = 100,
+		Default = 15,
+		Visible = false
+	})
+	
+	-- Position desync min offset
+	PositionDesyncMinOffset = Desync:CreateSlider({
+		Name = 'Min Offset',
+		Min = -50,
+		Max = 50,
+		Default = -10,
+		Visible = false,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
+	})
+	
+	-- Position desync max offset
+	PositionDesyncMaxOffset = Desync:CreateSlider({
+		Name = 'Max Offset',
+		Min = -50,
+		Max = 50,
+		Default = 10,
+		Visible = false,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
 	})
 	
 	-- Visualizer toggle
