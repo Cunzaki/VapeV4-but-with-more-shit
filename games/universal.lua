@@ -10429,7 +10429,7 @@ run(function()
 	local Speed
 	local Radius
 	local YOffset
-	local SpinAngle
+	local SpinAngle = 0
 	local originalPositions = {}
 	local originalAnchors = {}
 	local originalCFrames = {}
@@ -10439,7 +10439,7 @@ run(function()
 	local function getParts()
 		local parts = {}
 		for _, v in workspace:GetDescendants() do
-			if v:IsA("BasePart") and v.Anchored then
+			if v:IsA("BasePart") and not v.Anchored then
 				table.insert(parts, v)
 			end
 		end
@@ -10448,7 +10448,7 @@ run(function()
 	
 	local function selectPartByName()
 		for _, v in workspace:GetDescendants() do
-			if v:IsA("BasePart") and v.Name == PartName.Value and v.Anchored then
+			if v:IsA("BasePart") and v.Name == PartName.Value and not v.Anchored then
 				return v
 			end
 		end
