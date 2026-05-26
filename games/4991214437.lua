@@ -51,25 +51,22 @@ local function removeTags(str)
 end
 
 local hasForcefieldMaterial = function(ent)
-	local character = ent.Character
-	if not character then return false end
-	
-	local torso = character:FindFirstChild('Torso') or character:FindFirstChild('UpperTorso')
-	if not torso then return false end
-	
-	-- Check both enum and string name (case insensitive)
-	local materialName = tostring(torso.Material):lower()
-	
-	-- Check if Forcefield enum exists
-	local forcefieldEnumExists, forcefieldMaterial = pcall(function()
-		return Enum.Material.Forcefield
+	local success, result = pcall(function()
+		if not ent.Character then return false end
+		
+		local torso = ent.Character:FindFirstChild('Torso') or ent.Character:FindFirstChild('UpperTorso')
+		if not torso then return false end
+		
+		local materialName = tostring(torso.Material):lower()
+		
+		if materialName:find('forcefield') or materialName:find('force field') then
+			return true
+		end
+		
+		return false
 	end)
 	
-	if (forcefieldEnumExists and torso.Material == forcefieldMaterial) or materialName:find('forcefield') or materialName:find('force field') then
-		return true
-	end
-	
-	return false
+	return success and result
 end
 
 local updateLoop
@@ -77,8 +74,6 @@ local updateLoop
 run(function()
 	entitylib.getUpdateConnections = function(ent)
 		local hum = ent.Humanoid
-		local character = ent.Character
-		local torso = character and (character:FindFirstChild('Torso') or character:FindFirstChild('UpperTorso'))
 		
 		local connections = {
 			hum:GetPropertyChangedSignal('Health'),
@@ -91,10 +86,6 @@ run(function()
 				end
 			}
 		}
-		
-		if torso then
-			table.insert(connections, torso:GetPropertyChangedSignal('Material'))
-		end
 		
 		return connections
 	end
@@ -113,11 +104,19 @@ run(function()
 	
 	-- Super fast update loop to catch material changes instantly
 	updateLoop = runService.Heartbeat:Connect(function()
-		for _, ent in entitylib.List do
-			if ent.Character and hasForcefieldMaterial(ent) ~= (ent._lastForcefield or false) then
-				ent._lastForcefield = hasForcefieldMaterial(ent)
-				entitylib.Events.EntityUpdated:Fire(ent)
+		local success, err = pcall(function()
+			for _, ent in entitylib.List do
+				if ent.Character then
+					local current = hasForcefieldMaterial(ent)
+					if current ~= (ent._lastForcefield or false) then
+						ent._lastForcefield = current
+						entitylib.Events.EntityUpdated:Fire(ent)
+					end
+				end
 			end
+		end)
+		if not success then
+			warn('[4991214437] Update loop error:', err)
 		end
 	end)
 end)
