@@ -9570,16 +9570,71 @@ run(function()
 		'Loadstring',
 		'RobloxLocked',
 		'ScriptContext',
-		'LocalScript Detected'
+		'LocalScript Detected',
+		'Detected',
+		'Tamper',
+		'Proxy',
+		'metaMethod',
+		'indexInstance',
+		'newindexInstance',
+		'namecallInstance',
+		'indexEnum',
+		'namecallEnum',
+		'eqEnum'
 	}
 	
 	-- Storage for original functions
 	local originalKick
 	local originalDestroy
 	local originalDisconnect
+	local originalGetLogHistory
+	local originalFireServer
+	local originalInvokeServer
 	local hookedFunctions = {}
 	local antiKickActive = false
 	local antiBanActive = false
+	local adonisDisabled = false
+	
+	-- Function to completely disable Adonis
+	local function nukeAdonis()
+		-- Find Adonis core modules
+		for _, obj in ipairs(game:GetDescendants()) do
+			if obj:IsA('ModuleScript') and (obj.Name:lower():find('adonis') or obj.Name:lower():find('anti')) then
+				local success, err = pcall(function()
+					obj.Disabled = true
+				end)
+			elseif obj:IsA('LocalScript') and obj.Name:lower():find('adonis') then
+				local success, err = pcall(function()
+					obj.Disabled = true
+				end)
+			elseif obj:IsA('Script') and obj.Name:lower():find('adonis') then
+				local success, err = pcall(function()
+					obj.Disabled = true
+				end)
+			end
+		end
+		
+		-- Find and disable Adonis RemoteEvents and RemoteFunctions
+		for _, obj in ipairs(game:GetDescendants()) do
+			if obj:IsA('RemoteEvent') and (obj.Name:find('ADONIS') or obj.Name:find('Adonis')) then
+				local success, err = pcall(function()
+					obj:Destroy()
+				end)
+			elseif obj:IsA('RemoteFunction') and (obj.Name:find('ADONIS') or obj.Name:find('Adonis')) then
+				local success, err = pcall(function()
+					obj:Destroy()
+				end)
+			elseif obj:IsA('BindableEvent') and (obj.Name:find('ADONIS') or obj.Name:find('Adonis')) then
+				local success, err = pcall(function()
+					obj:Destroy()
+				end)
+			elseif obj:IsA('BindableFunction') and (obj.Name:find('ADONIS') or obj.Name:find('Adonis')) then
+				local success, err = pcall(function()
+					obj:Destroy()
+				end)
+			end
+		end
+	end
 	
 	-- Character disabler function
 	local function characterAdded(char)
@@ -9589,6 +9644,7 @@ run(function()
 		end
 		
 		local rootPart = char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('RootPart')
+		local humanoid = char:FindFirstChildOfClass('Humanoid')
 		if not rootPart then return end
 		
 		-- Hook CFrame changed signals
@@ -9629,35 +9685,112 @@ run(function()
 				end
 			end
 		end
+		
+		-- Hook Humanoid signals
+		if humanoid then
+			for _, v in getconnections(humanoid.StateChanged) do
+				local func = v.Function
+				if func and typeof(func) == 'function' then
+					local success, err = pcall(function()
+						hookfunction(func, function() end)
+					end)
+					if not success then
+						v:Disable()
+					end
+				end
+			end
+			
+			for _, v in getconnections(humanoid.Changed) do
+				local func = v.Function
+				if func and typeof(func) == 'function' then
+					local success, err = pcall(function()
+						hookfunction(func, function() end)
+					end)
+					if not success then
+						v:Disable()
+					end
+				end
+			end
+			
+			for _, prop in {'WalkSpeed', 'JumpPower'} do
+				for _, v in getconnections(humanoid:GetPropertyChangedSignal(prop)) do
+					local func = v.Function
+					if func and typeof(func) == 'function' then
+						local success, err = pcall(function()
+							hookfunction(func, function() end)
+						end)
+						if not success then
+							v:Disable()
+						end
+					end
+				end
+			end
+		end
 	end
 	
 	-- Adonis specific disabler
 	local function disableAdonis()
-		-- Hook RemoteEvent FireServer to block Adonis detection
+		if adonisDisabled then return end
+		adonisDisabled = true
+		
+		-- Nuke Adonis first
+		nukeAdonis()
+		
+		-- Hook LogService.GetLogHistory
+		local logService = game:GetService('LogService')
+		if logService and not originalGetLogHistory then
+			originalGetLogHistory = logService.GetLogHistory
+			logService.GetLogHistory = function(self)
+				return originalGetLogHistory(self)
+			end
+		end
+		
+		-- Hook all RemoteEvents to block Adonis packets
 		for _, obj in ipairs(game:GetDescendants()) do
-			if obj:IsA('RemoteEvent') and obj.Name:match('ADONIS') or obj.Name:match('Adonis') then
+			if obj:IsA('RemoteEvent') then
 				local oldFire = obj.FireServer
 				obj.FireServer = function(self, ...)
 					local args = {...}
-					-- Block detection packets
-					if #args > 0 and typeof(args[1]) == 'string' then
-						for _, pattern in ipairs(adonisPatterns) do
-							if args[1]:find(pattern) then
-								return nil
+					if #args > 0 then
+						local firstArg = args[1]
+						if typeof(firstArg) == 'string' then
+							for _, pattern in ipairs(adonisPatterns) do
+								if firstArg:find(pattern) then
+									return nil
+								end
 							end
 						end
 					end
 					return oldFire(self, ...)
 				end
+			elseif obj:IsA('RemoteFunction') then
+				local oldInvoke = obj.InvokeServer
+				obj.InvokeServer = function(self, ...)
+					local args = {...}
+					if #args > 0 then
+						local firstArg = args[1]
+						if typeof(firstArg) == 'string' then
+							for _, pattern in ipairs(adonisPatterns) do
+								if firstArg:find(pattern) then
+									return nil
+								end
+							end
+						end
+					end
+					return oldInvoke(self, ...)
+				end
 			end
 		end
 		
-		-- Hook BindableEvent for Adonis internal communication
-		for _, obj in ipairs(game:GetDescendants()) do
-			if obj:IsA('BindableEvent') and obj.Name:match('ADONIS') then
-				local oldFire = obj.Fire
-				obj.Fire = function(self, ...)
-					return nil -- Block internal signals
+		-- Hook player signals
+		for _, v in getconnections(lplr.Idled) do
+			local func = v.Function
+			if func and typeof(func) == 'function' then
+				local success, err = pcall(function()
+					hookfunction(func, function() end)
+				end)
+				if not success then
+					v:Disable()
 				end
 			end
 		end
@@ -9666,13 +9799,53 @@ run(function()
 		if not originalKick then
 			originalKick = hookfunction(lplr.Kick, function(self, reason)
 				if antiKickActive and self == lplr then
-					-- Log the kick attempt but don't kick
 					print('[Disabler] Blocked kick: ' .. tostring(reason))
 					return nil
 				end
 				return originalKick(self, reason)
 			end)
 		end
+		
+		-- Set up DescendantAdded to keep blocking
+		game.DescendantAdded:Connect(function(obj)
+			if obj:IsA('RemoteEvent') then
+				local oldFire = obj.FireServer
+				obj.FireServer = function(self, ...)
+					local args = {...}
+					if #args > 0 then
+						local firstArg = args[1]
+						if typeof(firstArg) == 'string' then
+							for _, pattern in ipairs(adonisPatterns) do
+								if firstArg:find(pattern) then
+									return nil
+								end
+							end
+						end
+					end
+					return oldFire(self, ...)
+				end
+			elseif obj:IsA('RemoteFunction') then
+				local oldInvoke = obj.InvokeServer
+				obj.InvokeServer = function(self, ...)
+					local args = {...}
+					if #args > 0 then
+						local firstArg = args[1]
+						if typeof(firstArg) == 'string' then
+							for _, pattern in ipairs(adonisPatterns) do
+								if firstArg:find(pattern) then
+									return nil
+								end
+							end
+						end
+					end
+					return oldInvoke(self, ...)
+				end
+			elseif obj:IsA('ModuleScript') and obj.Name:lower():find('adonis') then
+				obj.Disabled = true
+			elseif obj:IsA('LocalScript') and obj.Name:lower():find('adonis') then
+				obj.Disabled = true
+			end
+		end)
 	end
 	
 	-- Universal AntiKick
@@ -9774,6 +9947,7 @@ run(function()
 	local function disableAll()
 		antiKickActive = false
 		antiBanActive = false
+		adonisDisabled = false
 		print('[Disabler] All protections disabled')
 	end
 	
