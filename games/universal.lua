@@ -9078,7 +9078,7 @@ run(function()
 	
 	-- Function to update visibility
 	local function updateUIVisibility()
-		local isServerMode = Mode and (Mode.Value == 'Server Desync' or Mode.Value == 'Raknet Method 2')
+		local isServerMode = Mode and Mode.Value == 'Server Desync'
 		if isServerMode then
 			ModeX.Object.Visible = false
 			ModeY.Object.Visible = false
@@ -9140,10 +9140,6 @@ run(function()
 	end
 	
 	-- Create the module
-	-- Variables for Raknet Method 2
-	local raknet2SendHook
-	local raknet2RecvHook
-	
 	Desync = vape.Categories.Utility:CreateModule({
 		Name = 'Desync',
 		Function = function(callback)
@@ -9173,43 +9169,6 @@ run(function()
 					end
 					
 					raknet.add_send_hook(serverDesyncHook)
-				elseif Mode.Value == 'Raknet Method 2' then
-					local function rakNetCheck()
-						if not (raknet and raknet.add_send_hook and raknet.add_recv_hook and 
-							raknet.remove_send_hook and raknet.remove_recv_hook and
-							pcall(raknet.add_send_hook, function() end)) then
-							vape:CreateNotification('Desync', 'This feature requires raknet! (risky feature, please do not use on mains.)', 10, 'warning')
-							return false
-						end
-						return true
-					end
-					
-					if not rakNetCheck() then
-						Desync:Toggle()
-						return
-					end
-					
-					raknet2SendHook = function(packet)
-						if packet.PacketId == 0x1B or (packet.AsArray and packet.AsArray[1] == 0x1B) then
-							local buf = packet.AsBuffer
-							if buf then
-								buffer.writeu32(buf, 1, 0xFFFFFFFF)
-								buffer.writeu32(buf, 5, 0xFFFFFFFF)
-								buffer.writeu32(buf, 9, 0xFFFFFFFF)
-								packet:SetData(buf)
-							end
-						end
-					end
-					
-					raknet2RecvHook = function(packet)
-						if packet.PacketId == 0x1B or packet.PacketId == 0x86 or (packet.AsArray and (packet.AsArray[1] == 0x1B or packet.AsArray[1] == 0x86)) then
-							packet:Drop()
-						end
-					end
-					
-					raknet.add_send_hook(raknet2SendHook)
-					raknet.add_recv_hook(raknet2RecvHook)
-					vape:CreateNotification('Desync', 'Raknet Method 2 enabled!', 5, 'info')
 				else
 					desyncEnabled = true
 					setupCameraProxy()
@@ -9229,29 +9188,9 @@ run(function()
 					end))
 				end
 			else
-				if Mode.Value == 'Server Desync' then
-					if raknet and serverDesyncHook then
-						pcall(function()
-							raknet.remove_send_hook(serverDesyncHook)
-						end)
-						serverDesyncHook = nil
-					end
-				elseif Mode.Value == 'Raknet Method 2' then
-					if raknet then
-						if raknet2SendHook then
-							pcall(function()
-								raknet.remove_send_hook(raknet2SendHook)
-							end)
-							raknet2SendHook = nil
-						end																																																																																																																																											
-						if raknet2RecvHook then
-							pcall(function()
-								raknet.remove_recv_hook(raknet2RecvHook)
-							end)
-							raknet2RecvHook = nil
-						end
-						vape:CreateNotification('Desync', 'Raknet Method 2 disabled!', 5, 'info')
-					end
+				if Mode.Value == 'Server Desync' and serverDesyncHook then
+					raknet.remove_send_hook(serverDesyncHook)
+					serverDesyncHook = nil
 				else
 					desyncEnabled = false
 					currentDesyncRotation = CFrame.identity
@@ -9267,7 +9206,7 @@ run(function()
 	
 	Mode = Desync:CreateDropdown({
 		Name = 'Mode',
-		List = {'CFrame Desync', 'Server Desync', 'Raknet Method 2'},
+		List = {'CFrame Desync', 'Server Desync'},
 		Default = 'CFrame Desync',
 		Function = function(val)
 			updateUIVisibility()
