@@ -1,36 +1,36 @@
 local loadstring = function(...)
 	local res, err = loadstring(...)
-	if err and vape then 
-		vape:CreateNotification('Vape', 'Failed to load : '..err, 30, 'alert') 
+	if err and vape then
+		vape:CreateNotification('Vape', 'Failed to load : '..err, 30, 'alert')
 	end
 	return res
 end
 local isfile = isfile or function(file)
-	local suc, res = pcall(function() 
-		return readfile(file) 
+	local suc, res = pcall(function()
+		return readfile(file)
 	end)
 	return suc and res ~= nil and res ~= ''
 end
 local function downloadFile(path, func)
 	if not isfile(path) then
-		local suc, res = pcall(function() 
-			return game:HttpGet('https://raw.githubusercontent.com/7GrandDadPGN/VapeV4ForRoblox/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true) 
+		local suc, res = pcall(function()
+			return game:HttpGet('https://raw.githubusercontent.com/7GrandDadPGN/VapeV4ForRoblox/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
 		end)
-		if not suc or res == '404: Not Found' then 
-			error(res) 
+		if not suc or res == '404: Not Found' then
+			error(res)
 		end
-		if path:find('.lua') then 
-			res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res 
+		if path:find('.lua') then
+			res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res
 		end
 		writefile(path, res)
 	end
 	return (func or readfile)(path)
 end
-local run = function(func) 
-	func() 
+local run = function(func)
+	func()
 end
-local cloneref = cloneref or function(obj) 
-	return obj 
+local cloneref = cloneref or function(obj)
+	return obj
 end
 
 local playersService = cloneref(game:GetService('Players'))
@@ -50,12 +50,12 @@ local targetinfo = vape.Libraries.targetinfo
 local sessioninfo = vape.Libraries.sessioninfo
 local getcustomasset = vape.Libraries.getcustomasset
 local drawingactor = loadstring(downloadFile('newvape/libraries/drawing.lua'), 'drawing')(...)
-local function notif(...) 
-	return vape:CreateNotification(...) 
+local function notif(...)
+	return vape:CreateNotification(...)
 end
 
-if not select(1, ...) then
-	if run_on_actor and getactors then 
+if not select(1, ...) and game.PlaceId == 5938036553 then
+	if run_on_actor and getactors then
 		local oldreload = shared.vapereload
 		vape.Load = function()
 			task.delay(0.1, function()
@@ -69,16 +69,16 @@ if not select(1, ...) then
 			for i, v in shared do
 				if type(v) == 'string' then
 					executionString = string.format("shared.%s = '%s'", i, v)..'\n'..executionString
-				elseif type(v) == 'boolean' then 
+				elseif type(v) == 'boolean' then
 					executionString = string.format("shared.%s = %s", i, tostring(v))..'\n'..executionString
 				end
 			end
-			if oldreload then 
-				executionString = 'shared.vapereload = true\n'..executionString 
+			if oldreload then
+				executionString = 'shared.vapereload = true\n'..executionString
 			end
 
-			for i, v in getactors() do 
-				if tostring(v) == 'frontlines_client_actor' then 
+			for i, v in getactors() do
+				if tostring(v) == 'frontlines_client_actor' then
 					run_on_actor(v, executionString)
 					return
 				end
@@ -109,14 +109,14 @@ local function addBlur(parent)
 	return blur
 end
 
-local function getTeam(plr)
-	return frontlines.Main.globals.sol_teams[table.find(frontlines.Main.globals.cli_names, plr.Name)]
+local function getTeam(ent)
+	return frontlines.Main.globals.cli_teams[ent.Id]
 end
 
 local function getKey(id, server)
 	for i, v in frontlines.Main.enums[(server and 's' or 'c')..'_net_msg'] do
-		if v == id then 
-			return i 
+		if v == id then
+			return i
 		end
 	end
 end
@@ -125,10 +125,13 @@ local function hookEvent(id, rfunc)
 	local suc, res = pcall(function()
 		local func = frontlines.Events[frontlines.Main.exe_func_t[id]]
 		local hook
-		hook = hookfunction(func, function(...)
+
+		local function newFunc(...)
 			if rfunc(...) then return end
 			return hook(...)
-		end)
+		end
+
+		hook = hookfunction(func, function(...) return newFunc(...) end)
 		frontlines.Functions[func] = hook
 		return function()
 			if not frontlines.Functions[func] then return end
@@ -138,8 +141,8 @@ local function hookEvent(id, rfunc)
 		end
 	end)
 
-	if not suc then 
-		notif('Vape', 'Failed to hook ('..id..')', 10, 'alert') 
+	if not suc then
+		notif('Vape', 'Failed to hook ('..id..')', 10, 'alert')
 	end
 
 	return type(res) == 'function' and res or function() end
@@ -148,8 +151,8 @@ end
 local function isFriend(plr, recolor)
 	if vape.Categories.Friends.Options['Use friends'].Enabled then
 		local friend = table.find(vape.Categories.Friends.ListEnabled, plr.Name) and true
-		if recolor then 
-			friend = friend and vape.Categories.Friends.Options['Recolor visuals'].Enabled 
+		if recolor then
+			friend = friend and vape.Categories.Friends.Options['Recolor visuals'].Enabled
 		end
 		return friend
 	end
@@ -158,47 +161,52 @@ end
 
 run(function()
 	repeat
-		local gc = getgc(true)
-		for _, v in gc do
-			if type(v) == 'table' then
-				if rawget(v, 'script') then
-					frontlines.Main = v._G
-				end
-			elseif type(v) == 'function' and islclosure(v) then
-				local name = debug.info(v, 'n')
-				if name == 'spawn_bullet' and debug.getinfo(v).nups == 14 then
-					frontlines.ShootFunction = v
-					frontlines.ShootRay = debug.getupvalue(v, 6)
-				elseif name == 'on_melee_hit' then
-					frontlines.KnifeFunction = v
-				elseif name == 'spawn_throwable' then
-					frontlines.SpawnThrowable = v
-					frontlines.Throwables = debug.getupvalue(v, 1)
+		if not frontlines.ShootFunction then
+			local gc = getgc(true)
+			for _, v in gc do
+				if type(v) == 'table' then
+					if rawget(v, 'script') and v._G and v._G.append_exe_set then
+						frontlines.Main = v._G
+					end
+				elseif type(v) == 'function' and islclosure(v) then
+					local name = debug.info(v, 'n')
+					if name == 'spawn_bullet' and debug.getinfo(v).nups > 11 then
+						frontlines.ShootFunction = v
+						frontlines.ShootRay = typeof(debug.getupvalue(v, 6)) == 'RaycastParams' and debug.getupvalue(v, 6) or debug.getupvalue(v, 5)
+					elseif name == 'on_melee_hit' then
+						frontlines.KnifeFunction = v
+					elseif name == 'spawn_throwable' then
+						frontlines.SpawnThrowable = v
+						frontlines.Throwables = debug.getupvalue(v, 1)
+					end
 				end
 			end
+			table.clear(gc)
 		end
-		table.clear(gc)
-		if not frontlines.ShootFunction then 
+
+		if not (frontlines.ShootFunction and (game.PlaceId == 5938036553 or game.StarterGui:GetCore('ResetButtonCallback') == false)) then
 			task.wait(1)
+		else
+			break
 		end
-	until frontlines.ShootFunction or vape.Loaded == nil
+	until vape.Loaded == nil
 	if vape.Loaded == nil then return end
 	frontlines.Events = debug.getupvalue(frontlines.Main.append_exe_set, 1)
 	frontlines.PickupBit = debug.getupvalue(frontlines.Events[frontlines.Main.exe_func_t.INIT_FPV_SOL_AMMO_PICKUP], 5)
-	frontlines.Chat = debug.getupvalue(frontlines.Events[frontlines.Main.exe_func_t.UPDATE_CHAT_GUI], 1)
+	--frontlines.Chat = debug.getupvalue(frontlines.Events[frontlines.Main.exe_func_t.UPDATE_CHAT_GUI], 1)
 
 	local kills = sessioninfo:AddItem('Kills')
 	local deaths = sessioninfo:AddItem('Deaths')
 
 	hookEvent('SET_CLI_MATCH_KILLS', function(id)
-		if id == frontlines.Main.globals.cli_state.fpv_sol_id then 
-			kills:Increment() 
+		if id == frontlines.Main.globals.cli_state.fpv_sol_id then
+			kills:Increment()
 		end
 	end)
 
 	hookEvent('PLAY_FPV_SOL_DEATH_SOUND', function(self, id)
-		if id == frontlines.Main.globals.cli_state.fpv_sol_id then 
-			deaths:Increment() 
+		if id == frontlines.Main.globals.cli_state.fpv_sol_id then
+			deaths:Increment()
 		end
 	end)
 
@@ -211,44 +219,47 @@ run(function()
 	end)
 
 	hookEvent('INIT_SOLDIER_MODEL', function(id)
-		local plr = playersService:FindFirstChild(frontlines.Main.globals.cli_names[id])
-		if plr then
-			entitylib.refreshEntity(frontlines.Main.soldier_actors[id].main.model.Value, plr)
-		end
+		entitylib.refreshEntity(frontlines.Main.globals.soldier_models[id], id)
 	end)
 
 	hookEvent('DEINIT_SOL_STATE', function(id)
-		local plr = playersService:FindFirstChild(frontlines.Main.globals.cli_names[id])
-		if plr then
-			entitylib.refreshEntity(frontlines.Main.soldier_actors[id].main.model.Value, plr)
-		end
+		entitylib.refreshEntity(frontlines.Main.globals.soldier_models[id], id)
 	end)
 
-	hookEvent('UPDATE_CHAT_GUI', function(id, text)
-		text = string.unpack('z', text)
-		task.delay(0, function()
-			local name = frontlines.Main.globals.cli_names[id]
-			local plr = playersService:FindFirstChild(name)
-			if not plr then return end
-			for i, v in frontlines.Chat do
-				if v.TextLabel.TextTransparency > 0.5 and v.TextLabel.Text:find(name) then
-					v.TextLabel.Text = whitelist:tag(plr, true, true)..v.TextLabel.Text
-					whitelist:process(text, plr)
-					break
-				end
-			end
+	hookEvent('SET_CLI_TEAM', function(id)
+		task.defer(function()
+			entitylib.refreshEntity(frontlines.Main.globals.soldier_models[id], id)
 		end)
 	end)
 
-	vape:Clean(Drawing.kill)
+	--[[if game.PlaceId == 5938036553 then
+		hookEvent('UPDATE_CHAT_GUI', function(id, text)
+			text = string.unpack('z', text)
+			task.delay(0, function()
+				local name = frontlines.Main.globals.cli_names[id]
+				local plr = playersService:FindFirstChild(name)
+				if not plr then return end
+				for i, v in frontlines.Chat do
+					if v.TextLabel.TextTransparency > 0.5 and v.TextLabel.Text:find(name) then
+						v.TextLabel.Text = whitelist:tag(plr, true, true)..v.TextLabel.Text
+						whitelist:process(text, plr)
+						break
+					end
+				end
+			end)
+		end)
+	end]]
+
+	vape:Clean(Drawing.kill or function() end)
 	vape:Clean(function()
-		for i, v in frontlines.Functions do 
-			hookfunction(i, v) 
+		for i, v in frontlines.Functions do
+			hookfunction(i, v)
 		end
 		table.clear(frontlines.Functions)
 		table.clear(frontlines)
 	end)
 end)
+if vape.Loaded == nil then return end
 
 run(function()
 	entitylib.Wallcheck = function(origin, position, ignoreobject)
@@ -257,50 +268,59 @@ run(function()
 	end
 
 	entitylib.targetCheck = function(ent)
-		if isFriend(ent.Player) then return false end
-		if not select(2, whitelist:get(ent.Player)) then return false end
-		return getTeam(lplr) ~= getTeam(ent.Player)
+		if ent.Player then
+			if isFriend(ent.Player) then return false end
+			if not select(2, whitelist:get(ent.Player)) then return false end
+		end
+
+		return getTeam({Id = frontlines.Main.globals.cli_state.id}) ~= getTeam(ent)
 	end
 
 	entitylib.getEntityColor = function(ent)
-		ent = ent.Player
-		if not (ent and vape.Categories.Main.Options['Use team color'].Enabled) then return end
-		if isFriend(ent, true) then
+		if not (ent.Player and vape.Categories.Main.Options['Use team color'].Enabled) then return end
+		if isFriend(ent.Player, true) then
 			return Color3.fromHSV(vape.Categories.Friends.Options['Friends color'].Hue, vape.Categories.Friends.Options['Friends color'].Sat, vape.Categories.Friends.Options['Friends color'].Value)
 		end
-		return getTeam(lplr) == getTeam(ent) and Color3.fromRGB(67, 140, 229) or Color3.fromRGB(234, 50, 50)
+		return getTeam({Id = frontlines.Main.globals.cli_state.id}) == getTeam(ent) and Color3.fromRGB(67, 140, 229) or Color3.fromRGB(234, 50, 50)
 	end
 
 	entitylib.getEntity = function(char)
 		for i, v in entitylib.List do
-			if v.Player == char or v.Character == char or v.Id == char then
+			if v.Id == char then
 				return v, i
 			end
 		end
 	end
 
-	entitylib.addEntity = function(char, plr, teamfunc)
+	entitylib.addEntity = function(char, id, teamfunc)
 		if not char then return end
 		entitylib.EntityThreads[char] = task.spawn(function()
-			local id = table.find(frontlines.Main.globals.cli_names, plr.Name) or -1
+			local plr
+			if game.PlaceId == 5938036553 then
+				plr = playersService:FindFirstChild(frontlines.Main.globals.cli_names[id])
+			else
+				plr = playersService:GetPlayerByUserId(frontlines.Main.globals.cli_user_ids[id] or -1)
+			end
+
 			if not id or not frontlines.Main.globals.soldiers_alive[id] then
 				entitylib.EntityThreads[char] = nil
 				return
 			end
 
 			local hum = {
-				HipHeight = 2, 
-				MoveDirection = Vector3.zero, 
-				Health = 100, 
-				MaxHealth = 100, 
-				GetState = function() 
-					return Enum.HumanoidStateType.Running 
+				HipHeight = 2,
+				MoveDirection = Vector3.zero,
+				Health = 100,
+				MaxHealth = 100,
+				GetState = function()
+					return Enum.HumanoidStateType.Running
 				end
 			}
+
 			if plr == lplr then
-				repeat 
-					hum = frontlines.Main.globals.fpv_sol_instances.humanoid 
-					task.wait() 
+				repeat
+					hum = frontlines.Main.globals.fpv_sol_instances.humanoid
+					task.wait()
 				until hum or not frontlines.Main
 				if not frontlines.Main then
 					entitylib.EntityThreads[char] = nil
@@ -326,7 +346,7 @@ run(function()
 					Humanoid = hum,
 					HumanoidRootPart = humrootpart,
 					HipHeight = hum.HipHeight + (humrootpart.Size.Y / 2) + (hum.RigType == Enum.HumanoidRigType.R6 and 2 or 0),
-					Id = table.find(frontlines.Main.globals.cli_names, plr.Name) or -1,
+					Id = id,
 					MaxHealth = hum.MaxHealth,
 					NPC = plr == nil,
 					Player = plr,
@@ -344,22 +364,40 @@ run(function()
 					entitylib.Events.EntityAdded:Fire(entity)
 				end
 			end
+
 			entitylib.EntityThreads[char] = nil
 		end)
 	end
 
-	entitylib.addPlayer = function(plr)
-		task.spawn(function()
-			local id, actor
-			repeat
-				id = table.find(frontlines.Main.globals.cli_names, plr.Name)
-				actor = frontlines.Main.soldier_actors[id]
-				task.wait()
-			until actor or (not entitylib.Running) or not plr.Parent
-			if not entitylib.Running or not plr.Parent then return end
-			
-			entitylib.refreshEntity(actor.main.model.Value, plr)
-		end)
+	entitylib.refreshEntity = function(char, id)
+		entitylib.removeEntity(id)
+		entitylib.addEntity(char, id)
+	end
+
+	entitylib.refresh = function()
+		local cloned = table.clone(entitylib.List)
+		for _, v in cloned do
+			entitylib.refreshEntity(v.Character, v.Id)
+		end
+		table.clear(cloned)
+	end
+
+	entitylib.start = function()
+		if entitylib.Running then
+			entitylib.stop()
+		end
+
+		for id, actor in frontlines.Main.soldier_actors do
+			if actor.main.model.Value then
+				entitylib.refreshEntity(actor.main.model.Value, id)
+			end
+		end
+
+		table.insert(entitylib.Connections, workspace:GetPropertyChangedSignal('CurrentCamera'):Connect(function()
+			gameCamera = workspace.CurrentCamera or workspace:FindFirstChildWhichIsA('Camera')
+		end))
+
+		entitylib.Running = true
 	end
 end)
 entitylib.start()
@@ -511,6 +549,7 @@ run(function()
 	local HitChance
 	local HeadshotChance
 	local AutoFire
+	local Wallbang
 	local CircleColor
 	local CircleTransparency
 	local CircleFilled
@@ -531,10 +570,25 @@ run(function()
 			Players = Target.Players.Enabled,
 			NPCs = Target.NPCs.Enabled
 		})
-		if ent then 
-			targetinfo.Targets[ent] = tick() + 1 
+		if ent then
+			targetinfo.Targets[ent] = tick() + 1
 		end
 		return ent, ent and ent[targetPart]
+	end
+	
+	local function raycastLoop(origin, pos)
+		local returned
+		local real = origin
+		for i = 1, 20 do
+			local ray = workspace:Raycast(origin, (pos - origin), frontlines.ShootRay)
+			if ray and not ray.Instance:HasTag('SOLDIER') then
+				returned = ray.Position - ray.Normal * 0.1
+				origin = returned
+			else
+				break
+			end
+		end
+		return returned
 	end
 	
 	SilentAim = vape.Categories.Combat:CreateModule({
@@ -547,29 +601,39 @@ run(function()
 			if callback then
 				old = hookfunction(frontlines.ShootFunction, function(shootid, fire, pos, dir, ...)
 					if not frontlines.Main then return end
+	
 					local cstate = frontlines.Main.globals.cli_state
 					if cstate.state == frontlines.Main.cli_state_t.COMBAT and (shootid % frontlines.Main.globals.cli_id_alloc.m) == cstate.id then
 						local ent, targetPart = getTarget(pos)
 						if ent then
 							local velo = dir.Magnitude
 							local targetpos = targetPart.Root_M.Spine1_M.WorldCFrame.Position
-							local origin = gameCamera.CFrame.Position
 							ProjectileRaycast.FilterDescendantsInstances = {gameCamera, ent.Character}
 							ProjectileRaycast.CollisionGroup = targetPart.CollisionGroup
+	
+							if Wallbang.Enabled then
+								local wall = raycastLoop(pos, targetpos)
+								if wall and (pos - wall).Magnitude < 8 then
+									pos = wall
+								end
+							end
+	
 							local calc = prediction.SolveTrajectory(pos, velo, workspace.Gravity, targetpos, Vector3.zero, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
 							if calc then
 								dir = -CFrame.new(pos, calc).ZVector * velo
 							end
 						end
 					end
+	
 					return old(shootid, fire, pos, dir, ...)
 				end)
 	
 				local oldent
 				repeat
-					if CircleObject then 
-						CircleObject.Position = inputService:GetMouseLocation() 
+					if CircleObject then
+						CircleObject.Position = inputService:GetMouseLocation()
 					end
+	
 					if AutoFire.Enabled then
 						local ent = entitylib['Entity'..Mode.Value]({
 							Range = Range.Value,
@@ -579,17 +643,18 @@ run(function()
 							Players = Target.Players.Enabled,
 							NPCs = Target.NPCs.Enabled
 						})
-						
+	
 						local gun = frontlines.Main.globals.fpv_sol_equipment.curr_equipment
 						ent = gun and gun.type ~= 2 and ent or nil
 						if ent ~= oldent or ent then
 							frontlines.Main.globals.ctrl_states.trigger = ent and true or false
-							if ent then 
-								frontlines.Main.globals.ctrl_ts.trigger = time() 
+							if ent then
+								frontlines.Main.globals.ctrl_ts.trigger = time()
 							end
 							oldent = ent
 						end
 					end
+	
 					task.wait()
 				until not SilentAim.Enabled
 			else
@@ -616,8 +681,8 @@ run(function()
 		Min = 1,
 		Max = 1000,
 		Default = 150,
-		Suffix = function(val) 
-			return val == 1 and 'stud' or 'studs' 
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
 		end,
 		Function = function(val)
 			if CircleObject then
@@ -633,6 +698,7 @@ run(function()
 		Suffix = '%'
 	})
 	AutoFire = SilentAim:CreateToggle({Name = 'AutoFire'})
+	Wallbang = SilentAim:CreateToggle({Name = 'Wallbang'})
 	SilentAim:CreateToggle({
 		Name = 'Range Circle',
 		Function = function(callback)
@@ -657,13 +723,13 @@ run(function()
 		end
 	})
 	CircleColor = SilentAim:CreateColorSlider({
-		Name = 'Circle Color', 
+		Name = 'Circle Color',
 		Function = function(hue, sat, val)
 			if CircleObject then
 				CircleObject.Color = Color3.fromHSV(hue, sat, val)
 			end
-		end, 
-		Darker = true, 
+		end,
+		Darker = true,
 		Visible = false
 	})
 	CircleTransparency = SilentAim:CreateSlider({
@@ -681,13 +747,13 @@ run(function()
 		Visible = false
 	})
 	CircleFilled = SilentAim:CreateToggle({
-		Name = 'Circle Filled', 
+		Name = 'Circle Filled',
 		Function = function(callback)
 			if CircleObject then
 				CircleObject.Filled = callback
 			end
-		end, 
-		Darker = true, 
+		end,
+		Darker = true,
 		Visible = false
 	})
 end)
@@ -726,10 +792,10 @@ run(function()
 	GrenadeTP = vape.Categories.Blatant:CreateModule({
 		Name = 'GrenadeTP',
 		Function = function(callback)
-			if callback then 
+			if callback then
 				repeat
-					for i, v in frontlines.Throwables do 
-						if v.model and v.network_ownership then 
+					for _, v in frontlines.Throwables do
+						if v.model and v.network_ownership then
 							local ent = entitylib.EntityPosition({
 								Range = Range.Value,
 								Part = 'RootPart',
@@ -737,18 +803,18 @@ run(function()
 								Players = true
 							})
 	
-							if ent then 
+							if ent then
 								local id
-								for i2, v2 in frontlines.Main.globals.soldier_hitbox_hash do 
-									if i2.Weld.Part0 == v.RootPart then
-										id = v2
+								for i, hash in frontlines.Main.globals.soldier_hitbox_hash do
+									if i.Weld.Part0 == v.RootPart then
+										id = hash
 										break
 									end
 								end
-								
+	
 								if id then
 									v.model:PivotTo(ent.RootPart.Root_M.Spine1_M.WorldCFrame)
-								end 
+								end
 							end
 						end
 					end
@@ -1122,17 +1188,20 @@ run(function()
 		Function = function(callback)
 			if callback then
 				Phase:Clean(entitylib.Events.LocalAdded:Connect(function()
-					if frontlines.Main.globals.fpv_sol_instances.root then 
-						frontlines.Main.globals.fpv_sol_instances.root.CanCollide = false 
+					local root = frontlines.Main.globals.fpv_sol_instances.root
+					if root then
+						root.CanCollide = false
 					end
 				end))
-				
-				if frontlines.Main.globals.fpv_sol_instances.root then 
-					frontlines.Main.globals.fpv_sol_instances.root.CanCollide = false 
+	
+				local root = frontlines.Main.globals.fpv_sol_instances.root
+				if root then
+					root.CanCollide = false
 				end
 			else
-				if frontlines.Main.globals.fpv_sol_instances.root then 
-					frontlines.Main.globals.fpv_sol_instances.root.CanCollide = true 
+				local root = frontlines.Main.globals.fpv_sol_instances.root
+				if root then
+					root.CanCollide = true
 				end
 			end
 		end,
@@ -1148,8 +1217,8 @@ run(function()
 	local aimtable = {}
 	local maxy = frontlines.Main.consts.fpv_sol_movement.MAX_ATT_X
 	local yaw, pitch = 0, 90
-	for i = 1, 40 do 
-		table.insert(aimtable, Vector3.zero) 
+	for i = 1, 40 do
+		table.insert(aimtable, Vector3.zero)
 	end
 	
 	SpinBot = vape.Categories.Blatant:CreateModule({
@@ -1171,6 +1240,9 @@ run(function()
 					aimtable = table.clone(frontlines.Main.globals.sol_attitudes)
 					aimtable[frontlines.Main.globals.cli_state.fpv_sol_id] = Vector3.new(math.clamp(math.rad(pitch), -maxy, maxy), math.rad(yaw))
 					yaw += task.wait() * (Yaw.Value == 'Clockwise' and (Speed.Value or 0) or -(Speed.Value or 0)) * 1000
+					if Pitch.Value == 'Sine' then
+						pitch = math.sin(math.rad(yaw)) * 90
+					end
 				until not SpinBot.Enabled
 			else
 				yaw = 0
@@ -1197,7 +1269,7 @@ run(function()
 	})
 	Pitch = SpinBot:CreateDropdown({
 		Name = 'Pitch Direction',
-		List = {'Up', 'Down', 'Forward'},
+		List = {'Up', 'Down', 'Forward', 'Sine'},
 		Function = function(val)
 			pitch = val == 'Up' and 90 or val == 'Down' and -90 or 0
 		end
@@ -1440,19 +1512,17 @@ end)
 run(function()
 	local PickupRange
 	local Range
-	local pickupdelay = tick()
 	
 	PickupRange = vape.Categories.Utility:CreateModule({
 		Name = 'PickupRange',
 		Function = function(callback)
-			if callback then 
+			if callback then
 				repeat
-					if entitylib.isAlive and pickupdelay < tick() then
-						for i, v in frontlines.Main.globals.equipment_drop_ids do 
+					if entitylib.isAlive then
+						for i, v in frontlines.Main.globals.equipment_drop_ids do
 							local obj = frontlines.Main.globals.equipments[v]
-							if obj and (obj.model.PrimaryPart.Position - entitylib.character.RootPart.Position).Magnitude < Range.Value then 
-								if frontlines.Main.matrix_bit(frontlines.PickupBit, v) == 0 then 
-									pickupdelay = tick() + 0.1
+							if obj and obj.model and obj.model.PrimaryPart and (obj.model.PrimaryPart.Position - entitylib.character.RootPart.Position).Magnitude < Range.Value then
+								if frontlines.Main.matrix_bit(frontlines.PickupBit, v) == 0 then
 									frontlines.Main.set_matrix_bit(frontlines.PickupBit, v, true)
 									frontlines.Main.utils.net_msg_util.c_prep_net_msg(frontlines.Main.globals.combat_net_msg_state, frontlines.Main.enums.c_net_msg.PICKUP_AMMO, v)
 									break
@@ -1460,7 +1530,8 @@ run(function()
 							end
 						end
 					end
-					task.wait()
+	
+					task.wait(0.05)
 				until not PickupRange.Enabled
 			end
 		end,
