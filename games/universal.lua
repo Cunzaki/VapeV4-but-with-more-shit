@@ -10419,6 +10419,189 @@ run(function()
 		Tooltip = 'Automatically jumps after reaching the edge'
 	})
 end)
+
+run(function()
+	local PartManipulation
+	local Mode
+	local TargetPart
+	local PartName
+	local Distance
+	local Speed
+	local Radius
+	local YOffset
+	local SpinAngle
+	local originalPositions = {}
+	local originalAnchors = {}
+	local originalCFrames = {}
+	local isRunning = false
+	local selectedPart = nil
+	
+	local function getParts()
+		local parts = {}
+		for _, v in workspace:GetDescendants() do
+			if v:IsA("BasePart") and v.Anchored then
+				table.insert(parts, v)
+			end
+		end
+		return parts
+	end
+	
+	local function selectPartByName()
+		for _, v in workspace:GetDescendants() do
+			if v:IsA("BasePart") and v.Name == PartName.Value and v.Anchored then
+				return v
+			end
+		end
+		return nil
+	end
+	
+	PartManipulation = vape.Categories.World:CreateModule({
+		Name = 'Part Manipulation',
+		Function = function(callback)
+			if callback then
+				isRunning = true
+				table.clear(originalPositions)
+				table.clear(originalAnchors)
+				table.clear(originalCFrames)
+				
+				PartManipulation:Clean(runService.PreSimulation:Connect(function()
+					if not isRunning then return end
+					
+					local target = nil
+					if TargetPart.Value == 'Selected' then
+						if not selectedPart then
+							selectedPart = selectPartByName()
+						end
+						target = selectedPart
+					elseif TargetPart.Value == 'All' then
+						target = getParts()
+					end
+					
+					if not target then return end
+					
+					local char = entitylib.isAlive and entitylib.character.Character
+					local root = char and char:FindFirstChild("HumanoidRootPart")
+					
+					if not root then return end
+					
+					local function processPart(part)
+						if not originalCFrames[part] then
+							originalCFrames[part] = part.CFrame
+							originalAnchors[part] = part.Anchored
+						end
+						
+						local mode = Mode.Value
+						local offset = YOffset.Value
+						local dist = Distance.Value
+						local spd = Speed.Value
+						local rad = Radius.Value
+						
+						if mode == 'Spin Around Player' then
+							SpinAngle = (SpinAngle + spd) % 360
+							local radian = math.rad(SpinAngle)
+							local pos = root.Position + Vector3.new(math.cos(radian) * rad, offset, math.sin(radian) * rad)
+							part.CFrame = CFrame.new(pos, root.Position)
+						elseif mode == 'Bring to Player' then
+							local targetPos = root.Position + Vector3.new(0, offset, 0)
+							part.Position = part.Position:Lerp(targetPos, spd / 100)
+						elseif mode == 'Orbit' then
+							SpinAngle = (SpinAngle + spd) % 360
+							local radian = math.rad(SpinAngle)
+							local up = Vector3.new(0, offset, 0)
+							local pos = originalCFrames[part].Position + Vector3.new(math.cos(radian) * rad, offset, math.sin(radian) * rad)
+							part.Position = pos
+						elseif mode == 'Float' then
+							part.Position = originalCFrames[part].Position + Vector3.new(0, offset + math.sin(os.clock() * spd) * rad, 0)
+						elseif mode == 'Follow' then
+							local targetPos = root.Position + Vector3.new(0, offset, 0) + (root.CFrame.LookVector * dist)
+							part.Position = part.Position:Lerp(targetPos, spd / 100)
+						end
+					end
+					
+					if type(target) == 'table' then
+						for _, part in target do
+							if part and part.Parent then
+								processPart(part)
+							end
+						end
+					elseif target and target.Parent then
+						processPart(target)
+					end
+				end))
+			else
+				isRunning = false
+				for part, cframe in originalCFrames do
+					if part and part.Parent then
+						part.CFrame = cframe
+					end
+				end
+				table.clear(originalCFrames)
+				table.clear(originalAnchors)
+				selectedPart = nil
+			end
+		end,
+		Tooltip = 'Manipulate anchored parts in various ways'
+	})
+	
+	Mode = PartManipulation:CreateDropdown({
+		Name = 'Mode',
+		List = {'Spin Around Player', 'Bring to Player', 'Orbit', 'Float', 'Follow'},
+		Default = 'Spin Around Player'
+	})
+	
+	TargetPart = PartManipulation:CreateDropdown({
+		Name = 'Target',
+		List = {'Selected', 'All'},
+		Default = 'Selected'
+	})
+	
+	PartName = PartManipulation:CreateTextBox({
+		Name = 'Part Name',
+		Placeholder = 'Enter part name',
+		Function = function()
+			if PartManipulation.Enabled then
+				selectedPart = nil
+			end
+		end
+	})
+	
+	Distance = PartManipulation:CreateSlider({
+		Name = 'Distance',
+		Min = 0,
+		Max = 100,
+		Default = 10,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
+	})
+	
+	Speed = PartManipulation:CreateSlider({
+		Name = 'Speed',
+		Min = 1,
+		Max = 100,
+		Default = 10
+	})
+	
+	Radius = PartManipulation:CreateSlider({
+		Name = 'Radius',
+		Min = 1,
+		Max = 100,
+		Default = 10,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
+	})
+	
+	YOffset = PartManipulation:CreateSlider({
+		Name = 'Y Offset',
+		Min = -50,
+		Max = 50,
+		Default = 5,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
+	})
+end)
 	
 run(function()
 	local rayCheck = RaycastParams.new()
