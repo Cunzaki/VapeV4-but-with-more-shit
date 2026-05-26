@@ -4222,6 +4222,43 @@ run(function()
 		Default = true
 	})
 end)
+
+run(function()
+	local Jesus
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	
+	Jesus = vape.Categories.Blatant:CreateModule({
+		Name = 'Jesus',
+		Function = function(callback)
+			if callback then
+				local terrain = workspace:FindFirstChildWhichIsA('Terrain')
+				params.FilterDescendantsInstances = {terrain}
+				local Platform = Instance.new('Part')
+				Platform.CanQuery = false
+				Platform.Anchored = true
+				Platform.Size = Vector3.one
+				Platform.Transparency = 1
+				Platform.Parent = gameCamera
+	
+				Jesus:Clean(Platform)
+				Jesus:Clean(runService.PreSimulation:Connect(function()
+					if entitylib.isAlive then
+						local root = entitylib.character.RootPart
+						local ray = workspace:Raycast(root.Position, Vector3.new(0, -((root.Size.Y / 2) + entitylib.character.HipHeight + math.abs(root.AssemblyLinearVelocity.Y * 0.032)), 0), params)
+	
+						if ray and ray.Material == Enum.Material.Water then
+							Platform.CFrame = CFrame.new(ray.Position)
+						else
+							Platform.CFrame = CFrame.new(10000, 10000, 10000)
+						end
+					end
+				end))
+			end
+		end,
+		Tooltip = 'Allow you to stand on terrain water'
+	})
+end)
 	
 run(function()
 	local MouseTP
@@ -9784,6 +9821,58 @@ run(function()
 	Role = StaffDetector:CreateTextBox({
 		Name = 'Role',
 		Placeholder = 'Role Rank'
+	})
+end)
+
+run(function()
+	local StateSpoofer
+	local State
+	local hook
+	
+	StateSpoofer = vape.Categories.Utility:CreateModule({
+		Name = 'StateSpoofer',
+		Function = function(callback)
+			if callback then
+				local function rakNetCheck()
+					if not (raknet and raknet.add_send_hook and pcall(raknet.add_send_hook, function() end)) then
+						vape:CreateNotification('StateSpoofer', 'This feature requires raknet! (risky feature, please do not use on mains.)', 10, 'warning')
+						return false
+					end
+					return true
+				end
+				
+				if not rakNetCheck() then
+					StateSpoofer:Toggle()
+					return
+				end
+	
+				hook = function(packet)
+					if packet.AsArray and packet.AsArray[1] == 0x1b then
+						local data = packet.AsBuffer
+						if data then
+							buffer.writeu8(data, 25, Enum.HumanoidStateType[State.Value].Value + 32)
+							packet:SetData(data)
+						end
+					end
+				end
+	
+				raknet.add_send_hook(hook)
+			elseif hook then
+				raknet.remove_send_hook(hook)
+				hook = nil
+			end
+		end,
+		Tooltip = 'Spoof humanoid states on the server.'
+	})
+	local states = {}
+	for _, v in Enum.HumanoidStateType:GetEnumItems() do
+		if v.Name ~= 'None' then
+			table.insert(states, v.Name)
+		end
+	end
+	State = StateSpoofer:CreateDropdown({
+		Name = 'Humanoid State',
+		List = states
 	})
 end)
 	
