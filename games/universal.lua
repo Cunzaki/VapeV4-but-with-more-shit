@@ -9229,13 +9229,27 @@ run(function()
 					end))
 				end
 			else
-				if Mode.Value == 'Server Desync' and serverDesyncHook then
-					raknet.remove_send_hook(serverDesyncHook)
-					serverDesyncHook = nil
+				if Mode.Value == 'Server Desync' then
+					if raknet and serverDesyncHook then
+						pcall(function()
+							raknet.remove_send_hook(serverDesyncHook)
+						end)
+						serverDesyncHook = nil
+					end
 				elseif Mode.Value == 'Raknet Method 2' then
-					if raknet and raknet2SendHook and raknet.remove_send_hook then
-						raknet.remove_send_hook(raknet2SendHook)
-						raknet.remove_recv_hook(raknet2RecvHook)
+					if raknet then
+						if raknet2SendHook then
+							pcall(function()
+								raknet.remove_send_hook(raknet2SendHook)
+							end)
+							raknet2SendHook = nil
+						end																																																																																																																																											
+						if raknet2RecvHook then
+							pcall(function()
+								raknet.remove_recv_hook(raknet2RecvHook)
+							end)
+							raknet2RecvHook = nil
+						end
 						vape:CreateNotification('Desync', 'Raknet Method 2 disabled!', 5, 'info')
 					end
 				else
