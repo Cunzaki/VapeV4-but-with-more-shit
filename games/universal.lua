@@ -9194,6 +9194,8 @@ run(function()
 				else
 					desyncEnabled = false
 					currentDesyncRotation = CFrame.identity
+					currentPosOffset = Vector3.zero
+					currentRot = CFrame.identity
 					cleanupCameraProxy()
 					cleanupDesyncClone()
 				end
@@ -9340,7 +9342,10 @@ run(function()
 		Name = 'Position Desync',
 		Default = false,
 		Tooltip = 'Desync your character position as well',
-		Function = function()
+		Function = function(enabled)
+			if not enabled then
+				currentPosOffset = Vector3.zero
+			end
 			updateUIVisibility()
 		end
 	})
