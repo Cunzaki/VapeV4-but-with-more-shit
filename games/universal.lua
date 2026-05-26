@@ -1337,6 +1337,40 @@ run(function()
 	local originalWalkSpeed
 	local originalJumpPower
 	local isFrozen = false
+	
+	local pl = {}
+	local oldshoot
+	local oldPrisonBulletHook
+	local positions = {
+		Vector3.new(0, 1, 0),
+		Vector3.new(1, 0, 0),
+		Vector3.new(0.7, -0.5, -0.5),
+		Vector3.new(-0.1, -0.8, -0.8),
+		Vector3.new(-0.8, -0.5, -0.5),
+		Vector3.new(-1, 0, 0),
+		Vector3.new(-0.8, 0.4, 0.4),
+		Vector3.new(0, 0.7, 0.7),
+		Vector3.new(0.7, 0.5, 0.5),
+		Vector3.new(1, 0, 0),
+		Vector3.new(0.7, 0, -0.8),
+		Vector3.new(-0.1, 0, -1),
+		Vector3.new(-0.8, 0, -0.8),
+		Vector3.new(-1, 0, 0),
+		Vector3.new(-0.8, 0, 0.7),
+		Vector3.new(0, 0, 1),
+		Vector3.new(0.7, 0, 0.7),
+		Vector3.new(1, 0, 0),
+		Vector3.new(0.7, 0.4, -0.5),
+		Vector3.new(-0.1, 0.7, -0.8),
+		Vector3.new(-0.8, 0.4, -0.5),
+		Vector3.new(-1, -0.1, 0),
+		Vector3.new(-0.8, -0.5, 0.4),
+		Vector3.new(0, -0.8, 0.7),
+		Vector3.new(0.7, -0.6, 0.5),
+		Vector3.new(0, -1, 0)
+	}
+	local rayParams = RaycastParams.new()
+	local rayParams2 = OverlapParams.new()
 	local bulletTracerActive = {}
 	local bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	local healthCache = setmetatable({}, {__mode = 'k'})
@@ -2233,6 +2267,76 @@ run(function()
 		return ent, ent and ent[targetPart], origin
 	end
 
+	local function getShootFunction()
+		local gui = lplr.PlayerGui:FindFirstChild('Home')
+		gui = gui and gui.hud and gui.hud.ActionArea
+		if gui then
+			for _, v in getconnections(gui.InputBegan) do
+				if v.Function then
+					pl.Shoot = debug.getupvalue(v.Function, 2)
+					pl.Reload = debug.getupvalue(pl.Shoot, 2)
+					pl.Bullet = debug.getupvalue(pl.Shoot, 16)
+					break
+				end
+			end
+		end
+	end
+
+	local function resolveOrigin(origin, extra, target)
+		local scanPositions = {}
+		if (extra - origin).Magnitude < 6 then
+			table.insert(scanPositions, extra)
+		end
+
+		for i = 3, 6, 3 do
+			for _, v in positions do
+				table.insert(scanPositions, origin + v * i)
+			end
+		end
+
+		for _, pos in scanPositions do
+			local ray = workspace:Raycast(target, (pos - target), rayParams)
+			if not ray and #workspace:GetPartBoundsInBox(CFrame.new(pos), Vector3.one * 0.1, rayParams2) <= 0 then
+				return pos
+			end
+		end
+	end
+
+	local function PrisonBulletHook(...)
+		local origin, direction = ...
+		local ent, targetPart, origin = getTarget(origin)
+		if not ent then return oldPrisonBulletHook(...) end
+
+		local args = table.pack(...)
+		args[2] = targetPart.Position
+
+		if Wallbang.Enabled then
+			local ignore = {lplr.Character}
+			for _, v in entitylib.List do
+				table.insert(ignore, v.Character)
+			end
+			rayParams.FilterDescendantsInstances = ignore
+			rayParams2.FilterDescendantsInstances = ignore
+			local ray = workspace:Raycast(args[2], (origin - args[2]), rayParams)
+
+			if ray then
+				local neworigin = resolveOrigin(origin, ray.Position + ray.Normal * 0.05, args[2])
+
+				if neworigin then
+					for i, v in debug.getstack(3) do
+						if v == origin then
+							debug.setstack(3, i, neworigin)
+						end
+					end
+
+					args[1] = neworigin
+				end
+			end
+		end
+
+		return oldPrisonBulletHook(unpack(args, 1, args.n))
+	end
+
 	local Hooks = {
 		FindPartOnRayWithIgnoreList = function(args)
 			local ent, targetPart, origin = getTarget(args[1].Origin, {args[2]})
@@ -2382,6 +2486,24 @@ run(function()
 						end
 						return oldnamecall(self, unpack(args))
 					end)
+				end
+				
+				if game.PlaceId == 155615604 then
+					getShootFunction()
+					if not pl.Bullet then
+						repeat
+							getShootFunction()
+							task.wait()
+						until pl.Bullet or not SilentAim.Enabled
+					end
+					if pl.Bullet and SilentAim.Enabled then
+						oldPrisonBulletHook = hookfunction(pl.Bullet, PrisonBulletHook)
+					end
+					
+					rayParams.CollisionGroup = 'ClientBullet'
+					rayParams.FilterType = Enum.RaycastFilterType.Exclude
+					rayParams2.CollisionGroup = 'ClientBullet'
+					rayParams2.FilterType = Enum.RaycastFilterType.Exclude
 				end
 
 				repeat
@@ -2543,7 +2665,10 @@ run(function()
 				if oldray then
 					hookfunction(Ray.new, oldray)
 				end
-				oldnamecall, oldray = nil, nil
+				if game.PlaceId == 155615604 and oldPrisonBulletHook then
+					hookfunction(pl.Bullet, oldPrisonBulletHook)
+				end
+				oldnamecall, oldray, oldPrisonBulletHook = nil, nil, nil
 				cleanupPMClone()
 				cleanupPMRadius()
 				cleanupPMCameraProxy()
