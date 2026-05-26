@@ -2436,6 +2436,8 @@ run(function()
 					if BulletTracers.Enabled then
 						renderBulletTracers()
 					end
+					
+					local ent
 					if AutoFire.Enabled then
 						local origin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
 						local effectiveOrigin = origin
@@ -2444,7 +2446,7 @@ run(function()
 							effectiveOrigin = CFrame.new(pmTargetPosition) * origin.Rotation
 						end
 						
-						local ent = entitylib['Entity'..Mode.Value]({
+						ent = entitylib['Entity'..Mode.Value]({
 							Range = Range.Value,
 							Wallcheck = Target.Walls.Enabled or nil,
 							Part = 'Head',
@@ -2456,38 +2458,6 @@ run(function()
 						
 						if ent then
 							registerShot(ent, ent.Head or ent.RootPart, (effectiveOrigin * fireoffset).Position)
-						end
-
-						if AutoStop and AutoStop.Enabled then
-							if ent and entitylib.isAlive then
-								local char = entitylib.character.Character
-								local hum = char and char:FindFirstChild("Humanoid")
-								if hum then
-									if not isFrozen then
-										originalWalkSpeed = hum.WalkSpeed
-										originalJumpPower = hum.JumpPower
-										isFrozen = true
-									end
-									hum.WalkSpeed = 0
-									hum.JumpPower = 0
-								end
-							elseif isFrozen then
-								local char = entitylib.character.Character
-								local hum = char and char:FindFirstChild("Humanoid")
-								if hum and originalWalkSpeed ~= nil and originalJumpPower ~= nil then
-									hum.WalkSpeed = originalWalkSpeed
-									hum.JumpPower = originalJumpPower
-								end
-								isFrozen = false
-							end
-						elseif isFrozen then
-							local char = entitylib.character.Character
-							local hum = char and char:FindFirstChild("Humanoid")
-							if hum and originalWalkSpeed ~= nil and originalJumpPower ~= nil then
-								hum.WalkSpeed = originalWalkSpeed
-								hum.JumpPower = originalJumpPower
-							end
-							isFrozen = false
 						end
 
 						if mouse1click and (isrbxactive or iswindowactive)() then
@@ -2509,6 +2479,57 @@ run(function()
 								mouseClicked = false
 							end
 						end
+					end
+					
+					if not ent and AutoStop and AutoStop.Enabled then
+						local origin = Mode.Value == 'Mouse' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
+						local effectiveOrigin = origin
+						
+						if PositionManipulation and PositionManipulation.Enabled and pmTargetPosition then
+							effectiveOrigin = CFrame.new(pmTargetPosition) * origin.Rotation
+						end
+						
+						ent = entitylib['Entity'..Mode.Value]({
+							Range = Range.Value,
+							Wallcheck = Target.Walls.Enabled or nil,
+							Part = 'Head',
+							Origin = effectiveOrigin.Position,
+							Players = Target.Players.Enabled,
+							NPCs = Target.NPCs.Enabled,
+							Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
+						})
+					end
+
+					if AutoStop and AutoStop.Enabled then
+						if ent and entitylib.isAlive then
+							local char = entitylib.character.Character
+							local hum = char and char:FindFirstChildOfClass("Humanoid")
+							if hum then
+								if not isFrozen then
+									originalWalkSpeed = hum.WalkSpeed
+									originalJumpPower = hum.JumpPower
+									isFrozen = true
+								end
+								hum.WalkSpeed = 0
+								hum.JumpPower = 0
+							end
+						elseif isFrozen then
+							local char = entitylib.character.Character
+							local hum = char and char:FindFirstChildOfClass("Humanoid")
+							if hum and originalWalkSpeed ~= nil and originalJumpPower ~= nil then
+								hum.WalkSpeed = originalWalkSpeed
+								hum.JumpPower = originalJumpPower
+							end
+							isFrozen = false
+						end
+					elseif isFrozen then
+						local char = entitylib.character.Character
+						local hum = char and char:FindFirstChildOfClass("Humanoid")
+						if hum and originalWalkSpeed ~= nil and originalJumpPower ~= nil then
+							hum.WalkSpeed = originalWalkSpeed
+							hum.JumpPower = originalJumpPower
+						end
+						isFrozen = false
 					end
 					task.wait()
 				until not SilentAim.Enabled
