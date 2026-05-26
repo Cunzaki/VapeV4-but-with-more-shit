@@ -10987,6 +10987,44 @@ run(function()
 		Tooltip = 'Automatic murder mystery teaming based on equipped roblox tools.'
 	})
 end)
+
+run(function()
+	local TestTeamCheck
+	local oldtargetable
+	
+	TestTeamCheck = vape.Categories.Minigames:CreateModule({
+		Name = 'Test Team Check',
+		Function = function(callback)
+			if callback then
+				oldtargetable = entitylib.targetCheck
+				
+				entitylib.targetCheck = function(ent)
+					if ent.Health <= 0 then
+						return false
+					end
+					if ent.NPC then return true end
+					if isFriend(ent.Player) then return false end
+					if not select(2, whitelist:get(ent.Player)) then return false end
+					
+					if ent.Character then
+						local torso = ent.Character:FindFirstChild('Torso') or ent.Character:FindFirstChild('UpperTorso')
+						if torso and torso:IsA('BasePart') and torso.Material == Enum.Material.ForceField then
+							return false
+						end
+					end
+					
+					return true
+				end
+				
+				entitylib.refresh()
+			else
+				entitylib.targetCheck = oldtargetable
+				entitylib.refresh()
+			end
+		end,
+		Tooltip = 'Test team check: skips players with Torso/UpperTorso material set to ForceField.'
+	})
+end)
 	
 run(function()
 	local Atmosphere
