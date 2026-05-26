@@ -957,6 +957,7 @@ run(function()
 	local CircleFilled
 	local CircleObject
 	local RightClick
+	local Strength
 	local moveConst = Vector2.new(1, 0.77) * math.rad(0.5)
 	
 	local function wrapAngle(num)
@@ -1002,6 +1003,7 @@ run(function()
 								local angle = Vector2.new(diffYaw, diffPitch) // (moveConst * UserSettings():GetService('UserGameSettings').MouseSensitivity)
 								
 								angle *= math.min(Speed.Value * dt, 1)
+								angle *= Strength and Strength.Value or 1
 								mousemoverel(angle.X, angle.Y)
 							end
 						end
@@ -1044,8 +1046,15 @@ run(function()
 	Speed = AimAssist:CreateSlider({
 		Name = 'Speed',
 		Min = 0,
-		Max = 30,
+		Max = 100,
 		Default = 15
+	})
+	Strength = AimAssist:CreateSlider({
+		Name = 'Strength',
+		Min = 0,
+		Max = 10,
+		Decimal = 10,
+		Default = 1
 	})
 	AimAssist:CreateToggle({
 		Name = 'Range Circle',
