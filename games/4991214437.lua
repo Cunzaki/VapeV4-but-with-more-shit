@@ -56,6 +56,9 @@ local function removeTags(str)
 end
 
 run(function()
+	-- Save original target check
+	local originalTargetCheck = entitylib.targetCheck
+	
 	-- Force the target check to override everything
 	entitylib.targetCheck = function(ent)
 		-- First, do forcefield check (top priority)
@@ -75,8 +78,12 @@ run(function()
 			end
 		end
 		
-		-- Now check normal stuff
+		-- Now run original target check if forcefield isn't present
 		ent.Targetable = true
+		
+		if originalTargetCheck then
+			return originalTargetCheck(ent)
+		end
 		
 		if ent.Health <= 0 then
 			return false
