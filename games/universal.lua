@@ -10991,6 +10991,8 @@ end)
 run(function()
 	local TestTeamCheck
 	local oldtargetable
+	local renderConnection
+	local lastMaterialCache = {}
 	
 	TestTeamCheck = vape.Categories.Minigames:CreateModule({
 		Name = 'Test Team Check',
@@ -11016,8 +11018,34 @@ run(function()
 					return true
 				end
 				
+				renderConnection = RunService.RenderStepped:Connect(function()
+					local needsRefresh = false
+					
+					for _, ent in entitylib.List do
+						if ent.Player and ent.Character then
+							local torso = ent.Character:FindFirstChild('Torso') or ent.Character:FindFirstChild('UpperTorso')
+							local currentMaterial = torso and torso:IsA('BasePart') and torso.Material or nil
+							local cachedMaterial = lastMaterialCache[ent.Player]
+							
+							if currentMaterial ~= cachedMaterial then
+								lastMaterialCache[ent.Player] = currentMaterial
+								needsRefresh = true
+							end
+						end
+					end
+					
+					if needsRefresh then
+						entitylib.refresh()
+					end
+				end)
+				
 				entitylib.refresh()
 			else
+				if renderConnection then
+					renderConnection:Disconnect()
+					renderConnection = nil
+				end
+				table.clear(lastMaterialCache)
 				entitylib.targetCheck = oldtargetable
 				entitylib.refresh()
 			end
