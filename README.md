@@ -11,7 +11,14 @@
   Rise up to the top while remaining completely untouchable.
 </h2>
 
-## Contacts
+## Uhhh why did you fork it
+I really like the vapev4 project and ive been using this script for a while. I dont wanna take any credits to the still updated version by 7GrandDad. I just felt there was a few things I could add to the universal to make it more fun to use and that I felt were needed. 
+
+## Why use the fork?
+Im gonna try to stay relatively updated to the original version with game support and whatnot. Once again, all credits to https://github.com/7GrandDadVape for the original scripts. 
+This version has bullet tracers, cframe desync, more visualizers, better npc detection and so on. I may make a full change list eventually but I am too lazy for that as I type this right now. 
+
+## 7GrandDadVape Contacts
 [Discord](https://discord.gg/ZqS836yx9k)
 <br/>
 [Youtube](https://youtube.com/c/7GrandDadVape)
@@ -35,9 +42,9 @@ If its not the supposed utility at fault, please try some troubleshooting steps.
 3. Ensuring no external script is conflicting with vape.
 
 ## Developers & Credits
-[Cunzaki](https://github.com/Cunzaki) - maintainer of the project
+[Cunzaki](https://github.com/Cunzaki) - forker of the project
 <br/>
-[7GrandDad](https://github.com/7GrandDadVape) - Original Lead maintainer of the project - vaperoblox on Discord
+[7GrandDad](https://github.com/7GrandDadVape) - Lead maintainer of the project - vaperoblox on Discord
 <br/>
 [rce-incorporated](https://github.com/rce-incorporated/Fiu) - Luau bytecode disassembly with modifications
 <br/>
