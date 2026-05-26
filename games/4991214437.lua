@@ -56,10 +56,46 @@ local function removeTags(str)
 end
 
 run(function()
+	-- Force the target check to override everything
+	entitylib.targetCheck = function(ent)
+		-- First, do forcefield check (top priority)
+		local char = ent.Character
+		if char then
+			local torso = char:FindFirstChild('Torso') or char:FindFirstChild('UpperTorso') or char:FindFirstChild('Head')
+			
+			local hasForcefieldObject = char:FindFirstChildWhichIsA('ForceField') ~= nil
+			local isForcefieldMaterial = false
+			if torso then
+				isForcefieldMaterial = torso.Material == Enum.Material.ForceField or torso.Material == Enum.Material.Neon
+			end
+			
+			if hasForcefieldObject or isForcefieldMaterial then
+				ent.Targetable = false
+				return false
+			end
+		end
+		
+		-- Now check normal stuff
+		ent.Targetable = true
+		
+		if ent.Health <= 0 then
+			return false
+		end
+		if ent.NPC then return true end
+		if isFriend(ent.Player) then return false end
+		if not select(2, whitelist:get(ent.Player)) then return false end
+		
+		return true
+	end
+	
 	-- Custom entitylib functions for this game
 	entitylib.getUpdateConnections = function(ent)
 		local hum = ent.Humanoid
-		local torso = ent.Character and (ent.Character:FindFirstChild('Torso') or ent.Character:FindFirstChild('UpperTorso'))
+		local torso
+		if ent.Character then
+			torso = ent.Character:FindFirstChild('Torso') or ent.Character:FindFirstChild('UpperTorso') or ent.Character:FindFirstChild('Head')
+		end
+		
 		local connections = {
 			hum:GetPropertyChangedSignal('Health'),
 			hum:GetPropertyChangedSignal('MaxHealth')
@@ -69,10 +105,28 @@ run(function()
 			table.insert(connections, torso:GetPropertyChangedSignal('Material'))
 		end
 		
+		-- Check for forcefield in the character's descendants
+		if ent.Character then
+			table.insert(connections, ent.Character.DescendantAdded)
+			table.insert(connections, ent.Character.DescendantRemoving)
+		end
+		
 		table.insert(connections, {
 			Connect = function()
 				ent.Friend = ent.Player and isFriend(ent.Player) or nil
 				ent.Target = ent.Player and isTarget(ent.Player) or nil
+				
+				-- Check for forcefield right away
+				local char = ent.Character
+				if char then
+					local torsoLocal = char:FindFirstChild('Torso') or char:FindFirstChild('UpperTorso') or char:FindFirstChild('Head')
+					local hasForcefield = char:FindFirstChildWhichIsA('ForceField') ~= nil
+					local isForcefieldMaterial = torsoLocal and (torsoLocal.Material == Enum.Material.ForceField or torsoLocal.Material == Enum.Material.Neon)
+					
+					-- Mark as not targetable
+					ent.Targetable = not (hasForcefield or isForcefieldMaterial)
+				end
+				
 				return {Disconnect = function() end}
 			end
 		})
@@ -80,31 +134,21 @@ run(function()
 		return connections
 	end
 	
-	-- Custom target check based on forcefield
-	entitylib.targetCheck = function(ent)
-		if ent.TeamCheck then return ent:TeamCheck() end
-		if ent.NPC then return true end
-		if isFriend(ent.Player) then return false end
-		if not select(2, whitelist:get(ent.Player)) then return false end
-		
-		-- Check if torso is forcefield material (Neon/ForceField?)
-		local torso = ent.Character and (ent.Character:FindFirstChild('Torso') or ent.Character:FindFirstChild('UpperTorso'))
-		if torso then
-			local hasForcefield = ent.Character:FindFirstChildWhichIsA('ForceField') ~= nil
-			-- Or check material?
-			if hasForcefield or (torso.Material == Enum.Material.ForceField or torso.Material == Enum.Material.Neon) then
-				return false -- Don't target if they have forcefield
+	-- Custom isVulnerable
+	local originalIsVulnerable = entitylib.isVulnerable
+	entitylib.isVulnerable = function(ent)
+		local char = ent.Character
+		if char then
+			local torso = char:FindFirstChild('Torso') or char:FindFirstChild('UpperTorso') or char:FindFirstChild('Head')
+			local hasForcefield = char:FindFirstChildWhichIsA('ForceField') ~= nil
+			local isForcefieldMaterial = torso and (torso.Material == Enum.Material.ForceField or torso.Material == Enum.Material.Neon)
+			
+			if hasForcefield or isForcefieldMaterial then
+				return false
 			end
 		end
 		
-		return true
-	end
-	
-	-- Custom isVulnerable
-	entitylib.isVulnerable = function(ent)
-		local torso = ent.Character and (ent.Character:FindFirstChild('Torso') or ent.Character:FindFirstChild('UpperTorso'))
-		local hasForcefield = ent.Character:FindFirstChildWhichIsA('ForceField') ~= nil
-		return ent.Health > 0 and not hasForcefield and (torso and torso.Material ~= Enum.Material.ForceField and torso.Material ~= Enum.Material.Neon)
+		return ent.Health > 0
 	end
 end)
 
@@ -121,7 +165,20 @@ run(function()
 				-- Update entities on fast loop (every frame) to catch rapid changes
 				ForcefieldCheck:Clean(runService.Heartbeat:Connect(function(dt)
 					for _, ent in entitylib.List do
-						-- Force update the entity to refresh target check
+						if not ent.Character then continue end
+						
+						local char = ent.Character
+						local torso = char:FindFirstChild('Torso') or char:FindFirstChild('UpperTorso')
+						local hasForcefield = char:FindFirstChildWhichIsA('ForceField') ~= nil
+						local isForcefieldMaterial = torso and (torso.Material == Enum.Material.ForceField or torso.Material == Enum.Material.Neon)
+						
+						-- Update Targetable and manually check if we should draw ESP
+						local newTargetable = not (hasForcefield or isForcefieldMaterial)
+						if ent.Targetable ~= newTargetable then
+							ent.Targetable = newTargetable
+						end
+						
+						-- Force entity update
 						if entitylib.Events.EntityUpdated then
 							entitylib.Events.EntityUpdated:Fire(ent)
 						end
