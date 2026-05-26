@@ -17,6 +17,7 @@ I really like the vapev4 project and ive been using this script for a while. I d
 ## Why use the fork?
 Im gonna try to stay relatively updated to the original version with game support and whatnot. Once again, all credits to https://github.com/7GrandDadVape for the original scripts. 
 This version has bullet tracers, cframe desync, more visualizers, better npc detection and so on. I may make a full change list eventually but I am too lazy for that as I type this right now. 
+Yo btw this is vibe coded as hell just wanted to put that out there im just having fun here
 
 ## 7GrandDadVape Contacts
 [Discord](https://discord.gg/ZqS836yx9k)
