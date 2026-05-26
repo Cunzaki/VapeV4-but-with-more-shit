@@ -9557,30 +9557,21 @@ run(function()
 	local AntiKickToggle
 	local AntiBanToggle
 	
-	-- Adonis anticheat detection patterns
-	local adonisPatterns = {
-		'ADONIS',
-		'Adonis',
-		'adonis',
-		'Scyte',
-		'RemoteEvent',
-		'__adonis',
-		'_ADONIS',
-		'GetTable',
-		'Loadstring',
-		'RobloxLocked',
-		'ScriptContext',
-		'LocalScript Detected',
-		'Detected',
-		'Tamper',
-		'Proxy',
-		'metaMethod',
-		'indexInstance',
-		'newindexInstance',
-		'namecallInstance',
-		'indexEnum',
-		'namecallEnum',
-		'eqEnum'
+	-- Anticheat detection patterns
+	local anticheatPatterns = {
+		-- Adonis
+		'ADONIS', 'Adonis', 'adonis', 'Scyte', 'RemoteEvent', '__adonis', '_ADONIS',
+		'GetTable', 'Loadstring', 'RobloxLocked', 'ScriptContext', 'LocalScript Detected',
+		'Detected', 'Tamper', 'Proxy', 'metaMethod', 'indexInstance', 'newindexInstance',
+		'namecallInstance', 'indexEnum', 'namecallEnum', 'eqEnum',
+		-- HD Admin
+		'HD Admin', 'HDAdmin', 'hd admin', 'HD',
+		-- Simple Anti-Cheat
+		'AntiCheat', 'Anti-Cheat', 'anticheat', 'SimpleAC',
+		-- Durka
+		'Durka', 'durka',
+		-- Common anti-cheat keywords
+		'AntiExploit', 'Anti-Exploit', 'antiexploit', 'Cheat', 'cheat', 'Hack', 'hack'
 	}
 	
 	-- Storage for original functions
@@ -9593,45 +9584,32 @@ run(function()
 	local hookedFunctions = {}
 	local antiKickActive = false
 	local antiBanActive = false
-	local adonisDisabled = false
+	local anticheatsDisabled = false
 	
-	-- Function to completely disable Adonis
-	local function nukeAdonis()
-		-- Find Adonis core modules
+	-- Function to completely disable all detected anticheats
+	local function nukeAnticheats()
+		-- Find and disable all anticheat-related scripts/modules
 		for _, obj in ipairs(game:GetDescendants()) do
-			if obj:IsA('ModuleScript') and (obj.Name:lower():find('adonis') or obj.Name:lower():find('anti')) then
-				local success, err = pcall(function()
-					obj.Disabled = true
-				end)
-			elseif obj:IsA('LocalScript') and obj.Name:lower():find('adonis') then
-				local success, err = pcall(function()
-					obj.Disabled = true
-				end)
-			elseif obj:IsA('Script') and obj.Name:lower():find('adonis') then
-				local success, err = pcall(function()
-					obj.Disabled = true
-				end)
-			end
-		end
-		
-		-- Find and disable Adonis RemoteEvents and RemoteFunctions
-		for _, obj in ipairs(game:GetDescendants()) do
-			if obj:IsA('RemoteEvent') and (obj.Name:find('ADONIS') or obj.Name:find('Adonis')) then
-				local success, err = pcall(function()
-					obj:Destroy()
-				end)
-			elseif obj:IsA('RemoteFunction') and (obj.Name:find('ADONIS') or obj.Name:find('Adonis')) then
-				local success, err = pcall(function()
-					obj:Destroy()
-				end)
-			elseif obj:IsA('BindableEvent') and (obj.Name:find('ADONIS') or obj.Name:find('Adonis')) then
-				local success, err = pcall(function()
-					obj:Destroy()
-				end)
-			elseif obj:IsA('BindableFunction') and (obj.Name:find('ADONIS') or obj.Name:find('Adonis')) then
-				local success, err = pcall(function()
-					obj:Destroy()
-				end)
+			local nameLower = obj.Name:lower()
+			if obj:IsA('ModuleScript') or obj:IsA('LocalScript') or obj:IsA('Script') then
+				for _, pattern in ipairs(anticheatPatterns) do
+					if nameLower:find(pattern:lower()) then
+						local success, err = pcall(function()
+							obj.Disabled = true
+						end)
+						break
+					end
+				end
+			elseif obj:IsA('RemoteEvent') or obj:IsA('RemoteFunction') or 
+					obj:IsA('BindableEvent') or obj:IsA('BindableFunction') then
+				for _, pattern in ipairs(anticheatPatterns) do
+					if obj.Name:find(pattern) or nameLower:find(pattern:lower()) then
+						local success, err = pcall(function()
+							obj:Destroy()
+						end)
+						break
+					end
+				end
 			end
 		end
 	end
@@ -9728,13 +9706,13 @@ run(function()
 		end
 	end
 	
-	-- Adonis specific disabler
-	local function disableAdonis()
-		if adonisDisabled then return end
-		adonisDisabled = true
+	-- Universal anticheat disabler
+	local function disableAnticheats()
+		if anticheatsDisabled then return end
+		anticheatsDisabled = true
 		
-		-- Nuke Adonis first
-		nukeAdonis()
+		-- Nuke all anticheats
+		nukeAnticheats()
 		
 		-- Hook LogService.GetLogHistory
 		local logService = game:GetService('LogService')
@@ -9745,7 +9723,7 @@ run(function()
 			end
 		end
 		
-		-- Hook all RemoteEvents to block Adonis packets
+		-- Hook all RemoteEvents to block anticheat packets
 		for _, obj in ipairs(game:GetDescendants()) do
 			if obj:IsA('RemoteEvent') then
 				local oldFire = obj.FireServer
@@ -9754,7 +9732,7 @@ run(function()
 					if #args > 0 then
 						local firstArg = args[1]
 						if typeof(firstArg) == 'string' then
-							for _, pattern in ipairs(adonisPatterns) do
+							for _, pattern in ipairs(anticheatPatterns) do
 								if firstArg:find(pattern) then
 									return nil
 								end
@@ -9770,7 +9748,7 @@ run(function()
 					if #args > 0 then
 						local firstArg = args[1]
 						if typeof(firstArg) == 'string' then
-							for _, pattern in ipairs(adonisPatterns) do
+							for _, pattern in ipairs(anticheatPatterns) do
 								if firstArg:find(pattern) then
 									return nil
 								end
@@ -9808,6 +9786,7 @@ run(function()
 		
 		-- Set up DescendantAdded to keep blocking
 		game.DescendantAdded:Connect(function(obj)
+			local nameLower = obj.Name:lower()
 			if obj:IsA('RemoteEvent') then
 				local oldFire = obj.FireServer
 				obj.FireServer = function(self, ...)
@@ -9815,7 +9794,7 @@ run(function()
 					if #args > 0 then
 						local firstArg = args[1]
 						if typeof(firstArg) == 'string' then
-							for _, pattern in ipairs(adonisPatterns) do
+							for _, pattern in ipairs(anticheatPatterns) do
 								if firstArg:find(pattern) then
 									return nil
 								end
@@ -9831,7 +9810,7 @@ run(function()
 					if #args > 0 then
 						local firstArg = args[1]
 						if typeof(firstArg) == 'string' then
-							for _, pattern in ipairs(adonisPatterns) do
+							for _, pattern in ipairs(anticheatPatterns) do
 								if firstArg:find(pattern) then
 									return nil
 								end
@@ -9840,10 +9819,13 @@ run(function()
 					end
 					return oldInvoke(self, ...)
 				end
-			elseif obj:IsA('ModuleScript') and obj.Name:lower():find('adonis') then
-				obj.Disabled = true
-			elseif obj:IsA('LocalScript') and obj.Name:lower():find('adonis') then
-				obj.Disabled = true
+			elseif obj:IsA('ModuleScript') or obj:IsA('LocalScript') or obj:IsA('Script') then
+				for _, pattern in ipairs(anticheatPatterns) do
+					if nameLower:find(pattern:lower()) then
+						obj.Disabled = true
+						break
+					end
+				end
 			end
 		end)
 	end
@@ -9947,7 +9929,7 @@ run(function()
 	local function disableAll()
 		antiKickActive = false
 		antiBanActive = false
-		adonisDisabled = false
+		anticheatsDisabled = false
 		print('[Disabler] All protections disabled')
 	end
 	
@@ -9957,15 +9939,15 @@ run(function()
 			if callback then
 				local method = Method and Method.Value or 'Current'
 				
-				if method == 'Current' or method == 'Both' then
+				if method == 'Current' or method == 'Universal' then
 					Disabler:Clean(entitylib.Events.LocalAdded:Connect(characterAdded))
 					if entitylib.isAlive then
 						characterAdded(entitylib.character)
 					end
 				end
 				
-				if method == 'Adonis' or method == 'Both' then
-					disableAdonis()
+				if method == 'Universal' then
+					disableAnticheats()
 				end
 				
 				if AntiKickToggle and AntiKickToggle.Enabled then
@@ -9979,14 +9961,14 @@ run(function()
 				disableAll()
 			end
 		end,
-		Tooltip = 'Advanced disabler with Adonis support, AntiKick, and AntiBan'
+		Tooltip = 'Advanced disabler with universal anticheat support, AntiKick, and AntiBan'
 	})
 	
 	Method = Disabler:CreateDropdown({
 		Name = 'Method',
-		List = {'Current', 'Adonis', 'Both'},
+		List = {'Current', 'Universal'},
 		Default = 'Current',
-		Tooltip = 'Current - Original disabler method\nAdonis - Target Adonis anticheat specifically\nBoth - Apply both methods'
+		Tooltip = 'Current - Original disabler method\nUniversal - Target all common anticheats (Adonis, HD Admin, etc.)'
 	})
 	
 	AntiKickToggle = Disabler:CreateToggle({
