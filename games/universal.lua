@@ -1303,6 +1303,7 @@ run(function()
 	local AutoFireShootDelay
 	local AutoFireMode
 	local AutoFirePosition
+	local AutoStop
 	local Wallbang
 	local CircleColor
 	local CircleTransparency
@@ -1333,6 +1334,9 @@ run(function()
 	local oldnamecall, oldray
 	local lastMb1Click = 0
 	local isMb1Held = false
+	local originalWalkSpeed
+	local originalJumpPower
+	local isFrozen = false
 	local bulletTracerActive = {}
 	local bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	local healthCache = setmetatable({}, {__mode = 'k'})
@@ -2454,6 +2458,38 @@ run(function()
 							registerShot(ent, ent.Head or ent.RootPart, (effectiveOrigin * fireoffset).Position)
 						end
 
+						if AutoStop and AutoStop.Enabled then
+							if ent and entitylib.isAlive then
+								local char = entitylib.character.Character
+								local hum = char and char:FindFirstChild("Humanoid")
+								if hum then
+									if not isFrozen then
+										originalWalkSpeed = hum.WalkSpeed
+										originalJumpPower = hum.JumpPower
+										isFrozen = true
+									end
+									hum.WalkSpeed = 0
+									hum.JumpPower = 0
+								end
+							elseif isFrozen then
+								local char = entitylib.character.Character
+								local hum = char and char:FindFirstChild("Humanoid")
+								if hum and originalWalkSpeed ~= nil and originalJumpPower ~= nil then
+									hum.WalkSpeed = originalWalkSpeed
+									hum.JumpPower = originalJumpPower
+								end
+								isFrozen = false
+							end
+						elseif isFrozen then
+							local char = entitylib.character.Character
+							local hum = char and char:FindFirstChild("Humanoid")
+							if hum and originalWalkSpeed ~= nil and originalJumpPower ~= nil then
+								hum.WalkSpeed = originalWalkSpeed
+								hum.JumpPower = originalJumpPower
+							end
+							isFrozen = false
+						end
+
 						if mouse1click and (isrbxactive or iswindowactive)() then
 							if ent and canClick() then
 								if delayCheck < tick() then
@@ -2490,6 +2526,16 @@ run(function()
 				cleanupPMClone()
 				cleanupPMRadius()
 				cleanupPMCameraProxy()
+				
+				if isFrozen then
+					local char = entitylib.character.Character
+					local hum = char and char:FindFirstChild("Humanoid")
+					if hum and originalWalkSpeed ~= nil and originalJumpPower ~= nil then
+						hum.WalkSpeed = originalWalkSpeed
+						hum.JumpPower = originalJumpPower
+					end
+					isFrozen = false
+				end
 			end
 		end,
 		ExtraText = function()
@@ -2592,6 +2638,10 @@ run(function()
 		Default = '0, 0, 0',
 		Visible = false,
 		Darker = true
+	})
+	AutoStop = SilentAim:CreateToggle({
+		Name = 'AutoStop',
+		Tooltip = 'Freezes your character when targetting an enemy'
 	})
 	Wallbang = SilentAim:CreateToggle({Name = 'Wallbang'})
 	SilentAim:CreateToggle({
