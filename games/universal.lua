@@ -3978,12 +3978,11 @@ run(function()
 				if Mode.Value == 'Fates' then
 					if entitylib.isAlive then
 						fatesInvisibleCF = entitylib.character.RootPart.CFrame
-						Invisible:Clean(runService.PreSimulation:Connect(function(dt)
-							if entitylib.isAlive then
+						Invisible:Clean(runService.Stepped:Connect(function()
+							if entitylib.isAlive and lplr.Character then
 								local char = lplr.Character
-								if char and char.Parent == workspace then
-									char.Parent = game
-									task.wait()
+								if char.Parent == workspace then
+									char.Parent = nil
 									char.Parent = workspace
 								end
 							end
@@ -4069,7 +4068,6 @@ run(function()
 	local TargetPlayer
 	local FlingButton
 	local flingActive = false
-	local flingConnection = nil
 	
 	local function getPlayerList()
 		local list = {}
@@ -4094,56 +4092,27 @@ run(function()
 	local function flingMethod1(targetPlr)
 		if not entitylib.isAlive or not targetPlr or not targetPlr.Character then return end
 		local targetRoot = targetPlr.Character:FindFirstChild('HumanoidRootPart')
+		local targetHum = targetPlr.Character:FindFirstChildOfClass('Humanoid')
 		local myRoot = entitylib.character.RootPart
-		if not targetRoot or not myRoot then return end
+		if not targetRoot or not myRoot or not targetHum then return end
 		
-		flingActive = true
-		local startTime = tick()
-		local duration = 0.5
-		
-		flingConnection = Fling:Clean(runService.PreSimulation:Connect(function(dt)
-			if tick() - startTime > duration or not flingActive then
-				flingActive = false
-				if flingConnection then
-					flingConnection:Disconnect()
-					flingConnection = nil
-				end
-				return
-			end
-			
-			if targetPlr and targetPlr.Character and targetRoot then
-				local direction = (targetRoot.Position - myRoot.Position).Unit
-				targetRoot.Velocity = direction * 200 + Vector3.new(0, 100, 0)
-			end
-		end))
+		local direction = (targetRoot.Position - myRoot.Position).Unit
+		targetRoot.AssemblyLinearVelocity = direction * 250 + Vector3.new(0, 150, 0)
+		targetHum:ChangeState(Enum.HumanoidStateType.Flying)
 	end
 	
 	local function flingMethod2(targetPlr)
 		if not entitylib.isAlive or not targetPlr or not targetPlr.Character then return end
 		local targetRoot = targetPlr.Character:FindFirstChild('HumanoidRootPart')
+		local targetHum = targetPlr.Character:FindFirstChildOfClass('Humanoid')
 		local myRoot = entitylib.character.RootPart
-		if not targetRoot or not myRoot then return end
+		if not targetRoot or not myRoot or not targetHum then return end
 		
-		flingActive = true
-		local startTime = tick()
-		local duration = 0.3
-		
-		flingConnection = Fling:Clean(runService.PreSimulation:Connect(function(dt)
-			if tick() - startTime > duration or not flingActive then
-				flingActive = false
-				if flingConnection then
-					flingConnection:Disconnect()
-					flingConnection = nil
-				end
-				return
-			end
-			
-			if targetPlr and targetPlr.Character and targetRoot then
-				local direction = (myRoot.Position - targetRoot.Position).Unit
-				myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 5)
-				targetRoot.Velocity = direction * 300 + Vector3.new(0, 150, 0)
-			end
-		end))
+		myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 3, -5)
+		task.wait()
+		local direction = (targetRoot.Position - myRoot.Position).Unit
+		targetRoot.AssemblyLinearVelocity = direction * 350 + Vector3.new(0, 200, 0)
+		targetHum:ChangeState(Enum.HumanoidStateType.Flying)
 	end
 	
 	Fling = vape.Categories.Blatant:CreateModule({
@@ -4155,10 +4124,6 @@ run(function()
 				Fling:Clean(playersService.PlayerRemoving:Connect(updatePlayerList))
 			else
 				flingActive = false
-				if flingConnection then
-					flingConnection:Disconnect()
-					flingConnection = nil
-				end
 			end
 		end,
 		Tooltip = 'Fling other players.'
@@ -4167,7 +4132,7 @@ run(function()
 	FlingMode = Fling:CreateDropdown({
 		Name = 'Method',
 		List = {'Method 1', 'Method 2'},
-		Tooltip = 'Method 1 - Direct velocity fling\nMethod 2 - Position-based fling'
+		Tooltip = 'Method 1 - Direct velocity fling\nMethod 2 - Teleport behind then fling'
 	})
 	
 	TargetPlayer = Fling:CreateDropdown({
@@ -4181,11 +4146,6 @@ run(function()
 		Function = function()
 			if not Fling.Enabled then
 				notif('Fling', 'Enable Fling first!', 3, 'warning')
-				return
-			end
-			
-			if flingActive then
-				flingActive = false
 				return
 			end
 			
