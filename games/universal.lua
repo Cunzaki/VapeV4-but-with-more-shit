@@ -2064,6 +2064,22 @@ run(function()
 			numRadiusSamples = 12
 			numYSamples = 4
 		end
+		
+		local function getRayOrigins(testPos)
+			local origins = {}
+			
+			table.insert(origins, testPos + Vector3.new(0, 2, 0))
+			
+			if localChar.Head then
+				table.insert(origins, testPos + Vector3.new(0, (localChar.Head.Position.Y - localPos.Y) + 0.5, 0))
+			end
+			
+			table.insert(origins, testPos + Vector3.new(0, 1, 0))
+			table.insert(origins, testPos + Vector3.new(0, 3, 0))
+			
+			return origins
+		end
+		
 		for ySample = 0, numYSamples - 1 do
 			local yOffset = (ySample / (numYSamples - 1)) * 4 - 2
 			for radiusSample = 0, numRadiusSamples - 1 do
@@ -2078,23 +2094,26 @@ run(function()
 						continue
 					end
 					
-					local rayOrigin = testPos + Vector3.new(0, 2, 0)
+					local rayOrigins = getRayOrigins(testPos)
 					
 					for _, target in validTargets do
 						local targetHead = target.Head or target.RootPart
 						if not targetHead then continue end
 						
-						local rayDirection = (targetHead.Position - rayOrigin).Unit
-						local rayResult = workspace:Raycast(rayOrigin, rayDirection * 1000, pmRaycastParams)
-						
-						if rayResult then
-							local hitPart = rayResult.Instance
-							local hitChar = hitPart and hitPart:FindFirstAncestorOfClass("Model")
-							if hitChar and hitChar == target.Character then
-								local score = (testPos - localPos).Magnitude
-								if score < bestPositionScore then
-									bestPositionScore = score
-									bestPosition = testPos
+						for _, rayOrigin in ipairs(rayOrigins) do
+							local rayDirection = (targetHead.Position - rayOrigin).Unit
+							local rayResult = workspace:Raycast(rayOrigin, rayDirection * 1000, pmRaycastParams)
+							
+							if rayResult then
+								local hitPart = rayResult.Instance
+								local hitChar = hitPart and hitPart:FindFirstAncestorOfClass("Model")
+								if hitChar and hitChar == target.Character then
+									local score = (testPos - localPos).Magnitude
+									if score < bestPositionScore then
+										bestPositionScore = score
+										bestPosition = testPos
+									end
+									break
 								end
 							end
 						end
@@ -3963,9 +3982,13 @@ run(function()
 		seat = Instance.new('Seat')
 		weld = Instance.new('Weld')
 		
+		seat.Transparency = 1
+		seat.CanCollide = false
+		seat.CanTouch = false
+		seat.Anchored = false
+		
 		seat.Parent = workspace
 		seat.CFrame = root.CFrame
-		seat.Anchored = false
 		
 		weld.Parent = seat
 		weld.Part0 = seat
