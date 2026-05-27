@@ -957,6 +957,7 @@ run(function()
 	local CircleFilled
 	local CircleObject
 	local RightClick
+	local LeftClick
 	local Strength
 	local moveConst = Vector2.new(1, 0.77) * math.rad(0.5)
 	
@@ -976,12 +977,16 @@ run(function()
 			if callback then 
 				local ent
 				local rightClicked = not RightClick.Enabled or inputService:IsMouseButtonPressed(1)
+				local leftClicked = not LeftClick.Enabled or inputService:IsMouseButtonPressed(0)
 				AimAssist:Clean(runService.RenderStepped:Connect(function(dt)
 					if CircleObject then 
 						CircleObject.Position = inputService:GetMouseLocation() 
 					end
 					
-					if rightClicked and not vape.gui.ScaledGui.ClickGui.Visible then
+					rightClicked = not RightClick.Enabled or inputService:IsMouseButtonPressed(1)
+					leftClicked = not LeftClick.Enabled or inputService:IsMouseButtonPressed(0)
+					
+					if rightClicked and leftClicked and not vape.gui.ScaledGui.ClickGui.Visible then
 						ent = entitylib.EntityMouse({
 							Range = FOV.Value,
 							Part = Part.Value,
@@ -1020,6 +1025,20 @@ run(function()
 					AimAssist:Clean(inputService.InputEnded:Connect(function(input)
 						if input.UserInputType == Enum.UserInputType.MouseButton2 then 
 							rightClicked = false
+						end
+					end))
+				end
+				
+				if LeftClick.Enabled then 
+					AimAssist:Clean(inputService.InputBegan:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton1 then 
+							ent = nil
+							leftClicked = true
+						end
+					end))
+					AimAssist:Clean(inputService.InputEnded:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton1 then 
+							leftClicked = false
 						end
 					end))
 				end
@@ -1115,6 +1134,15 @@ run(function()
 	})
 	RightClick = AimAssist:CreateToggle({
 		Name = 'Require right click',
+		Function = function()
+			if AimAssist.Enabled then 
+				AimAssist:Toggle()
+				AimAssist:Toggle()
+			end
+		end
+	})
+	LeftClick = AimAssist:CreateToggle({
+		Name = 'Require left click',
 		Function = function()
 			if AimAssist.Enabled then 
 				AimAssist:Toggle()
