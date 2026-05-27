@@ -1984,8 +1984,17 @@ run(function()
 		pmRadiusPart.Parent = workspace
 	end
 	
+	local lastPMFrame = 0
+	local PM_THROTTLE = 0.15
+	
 	local function findBestPosition()
 		if not PositionManipulation or not PositionManipulation.Enabled then return nil end
+		
+		local now = tick()
+		if now - lastPMFrame < PM_THROTTLE then
+			return pmTargetPosition
+		end
+		lastPMFrame = now
 		
 		local localChar = entitylib.character
 		if not localChar or not localChar.RootPart then return nil end
@@ -2074,9 +2083,6 @@ run(function()
 				table.insert(origins, testPos + Vector3.new(0, (localChar.Head.Position.Y - localPos.Y) + 0.5, 0))
 			end
 			
-			table.insert(origins, testPos + Vector3.new(0, 1, 0))
-			table.insert(origins, testPos + Vector3.new(0, 3, 0))
-			
 			return origins
 		end
 		
@@ -2112,6 +2118,11 @@ run(function()
 									if score < bestPositionScore then
 										bestPositionScore = score
 										bestPosition = testPos
+										
+										if bestPositionScore <= 1 then
+											pmTargetPosition = bestPosition
+											return bestPosition
+										end
 									end
 									break
 								end
@@ -2122,6 +2133,7 @@ run(function()
 			end
 		end
 		
+		pmTargetPosition = bestPosition
 		return bestPosition
 	end
 
