@@ -3870,9 +3870,14 @@ end)
 	
 run(function()
 	local Invisible
+	local Mode
 	local clone, oldroot, hip, valid
 	local animtrack
 	local proper = true
+	local seat
+	local weld
+	local oldTransparency = {}
+	local oldPos
 	
 	local function doClone()
 		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
@@ -3945,6 +3950,72 @@ run(function()
 		entitylib.character.Humanoid.HipHeight = hip or 2
 	end
 	
+	local function doSeatInvisible()
+		if not entitylib.isAlive then return false end
+		
+		local root = entitylib.character.RootPart
+		oldPos = root.CFrame
+		
+		root.CFrame = CFrame.new(9e9, 9e9, 9e9)
+		task.wait(0.2)
+		root.Anchored = true
+		
+		seat = Instance.new('Seat')
+		weld = Instance.new('Weld')
+		
+		seat.Parent = workspace
+		seat.CFrame = root.CFrame
+		seat.Anchored = false
+		
+		weld.Parent = seat
+		weld.Part0 = seat
+		weld.Part1 = root
+		
+		root.Anchored = false
+		seat.CFrame = oldPos
+		
+		for _, v in ipairs(root.Parent:GetChildren()) do
+			if v:IsA('BasePart') or v:IsA('MeshPart') or v:IsA('Part') then
+				oldTransparency[v] = v.Transparency
+				v.Transparency = v.Transparency <= 0.3 and 0.4 or v.Transparency
+			elseif v:IsA('Accessory') then
+				local handle = v:FindFirstChildWhichIsA('MeshPart') or v:FindFirstChildWhichIsA('Part')
+				if handle then
+					oldTransparency[handle] = handle.Transparency
+					handle.Transparency = handle.Transparency <= 0.3 and 0.4 or handle.Transparency
+				end
+			end
+		end
+		
+		return true
+	end
+	
+	local function revertSeatInvisible()
+		if not seat or not weld then return false end
+		
+		weld.Part0 = nil
+		weld.Part1 = nil
+		seat:Destroy()
+		weld:Destroy()
+		seat = nil
+		weld = nil
+		
+		for obj, transparency in pairs(oldTransparency) do
+			if obj and obj.Parent then
+				obj.Transparency = transparency
+			end
+		end
+		table.clear(oldTransparency)
+		
+		if entitylib.isAlive and entitylib.character and entitylib.character.RootPart and oldPos then
+			entitylib.character.RootPart.Anchored = false
+			entitylib.character.RootPart.CFrame = oldPos
+		end
+		oldPos = nil
+		
+		return true
+	end
+	
 	local function animationTrickery()
 		if entitylib.isAlive then
 			local anim = Instance.new('Animation')
@@ -3972,16 +4043,24 @@ run(function()
 		Name = 'Invisible',
 		Function = function(callback)
 			if callback then
-				if not proper then
-					notif('Invisible', 'Broken state detected', 3, 'alert')
-					Invisible:Toggle()
-					return
-				end
-	
-				success = doClone()
-				if not success then
-					Invisible:Toggle()
-					return
+				if Mode.Value == 'Clone' then
+					if not proper then
+						notif('Invisible', 'Broken state detected', 3, 'alert')
+						Invisible:Toggle()
+						return
+					end
+
+					success = doClone()
+					if not success then
+						Invisible:Toggle()
+						return
+					end
+				else
+					success = doSeatInvisible()
+					if not success then
+						Invisible:Toggle()
+						return
+					end
 				end
 	
 				animationTrickery()
@@ -4015,16 +4094,27 @@ run(function()
 					animtrack:Stop()
 					animtrack:Destroy()
 				end
-	
-				if success and clone and oldroot and proper then
-					proper = true
-					if oldroot and clone then
-						revertClone()
+
+				if Mode.Value == 'Clone' then
+					if success and clone and oldroot and proper then
+						proper = true
+						if oldroot and clone then
+							revertClone()
+						end
+					end
+				else
+					if success then
+						revertSeatInvisible()
 					end
 				end
 			end
 		end,
 		Tooltip = 'Turns you invisible.'
+	})
+	Mode = Invisible:CreateDropdown({
+		Name = 'Mode',
+		List = {'Clone', 'Seat'},
+		Tooltip = 'Clone - Original clone method\nSeat - New seat-based method'
 	})
 end)
 	
