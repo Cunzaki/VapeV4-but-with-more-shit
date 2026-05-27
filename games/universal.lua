@@ -10456,7 +10456,12 @@ end)
 run(function()
 	local Freecam
 	local Value
+	local FunnyMethod
 	local randomkey, module, old = httpService:GenerateGUID(false)
+	local originalPosition = nil
+	local originalWalkSpeed = nil
+	local originalJumpPower = nil
+	local isFunnyActive = false
 	
 	Freecam = vape.Categories.World:CreateModule({
 		Name = 'Freecam',
@@ -10486,6 +10491,43 @@ run(function()
 							dt = dt * (inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 0.25 or 1)
 							camPos = (CFrame.lookAlong(camPos, gameCamera.CFrame.LookVector) * CFrame.new(Vector3.new(side, up, forward) * (Value.Value * dt))).Position
 						end
+						
+						-- Funny Method logic
+						if FunnyMethod and FunnyMethod.Enabled then
+							local lmb = inputService:IsMouseButtonPressed(0)
+							if lmb and not isFunnyActive then
+								-- Teleport to camera position and freeze
+								if entitylib.isAlive and entitylib.character and entitylib.character.RootPart then
+									originalPosition = entitylib.character.RootPart.CFrame
+									originalWalkSpeed = entitylib.character.Humanoid.WalkSpeed
+									originalJumpPower = entitylib.character.Humanoid.JumpPower
+									
+									entitylib.character.Humanoid.WalkSpeed = 0
+									entitylib.character.Humanoid.JumpPower = 0
+									entitylib.character.RootPart.CFrame = CFrame.new(camPos)
+									
+									isFunnyActive = true
+								end
+							elseif not lmb and isFunnyActive then
+								-- Teleport back to original position
+								if entitylib.isAlive and entitylib.character and entitylib.character.RootPart then
+									if originalPosition then
+										entitylib.character.RootPart.CFrame = originalPosition
+									end
+									if originalWalkSpeed then
+										entitylib.character.Humanoid.WalkSpeed = originalWalkSpeed
+									end
+									if originalJumpPower then
+										entitylib.character.Humanoid.JumpPower = originalJumpPower
+									end
+									
+									originalPosition = nil
+									originalWalkSpeed = nil
+									originalJumpPower = nil
+									isFunnyActive = false
+								end
+							end
+						end
 					end))
 	
 					contextService:BindActionAtPriority('FreecamKeyboard'..randomkey, function() 
@@ -10510,6 +10552,22 @@ run(function()
 					module = nil
 					old = nil
 				end
+				-- Reset Funny Method
+				if isFunnyActive and entitylib.isAlive and entitylib.character and entitylib.character.RootPart then
+					if originalPosition then
+						entitylib.character.RootPart.CFrame = originalPosition
+					end
+					if originalWalkSpeed then
+						entitylib.character.Humanoid.WalkSpeed = originalWalkSpeed
+					end
+					if originalJumpPower then
+						entitylib.character.Humanoid.JumpPower = originalJumpPower
+					end
+					originalPosition = nil
+					originalWalkSpeed = nil
+					originalJumpPower = nil
+					isFunnyActive = false
+				end
 			end
 		end,
 		Tooltip = 'Lets you fly and clip through walls freely\nwithout moving your player server-sided.'
@@ -10522,6 +10580,10 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end
+	})
+	FunnyMethod = Freecam:CreateToggle({
+		Name = 'Funny Method',
+		Tooltip = 'Hold left click to teleport to camera position and freeze'
 	})
 end)
 	
