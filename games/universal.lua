@@ -3870,9 +3870,12 @@ end)
 	
 run(function()
 	local Invisible
+	local Mode
 	local clone, oldroot, hip, valid
 	local animtrack
 	local proper = true
+	local fatesInvisibleCF = nil
+	local fatesConnection = nil
 	
 	local function doClone()
 		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
@@ -3972,62 +3975,237 @@ run(function()
 		Name = 'Invisible',
 		Function = function(callback)
 			if callback then
-				if not proper then
-					notif('Invisible', 'Broken state detected', 3, 'alert')
-					Invisible:Toggle()
-					return
-				end
+				if Mode.Value == 'Fates' then
+					if entitylib.isAlive then
+						fatesInvisibleCF = entitylib.character.RootPart.CFrame
+						Invisible:Clean(runService.PreSimulation:Connect(function(dt)
+							if entitylib.isAlive then
+								local char = lplr.Character
+								if char and char.Parent == workspace then
+									char.Parent = game
+									task.wait()
+									char.Parent = workspace
+								end
+							end
+						end))
+					end
+				else
+					if not proper then
+						notif('Invisible', 'Broken state detected', 3, 'alert')
+						Invisible:Toggle()
+						return
+					end
+
+					success = doClone()
+					if not success then
+						Invisible:Toggle()
+						return
+					end
+
+					animationTrickery()
+					Invisible:Clean(runService.PreSimulation:Connect(function(dt)
+						if entitylib.isAlive and oldroot then
+							local root = entitylib.character.RootPart
+							local cf = root.CFrame - Vector3.new(0, entitylib.character.Humanoid.HipHeight + (root.Size.Y / 2) - 1, 0)
 	
-				success = doClone()
-				if not success then
-					Invisible:Toggle()
-					return
-				end
+							if not isnetworkowner(oldroot) then
+								root.CFrame = oldroot.CFrame
+								root.Velocity = oldroot.Velocity
+								return
+							end
 	
-				animationTrickery()
-				Invisible:Clean(runService.PreSimulation:Connect(function(dt)
-					if entitylib.isAlive and oldroot then
-						local root = entitylib.character.RootPart
-						local cf = root.CFrame - Vector3.new(0, entitylib.character.Humanoid.HipHeight + (root.Size.Y / 2) - 1, 0)
-	
-						if not isnetworkowner(oldroot) then
-							root.CFrame = oldroot.CFrame
-							root.Velocity = oldroot.Velocity
-							return
+							oldroot.CFrame = cf * CFrame.Angles(math.rad(180), 0, 0)
+							oldroot.Velocity = root.Velocity
+							oldroot.CanCollide = false
 						end
+					end))
 	
-						oldroot.CFrame = cf * CFrame.Angles(math.rad(180), 0, 0)
-						oldroot.Velocity = root.Velocity
-						oldroot.CanCollide = false
-					end
-				end))
-	
-				Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
-					local animator = char.Humanoid:WaitForChild('Animator', 1)
-					if animator and Invisible.Enabled then
-						oldroot = nil
-						Invisible:Toggle()
-						Invisible:Toggle()
-					end
-				end))
-			else
-				if animtrack then
-					animtrack:Stop()
-					animtrack:Destroy()
+					Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
+						local animator = char.Humanoid:WaitForChild('Animator', 1)
+						if animator and Invisible.Enabled then
+							oldroot = nil
+							Invisible:Toggle()
+							Invisible:Toggle()
+						end
+					end))
 				end
+			else
+				if Mode.Value == 'Fates' then
+					fatesInvisibleCF = nil
+				else
+					if animtrack then
+						animtrack:Stop()
+						animtrack:Destroy()
+					end
 	
-				if success and clone and oldroot and proper then
-					proper = true
-					if oldroot and clone then
-						revertClone()
+					if success and clone and oldroot and proper then
+						proper = true
+						if oldroot and clone then
+							revertClone()
+						end
 					end
 				end
 			end
 		end,
 		Tooltip = 'Turns you invisible.'
 	})
-end)
 	
+	Mode = Invisible:CreateDropdown({
+		Name = 'Mode',
+		List = {'Original', 'Fates'},
+		Tooltip = 'Original - Classic invisible method\nFates - Fates admin invisible method',
+		Function = function()
+			if Invisible.Enabled then
+				Invisible:Toggle()
+				Invisible:Toggle()
+			end
+		end
+	})
+end)
+
+run(function()
+	local Fling
+	local FlingMode
+	local TargetPlayer
+	local FlingButton
+	local flingActive = false
+	local flingConnection = nil
+	
+	local function getPlayerList()
+		local list = {}
+		for _, plr in playersService:GetPlayers() do
+			if plr ~= lplr then
+				table.insert(list, plr.Name)
+			end
+		end
+		if #list == 0 then
+			table.insert(list, 'No players')
+		end
+		return list
+	end
+	
+	local function updatePlayerList()
+		TargetPlayer.List = getPlayerList()
+		if not table.find(TargetPlayer.List, TargetPlayer.Value) and #TargetPlayer.List > 0 then
+			TargetPlayer.Value = TargetPlayer.List[1]
+		end
+	end
+	
+	local function flingMethod1(targetPlr)
+		if not entitylib.isAlive or not targetPlr or not targetPlr.Character then return end
+		local targetRoot = targetPlr.Character:FindFirstChild('HumanoidRootPart')
+		local myRoot = entitylib.character.RootPart
+		if not targetRoot or not myRoot then return end
+		
+		flingActive = true
+		local startTime = tick()
+		local duration = 0.5
+		
+		flingConnection = Fling:Clean(runService.PreSimulation:Connect(function(dt)
+			if tick() - startTime > duration or not flingActive then
+				flingActive = false
+				if flingConnection then
+					flingConnection:Disconnect()
+					flingConnection = nil
+				end
+				return
+			end
+			
+			if targetPlr and targetPlr.Character and targetRoot then
+				local direction = (targetRoot.Position - myRoot.Position).Unit
+				targetRoot.Velocity = direction * 200 + Vector3.new(0, 100, 0)
+			end
+		end))
+	end
+	
+	local function flingMethod2(targetPlr)
+		if not entitylib.isAlive or not targetPlr or not targetPlr.Character then return end
+		local targetRoot = targetPlr.Character:FindFirstChild('HumanoidRootPart')
+		local myRoot = entitylib.character.RootPart
+		if not targetRoot or not myRoot then return end
+		
+		flingActive = true
+		local startTime = tick()
+		local duration = 0.3
+		
+		flingConnection = Fling:Clean(runService.PreSimulation:Connect(function(dt)
+			if tick() - startTime > duration or not flingActive then
+				flingActive = false
+				if flingConnection then
+					flingConnection:Disconnect()
+					flingConnection = nil
+				end
+				return
+			end
+			
+			if targetPlr and targetPlr.Character and targetRoot then
+				local direction = (myRoot.Position - targetRoot.Position).Unit
+				myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 5)
+				targetRoot.Velocity = direction * 300 + Vector3.new(0, 150, 0)
+			end
+		end))
+	end
+	
+	Fling = vape.Categories.Blatant:CreateModule({
+		Name = 'Fling',
+		Function = function(callback)
+			if callback then
+				updatePlayerList()
+				Fling:Clean(playersService.PlayerAdded:Connect(updatePlayerList))
+				Fling:Clean(playersService.PlayerRemoving:Connect(updatePlayerList))
+			else
+				flingActive = false
+				if flingConnection then
+					flingConnection:Disconnect()
+					flingConnection = nil
+				end
+			end
+		end,
+		Tooltip = 'Fling other players.'
+	})
+	
+	FlingMode = Fling:CreateDropdown({
+		Name = 'Method',
+		List = {'Method 1', 'Method 2'},
+		Tooltip = 'Method 1 - Direct velocity fling\nMethod 2 - Position-based fling'
+	})
+	
+	TargetPlayer = Fling:CreateDropdown({
+		Name = 'Target',
+		List = getPlayerList(),
+		Tooltip = 'Select player to fling'
+	})
+	
+	FlingButton = Fling:CreateButton({
+		Name = 'Fling!',
+		Function = function()
+			if not Fling.Enabled then
+				notif('Fling', 'Enable Fling first!', 3, 'warning')
+				return
+			end
+			
+			if flingActive then
+				flingActive = false
+				return
+			end
+			
+			local targetPlr = playersService:FindFirstChild(TargetPlayer.Value)
+			if not targetPlr then
+				notif('Fling', 'Player not found!', 3, 'warning')
+				return
+			end
+			
+			if FlingMode.Value == 'Method 1' then
+				flingMethod1(targetPlr)
+			else
+				flingMethod2(targetPlr)
+			end
+			
+			notif('Fling', 'Flinging ' .. targetPlr.Name .. '!', 2)
+		end
+	})
+end)
+
 run(function()
 	local Killaura
 	local Targets
