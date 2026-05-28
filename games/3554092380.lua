@@ -12,7 +12,6 @@ local vape = shared.vape
 
 local originalSettings = {}
 local gunConfigs = {}
-local rpmUpvalueTargets = {}
 
 local function scanForGunConfigs()
     for _, v in ipairs(getgc(true)) do
@@ -28,8 +27,6 @@ local function scanForGunConfigs()
                     MaxSpread = rawget(v, "MaxSpread"),
                     Damage = rawget(v, "Damage"),
                     Headshot = rawget(v, "Headshot"),
-                    RPM = rawget(v, "RPM"),
-                    RPM2 = rawget(v, "RPM2"),
                     PreshootFunc = rawget(v, "PreshootFunc")
                 }
             end
@@ -37,36 +34,17 @@ local function scanForGunConfigs()
     end
 end
 
-local getupvalue = getupvalue or debug.getupvalue
-local setupvalue = setupvalue or debug.setupvalue
-local getsenv = getsenv or function() return {} end
-
--- Find active GunScripts in Camera or Character
-local function getActiveGunScripts()
-    local scripts = {}
-    local camera = workspace.CurrentCamera
-    if camera then
-        for _, model in ipairs(camera:GetChildren()) do
-            local gs = model:FindFirstChild("GunScript", true)
-            if gs and gs:IsA("LocalScript") then
-                table.insert(scripts, gs)
-            end
-        end
-    end
-    if lplr.Character then
-        for _, tool in ipairs(lplr.Character:GetChildren()) do
-            if tool:IsA("Tool") or tool:IsA("Model") then
-                local gs = tool:FindFirstChild("GunScript", true)
-                if gs and gs:IsA("LocalScript") then
-                    table.insert(scripts, gs)
-                end
-            end
-        end
-    end
-    return scripts
+-- Get the Functions module from ReplicatedStorage
+local function getFunctionsModule()
+    local success, result = pcall(function()
+        return require(replicatedStorage:WaitForChild("Functions"))
+    end)
+    return success and result or nil
 end
 
-local originalU54s = {}
+local originalConvertd = nil
+local originalPerkMin = nil
+local FunctionsModule = getFunctionsModule()
 
 -- Gun Mods (Infinite Ammo, Fire Rate, Recoil, Spread)
 run(function()
@@ -76,10 +54,20 @@ run(function()
     local NoSpread
     local FastFireRate
     
+    -- Hook Functions.convertd for perfectly reliable Fire Rate
+    if FunctionsModule and not originalConvertd then
+        originalConvertd = FunctionsModule.convertd
+        FunctionsModule.convertd = function(rpm, player, ...)
+            local result = originalConvertd(rpm, player, ...)
+            if GunModsModule and GunModsModule.Enabled and FastFireRate and FastFireRate.Value > 1 then
+                result = result / FastFireRate.Value
+            end
+            return result
+        end
+    end
+    
     local function applyMods()
-        local multiplier = GunModsModule.Enabled and FastFireRate.Value or 1
-        
-        -- 1. Modify gunConfigs (for when the user equips a new gun)
+        -- 1. Modify gunConfigs (for recoil, spread, ammo)
         for _, config in ipairs(gunConfigs) do
             local orig = originalSettings[config]
             if orig then
@@ -124,64 +112,6 @@ run(function()
                 end
             end
         end
-        
-        -- 2. Modify currently active GunScript upvalues instantly
-        for _, gs in ipairs(getActiveGunScripts()) do
-            pcall(function()
-                local env = getsenv(gs)
-                if env and env.checkFirerate then
-                    -- checkFirerate is a global function inside the script's environment.
-                    -- It accesses u35, u49, u54 which are the actual RPM variables used in the firing loop!
-                    
-                    -- To ensure we aren't breaking anything, let's also hook the environment directly if possible
-                    -- but modifying the upvalues of `checkFirerate` is the cleanest way to reach the main file's locals.
-                    
-                    local _, current_u35 = getupvalue(env.checkFirerate, 2)
-                    local _, current_u49 = getupvalue(env.checkFirerate, 3)
-                    local _, current_u54 = getupvalue(env.checkFirerate, 4)
-                    
-                    -- Some exploits map debug.getupvalue differently, so we also scan the whole function's upvalues
-                    if current_u54 == nil then
-                        for i = 1, 10 do
-                            local name, val = getupvalue(env.checkFirerate, i)
-                            if name == "u54" or (type(val) == "number" and val > 0.01 and val < 1) then
-                                current_u54 = val
-                                break
-                            end
-                        end
-                    end
-                    
-                    if type(current_u54) == "number" then
-                        local origRPM = originalU54s[gs]
-                        
-                        -- If we haven't stored it, or it changed significantly (meaning equip() reset it), store it
-                        if not origRPM or math.abs(current_u54 - (origRPM / multiplier)) > 0.0001 then
-                            if current_u54 > 0.001 then -- basic sanity check
-                                originalU54s[gs] = current_u54
-                                origRPM = current_u54
-                            end
-                        end
-                        
-                        if origRPM then
-                            local targetRPM = origRPM / multiplier
-                            
-                            -- Set u35, u49, u54 to the target RPM directly
-                            for i = 1, 10 do
-                                local name, val = getupvalue(env.checkFirerate, i)
-                                if type(val) == "number" and val > 0.001 and val < 1 then
-                                    setupvalue(env.checkFirerate, i, targetRPM)
-                                end
-                            end
-                            
-                            -- Also set the main environment variables if they exist
-                            pcall(function() env.u35 = targetRPM end)
-                            pcall(function() env.u49 = targetRPM end)
-                            pcall(function() env.u54 = targetRPM end)
-                        end
-                    end
-                end
-            end)
-        end
     end
 
     GunModsModule = vape.Categories.Combat:CreateModule({
@@ -192,7 +122,7 @@ run(function()
                     scanForGunConfigs()
                     while GunModsModule.Enabled do
                         applyMods()
-                        task.wait(0.05)
+                        task.wait(1)
                     end
                 end)
             else
@@ -223,7 +153,7 @@ run(function()
         Max = 20,
         Default = 2,
         Decimal = 10,
-        Function = function(val) applyMods() end
+        Function = function(val) end -- Handled entirely by the convertd hook!
     })
 end)
 
@@ -254,7 +184,7 @@ run(function()
                     scanForGunConfigs()
                     while InstaKill.Enabled do
                         applyInstaKill()
-                        task.wait(0.1)
+                        task.wait(1)
                     end
                 end)
             else
@@ -262,6 +192,121 @@ run(function()
             end
         end,
         Tooltip = "Modifies gun damage to instantly kill zombies."
+    })
+end)
+
+-- Perk Spoofing
+run(function()
+    local PerkSpoofModule
+    local perkToggles = {}
+    
+    local perkList = {
+        {Name = "Juggernog", Internal = {"Juggernog"}},
+        {Name = "Speed Cola", Internal = {"SpeedCola"}},
+        {Name = "Double Tap", Internal = {"DoubleTap", "DTOne", "DTHalf"}},
+        {Name = "PhD Flopper", Internal = {"PHDFlopper"}},
+        {Name = "Stamin-Up", Internal = {"StaminUp"}},
+        {Name = "Quick Revive", Internal = {"QuickR"}},
+        {Name = "Deadshot", Internal = {"Deadshot", "Bullseye"}},
+        {Name = "Mule Kick", Internal = {"MuleKick", "MK"}},
+        {Name = "Tombstone", Internal = {"Tombstone"}},
+        {Name = "Who's Who", Internal = {"Who'sWho"}},
+        {Name = "Death Perception", Internal = {"DeathPerception"}},
+        {Name = "Widow's Web", Internal = {"Web"}},
+        {Name = "Explosive Spirits", Internal = {"ESpirits"}},
+        {Name = "Nade Cola", Internal = {"NadeCola"}},
+        {Name = "Shopper", Internal = {"Shopper"}}
+    }
+    
+    -- Hook PerkMin for Limit Bypass
+    if FunctionsModule and not originalPerkMin then
+        originalPerkMin = FunctionsModule.PerkMin
+        FunctionsModule.PerkMin = function(...)
+            if PerkSpoofModule and PerkSpoofModule.Enabled then
+                return math.huge -- Infinite perk limit
+            end
+            if originalPerkMin then
+                return originalPerkMin(...)
+            end
+            return 4
+        end
+    end
+
+    local function applyPerks()
+        for _, perkData in ipairs(perkList) do
+            local toggle = perkToggles[perkData.Name]
+            local shouldHave = PerkSpoofModule.Enabled and toggle and toggle.Enabled
+            
+            for _, internalName in ipairs(perkData.Internal) do
+                local existing = lplr.PlayerGui:FindFirstChild(internalName)
+                
+                if shouldHave then
+                    if not existing then
+                        local val = Instance.new("StringValue")
+                        val.Name = internalName
+                        val.Parent = lplr.PlayerGui
+                    end
+                else
+                    -- Only remove if it's a StringValue we made (real perks are usually ScreenGuis or other types, but StringValue is what we use)
+                    if existing and existing:IsA("StringValue") then
+                        existing:Destroy()
+                    end
+                end
+            end
+        end
+    end
+
+    PerkSpoofModule = vape.Categories.Combat:CreateModule({
+        Name = "Spoof Perks",
+        Function = function(callback)
+            if callback then
+                task.spawn(function()
+                    while PerkSpoofModule.Enabled do
+                        applyPerks()
+                        task.wait(1)
+                    end
+                end)
+            else
+                applyPerks()
+            end
+        end,
+        Tooltip = "Gives you the effects of selected perk sodas and unlocks 6 perk limit."
+    })
+    
+    for _, perkData in ipairs(perkList) do
+        perkToggles[perkData.Name] = PerkSpoofModule:CreateToggle({
+            Name = perkData.Name,
+            Function = function() applyPerks() end
+        })
+    end
+end)
+
+-- No Env Damage (Toxic Waste, Fire, Lava)
+run(function()
+    local NoEnvDamage
+    NoEnvDamage = vape.Categories.Combat:CreateModule({
+        Name = "No Env Damage",
+        Function = function(callback)
+            if callback then
+                task.spawn(function()
+                    while NoEnvDamage.Enabled do
+                        local lavaFolder = workspace:FindFirstChild("Lava")
+                        if lavaFolder then
+                            for _, v in ipairs(lavaFolder:GetDescendants()) do
+                                if v:IsA("BasePart") and v.CanTouch then
+                                    v.CanTouch = false
+                                end
+                            end
+                        end
+                        task.wait(1)
+                    end
+                end)
+            else
+                -- We leave CanTouch false since reverting it might be dangerous, 
+                -- and disabling it doesn't hurt normal gameplay
+            end
+        end,
+        Tooltip = "Disables Lava, Toxic Waste, and Fire damage."
     })
 end)
 
