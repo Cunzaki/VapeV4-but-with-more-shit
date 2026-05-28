@@ -28,26 +28,24 @@ local gunConfigs = {}
 
 -- Directly require the module to change the guns permanently.
 local function scanForGunConfigs()
-    local weapons = getWeaponModule()
-    if weapons then
-        for name, config in pairs(weapons) do
-            if type(config) == "table" and config.Damage then
-                if not originalSettings[config] then
-                    table.insert(gunConfigs, config)
-                    originalSettings[config] = {
-                        FreeAmmo = config.FreeAmmo,
-                        Recoil = config.Recoil,
-                        CameraRecoil = config.CameraRecoil,
-                        RecoilReduc = config.RecoilReduc,
-                        Spread = config.Spread,
-                        MinSpread = config.MinSpread,
-                        MaxSpread = config.MaxSpread,
-                        Auto = config.Auto,
-                        FireType = config.FireType,
-                        Damage = config.Damage,
-                        Headshot = config.Headshot
-                    }
-                end
+    for _, v in ipairs(getgc(true)) do
+        if type(v) == "table" and rawget(v, "Damage") ~= nil and rawget(v, "RPM") ~= nil and rawget(v, "Bullets") ~= nil then
+            if not table.find(gunConfigs, v) then
+                table.insert(gunConfigs, v)
+                originalSettings[v] = {
+                    FreeAmmo = rawget(v, "FreeAmmo"),
+                    Recoil = rawget(v, "Recoil"),
+                    CameraRecoil = rawget(v, "CameraRecoil"),
+                    RecoilReduc = rawget(v, "RecoilReduc"),
+                    Spread = rawget(v, "Spread"),
+                    MinSpread = rawget(v, "MinSpread"),
+                    MaxSpread = rawget(v, "MaxSpread"),
+                    Auto = rawget(v, "Auto"),
+                    FireType = rawget(v, "FireType"),
+                    Damage = rawget(v, "Damage"),
+                    Headshot = rawget(v, "Headshot"),
+                    RPM = rawget(v, "RPM")
+                }
             end
         end
     end
@@ -60,6 +58,7 @@ run(function()
     local NoRecoil
     local NoSpread
     local AutoFire
+    local FastFireRate
     
     local function applyMods()
         scanForGunConfigs()
@@ -74,8 +73,8 @@ run(function()
                     end
                     
                     if NoRecoil.Enabled then 
-                        config.Recoil = {0,0,0}
-                        config.CameraRecoil = {0,0,0}
+                        config.Recoil = Vector3.new(0, 0, 0)
+                        config.CameraRecoil = Vector3.new(0, 0, 0)
                         config.RecoilReduc = {["Easy"] = 0, ["Original"] = 0}
                     else 
                         config.Recoil = orig.Recoil
@@ -100,6 +99,12 @@ run(function()
                         config.Auto = orig.Auto
                         config.FireType = orig.FireType 
                     end
+
+                    if FastFireRate.Enabled then
+                        config.RPM = 0.01
+                    else
+                        config.RPM = orig.RPM
+                    end
                 else
                     config.FreeAmmo = orig.FreeAmmo
                     config.Recoil = orig.Recoil
@@ -110,6 +115,7 @@ run(function()
                     config.MaxSpread = orig.MaxSpread
                     config.Auto = orig.Auto
                     config.FireType = orig.FireType
+                    config.RPM = orig.RPM
                 end
             end
         end
@@ -149,6 +155,11 @@ run(function()
     
     AutoFire = GunModsModule:CreateToggle({
         Name = "Auto Fire",
+        Function = function() applyMods() end
+    })
+    
+    FastFireRate = GunModsModule:CreateToggle({
+        Name = "Fast Fire Rate",
         Function = function() applyMods() end
     })
 end)
@@ -193,13 +204,13 @@ end)
 
 -- Exploit Points/Powerups
 run(function()
-    local ClaimPoints
-    ClaimPoints = vape.Categories.Combat:CreateModule({
-        Name = "ClaimPoints",
+    local ClaimPowerups
+    ClaimPowerups = vape.Categories.Combat:CreateModule({
+        Name = "Autoclaim Powerups",
         Function = function(callback)
             if callback then
                 task.spawn(function()
-                    while ClaimPoints.Enabled do
+                    while ClaimPowerups.Enabled do
                         -- Looking through decompiled structure, powerups use ReplicatedStorage.Resources["Power-ups"].Event:FireServer(PowerupValue)
                         -- The powerup values are stored in ReplicatedStorage.PowerupInfo
                         local powerupInfo = replicatedStorage:FindFirstChild("PowerupInfo")
@@ -217,6 +228,6 @@ run(function()
                 end)
             end
         end,
-        Tooltip = "Attempts to exploit points via remote events"
+        Tooltip = "Attempts to auto-claim powerups via remote events"
     })
 end)
