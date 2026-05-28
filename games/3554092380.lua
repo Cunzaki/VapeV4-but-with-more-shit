@@ -12,7 +12,7 @@ local vape = shared.vape
 
 local originalSettings = {}
 local gunConfigs = {}
-local activeConnections = {}
+local originalConvertd = nil
 
 local function scanForGunConfigs()
     for _, v in ipairs(getgc(true)) do
@@ -26,16 +26,23 @@ local function scanForGunConfigs()
                     Spread = rawget(v, "Spread"),
                     MinSpread = rawget(v, "MinSpread"),
                     MaxSpread = rawget(v, "MaxSpread"),
-                    Auto = rawget(v, "Auto"),
-                    FireType = rawget(v, "FireType"),
                     Damage = rawget(v, "Damage"),
                     Headshot = rawget(v, "Headshot"),
                     RPM = rawget(v, "RPM"),
+                    RPM2 = rawget(v, "RPM2"),
                     PreshootFunc = rawget(v, "PreshootFunc")
                 }
             end
         end
     end
+end
+
+-- Get the Functions module from ReplicatedStorage
+local function getFunctionsModule()
+    local success, result = pcall(function()
+        return require(replicatedStorage:WaitForChild("Functions"))
+    end)
+    return success and result or nil
 end
 
 -- Gun Mods (Infinite Ammo, Fire Rate, Recoil, Spread)
@@ -44,10 +51,11 @@ run(function()
     local InfiniteAmmo
     local NoRecoil
     local NoSpread
-    local AutoFire
     local FastFireRate
     
     local function applyMods()
+        local Functions = getFunctionsModule()
+        
         for _, config in ipairs(gunConfigs) do
             local orig = originalSettings[config]
             if orig then
@@ -84,16 +92,10 @@ run(function()
                         config.MinSpread = orig.MinSpread
                         config.MaxSpread = orig.MaxSpread 
                     end
-                    
-                    if AutoFire.Enabled then 
-                        config.Auto = true
-                        config.FireType = "Auto" 
-                    else 
-                        config.Auto = orig.Auto
-                        config.FireType = orig.FireType 
-                    end
 
+                    -- Set both RPM and RPM2 for fire rate
                     config.RPM = FastFireRate.Value
+                    config.RPM2 = FastFireRate.Value
                 else
                     config.PreshootFunc = orig.PreshootFunc
                     config.Recoil = orig.Recoil
@@ -102,9 +104,8 @@ run(function()
                     config.Spread = orig.Spread
                     config.MinSpread = orig.MinSpread
                     config.MaxSpread = orig.MaxSpread
-                    config.Auto = orig.Auto
-                    config.FireType = orig.FireType
                     config.RPM = orig.RPM
+                    config.RPM2 = orig.RPM2
                 end
             end
         end
@@ -140,11 +141,6 @@ run(function()
     
     NoSpread = GunModsModule:CreateToggle({
         Name = "No Spread",
-        Function = function() applyMods() end
-    })
-    
-    AutoFire = GunModsModule:CreateToggle({
-        Name = "Auto Fire",
         Function = function() applyMods() end
     })
     
