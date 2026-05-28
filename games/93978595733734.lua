@@ -96,6 +96,10 @@ local function CreateESPModule(name, collectionTag, fallbackNames, tooltip)
                 local model = obj:FindFirstAncestorOfClass("Model")
                 if model and model ~= workspace then
                     adornee = model
+                else
+                    -- If we can't find a model, try to use the part's parent if it's a folder,
+                    -- otherwise fallback to the part itself
+                    adornee = obj.Parent ~= workspace and obj.Parent or obj
                 end
             end
             
@@ -180,7 +184,7 @@ end
 CreateESPModule("GeneratorESP", "GeneratorPoint", {"Generator"}, "Display all generators")
 CreateESPModule("HookESP", "UnhookPoint", {"Hook"}, "Display all hooks")
 CreateESPModule("PalletESP", "PalletPoint", {"Pallet"}, "Display all pallets")
-CreateESPModule("WindowESP", "VaultPoint", {"Window"}, "Display all windows/vaults")
+CreateESPModule("WindowESP", "VaultPoint", {"Window", "Vault"}, "Display all windows/vaults")
 
 -- Auto Skill Check
 run(function()
