@@ -454,46 +454,63 @@ end)
 run(function()
     local GodMode
     local origNamecall = nil
+    local origNewIndex = nil
     
-    local function applyGodMode()
-        if GodMode.Enabled then
-            if lplr.Character and lplr.Character:FindFirstChild("Humanoid") then
-                lplr.Character.Humanoid.Health = lplr.Character.Humanoid.MaxHealth
-            end
-            
-            -- Hook __namecall to block the ETC remote from sending damage ("DMS" or "Damage5")
-            if not origNamecall and getgenv().hookmetamethod then
-                pcall(function()
-                    origNamecall = getgenv().hookmetamethod(game, "__namecall", function(self, ...)
-                        local method = getnamecallmethod()
-                        local args = {...}
-                        
-                        if GodMode and GodMode.Enabled and method == "FireServer" and self.Name == "ETC" then
-                            if type(args[1]) == "table" then
-                                local subArgs = args[1]
-                                -- Block damage remotes (DMS = Damage Sync, Damage5 = Tutorial/Bridge damage sync)
-                                if type(subArgs[#subArgs]) == "string" and (string.find(subArgs[#subArgs], "DMS") or string.find(subArgs[#subArgs], "Damage5")) then
-                                    return -- Block the damage completely
-                                end
-                            end
-                        end
-                        
-                        return origNamecall(self, ...)
-                    end)
-                end)
-            end
-        else
-            -- We don't necessarily unhook namecall, just let GodMode.Enabled condition bypass it
-        end
-    end
-
     GodMode = vape.Categories.Combat:CreateModule({
         Name = "God Mode",
         Function = function(callback)
             if callback then
+                -- Hook __namecall to block TakeDamage and damage remotes
+                if not origNamecall and getgenv().hookmetamethod then
+                    pcall(function()
+                        origNamecall = getgenv().hookmetamethod(game, "__namecall", function(self, ...)
+                            local method = getnamecallmethod()
+                            local args = {...}
+                            
+                            if GodMode and GodMode.Enabled then
+                                -- 1. Block Server Sync Remotes
+                                if method == "FireServer" and self.Name == "ETC" then
+                                    if type(args[1]) == "table" then
+                                        local subArgs = args[1]
+                                        if type(subArgs[#subArgs]) == "string" and (string.find(subArgs[#subArgs], "DMS") or string.find(subArgs[#subArgs], "Damage5")) then
+                                            return -- Block the damage sync completely
+                                        end
+                                    end
+                                end
+                                
+                                -- 2. Block Local TakeDamage
+                                if method == "TakeDamage" and self:IsA("Humanoid") and lplr.Character and self.Parent == lplr.Character then
+                                    return -- Block local TakeDamage
+                                end
+                            end
+                            
+                            return origNamecall(self, ...)
+                        end)
+                    end)
+                end
+                
+                -- Hook __newindex to block direct Health modifications (e.g. Humanoid.Health = Health - 50)
+                if not origNewIndex and getgenv().hookmetamethod then
+                    pcall(function()
+                        origNewIndex = getgenv().hookmetamethod(game, "__newindex", function(self, index, value)
+                            if GodMode and GodMode.Enabled then
+                                if self:IsA("Humanoid") and index == "Health" and lplr.Character and self.Parent == lplr.Character then
+                                    -- Only allow healing, block damage
+                                    if type(value) == "number" and value < self.Health then
+                                        return
+                                    end
+                                end
+                            end
+                            return origNewIndex(self, index, value)
+                        end)
+                    end)
+                end
+
                 task.spawn(function()
                     while GodMode.Enabled do
-                        applyGodMode()
+                        if lplr.Character and lplr.Character:FindFirstChild("Humanoid") then
+                            lplr.Character.Humanoid.Health = lplr.Character.Humanoid.MaxHealth
+                        end
                         task.wait(0.01) -- Very fast loop to ensure we stay alive locally too
                     end
                 end)
@@ -501,7 +518,7 @@ run(function()
                 -- Nothing needed on disable
             end
         end,
-        Tooltip = "Makes you invincible by blocking damage remotes to the server."
+        Tooltip = "Makes you invincible by blocking all local and remote damage methods."
     })
 end)
 
