@@ -166,11 +166,14 @@ run(function()
             local orig = originalSettings[config]
             if orig then
                 if InstaKill.Enabled then
-                    config.Damage = 999999
-                    config.Headshot = 999999
+                    config.Damage = math.huge
+                    config.Headshot = math.huge
+                    -- Also add immunity bypass so bosses don't ignore the damage
+                    config.ImmunityCheck = false
                 else
                     config.Damage = orig.Damage
                     config.Headshot = orig.Headshot
+                    config.ImmunityCheck = orig.ImmunityCheck
                 end
             end
         end
@@ -191,7 +194,7 @@ run(function()
                 applyInstaKill()
             end
         end,
-        Tooltip = "Modifies gun damage to instantly kill zombies."
+        Tooltip = "Modifies gun damage to instantly kill all zombies (including bosses)."
     })
 end)
 
@@ -242,14 +245,35 @@ run(function()
                 
                 if shouldHave then
                     if not existing then
-                        local val = Instance.new("StringValue")
+                        -- To make it show up on the HUD, the game requires the Perk instance to be a specific type 
+                        -- (usually an ImageLabel or similar) with specific formatting, but often it relies on the "Permanent" attribute
+                        -- or fires a local remote to update the HUD.
+                        -- However, injecting a Folder or StringValue tricks most logical checks, and we can force the HUD via
+                        -- the game's internal HUD updater if we find it. For now, creating a fake ScreenGui/ImageLabel helps.
+                        
+                        local val = Instance.new("Folder")
                         val.Name = internalName
                         val.Parent = lplr.PlayerGui
+                        -- Add a fake ImageLabel so ResortPerks counts it as a HUD icon
+                        local img = Instance.new("ImageLabel")
+                        img.Name = "ImageLabel"
+                        img.Parent = val
+                        
+                        -- Attempt to trigger the game's native UI update function for perks
+                        pcall(function()
+                            if FunctionsModule and FunctionsModule.ResortPerks then
+                                FunctionsModule.ResortPerks(lplr.PlayerGui)
+                            end
+                        end)
                     end
                 else
-                    -- Only remove if it's a StringValue we made (real perks are usually ScreenGuis or other types, but StringValue is what we use)
-                    if existing and existing:IsA("StringValue") then
+                    if existing and (existing:IsA("Folder") or existing:IsA("StringValue")) then
                         existing:Destroy()
+                        pcall(function()
+                            if FunctionsModule and FunctionsModule.ResortPerks then
+                                FunctionsModule.ResortPerks(lplr.PlayerGui)
+                            end
+                        end)
                     end
                 end
             end
@@ -281,14 +305,32 @@ run(function()
     end
 end)
 
--- No Env Damage (Toxic Waste, Fire, Lava)
+-- No Env/Explosive Damage
 run(function()
     local NoEnvDamage
+    local origExplosion = nil
+    
     NoEnvDamage = vape.Categories.Combat:CreateModule({
         Name = "No Env Damage",
         Function = function(callback)
             if callback then
                 task.spawn(function()
+                    -- Disable explosive damage via hooking Functions.Explosion
+                    if FunctionsModule and FunctionsModule.Explosion and not origExplosion then
+                        local hookfunction = hookfunction or detour_function
+                        if hookfunction then
+                            pcall(function()
+                                origExplosion = hookfunction(FunctionsModule.Explosion, function(pos, range, damage, p4, player, ...)
+                                    if NoEnvDamage.Enabled and player == lplr then
+                                        -- Nullify the damage if we are the ones getting hit by an explosion
+                                        damage = 0
+                                    end
+                                    return origExplosion(pos, range, damage, p4, player, ...)
+                                end)
+                            end)
+                        end
+                    end
+                    
                     while NoEnvDamage.Enabled do
                         local lavaFolder = workspace:FindFirstChild("Lava")
                         if lavaFolder then
@@ -306,7 +348,7 @@ run(function()
                 -- and disabling it doesn't hurt normal gameplay
             end
         end,
-        Tooltip = "Disables Lava, Toxic Waste, and Fire damage."
+        Tooltip = "Disables Lava, Toxic Waste, Fire, and Explosive damage."
     })
 end)
 
@@ -329,12 +371,36 @@ run(function()
     }
     
     local function doClaimPowerups()
+        -- With recent filtering updates, checking workspace for dropped powerups is more reliable
+        -- than relying purely on the PowerupInfo folder, which might not sync correctly.
+        -- Powerups are usually dropped in workspace under the 'Powerups' folder.
+        
+        local powerupsFolder = workspace:FindFirstChild("Powerups")
+        if powerupsFolder then
+            for _, drop in ipairs(powerupsFolder:GetChildren()) do
+                -- Check if this specific powerup is toggled on
+                local pName = drop.Name
+                local toggle = powerupToggles[pName]
+                if toggle and toggle.Enabled then
+                    -- Get the touch part of the powerup and fire its touch event locally to claim it
+                    local touchPart = drop:FindFirstChild("Hitbox") or drop:FindFirstChild("Part") or drop:FindFirstChildWhichIsA("BasePart")
+                    if touchPart then
+                        pcall(function()
+                            -- FireTouch is generally the best way to claim physical drops since the remote was filtered
+                            firetouchinterest(lplr.Character.HumanoidRootPart, touchPart, 0)
+                            firetouchinterest(lplr.Character.HumanoidRootPart, touchPart, 1)
+                        end)
+                    end
+                end
+            end
+        end
+        
+        -- Fallback to remote just in case
         local powerupInfo = replicatedStorage:FindFirstChild("PowerupInfo")
         local powerupsEvent = replicatedStorage:FindFirstChild("Resources") and replicatedStorage.Resources:FindFirstChild("Power-ups") and replicatedStorage.Resources["Power-ups"]:FindFirstChild("Event")
         
         if powerupInfo and powerupsEvent then
             for _, powerupValue in ipairs(powerupInfo:GetChildren()) do
-                -- Check if this specific powerup is toggled on
                 local toggle = powerupToggles[powerupValue.Name]
                 if toggle and toggle.Enabled then
                     pcall(function()
@@ -370,15 +436,40 @@ run(function()
     end
 end)
 
--- God Mode
+-- God Mode (Server-side bypass via Remote hooking)
 run(function()
     local GodMode
+    local origNamecall = nil
     
     local function applyGodMode()
         if GodMode.Enabled then
             if lplr.Character and lplr.Character:FindFirstChild("Humanoid") then
                 lplr.Character.Humanoid.Health = lplr.Character.Humanoid.MaxHealth
             end
+            
+            -- Hook __namecall to block the ETC remote from sending damage ("DMS" or "Damage5")
+            if not origNamecall and getgenv().hookmetamethod then
+                pcall(function()
+                    origNamecall = getgenv().hookmetamethod(game, "__namecall", function(self, ...)
+                        local method = getnamecallmethod()
+                        local args = {...}
+                        
+                        if GodMode and GodMode.Enabled and method == "FireServer" and self.Name == "ETC" then
+                            if type(args[1]) == "table" then
+                                local subArgs = args[1]
+                                -- Block damage remotes (DMS = Damage Sync, Damage5 = Tutorial/Bridge damage sync)
+                                if type(subArgs[#subArgs]) == "string" and (string.find(subArgs[#subArgs], "DMS") or string.find(subArgs[#subArgs], "Damage5")) then
+                                    return -- Block the damage completely
+                                end
+                            end
+                        end
+                        
+                        return origNamecall(self, ...)
+                    end)
+                end)
+            end
+        else
+            -- We don't necessarily unhook namecall, just let GodMode.Enabled condition bypass it
         end
     end
 
@@ -389,14 +480,14 @@ run(function()
                 task.spawn(function()
                     while GodMode.Enabled do
                         applyGodMode()
-                        task.wait(0.01) -- Very fast loop to ensure we stay alive
+                        task.wait(0.01) -- Very fast loop to ensure we stay alive locally too
                     end
                 end)
             else
                 -- Nothing needed on disable
             end
         end,
-        Tooltip = "Makes you invincible by rapidly healing."
+        Tooltip = "Makes you invincible by blocking damage remotes to the server."
     })
 end)
 
