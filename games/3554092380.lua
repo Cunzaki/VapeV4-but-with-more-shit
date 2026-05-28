@@ -392,18 +392,41 @@ run(function()
                 lplr.Character.Humanoid.Health = lplr.Character.Humanoid.MaxHealth
             end
             
-            -- If we couldn't get the DamagePlayer module normally, try to find the script and hook its environment
-            for _, v in ipairs(getgc(true)) do
-                if type(v) == "function" then
-                    local info = debug.getinfo(v)
-                    if info.name == "hitplr" then
-                        -- Hook the hitplr function directly in memory if we can't require it
-                        local env = getsenv(v)
-                        if env and env.hitplr then
-                            -- Replace the hitplr function with an empty function that does nothing
-                            env.hitplr = function() return end
-                        end
-                    end
+            -- If we successfully grabbed the originalHitPlr function, let's hook it properly using exploit hookfunction if available
+            -- We don't want to use getsenv on a function, getsenv requires a LocalScript instance!
+            if originalHitPlr and type(originalHitPlr) == "function" and not _G.HitPlrHooked then
+                local hookfunction = hookfunction or detour_function
+                if hookfunction then
+                    pcall(function()
+                        _G.HitPlrHooked = true
+                        _G.OldHitPlr = hookfunction(originalHitPlr, function(...)
+                            if GodMode.Enabled then
+                                -- Completely ignore all incoming damage by doing nothing when hitplr is called
+                                return
+                            end
+                            return _G.OldHitPlr(...)
+                        end)
+                    end)
+                end
+            end
+            
+            -- Also hook the game's actual "IncreaseStat" to prevent taking damage through the normal route
+            local FunctionsModule = getFunctionsModule()
+            if FunctionsModule and FunctionsModule.IncreaseStat and not _G.IncreaseStatHooked then
+                local hookfunction = hookfunction or detour_function
+                if hookfunction then
+                    pcall(function()
+                        _G.IncreaseStatHooked = true
+                        _G.OldIncreaseStat = hookfunction(FunctionsModule.IncreaseStat, function(player, stat, amount, ...)
+                            if GodMode.Enabled and stat == "DamageTaken" and player == lplr then
+                                if lplr.Character and lplr.Character:FindFirstChild("Humanoid") then
+                                    lplr.Character.Humanoid.Health = lplr.Character.Humanoid.MaxHealth
+                                end
+                                return -- Block damage
+                            end
+                            return _G.OldIncreaseStat(player, stat, amount, ...)
+                        end)
+                    end)
                 end
             end
         end
