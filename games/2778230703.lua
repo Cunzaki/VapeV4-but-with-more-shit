@@ -194,36 +194,55 @@ end)
 
 -- Lobby Exploits
 run(function()
-    local InfiniteTokens
+    local AutoRewards
     local CaseSpammer
     
-    InfiniteTokens = vape.Categories.Utility:CreateModule({
-        Name = "Infinite Tokens",
+    AutoRewards = vape.Categories.Utility:CreateModule({
+        Name = "Auto Rewards",
         Function = function(callback)
             if callback then
                 task.spawn(function()
                     local events = replicatedStorage:FindFirstChild("Events")
                     local gunCamos = events and events:FindFirstChild("GunCamos")
-                    local dataChange = events and events:FindFirstChild("DataChange")
                     
-                    while InfiniteTokens.Enabled do
-                        if gunCamos and dataChange then
-                            -- Method: Daily Reward Reset Abuse
-                            -- We use DataChange to trick the server into thinking our Daily Reward is ready
-                            -- Then we trigger the Daily Reward claim remote to get the tokens safely!
-                            pcall(function()
-                                -- Force the server's data for our DailyReward to be Ready
-                                dataChange:FireServer(1, "DailyReward", {Ready = 1, Streak = 100})
-                                -- Claim the reward (gives tokens)
-                                gunCamos:InvokeServer(8)
-                            end)
-                        end
-                        task.wait(0.25)
+                    if gunCamos then
+                        pcall(function()
+                            -- 1. Claim Daily Reward safely
+                            gunCamos:InvokeServer(8)
+                            
+                            -- 2. Automatically verify all Badge Sets for Z-Tokens
+                            local badgeSets = gunCamos:InvokeServer(10)
+                            if badgeSets then
+                                for setName, _ in pairs(badgeSets) do
+                                    if setName ~= "Descriptions" then
+                                        gunCamos:InvokeServer(11, setName)
+                                    end
+                                end
+                            end
+                            
+                            -- 3. Redeem known active promo codes automatically
+                            local knownCodes = {
+                                "20Milestone",
+                                "ItsStillWinter",
+                                "Christmas2025",
+                                "NewWeapons",
+                                "Cheese",
+                                "Dragon",
+                                "MOTD"
+                            }
+                            for _, code in ipairs(knownCodes) do
+                                gunCamos:InvokeServer(4, code)
+                                task.wait(0.5) -- Wait a bit to avoid rate limits
+                            end
+                        end)
                     end
+                    
+                    -- Turn off automatically after running once
+                    AutoRewards:ToggleButton(false)
                 end)
             end
         end,
-        Tooltip = "Exploits remote vulnerabilities to give you infinite Z-Tokens."
+        Tooltip = "Automatically claims Daily Rewards, verifies all Badge Sets, and redeems all known promo codes for Z-Tokens."
     })
     
     local caseDropdown
