@@ -533,3 +533,150 @@ run(function()
         Tooltip = "Abuses the reward remote to rapidly give you points."
     })
 end)
+
+-- Zombies Object ESP (Mystery Box, Pack-a-Punch, Power)
+run(function()
+    local ZombiesESPModule
+    local ShowMysteryBox
+    local ShowPackAPunch
+    local ShowPowerBox
+    
+    local espDrawings = {}
+
+    local function createESP(obj, name, color)
+        local text = Drawing.new("Text")
+        text.Text = name
+        text.Size = 20
+        text.Center = true
+        text.Outline = true
+        text.Color = color
+        text.Visible = false
+        
+        table.insert(espDrawings, {
+            obj = obj,
+            drawing = text,
+            type = name
+        })
+    end
+
+    local function scanObjects()
+        -- Clear old
+        for _, v in ipairs(espDrawings) do
+            if v.drawing then
+                v.drawing.Visible = false
+                v.drawing:Remove()
+            end
+        end
+        espDrawings = {}
+        
+        -- Power Box
+        local power = workspace:FindFirstChild("Power") or (workspace:FindFirstChild("Interactions") and workspace.Interactions:FindFirstChild("Power"))
+        if power then
+            createESP(power, "Power Box", Color3.fromRGB(255, 255, 0))
+        end
+        
+        -- Interactions (Mystery Box, Pack-A-Punch)
+        local interactions = workspace:FindFirstChild("Interactions")
+        if interactions then
+            for _, v in ipairs(interactions:GetChildren()) do
+                local nameLower = string.lower(v.Name)
+                if string.find(nameLower, "mystery") then
+                    createESP(v, "Mystery Box", Color3.fromRGB(150, 0, 255))
+                elseif string.find(nameLower, "pack") or string.find(nameLower, "punch") or string.find(string.upper(v.Name), "PAP") then
+                    createESP(v, "Pack-a-Punch", Color3.fromRGB(0, 255, 255))
+                end
+            end
+        end
+    end
+
+    local function updateESP()
+        local camera = workspace.CurrentCamera
+        if not camera then return end
+        
+        for _, esp in ipairs(espDrawings) do
+            local obj = esp.obj
+            local shouldShow = false
+            
+            if esp.type == "Mystery Box" and ShowMysteryBox.Enabled then shouldShow = true end
+            if esp.type == "Pack-a-Punch" and ShowPackAPunch.Enabled then shouldShow = true end
+            if esp.type == "Power Box" and ShowPowerBox.Enabled then shouldShow = true end
+            
+            if shouldShow and obj and obj.Parent then
+                local pos
+                if obj:IsA("Model") and obj.PrimaryPart then
+                    pos = obj.PrimaryPart.Position
+                elseif obj:IsA("Model") then
+                    -- Get first part
+                    local part = obj:FindFirstChildWhichIsA("BasePart", true)
+                    if part then pos = part.Position end
+                elseif obj:IsA("BasePart") then
+                    pos = obj.Position
+                end
+                
+                if pos then
+                    local vector, onScreen = camera:WorldToViewportPoint(pos)
+                    if onScreen then
+                        esp.drawing.Position = Vector2.new(vector.X, vector.Y)
+                        esp.drawing.Visible = true
+                    else
+                        esp.drawing.Visible = false
+                    end
+                else
+                    esp.drawing.Visible = false
+                end
+            else
+                esp.drawing.Visible = false
+            end
+        end
+    end
+
+    ZombiesESPModule = vape.Categories.Render:CreateModule({
+        Name = "Zombies ESP",
+        Function = function(callback)
+            if callback then
+                task.spawn(function()
+                    scanObjects()
+                    while ZombiesESPModule.Enabled do
+                        updateESP()
+                        task.wait()
+                    end
+                end)
+                
+                -- Refresh periodically in case box moves
+                task.spawn(function()
+                    while ZombiesESPModule.Enabled do
+                        task.wait(5)
+                        scanObjects()
+                    end
+                end)
+            else
+                for _, v in ipairs(espDrawings) do
+                    if v.drawing then
+                        v.drawing.Visible = false
+                        v.drawing:Remove()
+                    end
+                end
+                espDrawings = {}
+            end
+        end,
+        Tooltip = "Shows ESP for important Zombie map locations."
+    })
+    
+    ShowMysteryBox = ZombiesESPModule:CreateToggle({
+        Name = "Mystery Box",
+        Function = function() end,
+        Default = true
+    })
+    
+    ShowPackAPunch = ZombiesESPModule:CreateToggle({
+        Name = "Pack-a-Punch",
+        Function = function() end,
+        Default = true
+    })
+    
+    ShowPowerBox = ZombiesESPModule:CreateToggle({
+        Name = "Power Box",
+        Function = function() end,
+        Default = true
+    })
+end)
