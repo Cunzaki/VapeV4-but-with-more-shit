@@ -6,52 +6,52 @@ local cloneref = cloneref or function(obj)
 end
 
 local playersService = cloneref(game:GetService("Players"))
+local replicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
 local lplr = playersService.LocalPlayer
 local vape = shared.vape
+
+local function getWeaponModule()
+    local weaponModule = replicatedStorage:FindFirstChild("WeaponModule")
+    if weaponModule then
+        local success, result = pcall(function()
+            return require(weaponModule)
+        end)
+        if success and type(result) == "table" and result.Weapons then
+            return result.Weapons
+        end
+    end
+    return nil
+end
 
 local originalSettings = {}
 local gunConfigs = {}
 
--- Safely scan memory for the weapon configuration tables.
--- This bypasses the "getsenv (inactive script)" error entirely!
+-- Directly require the module to change the guns permanently.
 local function scanForGunConfigs()
-    for _, v in ipairs(getgc(true)) do
-        if type(v) == "table" and rawget(v, "Damage") ~= nil and rawget(v, "Recoil") ~= nil and rawget(v, "Headshot") ~= nil and rawget(v, "Spread") ~= nil then
-            if not table.find(gunConfigs, v) then
-                table.insert(gunConfigs, v)
-                originalSettings[v] = {
-                    FreeAmmo = rawget(v, "FreeAmmo"),
-                    Recoil = rawget(v, "Recoil"),
-                    CameraRecoil = rawget(v, "CameraRecoil"),
-                    Spread = rawget(v, "Spread"),
-                    MinSpread = rawget(v, "MinSpread"),
-                    MaxSpread = rawget(v, "MaxSpread"),
-                    Auto = rawget(v, "Auto"),
-                    FireType = rawget(v, "FireType"),
-                    Damage = rawget(v, "Damage"),
-                    Headshot = rawget(v, "Headshot")
-                }
+    local weapons = getWeaponModule()
+    if weapons then
+        for name, config in pairs(weapons) do
+            if type(config) == "table" and config.Damage then
+                if not originalSettings[config] then
+                    table.insert(gunConfigs, config)
+                    originalSettings[config] = {
+                        FreeAmmo = config.FreeAmmo,
+                        Recoil = config.Recoil,
+                        CameraRecoil = config.CameraRecoil,
+                        RecoilReduc = config.RecoilReduc,
+                        Spread = config.Spread,
+                        MinSpread = config.MinSpread,
+                        MaxSpread = config.MaxSpread,
+                        Auto = config.Auto,
+                        FireType = config.FireType,
+                        Damage = config.Damage,
+                        Headshot = config.Headshot
+                    }
+                end
             end
         end
     end
 end
-
--- Hook when a new gun is equipped to rescan memory
-local function setupCharacter(char)
-    char.ChildAdded:Connect(function(child)
-        if child:IsA("Tool") then
-            task.delay(0.5, function()
-                scanForGunConfigs()
-            end)
-        end
-    end)
-end
-
-if lplr.Character then
-    setupCharacter(lplr.Character)
-end
-lplr.CharacterAdded:Connect(setupCharacter)
-
 
 -- Gun Mods (Infinite Ammo, Fire Rate, Recoil, Spread)
 run(function()
@@ -62,6 +62,7 @@ run(function()
     local AutoFire
     
     local function applyMods()
+        scanForGunConfigs()
         for _, config in ipairs(gunConfigs) do
             local orig = originalSettings[config]
             if orig then
@@ -75,9 +76,11 @@ run(function()
                     if NoRecoil.Enabled then 
                         config.Recoil = {0,0,0}
                         config.CameraRecoil = {0,0,0}
+                        config.RecoilReduc = {["Easy"] = 0, ["Original"] = 0}
                     else 
                         config.Recoil = orig.Recoil
-                        config.CameraRecoil = orig.CameraRecoil 
+                        config.CameraRecoil = orig.CameraRecoil
+                        config.RecoilReduc = orig.RecoilReduc
                     end
                     
                     if NoSpread.Enabled then 
@@ -101,6 +104,7 @@ run(function()
                     config.FreeAmmo = orig.FreeAmmo
                     config.Recoil = orig.Recoil
                     config.CameraRecoil = orig.CameraRecoil
+                    config.RecoilReduc = orig.RecoilReduc
                     config.Spread = orig.Spread
                     config.MinSpread = orig.MinSpread
                     config.MaxSpread = orig.MaxSpread
@@ -116,10 +120,9 @@ run(function()
         Function = function(callback)
             if callback then
                 task.spawn(function()
-                    scanForGunConfigs()
                     while GunModsModule.Enabled do
                         applyMods()
-                        task.wait(0.5)
+                        task.wait(1)
                     end
                 end)
             else
@@ -155,6 +158,7 @@ run(function()
     local InstaKill
     
     local function applyInstaKill()
+        scanForGunConfigs()
         for _, config in ipairs(gunConfigs) do
             local orig = originalSettings[config]
             if orig then
@@ -174,10 +178,9 @@ run(function()
         Function = function(callback)
             if callback then
                 task.spawn(function()
-                    scanForGunConfigs()
                     while InstaKill.Enabled do
                         applyInstaKill()
-                        task.wait(0.5)
+                        task.wait(1)
                     end
                 end)
             else
@@ -185,5 +188,35 @@ run(function()
             end
         end,
         Tooltip = "Modifies gun damage to instantly kill zombies."
+    })
+end)
+
+-- Exploit Points/Powerups
+run(function()
+    local ClaimPoints
+    ClaimPoints = vape.Categories.Combat:CreateModule({
+        Name = "ClaimPoints",
+        Function = function(callback)
+            if callback then
+                task.spawn(function()
+                    while ClaimPoints.Enabled do
+                        -- Looking through decompiled structure, powerups use ReplicatedStorage.Resources["Power-ups"].Event:FireServer(PowerupValue)
+                        -- The powerup values are stored in ReplicatedStorage.PowerupInfo
+                        local powerupInfo = replicatedStorage:FindFirstChild("PowerupInfo")
+                        local powerupsEvent = replicatedStorage:FindFirstChild("Resources") and replicatedStorage.Resources:FindFirstChild("Power-ups") and replicatedStorage.Resources["Power-ups"]:FindFirstChild("Event")
+                        
+                        if powerupInfo and powerupsEvent then
+                            for _, powerupValue in ipairs(powerupInfo:GetChildren()) do
+                                pcall(function()
+                                    powerupsEvent:FireServer(powerupValue)
+                                end)
+                            end
+                        end
+                        task.wait(0.2)
+                    end
+                end)
+            end
+        end,
+        Tooltip = "Attempts to exploit points via remote events"
     })
 end)
