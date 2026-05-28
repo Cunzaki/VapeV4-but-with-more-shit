@@ -442,7 +442,7 @@ run(function()
                             -- Another method to get points is via the "Rewards8" event but the argument format is tricky
                             -- Some variants use { 0, amount, "Rewards8\240\159\144\153" }
                             pcall(function()
-                                etcEvent:FireServer({ 0, 500, "Rewards8\240\159\144\153" })
+                                etcEvent:FireServer({ 0, 2500, "Rewards8\240\159\144\153" })
                             end)
                         end
                         task.wait(0.1)
