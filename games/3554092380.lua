@@ -37,46 +37,36 @@ local function scanForGunConfigs()
     end
 end
 
--- Compatibility: use either getupvalue/setupvalue or debug.getupvalue/debug.setupvalue
 local getupvalue = getupvalue or debug.getupvalue
 local setupvalue = setupvalue or debug.setupvalue
+local getsenv = getsenv or function() return {} end
 
--- Scan for functions that have RPM-related upvalues (u35, u49, u54)
-local function scanForRPMUpvalues()
-    rpmUpvalueTargets = {}
-    for _, obj in ipairs(getgc(true)) do
-        if type(obj) == "function" then
-            local success, err = pcall(function()
-                -- Check upvalues for numeric values that are typical RPM values (0.01 to 1.0)
-                local upvalueIndex = 1
-                while true do
-                    local name, value = getupvalue(obj, upvalueIndex)
-                    if not name and not value then break end -- Exit loop if no more upvalues
-                    
-                    -- Look for upvalues that are numbers in the typical RPM range
-                    if type(value) == "number" and value >= 0.01 and value <= 1.0 then
-                        -- Check if this function has multiple such upvalues (likely RPM vars)
-                        table.insert(rpmUpvalueTargets, {
-                            func = obj,
-                            index = upvalueIndex,
-                            originalValue = value
-                        })
-                    end
-                    
-                    upvalueIndex = upvalueIndex + 1
-                end
-            end)
+-- Find active GunScripts in Camera or Character
+local function getActiveGunScripts()
+    local scripts = {}
+    local camera = workspace.CurrentCamera
+    if camera then
+        for _, model in ipairs(camera:GetChildren()) do
+            local gs = model:FindFirstChild("GunScript", true)
+            if gs and gs:IsA("LocalScript") then
+                table.insert(scripts, gs)
+            end
         end
     end
+    if lplr.Character then
+        for _, tool in ipairs(lplr.Character:GetChildren()) do
+            if tool:IsA("Tool") or tool:IsA("Model") then
+                local gs = tool:FindFirstChild("GunScript", true)
+                if gs and gs:IsA("LocalScript") then
+                    table.insert(scripts, gs)
+                end
+            end
+        end
+    end
+    return scripts
 end
 
--- Get the Functions module from ReplicatedStorage
-local function getFunctionsModule()
-    local success, result = pcall(function()
-        return require(replicatedStorage:WaitForChild("Functions"))
-    end)
-    return success and result or nil
-end
+local originalU54s = {}
 
 -- Gun Mods (Infinite Ammo, Fire Rate, Recoil, Spread)
 run(function()
@@ -87,20 +77,17 @@ run(function()
     local FastFireRate
     
     local function applyMods()
-        local Functions = getFunctionsModule()
+        local multiplier = GunModsModule.Enabled and FastFireRate.Value or 1
         
-        -- Modify config properties first
+        -- 1. Modify gunConfigs (for when the user equips a new gun)
         for _, config in ipairs(gunConfigs) do
             local orig = originalSettings[config]
             if orig then
                 if GunModsModule.Enabled then
-                    -- Infinite Ammo: override PreshootFunc to always set FreeAmmo = true
                     if InfiniteAmmo.Enabled then 
                         local originalPreshoot = orig.PreshootFunc
                         config.PreshootFunc = function()
-                            if originalPreshoot then
-                                originalPreshoot()
-                            end
+                            if originalPreshoot then originalPreshoot() end
                             config.FreeAmmo = true
                         end
                     else 
@@ -126,10 +113,6 @@ run(function()
                         config.MinSpread = orig.MinSpread
                         config.MaxSpread = orig.MaxSpread 
                     end
-
-                    -- Set both RPM and RPM2 for fire rate
-                    config.RPM = FastFireRate.Value
-                    config.RPM2 = FastFireRate.Value
                 else
                     config.PreshootFunc = orig.PreshootFunc
                     config.Recoil = orig.Recoil
@@ -138,26 +121,37 @@ run(function()
                     config.Spread = orig.Spread
                     config.MinSpread = orig.MinSpread
                     config.MaxSpread = orig.MaxSpread
-                    config.RPM = orig.RPM
-                    config.RPM2 = orig.RPM2
                 end
             end
         end
         
-        -- Now modify the upvalues (local variables) inside WeaponModule functions
-        if GunModsModule.Enabled then
-            for _, target in ipairs(rpmUpvalueTargets) do
-                pcall(function()
-                    setupvalue(target.func, target.index, FastFireRate.Value)
-                end)
-            end
-        else
-            -- Restore original upvalues
-            for _, target in ipairs(rpmUpvalueTargets) do
-                pcall(function()
-                    setupvalue(target.func, target.index, target.originalValue)
-                end)
-            end
+        -- 2. Modify currently active GunScript upvalues instantly
+        for _, gs in ipairs(getActiveGunScripts()) do
+            pcall(function()
+                local env = getsenv(gs)
+                if env and env.checkFirerate then
+                    -- checkFirerate has 4 upvalues: u107, u35(RPM), u49(RPM2), u54(Original Base RPM)
+                    local _, u54_val = getupvalue(env.checkFirerate, 4)
+                    
+                    if type(u54_val) == "number" then
+                        local origRPM = originalU54s[gs]
+                        local currentExpectedRPM = origRPM and (origRPM / multiplier) or nil
+                        
+                        -- If we haven't stored it yet, or if u54_val changed significantly (meaning equip() reset it)
+                        if not origRPM or math.abs(u54_val - currentExpectedRPM) > 0.0001 then
+                            originalU54s[gs] = u54_val
+                            origRPM = u54_val
+                        end
+                        
+                        local targetRPM = origRPM / multiplier
+                        
+                        -- Set u35, u49, u54 to the target RPM
+                        setupvalue(env.checkFirerate, 2, targetRPM)
+                        setupvalue(env.checkFirerate, 3, targetRPM)
+                        setupvalue(env.checkFirerate, 4, targetRPM)
+                    end
+                end
+            end)
         end
     end
 
@@ -167,10 +161,9 @@ run(function()
             if callback then
                 task.spawn(function()
                     scanForGunConfigs()
-                    scanForRPMUpvalues()
                     while GunModsModule.Enabled do
                         applyMods()
-                        task.wait(0.05) -- Even faster updates for fire rate
+                        task.wait(0.05)
                     end
                 end)
             else
@@ -196,11 +189,11 @@ run(function()
     })
     
     FastFireRate = GunModsModule:CreateSlider({
-        Name = "Fire Rate",
-        Min = 0.01,
-        Max = 0.5,
-        Default = 0.1,
-        Decimal = 100,
+        Name = "Fire Rate Multiplier",
+        Min = 1,
+        Max = 20,
+        Default = 2,
+        Decimal = 10,
         Function = function(val) applyMods() end
     })
 end)
