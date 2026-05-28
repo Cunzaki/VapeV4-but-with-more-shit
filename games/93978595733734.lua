@@ -107,7 +107,7 @@ run(function()
         end
     end
 
-    GeneratorESP = vape.Categories.Render:CreateModule({
+    GeneratorESP = vape.Categories.Minigames:CreateModule({
         Name = "GeneratorESP",
         Function = function(callback)
             if callback then
@@ -208,7 +208,7 @@ run(function()
         end
     end
 
-    HookESP = vape.Categories.Render:CreateModule({
+    HookESP = vape.Categories.Minigames:CreateModule({
         Name = "HookESP",
         Function = function(callback)
             if callback then
@@ -332,7 +332,7 @@ run(function()
         end
     end
 
-    AutoSkillCheck = vape.Categories.Blatant:CreateModule({
+    AutoSkillCheck = vape.Categories.Minigames:CreateModule({
         Name = "AutoSkillCheck",
         Function = function(callback)
             if callback then
@@ -353,5 +353,92 @@ run(function()
             end
         end,
         Tooltip = "Automatically pass skill checks"
+    })
+end)
+
+-- Exploits Found
+run(function()
+    local ForceStartGame
+    ForceStartGame = vape.Categories.Minigames:CreateModule({
+        Name = "ForceStartGame",
+        Function = function(callback)
+            if callback then
+                task.spawn(function()
+                    local chat = replicatedStorage:FindFirstChild("Remotes") and replicatedStorage.Remotes:FindFirstChild("Mechanics") and replicatedStorage.Remotes.Mechanics:FindFirstChild("Chat")
+                    local panelAction = chat and chat:FindFirstChild("PanelAction")
+                    if panelAction then
+                        panelAction:InvokeServer("startgame")
+                    end
+                    ForceStartGame:ToggleButton(false)
+                end)
+            end
+        end,
+        Tooltip = "Force start the game (Exploit)"
+    })
+end)
+
+run(function()
+    local PauseLobbyTimer
+    PauseLobbyTimer = vape.Categories.Minigames:CreateModule({
+        Name = "PauseLobbyTimer",
+        Function = function(callback)
+            if callback then
+                task.spawn(function()
+                    local chat = replicatedStorage:FindFirstChild("Remotes") and replicatedStorage.Remotes:FindFirstChild("Mechanics") and replicatedStorage.Remotes.Mechanics:FindFirstChild("Chat")
+                    local panelAction = chat and chat:FindFirstChild("PanelAction")
+                    if panelAction then
+                        panelAction:InvokeServer("pauselobby")
+                    end
+                    PauseLobbyTimer:ToggleButton(false)
+                end)
+            end
+        end,
+        Tooltip = "Pause the lobby timer (Exploit)"
+    })
+end)
+
+run(function()
+    local KickAllPlayers
+    KickAllPlayers = vape.Categories.Minigames:CreateModule({
+        Name = "KickAllPlayers",
+        Function = function(callback)
+            if callback then
+                task.spawn(function()
+                    local chat = replicatedStorage:FindFirstChild("Remotes") and replicatedStorage.Remotes:FindFirstChild("Mechanics") and replicatedStorage.Remotes.Mechanics:FindFirstChild("Chat")
+                    local panelAction = chat and chat:FindFirstChild("PanelAction")
+                    if panelAction then
+                        panelAction:InvokeServer("kick", "ALL", nil)
+                    end
+                    KickAllPlayers:ToggleButton(false)
+                end)
+            end
+        end,
+        Tooltip = "Kick all players in the lobby (Exploit)"
+    })
+end)
+
+run(function()
+    local AutoMedalClaim
+    local connections = {}
+    AutoMedalClaim = vape.Categories.Minigames:CreateModule({
+        Name = "AutoMedalClaim",
+        Function = function(callback)
+            if callback then
+                table.insert(connections, runService.Heartbeat:Connect(function()
+                    local medalQuestClaim = replicatedStorage:FindFirstChild("Remotes") and replicatedStorage.Remotes:FindFirstChild("Events") and replicatedStorage.Remotes.Events:FindFirstChild("Medal") and replicatedStorage.Remotes.Events.Medal:FindFirstChild("MedalQuestClaim")
+                    if medalQuestClaim then
+                        pcall(function() medalQuestClaim:InvokeServer() end)
+                    end
+                end))
+            else
+                for _, conn in ipairs(connections) do
+                    if conn then
+                        conn:Disconnect()
+                    end
+                end
+                table.clear(connections)
+            end
+        end,
+        Tooltip = "Automatically claim medals (Exploit)"
     })
 end)
