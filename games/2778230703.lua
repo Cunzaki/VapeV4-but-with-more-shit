@@ -203,25 +203,18 @@ run(function()
             if callback then
                 task.spawn(function()
                     local events = replicatedStorage:FindFirstChild("Events")
-                    local dataChange = events and events:FindFirstChild("DataChange")
                     local gunCamos = events and events:FindFirstChild("GunCamos")
                     
-                    if dataChange then
-                        -- Exploit 1: Client Data Sync Abuse
-                        pcall(function()
-                            dataChange:FireServer(1, "ZTokens", 999999999)
-                        end)
-                    end
-                    
                     if gunCamos then
-                        -- Exploit 2: Admin Code Creation Abuse
+                        -- Exploit 1: Admin Code Creation Abuse
+                        -- Creates a custom code and redeems it
                         local codeName = "VAPE_" .. tostring(math.random(1000, 9999))
                         pcall(function()
                             gunCamos:InvokeServer(5, codeName, "9999", "99999")
                             gunCamos:InvokeServer(4, codeName)
                         end)
                         
-                        -- Exploit 3: Daily Reward Spam
+                        -- Exploit 2: Daily Reward Spam
                         pcall(function()
                             gunCamos:InvokeServer(8)
                         end)
