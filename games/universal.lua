@@ -3247,6 +3247,7 @@ end)
 run(function()
 	local TriggerBot
 	local Targets
+	local HitParts
 	local ShootDelay
 	local Distance
 	local rayCheck, delayCheck = RaycastParams.new(), tick()
@@ -3259,6 +3260,16 @@ run(function()
 			for _, v in entitylib.List do
 				if v.Targetable and v.Character and (Targets.Players.Enabled and v.Player or Targets.NPCs.Enabled and v.NPC) then
 					if ray.Instance:IsDescendantOf(v.Character) then
+						if HitParts.Value ~= "Any" then
+							local hitPartName = ray.Instance.Name:lower()
+							local requiredPart = HitParts.Value:lower()
+							
+							if requiredPart == "head" and not hitPartName:find("head") then
+								continue
+							elseif requiredPart == "rootpart" and not hitPartName:find("rootpart") then
+								continue
+							end
+						end
 						return entitylib.isVulnerable(v, (Targets.Forcefield and Targets.Forcefield.Enabled) or false) and v
 					end
 				end
@@ -3305,6 +3316,11 @@ run(function()
 	Targets = TriggerBot:CreateTargets({
 		Players = true,
 		NPCs = true
+	})
+	HitParts = TriggerBot:CreateDropdown({
+		Name = 'Hit Parts',
+		List = {'Any', 'Head', 'RootPart'},
+		Tooltip = 'The specific body part to trigger on'
 	})
 	ShootDelay = TriggerBot:CreateSlider({
 		Name = 'Next Shot Delay',
