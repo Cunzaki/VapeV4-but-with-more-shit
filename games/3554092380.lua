@@ -313,27 +313,132 @@ end)
 -- Exploit Points/Powerups
 run(function()
     local ClaimPowerups
+    local powerupToggles = {}
+    
+    local powerupsList = {
+        "Max Ammo",
+        "Insta-Kill",
+        "Double Points",
+        "Nuke",
+        "Carpenter",
+        "Fire Sale",
+        "Death Machine",
+        "Bonus Points",
+        "Zombie Blood",
+        "Insta-PAP"
+    }
+    
+    local function doClaimPowerups()
+        local powerupInfo = replicatedStorage:FindFirstChild("PowerupInfo")
+        local powerupsEvent = replicatedStorage:FindFirstChild("Resources") and replicatedStorage.Resources:FindFirstChild("Power-ups") and replicatedStorage.Resources["Power-ups"]:FindFirstChild("Event")
+        
+        if powerupInfo and powerupsEvent then
+            for _, powerupValue in ipairs(powerupInfo:GetChildren()) do
+                -- Check if this specific powerup is toggled on
+                local toggle = powerupToggles[powerupValue.Name]
+                if toggle and toggle.Enabled then
+                    pcall(function()
+                        powerupsEvent:FireServer(powerupValue)
+                    end)
+                end
+            end
+        end
+    end
+
     ClaimPowerups = vape.Categories.Combat:CreateModule({
         Name = "Autoclaim Powerups",
         Function = function(callback)
             if callback then
                 task.spawn(function()
                     while ClaimPowerups.Enabled do
-                        local powerupInfo = replicatedStorage:FindFirstChild("PowerupInfo")
-                        local powerupsEvent = replicatedStorage:FindFirstChild("Resources") and replicatedStorage.Resources:FindFirstChild("Power-ups") and replicatedStorage.Resources["Power-ups"]:FindFirstChild("Event")
-                        
-                        if powerupInfo and powerupsEvent then
-                            for _, powerupValue in ipairs(powerupInfo:GetChildren()) do
-                                pcall(function()
-                                    powerupsEvent:FireServer(powerupValue)
-                                end)
-                            end
-                        end
+                        doClaimPowerups()
                         task.wait(0.2)
+                    end
+                end)
+            else
+                -- Nothing needed on disable
+            end
+        end,
+        Tooltip = "Attempts to auto-claim selected powerups via remote events"
+    })
+    
+    for _, pName in ipairs(powerupsList) do
+        powerupToggles[pName] = ClaimPowerups:CreateToggle({
+            Name = pName,
+            Function = function() doClaimPowerups() end
+        })
+    end
+end)
+
+-- God Mode
+run(function()
+    local GodMode
+    local forceField = nil
+    
+    local function applyGodMode()
+        if not lplr.Character then return end
+        
+        if GodMode.Enabled then
+            if not forceField or not forceField.Parent then
+                forceField = Instance.new("ForceField")
+                forceField.Visible = false
+                forceField.Parent = lplr.Character
+            end
+        else
+            if forceField then
+                forceField:Destroy()
+                forceField = nil
+            end
+        end
+    end
+
+    GodMode = vape.Categories.Combat:CreateModule({
+        Name = "God Mode",
+        Function = function(callback)
+            if callback then
+                task.spawn(function()
+                    while GodMode.Enabled do
+                        applyGodMode()
+                        task.wait(1)
+                    end
+                end)
+            else
+                applyGodMode()
+            end
+        end,
+        Tooltip = "Makes you completely invincible to all zombie damage."
+    })
+    
+    lplr.CharacterAdded:Connect(function()
+        if GodMode.Enabled then
+            task.wait(0.5)
+            applyGodMode()
+        end
+    end)
+end)
+
+-- Infinite Points (Remote Event Abuse)
+run(function()
+    local InfPoints
+    
+    InfPoints = vape.Categories.Combat:CreateModule({
+        Name = "Infinite Points",
+        Function = function(callback)
+            if callback then
+                task.spawn(function()
+                    local etcEvent = replicatedStorage:FindFirstChild("Events") and replicatedStorage.Events:FindFirstChild("ETC")
+                    while InfPoints.Enabled do
+                        if etcEvent then
+                            -- The game uses {0, amount, "Rewards8\240\159\144\153"} to grant cash locally via the ETC remote
+                            pcall(function()
+                                etcEvent:FireServer({0, 1000, "Rewards8\240\159\144\153"})
+                            end)
+                        end
+                        task.wait(0.1) -- Rapidly give points while enabled
                     end
                 end)
             end
         end,
-        Tooltip = "Attempts to auto-claim powerups via remote events"
+        Tooltip = "Abuses the reward remote to rapidly give you points."
     })
 end)
