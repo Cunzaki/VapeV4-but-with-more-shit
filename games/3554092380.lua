@@ -373,21 +373,36 @@ end)
 -- God Mode
 run(function()
     local GodMode
-    local forceField = nil
+    local origDamageTaken = nil
+    local FunctionsModule = getFunctionsModule()
     
     local function applyGodMode()
-        if not lplr.Character then return end
-        
         if GodMode.Enabled then
-            if not forceField or not forceField.Parent then
-                forceField = Instance.new("ForceField")
-                forceField.Visible = false
-                forceField.Parent = lplr.Character
+            -- Let's hook the game's stat tracker and hit function since the ForceField method failed
+            if FunctionsModule and FunctionsModule.IncreaseStat and not origDamageTaken then
+                origDamageTaken = FunctionsModule.IncreaseStat
+                FunctionsModule.IncreaseStat = function(player, stat, amount, ...)
+                    if stat == "DamageTaken" and player == lplr then
+                        -- Returning early prevents damage stats, but we also want to stop the damage
+                        -- Let's intercept the actual humanoid health change instead by keeping Health at MaxHealth
+                        if lplr.Character and lplr.Character:FindFirstChild("Humanoid") then
+                            lplr.Character.Humanoid.Health = lplr.Character.Humanoid.MaxHealth
+                        end
+                        return
+                    end
+                    return origDamageTaken(player, stat, amount, ...)
+                end
+            end
+            
+            -- Continuously heal the player just in case
+            if lplr.Character and lplr.Character:FindFirstChild("Humanoid") then
+                lplr.Character.Humanoid.Health = lplr.Character.Humanoid.MaxHealth
             end
         else
-            if forceField then
-                forceField:Destroy()
-                forceField = nil
+            -- Restore original hook
+            if FunctionsModule and origDamageTaken then
+                FunctionsModule.IncreaseStat = origDamageTaken
+                origDamageTaken = nil
             end
         end
     end
@@ -399,22 +414,15 @@ run(function()
                 task.spawn(function()
                     while GodMode.Enabled do
                         applyGodMode()
-                        task.wait(1)
+                        task.wait(0.1)
                     end
                 end)
             else
                 applyGodMode()
             end
         end,
-        Tooltip = "Makes you completely invincible to all zombie damage."
+        Tooltip = "Makes you invincible by instantly healing you and hooking the damage function."
     })
-    
-    lplr.CharacterAdded:Connect(function()
-        if GodMode.Enabled then
-            task.wait(0.5)
-            applyGodMode()
-        end
-    end)
 end)
 
 -- Infinite Points (Remote Event Abuse)
@@ -426,15 +434,18 @@ run(function()
         Function = function(callback)
             if callback then
                 task.spawn(function()
-                    local etcEvent = replicatedStorage:FindFirstChild("Events") and replicatedStorage.Events:FindFirstChild("ETC")
+                    -- The ETC event is actually located in game.Lighting.ETC or game.ReplicatedStorage.Events.ETC depending on the game mode
+                    local etcEvent = game:GetService("Lighting"):FindFirstChild("ETC") or (replicatedStorage:FindFirstChild("Events") and replicatedStorage.Events:FindFirstChild("ETC"))
+                    
                     while InfPoints.Enabled do
                         if etcEvent then
-                            -- The game uses {0, amount, "Rewards8\240\159\144\153"} to grant cash locally via the ETC remote
+                            -- Another method to get points is via the "Rewards8" event but the argument format is tricky
+                            -- Some variants use { 0, amount, "Rewards8\240\159\144\153" }
                             pcall(function()
-                                etcEvent:FireServer({0, 1000, "Rewards8\240\159\144\153"})
+                                etcEvent:FireServer({ 0, 500, "Rewards8\240\159\144\153" })
                             end)
                         end
-                        task.wait(0.1) -- Rapidly give points while enabled
+                        task.wait(0.1)
                     end
                 end)
             end
