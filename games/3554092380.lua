@@ -373,36 +373,38 @@ end)
 -- God Mode
 run(function()
     local GodMode
-    local origDamageTaken = nil
-    local FunctionsModule = getFunctionsModule()
+    local DamagePlayerModule
+    
+    pcall(function()
+        DamagePlayerModule = require(replicatedStorage:WaitForChild("DamagePlayer"))
+    end)
+    
+    local originalHitPlr = nil
+    if type(DamagePlayerModule) == "function" then
+        originalHitPlr = DamagePlayerModule
+    elseif type(DamagePlayerModule) == "table" and DamagePlayerModule.hitplr then
+        originalHitPlr = DamagePlayerModule.hitplr
+    end
     
     local function applyGodMode()
         if GodMode.Enabled then
-            -- Let's hook the game's stat tracker and hit function since the ForceField method failed
-            if FunctionsModule and FunctionsModule.IncreaseStat and not origDamageTaken then
-                origDamageTaken = FunctionsModule.IncreaseStat
-                FunctionsModule.IncreaseStat = function(player, stat, amount, ...)
-                    if stat == "DamageTaken" and player == lplr then
-                        -- Returning early prevents damage stats, but we also want to stop the damage
-                        -- Let's intercept the actual humanoid health change instead by keeping Health at MaxHealth
-                        if lplr.Character and lplr.Character:FindFirstChild("Humanoid") then
-                            lplr.Character.Humanoid.Health = lplr.Character.Humanoid.MaxHealth
-                        end
-                        return
-                    end
-                    return origDamageTaken(player, stat, amount, ...)
-                end
-            end
-            
-            -- Continuously heal the player just in case
             if lplr.Character and lplr.Character:FindFirstChild("Humanoid") then
                 lplr.Character.Humanoid.Health = lplr.Character.Humanoid.MaxHealth
             end
-        else
-            -- Restore original hook
-            if FunctionsModule and origDamageTaken then
-                FunctionsModule.IncreaseStat = origDamageTaken
-                origDamageTaken = nil
+            
+            -- If we couldn't get the DamagePlayer module normally, try to find the script and hook its environment
+            for _, v in ipairs(getgc(true)) do
+                if type(v) == "function" then
+                    local info = debug.getinfo(v)
+                    if info.name == "hitplr" then
+                        -- Hook the hitplr function directly in memory if we can't require it
+                        local env = getsenv(v)
+                        if env and env.hitplr then
+                            -- Replace the hitplr function with an empty function that does nothing
+                            env.hitplr = function() return end
+                        end
+                    end
+                end
             end
         end
     end
@@ -414,14 +416,14 @@ run(function()
                 task.spawn(function()
                     while GodMode.Enabled do
                         applyGodMode()
-                        task.wait(0.1)
+                        task.wait(0.05) -- Very fast loop to ensure we stay alive
                     end
                 end)
             else
-                applyGodMode()
+                -- Nothing needed on disable
             end
         end,
-        Tooltip = "Makes you invincible by instantly healing you and hooking the damage function."
+        Tooltip = "Makes you invincible by hooking the damage function and rapidly healing."
     })
 end)
 
