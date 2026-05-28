@@ -6,12 +6,52 @@ local cloneref = cloneref or function(obj)
 end
 
 local playersService = cloneref(game:GetService("Players"))
-local inputService = cloneref(game:GetService("UserInputService"))
-local replicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
-local runService = cloneref(game:GetService("RunService"))
-
 local lplr = playersService.LocalPlayer
 local vape = shared.vape
+
+local originalSettings = {}
+local gunConfigs = {}
+
+-- Safely scan memory for the weapon configuration tables.
+-- This bypasses the "getsenv (inactive script)" error entirely!
+local function scanForGunConfigs()
+    for _, v in ipairs(getgc(true)) do
+        if type(v) == "table" and rawget(v, "Damage") ~= nil and rawget(v, "Recoil") ~= nil and rawget(v, "Headshot") ~= nil and rawget(v, "Spread") ~= nil then
+            if not table.find(gunConfigs, v) then
+                table.insert(gunConfigs, v)
+                originalSettings[v] = {
+                    FreeAmmo = rawget(v, "FreeAmmo"),
+                    Recoil = rawget(v, "Recoil"),
+                    CameraRecoil = rawget(v, "CameraRecoil"),
+                    Spread = rawget(v, "Spread"),
+                    MinSpread = rawget(v, "MinSpread"),
+                    MaxSpread = rawget(v, "MaxSpread"),
+                    Auto = rawget(v, "Auto"),
+                    FireType = rawget(v, "FireType"),
+                    Damage = rawget(v, "Damage"),
+                    Headshot = rawget(v, "Headshot")
+                }
+            end
+        end
+    end
+end
+
+-- Hook when a new gun is equipped to rescan memory
+local function setupCharacter(char)
+    char.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then
+            task.delay(0.5, function()
+                scanForGunConfigs()
+            end)
+        end
+    end)
+end
+
+if lplr.Character then
+    setupCharacter(lplr.Character)
+end
+lplr.CharacterAdded:Connect(setupCharacter)
+
 
 -- Gun Mods (Infinite Ammo, Fire Rate, Recoil, Spread)
 run(function()
@@ -19,82 +59,53 @@ run(function()
     local InfiniteAmmo
     local NoRecoil
     local NoSpread
-    local InstantReload
     local AutoFire
     
-    local originalSettings = {}
-    local hookedGuns = {}
-
-    local function ApplyMods(gunModel)
-        if not gunModel then return end
-        local gunScript = gunModel:FindFirstChild("GunScript") or gunModel:FindFirstChild("RealisticV4")
-        if not gunScript then return end
-        
-        -- Find the environment or required module that holds the gun stats.
-        -- Often these games use a module in ReplicatedStorage for Weapon stats, 
-        -- but if the client has direct access to them, we can modify them via getrenv/getupvalue/etc.
-        
-        -- The decompiled scripts indicate there's a WeaponModule and a RealisticV4 script.
-        -- We will loop through the localplayer's weapons and modify the configuration.
-        task.spawn(function()
-            local env = getsenv and getsenv(gunScript)
-            if env and env.u47 then -- u47 seems to be the gun configuration table from decompiled script
-                if not originalSettings[gunModel] then
-                    originalSettings[gunModel] = {
-                        FreeAmmo = env.u47.FreeAmmo,
-                        Recoil = env.u47.Recoil,
-                        Spread = env.u47.Spread,
-                        ReloadTime = env.u47.ReloadTime,
-                        AutoFire = env.u47.AutoFire
-                    }
-                end
-                
-                if InfiniteAmmo.Enabled then
-                    env.u47.FreeAmmo = true
+    local function applyMods()
+        for _, config in ipairs(gunConfigs) do
+            local orig = originalSettings[config]
+            if orig then
+                if GunModsModule.Enabled then
+                    if InfiniteAmmo.Enabled then 
+                        config.FreeAmmo = true 
+                    else 
+                        config.FreeAmmo = orig.FreeAmmo 
+                    end
+                    
+                    if NoRecoil.Enabled then 
+                        config.Recoil = 0
+                        config.CameraRecoil = 0 
+                    else 
+                        config.Recoil = orig.Recoil
+                        config.CameraRecoil = orig.CameraRecoil 
+                    end
+                    
+                    if NoSpread.Enabled then 
+                        config.Spread = 0
+                        config.MinSpread = 0
+                        config.MaxSpread = 0 
+                    else 
+                        config.Spread = orig.Spread
+                        config.MinSpread = orig.MinSpread
+                        config.MaxSpread = orig.MaxSpread 
+                    end
+                    
+                    if AutoFire.Enabled then 
+                        config.Auto = true
+                        config.FireType = "Auto" 
+                    else 
+                        config.Auto = orig.Auto
+                        config.FireType = orig.FireType 
+                    end
                 else
-                    env.u47.FreeAmmo = originalSettings[gunModel].FreeAmmo
-                end
-                
-                if NoRecoil.Enabled then
-                    env.u47.Recoil = 0
-                    env.u47.CameraRecoil = 0
-                else
-                    env.u47.Recoil = originalSettings[gunModel].Recoil
-                end
-                
-                if NoSpread.Enabled then
-                    env.u47.Spread = 0
-                    env.u47.MinSpread = 0
-                    env.u47.MaxSpread = 0
-                else
-                    env.u47.Spread = originalSettings[gunModel].Spread
-                end
-                
-                if AutoFire.Enabled then
-                    env.u47.Auto = true
-                    env.u47.FireType = "Auto"
-                end
-            end
-        end)
-    end
-
-    local function HookGuns()
-        local char = lplr.Character
-        if char then
-            for _, v in ipairs(char:GetChildren()) do
-                if v:IsA("Tool") and not hookedGuns[v] then
-                    hookedGuns[v] = true
-                    ApplyMods(v)
-                end
-            end
-        end
-        
-        local cam = workspace.CurrentCamera
-        if cam then
-            for _, v in ipairs(cam:GetChildren()) do
-                if v:IsA("Model") and not hookedGuns[v] then
-                    hookedGuns[v] = true
-                    ApplyMods(v)
+                    config.FreeAmmo = orig.FreeAmmo
+                    config.Recoil = orig.Recoil
+                    config.CameraRecoil = orig.CameraRecoil
+                    config.Spread = orig.Spread
+                    config.MinSpread = orig.MinSpread
+                    config.MaxSpread = orig.MaxSpread
+                    config.Auto = orig.Auto
+                    config.FireType = orig.FireType
                 end
             end
         end
@@ -105,25 +116,14 @@ run(function()
         Function = function(callback)
             if callback then
                 task.spawn(function()
+                    scanForGunConfigs()
                     while GunModsModule.Enabled do
-                        HookGuns()
-                        task.wait(1)
+                        applyMods()
+                        task.wait(0.5)
                     end
                 end)
             else
-                for gun, orig in pairs(originalSettings) do
-                    local gunScript = gun:FindFirstChild("GunScript") or gun:FindFirstChild("RealisticV4")
-                    if gunScript then
-                        local env = getsenv and getsenv(gunScript)
-                        if env and env.u47 then
-                            env.u47.FreeAmmo = orig.FreeAmmo
-                            env.u47.Recoil = orig.Recoil
-                            env.u47.Spread = orig.Spread
-                        end
-                    end
-                end
-                table.clear(hookedGuns)
-                table.clear(originalSettings)
+                applyMods()
             end
         end,
         Tooltip = "Modifies your gun's stats"
@@ -131,22 +131,22 @@ run(function()
     
     InfiniteAmmo = GunModsModule:CreateToggle({
         Name = "Infinite Ammo",
-        Function = function() end
+        Function = function() applyMods() end
     })
     
     NoRecoil = GunModsModule:CreateToggle({
         Name = "No Recoil",
-        Function = function() end
+        Function = function() applyMods() end
     })
     
     NoSpread = GunModsModule:CreateToggle({
         Name = "No Spread",
-        Function = function() end
+        Function = function() applyMods() end
     })
     
     AutoFire = GunModsModule:CreateToggle({
         Name = "Auto Fire",
-        Function = function() end
+        Function = function() applyMods() end
     })
 end)
 
@@ -154,38 +154,34 @@ end)
 run(function()
     local InstaKill
     
+    local function applyInstaKill()
+        for _, config in ipairs(gunConfigs) do
+            local orig = originalSettings[config]
+            if orig then
+                if InstaKill.Enabled then
+                    config.Damage = 999999
+                    config.Headshot = 999999
+                else
+                    config.Damage = orig.Damage
+                    config.Headshot = orig.Headshot
+                end
+            end
+        end
+    end
+
     InstaKill = vape.Categories.Combat:CreateModule({
         Name = "InstaKill",
         Function = function(callback)
             if callback then
                 task.spawn(function()
+                    scanForGunConfigs()
                     while InstaKill.Enabled do
-                        local char = lplr.Character
-                        local cam = workspace.CurrentCamera
-                        
-                        -- Find currently equipped gun config
-                        local currentGun = nil
-                        if cam then
-                            for _, v in ipairs(cam:GetChildren()) do
-                                if v:IsA("Model") and (v:FindFirstChild("GunScript") or v:FindFirstChild("RealisticV4")) then
-                                    currentGun = v
-                                    break
-                                end
-                            end
-                        end
-                        
-                        if currentGun then
-                            local gunScript = currentGun:FindFirstChild("GunScript") or currentGun:FindFirstChild("RealisticV4")
-                            local env = getsenv and getsenv(gunScript)
-                            if env and env.u47 then
-                                env.u47.Damage = 99999
-                                env.u47.Headshot = 99999
-                            end
-                        end
-                        
-                        task.wait(1)
+                        applyInstaKill()
+                        task.wait(0.5)
                     end
                 end)
+            else
+                applyInstaKill()
             end
         end,
         Tooltip = "Modifies gun damage to instantly kill zombies."
