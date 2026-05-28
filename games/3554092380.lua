@@ -61,7 +61,6 @@ run(function()
     local FastFireRate
     
     local function applyMods()
-        scanForGunConfigs()
         for _, config in ipairs(gunConfigs) do
             local orig = originalSettings[config]
             if orig then
@@ -100,8 +99,8 @@ run(function()
                         config.FireType = orig.FireType 
                     end
 
-                    if FastFireRate.Enabled then
-                        config.RPM = 0.01
+                    if FastFireRate.Value ~= 0.5 then
+                        config.RPM = FastFireRate.Value
                     else
                         config.RPM = orig.RPM
                     end
@@ -126,6 +125,7 @@ run(function()
         Function = function(callback)
             if callback then
                 task.spawn(function()
+                    scanForGunConfigs()
                     while GunModsModule.Enabled do
                         applyMods()
                         task.wait(1)
@@ -158,9 +158,13 @@ run(function()
         Function = function() applyMods() end
     })
     
-    FastFireRate = GunModsModule:CreateToggle({
-        Name = "Fast Fire Rate",
-        Function = function() applyMods() end
+    FastFireRate = GunModsModule:CreateSlider({
+        Name = "Fire Rate (RPM)",
+        Min = 0.01,
+        Max = 0.5,
+        Default = 0.01,
+        Decimal = 100,
+        Function = function(val) applyMods() end
     })
 end)
 
@@ -169,7 +173,6 @@ run(function()
     local InstaKill
     
     local function applyInstaKill()
-        scanForGunConfigs()
         for _, config in ipairs(gunConfigs) do
             local orig = originalSettings[config]
             if orig then
@@ -189,6 +192,7 @@ run(function()
         Function = function(callback)
             if callback then
                 task.spawn(function()
+                    scanForGunConfigs()
                     while InstaKill.Enabled do
                         applyInstaKill()
                         task.wait(1)
