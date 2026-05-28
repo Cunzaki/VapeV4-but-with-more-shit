@@ -73,8 +73,8 @@ run(function()
                     end
                     
                     if NoRecoil.Enabled then 
-                        config.Recoil = 0
-                        config.CameraRecoil = 0 
+                        config.Recoil = {0,0,0}
+                        config.CameraRecoil = {0,0,0}
                     else 
                         config.Recoil = orig.Recoil
                         config.CameraRecoil = orig.CameraRecoil 
