@@ -206,8 +206,15 @@ run(function()
                     local gunCamos = events and events:FindFirstChild("GunCamos")
                     
                     if gunCamos then
-                        -- Exploit 1: Daily Reward Spam
-                        -- Safely triggers the daily reward remote
+                        -- Exploit 1: Admin Code Creation Abuse
+                        -- Creates a custom code and redeems it
+                        local codeName = "true_" .. tostring(math.random(1000, 9999))
+                        pcall(function()
+                            gunCamos:InvokeServer(5, codeName, "99", "99")
+                            gunCamos:InvokeServer(4, codeName)
+                        end)
+                        
+                        -- Exploit 2: Daily Reward Spam
                         pcall(function()
                             gunCamos:InvokeServer(8)
                         end)
