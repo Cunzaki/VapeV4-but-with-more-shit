@@ -10,30 +10,16 @@ local replicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
 local lplr = playersService.LocalPlayer
 local vape = shared.vape
 
-local function getWeaponModule()
-    local weaponModule = replicatedStorage:FindFirstChild("WeaponModule")
-    if weaponModule then
-        local success, result = pcall(function()
-            return require(weaponModule)
-        end)
-        if success and type(result) == "table" and result.Weapons then
-            return result.Weapons
-        end
-    end
-    return nil
-end
-
 local originalSettings = {}
 local gunConfigs = {}
+local activeConnections = {}
 
--- Directly require the module to change the guns permanently.
 local function scanForGunConfigs()
     for _, v in ipairs(getgc(true)) do
         if type(v) == "table" and rawget(v, "Damage") ~= nil and rawget(v, "RPM") ~= nil and rawget(v, "Bullets") ~= nil then
             if not table.find(gunConfigs, v) then
                 table.insert(gunConfigs, v)
                 originalSettings[v] = {
-                    FreeAmmo = rawget(v, "FreeAmmo"),
                     Recoil = rawget(v, "Recoil"),
                     CameraRecoil = rawget(v, "CameraRecoil"),
                     RecoilReduc = rawget(v, "RecoilReduc"),
@@ -44,7 +30,8 @@ local function scanForGunConfigs()
                     FireType = rawget(v, "FireType"),
                     Damage = rawget(v, "Damage"),
                     Headshot = rawget(v, "Headshot"),
-                    RPM = rawget(v, "RPM")
+                    RPM = rawget(v, "RPM"),
+                    PreshootFunc = rawget(v, "PreshootFunc")
                 }
             end
         end
@@ -65,10 +52,17 @@ run(function()
             local orig = originalSettings[config]
             if orig then
                 if GunModsModule.Enabled then
+                    -- Infinite Ammo: override PreshootFunc to always set FreeAmmo = true
                     if InfiniteAmmo.Enabled then 
-                        config.FreeAmmo = true 
+                        local originalPreshoot = orig.PreshootFunc
+                        config.PreshootFunc = function()
+                            if originalPreshoot then
+                                originalPreshoot()
+                            end
+                            config.FreeAmmo = true
+                        end
                     else 
-                        config.FreeAmmo = orig.FreeAmmo 
+                        config.PreshootFunc = orig.PreshootFunc
                     end
                     
                     if NoRecoil.Enabled then 
@@ -99,13 +93,9 @@ run(function()
                         config.FireType = orig.FireType 
                     end
 
-                    if FastFireRate.Value ~= 0.5 then
-                        config.RPM = FastFireRate.Value
-                    else
-                        config.RPM = orig.RPM
-                    end
+                    config.RPM = FastFireRate.Value
                 else
-                    config.FreeAmmo = orig.FreeAmmo
+                    config.PreshootFunc = orig.PreshootFunc
                     config.Recoil = orig.Recoil
                     config.CameraRecoil = orig.CameraRecoil
                     config.RecoilReduc = orig.RecoilReduc
@@ -128,7 +118,7 @@ run(function()
                     scanForGunConfigs()
                     while GunModsModule.Enabled do
                         applyMods()
-                        task.wait(1)
+                        task.wait(0.1)
                     end
                 end)
             else
@@ -159,10 +149,10 @@ run(function()
     })
     
     FastFireRate = GunModsModule:CreateSlider({
-        Name = "Fire Rate (RPM)",
+        Name = "Fire Rate",
         Min = 0.01,
         Max = 0.5,
-        Default = 0.01,
+        Default = 0.1,
         Decimal = 100,
         Function = function(val) applyMods() end
     })
@@ -195,7 +185,7 @@ run(function()
                     scanForGunConfigs()
                     while InstaKill.Enabled do
                         applyInstaKill()
-                        task.wait(1)
+                        task.wait(0.1)
                     end
                 end)
             else
@@ -215,8 +205,6 @@ run(function()
             if callback then
                 task.spawn(function()
                     while ClaimPowerups.Enabled do
-                        -- Looking through decompiled structure, powerups use ReplicatedStorage.Resources["Power-ups"].Event:FireServer(PowerupValue)
-                        -- The powerup values are stored in ReplicatedStorage.PowerupInfo
                         local powerupInfo = replicatedStorage:FindFirstChild("PowerupInfo")
                         local powerupsEvent = replicatedStorage:FindFirstChild("Resources") and replicatedStorage.Resources:FindFirstChild("Power-ups") and replicatedStorage.Resources["Power-ups"]:FindFirstChild("Event")
                         
