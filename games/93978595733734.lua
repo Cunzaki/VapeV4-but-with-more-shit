@@ -91,8 +91,16 @@ local function CreateESPModule(name, collectionTag, fallbackNames, tooltip)
             if not obj:IsDescendantOf(workspace) then return end
             if Reference[obj] then return end
             
+            local adornee = obj
+            if obj:IsA("BasePart") then
+                local model = obj:FindFirstAncestorOfClass("Model")
+                if model and model ~= workspace then
+                    adornee = model
+                end
+            end
+            
             local cham = Instance.new("Highlight")
-            cham.Adornee = obj
+            cham.Adornee = adornee
             cham.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
             cham.FillColor = Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
             cham.OutlineColor = Color3.fromHSV(OutlineColor.Hue, OutlineColor.Sat, OutlineColor.Value)
