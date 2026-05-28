@@ -130,25 +130,54 @@ run(function()
             pcall(function()
                 local env = getsenv(gs)
                 if env and env.checkFirerate then
-                    -- checkFirerate has 4 upvalues: u107, u35(RPM), u49(RPM2), u54(Original Base RPM)
-                    local _, u54_val = getupvalue(env.checkFirerate, 4)
+                    -- checkFirerate is a global function inside the script's environment.
+                    -- It accesses u35, u49, u54 which are the actual RPM variables used in the firing loop!
                     
-                    if type(u54_val) == "number" then
+                    -- To ensure we aren't breaking anything, let's also hook the environment directly if possible
+                    -- but modifying the upvalues of `checkFirerate` is the cleanest way to reach the main file's locals.
+                    
+                    local _, current_u35 = getupvalue(env.checkFirerate, 2)
+                    local _, current_u49 = getupvalue(env.checkFirerate, 3)
+                    local _, current_u54 = getupvalue(env.checkFirerate, 4)
+                    
+                    -- Some exploits map debug.getupvalue differently, so we also scan the whole function's upvalues
+                    if current_u54 == nil then
+                        for i = 1, 10 do
+                            local name, val = getupvalue(env.checkFirerate, i)
+                            if name == "u54" or (type(val) == "number" and val > 0.01 and val < 1) then
+                                current_u54 = val
+                                break
+                            end
+                        end
+                    end
+                    
+                    if type(current_u54) == "number" then
                         local origRPM = originalU54s[gs]
-                        local currentExpectedRPM = origRPM and (origRPM / multiplier) or nil
                         
-                        -- If we haven't stored it yet, or if u54_val changed significantly (meaning equip() reset it)
-                        if not origRPM or math.abs(u54_val - currentExpectedRPM) > 0.0001 then
-                            originalU54s[gs] = u54_val
-                            origRPM = u54_val
+                        -- If we haven't stored it, or it changed significantly (meaning equip() reset it), store it
+                        if not origRPM or math.abs(current_u54 - (origRPM / multiplier)) > 0.0001 then
+                            if current_u54 > 0.001 then -- basic sanity check
+                                originalU54s[gs] = current_u54
+                                origRPM = current_u54
+                            end
                         end
                         
-                        local targetRPM = origRPM / multiplier
-                        
-                        -- Set u35, u49, u54 to the target RPM
-                        setupvalue(env.checkFirerate, 2, targetRPM)
-                        setupvalue(env.checkFirerate, 3, targetRPM)
-                        setupvalue(env.checkFirerate, 4, targetRPM)
+                        if origRPM then
+                            local targetRPM = origRPM / multiplier
+                            
+                            -- Set u35, u49, u54 to the target RPM directly
+                            for i = 1, 10 do
+                                local name, val = getupvalue(env.checkFirerate, i)
+                                if type(val) == "number" and val > 0.001 and val < 1 then
+                                    setupvalue(env.checkFirerate, i, targetRPM)
+                                end
+                            end
+                            
+                            -- Also set the main environment variables if they exist
+                            pcall(function() env.u35 = targetRPM end)
+                            pcall(function() env.u49 = targetRPM end)
+                            pcall(function() env.u54 = targetRPM end)
+                        end
                     end
                 end
             end)
