@@ -257,7 +257,14 @@ run(function()
                         -- Add a fake ImageLabel so ResortPerks counts it as a HUD icon
                         local img = Instance.new("ImageLabel")
                         img.Name = "ImageLabel"
+                        -- Set a generic icon to prevent errors if the game expects one
+                        img.Image = "rbxassetid://0" 
                         img.Parent = val
+                        
+                        -- Add an ImageButton too, as some perk scripts specifically look for that
+                        local btn = Instance.new("ImageButton")
+                        btn.Name = "ImageButton"
+                        btn.Parent = val
                         
                         -- Attempt to trigger the game's native UI update function for perks
                         pcall(function()
@@ -372,40 +379,47 @@ run(function()
     
     local function doClaimPowerups()
         -- With recent filtering updates, checking workspace for dropped powerups is more reliable
-        -- than relying purely on the PowerupInfo folder, which might not sync correctly.
-        -- Powerups are usually dropped in workspace under the 'Powerups' folder.
+        -- Powerups are stored inside workspace["Power-ups"] (sometimes as models or stringvalues locally synced)
+        -- AND the powerupInfo folder in replicated storage syncs their existence
         
-        local powerupsFolder = workspace:FindFirstChild("Powerups")
+        local powerupInfo = replicatedStorage:FindFirstChild("PowerupInfo")
+        local powerupsEvent = replicatedStorage:FindFirstChild("Resources") and replicatedStorage.Resources:FindFirstChild("Power-ups") and replicatedStorage.Resources["Power-ups"]:FindFirstChild("Event")
+        
+        if powerupInfo and powerupsEvent then
+            for _, powerupValue in ipairs(powerupInfo:GetChildren()) do
+                -- Check if this specific powerup is toggled on
+                local toggle = powerupToggles[powerupValue.Name]
+                if toggle and toggle.Enabled then
+                    pcall(function()
+                        powerupsEvent:FireServer(powerupValue)
+                    end)
+                end
+            end
+        end
+        
+        -- Fallback: check workspace drops
+        local powerupsFolder = workspace:FindFirstChild("Power-ups") or workspace:FindFirstChild("Powerups")
         if powerupsFolder then
             for _, drop in ipairs(powerupsFolder:GetChildren()) do
                 -- Check if this specific powerup is toggled on
                 local pName = drop.Name
                 local toggle = powerupToggles[pName]
                 if toggle and toggle.Enabled then
-                    -- Get the touch part of the powerup and fire its touch event locally to claim it
-                    local touchPart = drop:FindFirstChild("Hitbox") or drop:FindFirstChild("Part") or drop:FindFirstChildWhichIsA("BasePart")
-                    if touchPart then
+                    -- PowerupVisuals handles the touch logic on the client, but the actual claim goes through the same remote using the ObjectValue/StringValue 
+                    -- associated with the drop.
+                    -- If we find the drop in workspace, we can try firing the remote with it directly
+                    if powerupsEvent then
+                        pcall(function() powerupsEvent:FireServer(drop) end)
+                    end
+                    
+                    -- Also attempt local physical touch just in case
+                    local touchPart = drop:FindFirstChild("Hitbox") or drop:FindFirstChild("Part") or drop:FindFirstChildWhichIsA("BasePart") or drop
+                    if touchPart and touchPart:IsA("BasePart") and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") then
                         pcall(function()
-                            -- FireTouch is generally the best way to claim physical drops since the remote was filtered
                             firetouchinterest(lplr.Character.HumanoidRootPart, touchPart, 0)
                             firetouchinterest(lplr.Character.HumanoidRootPart, touchPart, 1)
                         end)
                     end
-                end
-            end
-        end
-        
-        -- Fallback to remote just in case
-        local powerupInfo = replicatedStorage:FindFirstChild("PowerupInfo")
-        local powerupsEvent = replicatedStorage:FindFirstChild("Resources") and replicatedStorage.Resources:FindFirstChild("Power-ups") and replicatedStorage.Resources["Power-ups"]:FindFirstChild("Event")
-        
-        if powerupInfo and powerupsEvent then
-            for _, powerupValue in ipairs(powerupInfo:GetChildren()) do
-                local toggle = powerupToggles[powerupValue.Name]
-                if toggle and toggle.Enabled then
-                    pcall(function()
-                        powerupsEvent:FireServer(powerupValue)
-                    end)
                 end
             end
         end
