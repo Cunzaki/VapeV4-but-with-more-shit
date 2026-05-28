@@ -12,7 +12,7 @@ local vape = shared.vape
 
 local originalSettings = {}
 local gunConfigs = {}
-local originalConvertd = nil
+local rpmUpvalueTargets = {}
 
 local function scanForGunConfigs()
     for _, v in ipairs(getgc(true)) do
@@ -37,6 +37,39 @@ local function scanForGunConfigs()
     end
 end
 
+-- Compatibility: use either getupvalue/setupvalue or debug.getupvalue/debug.setupvalue
+local getupvalue = getupvalue or debug.getupvalue
+local setupvalue = setupvalue or debug.setupvalue
+
+-- Scan for functions that have RPM-related upvalues (u35, u49, u54)
+local function scanForRPMUpvalues()
+    rpmUpvalueTargets = {}
+    for _, obj in ipairs(getgc(true)) do
+        if type(obj) == "function" then
+            local success, err = pcall(function()
+                -- Check upvalues for numeric values that are typical RPM values (0.01 to 1.0)
+                local upvalueIndex = 1
+                while true do
+                    local name, value = getupvalue(obj, upvalueIndex)
+                    if not name and not value then break end -- Exit loop if no more upvalues
+                    
+                    -- Look for upvalues that are numbers in the typical RPM range
+                    if type(value) == "number" and value >= 0.01 and value <= 1.0 then
+                        -- Check if this function has multiple such upvalues (likely RPM vars)
+                        table.insert(rpmUpvalueTargets, {
+                            func = obj,
+                            index = upvalueIndex,
+                            originalValue = value
+                        })
+                    end
+                    
+                    upvalueIndex = upvalueIndex + 1
+                end
+            end)
+        end
+    end
+end
+
 -- Get the Functions module from ReplicatedStorage
 local function getFunctionsModule()
     local success, result = pcall(function()
@@ -56,6 +89,7 @@ run(function()
     local function applyMods()
         local Functions = getFunctionsModule()
         
+        -- Modify config properties first
         for _, config in ipairs(gunConfigs) do
             local orig = originalSettings[config]
             if orig then
@@ -109,6 +143,22 @@ run(function()
                 end
             end
         end
+        
+        -- Now modify the upvalues (local variables) inside WeaponModule functions
+        if GunModsModule.Enabled then
+            for _, target in ipairs(rpmUpvalueTargets) do
+                pcall(function()
+                    setupvalue(target.func, target.index, FastFireRate.Value)
+                end)
+            end
+        else
+            -- Restore original upvalues
+            for _, target in ipairs(rpmUpvalueTargets) do
+                pcall(function()
+                    setupvalue(target.func, target.index, target.originalValue)
+                end)
+            end
+        end
     end
 
     GunModsModule = vape.Categories.Combat:CreateModule({
@@ -117,9 +167,10 @@ run(function()
             if callback then
                 task.spawn(function()
                     scanForGunConfigs()
+                    scanForRPMUpvalues()
                     while GunModsModule.Enabled do
                         applyMods()
-                        task.wait(0.1)
+                        task.wait(0.05) -- Even faster updates for fire rate
                     end
                 end)
             else
