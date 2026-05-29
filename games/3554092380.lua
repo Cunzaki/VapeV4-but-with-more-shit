@@ -546,32 +546,55 @@ run(function()
     })
 end)
 
--- Infinite Points (Remote Event Abuse)
+-- XP/Kills Spoofing (Auto-Farm)
 run(function()
-    local InfPoints
+    local XPSpoofer
     
-    InfPoints = vape.Categories.Combat:CreateModule({
-        Name = "Infinite Points",
+    XPSpoofer = vape.Categories.Combat:CreateModule({
+        Name = "XP/Kills Spoofer",
         Function = function(callback)
             if callback then
                 task.spawn(function()
-                    -- The ETC event is actually located in game.Lighting.ETC or game.ReplicatedStorage.Events.ETC depending on the game mode
+                    -- The game tracks kills locally before syncing them to the server using the ETC remote
+                    -- and the 'LimbLoss' or 'AddRLL' keys, as well as giving local money via 'Rewards8'
                     local etcEvent = game:GetService("Lighting"):FindFirstChild("ETC") or (replicatedStorage:FindFirstChild("Events") and replicatedStorage.Events:FindFirstChild("ETC"))
+                    local HandleDataModule = nil
                     
-                    while InfPoints.Enabled do
-                        if etcEvent then
-                            -- Another method to get points is via the "Rewards8" event but the argument format is tricky
-                            -- Some variants use { 0, amount, "Rewards8\240\159\144\153" }
+                    pcall(function()
+                        HandleDataModule = require(replicatedStorage:WaitForChild("HandleData"))
+                    end)
+                    
+                    while XPSpoofer.Enabled do
+                        -- 1. Exploit Local Data Tracker to farm XP/Kills
+                        -- The game uses HandleData.IncreaseStat and HandleData.AwardXP locally
+                        if HandleDataModule then
                             pcall(function()
+                                if HandleDataModule.IncreaseStat then
+                                    HandleDataModule.IncreaseStat(lplr, "Kills", 50)
+                                    HandleDataModule.IncreaseStat(lplr, "Headshots", 50)
+                                end
+                                if HandleDataModule.AwardXP then
+                                    -- AwardXP(player, amount, reason, bonus)
+                                    HandleDataModule.AwardXP(lplr, 500, "Exploiting", 100)
+                                end
+                            end)
+                        end
+                        
+                        -- 2. Spam Server Reward Syncs
+                        -- The ETC remote is used to sync limb loss and reward points to the server
+                        if etcEvent then
+                            pcall(function()
+                                -- Spamming the server to think we are getting rewards
                                 etcEvent:FireServer({ 0, 500, "Rewards8\240\159\144\153" })
                             end)
                         end
+                        
                         task.wait(0.1)
                     end
                 end)
             end
         end,
-        Tooltip = "Abuses the reward remote to rapidly give you points."
+        Tooltip = "Rapidly spoofs kills, headshots, and XP locally and attempts to sync them."
     })
 end)
 
