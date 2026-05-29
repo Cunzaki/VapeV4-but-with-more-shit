@@ -555,8 +555,6 @@ run(function()
         Function = function(callback)
             if callback then
                 task.spawn(function()
-                    -- The game tracks kills locally before syncing them to the server using the ETC remote
-                    -- and the 'LimbLoss' or 'AddRLL' keys, as well as giving local money via 'Rewards8'
                     local etcEvent = game:GetService("Lighting"):FindFirstChild("ETC") or (replicatedStorage:FindFirstChild("Events") and replicatedStorage.Events:FindFirstChild("ETC"))
                     local HandleDataModule = nil
                     
@@ -566,7 +564,6 @@ run(function()
                     
                     while XPSpoofer.Enabled do
                         -- 1. Exploit Local Data Tracker to farm XP/Kills
-                        -- The game uses HandleData.IncreaseStat and HandleData.AwardXP locally
                         if HandleDataModule then
                             pcall(function()
                                 if HandleDataModule.IncreaseStat then
@@ -574,32 +571,25 @@ run(function()
                                     HandleDataModule.IncreaseStat(lplr, "Headshots", 50)
                                 end
                                 if HandleDataModule.AwardXP then
-                                    -- AwardXP(player, amount, reason, bonus)
                                     HandleDataModule.AwardXP(lplr, 500, "Exploiting", 100)
                                 end
                             end)
                         end
                         
-                        -- 2. Spam Server Reward Syncs
-                        -- The ETC remote is used to sync limb loss and reward points to the server
-                        if etcEvent then
-                            pcall(function()
-                                -- Spamming the server to think we are getting rewards (Kills/Headshots usually trigger this)
-                                -- 1 = Headshot kill flag, 500 = amount of points, nil = part hit
-                                etcEvent:FireServer({ 1, 500, "Rewards8\240\159\144\153", nil })
-                                
-                                -- Also we can tell the server to damage a zombie with extreme damage, resulting in an instant kill if there are zombies spawned
-                                local zombies = workspace:FindFirstChild("Zombies")
-                                if zombies then
-                                    for _, z in ipairs(zombies:GetChildren()) do
-                                        local hum = z:FindFirstChild("Humanoid")
-                                        if hum and hum.Health > 0 then
-                                            -- The proper array for Damage5 is: { Humanoid, DamageAmount, "Damage5...", false, false, false, nil, Vector3, nil }
-                                            etcEvent:FireServer({ hum, math.huge, "Damage5\240\159\144\153", false, false, false, nil, Vector3.new(0, 0, 0), nil })
-                                        end
-                                    end
+                        -- 2. Direct Zombie Execution (Real Kills + Server XP)
+                        -- Instead of trying to forge a generic ETC request, we find real spawned zombies
+                        -- and hit them with infinite damage using the specific signature the server expects
+                        local zombies = workspace:FindFirstChild("Zombies")
+                        if zombies and etcEvent then
+                            for _, z in ipairs(zombies:GetChildren()) do
+                                local hum = z:FindFirstChild("Humanoid")
+                                if hum and hum.Health > 0 then
+                                    pcall(function()
+                                        -- { Zombie, Damage, "Damage5(logo)", HeadshotBool, false, false, PartHit, DirectionVector, {} }
+                                        etcEvent:FireServer({ hum, math.huge, "Damage5\240\159\144\153", true, false, false, z:FindFirstChild("Head") or z:FindFirstChild("Torso"), Vector3.new(0, -1, 0), {} })
+                                    end)
                                 end
-                            end)
+                            end
                         end
                         
                         task.wait(0.2)
@@ -607,7 +597,7 @@ run(function()
                 end)
             end
         end,
-        Tooltip = "Rapidly spoofs kills, headshots, and XP locally and attempts to sync them."
+        Tooltip = "Rapidly spoofs kills, headshots, and XP by locally exploiting data and executing all zombies."
     })
 end)
 
