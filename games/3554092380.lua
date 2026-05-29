@@ -585,8 +585,10 @@ run(function()
                                 local hum = z:FindFirstChild("Humanoid")
                                 if hum and hum.Health > 0 then
                                     pcall(function()
-                                        -- { Zombie, Damage, "Damage5(logo)", HeadshotBool, false, false, PartHit, DirectionVector, {} }
-                                        etcEvent:FireServer({ hum, math.huge, "Damage5\240\159\144\153", true, false, false, z:FindFirstChild("Head") or z:FindFirstChild("Torso"), Vector3.new(0, -1, 0), {} })
+                                        -- Proper format from decompiled knife script:
+                                        -- { Humanoid, Damage, "Damage5(logo)", nil, nil, nil, nil, nil, {["KnifeHit"] = 0} }
+                                        -- Or generic format: { Humanoid, Damage, "Damage5(logo)", nil, nil, nil, nil, nil, {["Base"] = math.huge} }
+                                        etcEvent:FireServer({ hum, math.huge, "Damage5\240\159\144\153", nil, nil, nil, nil, nil, {["KnifeHit"] = 0} })
                                     end)
                                 end
                             end
@@ -598,6 +600,34 @@ run(function()
             end
         end,
         Tooltip = "Rapidly spoofs kills, headshots, and XP by locally exploiting data and executing all zombies."
+    })
+end)
+
+-- Infinite Points (Remote Event Abuse)
+run(function()
+    local InfPoints
+    
+    InfPoints = vape.Categories.Combat:CreateModule({
+        Name = "Infinite Points",
+        Function = function(callback)
+            if callback then
+                task.spawn(function()
+                    -- The ETC event is actually located in game.Lighting.ETC or game.ReplicatedStorage.Events.ETC depending on the game mode
+                    local etcEvent = game:GetService("Lighting"):FindFirstChild("ETC") or (replicatedStorage:FindFirstChild("Events") and replicatedStorage.Events:FindFirstChild("ETC"))
+                    
+                    while InfPoints.Enabled do
+                        if etcEvent then
+                            pcall(function()
+                                -- Spamming the server to think we are getting rewards
+                                etcEvent:FireServer({ 0, 500, "Rewards8\240\159\144\153" })
+                            end)
+                        end
+                        task.wait(0.1)
+                    end
+                end)
+            end
+        end,
+        Tooltip = "Abuses the reward remote to rapidly give you points."
     })
 end)
 
