@@ -584,12 +584,24 @@ run(function()
                         -- The ETC remote is used to sync limb loss and reward points to the server
                         if etcEvent then
                             pcall(function()
-                                -- Spamming the server to think we are getting rewards
-                                etcEvent:FireServer({ 0, 500, "Rewards8\240\159\144\153" })
+                                -- Spamming the server to think we are getting rewards (Kills/Headshots usually trigger this)
+                                -- 1 = Headshot kill flag, 500 = amount of points, nil = part hit
+                                etcEvent:FireServer({ 1, 500, "Rewards8\240\159\144\153", nil })
+                                
+                                -- Also we can tell the server to damage a zombie with extreme damage, resulting in an instant kill if there are zombies spawned
+                                local zombies = workspace:FindFirstChild("Zombies")
+                                if zombies then
+                                    for _, z in ipairs(zombies:GetChildren()) do
+                                        local hum = z:FindFirstChild("Humanoid")
+                                        if hum and hum.Health > 0 then
+                                            etcEvent:FireServer({ hum, math.huge, "Damage5\240\159\144\153", false, false, false, nil, Vector3.new(), {} })
+                                        end
+                                    end
+                                end
                             end)
                         end
                         
-                        task.wait(0.1)
+                        task.wait(0.2)
                     end
                 end)
             end
