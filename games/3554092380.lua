@@ -594,7 +594,8 @@ run(function()
                                     for _, z in ipairs(zombies:GetChildren()) do
                                         local hum = z:FindFirstChild("Humanoid")
                                         if hum and hum.Health > 0 then
-                                            etcEvent:FireServer({ hum, math.huge, "Damage5\240\159\144\153", false, false, false, nil, Vector3.new(), {} })
+                                            -- The proper array for Damage5 is: { Humanoid, DamageAmount, "Damage5...", false, false, false, nil, Vector3, nil }
+                                            etcEvent:FireServer({ hum, math.huge, "Damage5\240\159\144\153", false, false, false, nil, Vector3.new(0, 0, 0), nil })
                                         end
                                     end
                                 end
