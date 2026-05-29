@@ -3870,6 +3870,7 @@ run(function()
 	local Targets
 	local TargetPart
 	local Expand
+	local Visualize
 	local modified = {}
 	
 	HitBoxes = vape.Categories.Blatant:CreateModule({
@@ -3883,16 +3884,22 @@ run(function()
 							if not Targets.NPCs.Enabled and v.NPC then continue end
 							local part = v[TargetPart.Value]
 							if not modified[part] then
-								modified[part] = part.Size
+								modified[part] = {Size = part.Size, Transparency = part.Transparency}
 							end
-							part.Size = modified[part] + Vector3.new(Expand.Value, Expand.Value, Expand.Value)
+							part.Size = modified[part].Size + Vector3.new(Expand.Value, Expand.Value, Expand.Value)
+							if Visualize.Enabled then
+								part.Transparency = 0.5
+							else
+								part.Transparency = modified[part].Transparency
+							end
 						end
 					end
 					task.wait()
 				until not HitBoxes.Enabled
 			else
 				for i, v in modified do
-					i.Size = v
+					i.Size = v.Size
+					i.Transparency = v.Transparency
 				end
 				table.clear(modified)
 			end
@@ -3907,11 +3914,22 @@ run(function()
 	Expand = HitBoxes:CreateSlider({
 		Name = 'Expand amount',
 		Min = 0,
-		Max = 2,
+		Max = 5,
 		Decimal = 10,
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end
+	})
+	Visualize = HitBoxes:CreateToggle({
+		Name = 'Visualize',
+		Function = function(callback)
+			if not callback then
+				for i, v in modified do
+					i.Transparency = v.Transparency
+				end
+			end
+		end,
+		Tooltip = 'Shows the expanded hitboxes.'
 	})
 end)
 	
