@@ -312,10 +312,26 @@ run(function()
     end
 end)
 
--- No Env/Explosive Damage
+-- No Env/Explosive/Gas Damage
 run(function()
     local NoEnvDamage
     local origExplosion = nil
+    local hazardNames = {
+        ["Lava"] = true,
+        ["Toxic Waste"] = true,
+        ["Gas"] = true,
+        ["Smoke"] = true,
+        ["NovaGas"] = true,
+        ["CrawlerGas"] = true,
+        ["Acid"] = true,
+        ["Fire"] = true
+    }
+    
+    local function disableHazard(v)
+        if v:IsA("BasePart") and hazardNames[v.Name] then
+            v.CanTouch = false
+        end
+    end
     
     NoEnvDamage = vape.Categories.Combat:CreateModule({
         Name = "No Env Damage",
@@ -323,6 +339,7 @@ run(function()
             if callback then
                 task.spawn(function()
                     -- Disable explosive damage via hooking Functions.Explosion
+                    local FunctionsModule = getFunctionsModule()
                     if FunctionsModule and FunctionsModule.Explosion and not origExplosion then
                         local hookfunction = hookfunction or detour_function
                         if hookfunction then
@@ -338,24 +355,31 @@ run(function()
                         end
                     end
                     
-                    while NoEnvDamage.Enabled do
-                        local lavaFolder = workspace:FindFirstChild("Lava")
-                        if lavaFolder then
-                            for _, v in ipairs(lavaFolder:GetDescendants()) do
-                                if v:IsA("BasePart") and v.CanTouch then
-                                    v.CanTouch = false
-                                end
-                            end
+                    -- Hook dynamically added hazards
+                    local connection = workspace.DescendantAdded:Connect(function(v)
+                        if NoEnvDamage.Enabled then
+                            task.wait() -- let properties initialize
+                            disableHazard(v)
                         end
+                    end)
+                    
+                    while NoEnvDamage.Enabled do
+                        -- Scan workspace for existing hazards
+                        for _, v in ipairs(workspace:GetDescendants()) do
+                            disableHazard(v)
+                        end
+                        
                         task.wait(1)
                     end
+                    
+                    connection:Disconnect()
                 end)
             else
                 -- We leave CanTouch false since reverting it might be dangerous, 
                 -- and disabling it doesn't hurt normal gameplay
             end
         end,
-        Tooltip = "Disables Lava, Toxic Waste, Fire, and Explosive damage."
+        Tooltip = "Disables Lava, Toxic Waste, Fire, Gas, Smoke, and Explosive damage."
     })
 end)
 
