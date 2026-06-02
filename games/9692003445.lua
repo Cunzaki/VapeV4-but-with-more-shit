@@ -31,7 +31,7 @@ end
 
 local playersService = cloneref(game:GetService('Players'))
 local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
-local runService = cloneref(game:GetService('RunService'))
+local workspaceService = cloneref(game:GetService('Workspace'))
 
 local lplr = playersService.LocalPlayer
 local vape = shared.vape
@@ -57,6 +57,10 @@ local function waitRemote(parent, name, timeout)
 	return ok and inst or nil
 end
 
+local function getHalloweenRemotes()
+	return replicatedStorage:FindFirstChild('Halloween23_Remotes')
+end
+
 local function getHalloweenClientScript()
 	return lplr.PlayerScripts:FindFirstChild('Halloween24_Client')
 end
@@ -65,73 +69,275 @@ local function getCharacter()
 	return lplr.Character
 end
 
-local function getHead()
+local function getHumanoidRoot()
 	local char = getCharacter()
-	return char and char:FindFirstChild('Head')
+	return char and (char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('Head'))
 end
 
-local function getHalloweenRemotes()
-	return replicatedStorage:FindFirstChild('Halloween23_Remotes')
+local function isInCharacter()
+	return replicatedStorage:GetAttribute('IsInCharacter') == true
 end
 
-local function findHalloweenRemote(name)
+-- client_message_receiver: message_sent.Event -> FireServer(text) when IsInCharacter
+local function fireRpBubble(text, mode)
+	if mode ~= 'Direct' and not isInCharacter() then
+		return false, 'not_in_character'
+	end
+	if mode ~= 'Direct' then
+		local bindable = replicatedStorage:FindFirstChild('message_sent')
+		if bindable and bindable:IsA('BindableEvent') then
+			pcall(function()
+				bindable:Fire(text)
+			end)
+			return true
+		end
+	end
+	local remote = replicatedStorage:FindFirstChild('server_message_sent')
+	if remote then
+		pcall(function()
+			remote:FireServer(text)
+		end)
+		return true
+	end
+	return false, 'missing_remote'
+end
+
+local function findWaterVfxTemplate()
+	local searchModels = {
+		'Halloween23_Necromancer',
+		'Halloween23_Alchemist',
+		'Halloween23_Hydromancer'
+	}
+	for _, modelName in ipairs(searchModels) do
+		local model = workspaceService:FindFirstChild(modelName)
+		if model then
+			local liquid = model:FindFirstChild('CAULDRON_LIQUID', true)
+				or model:FindFirstChild('LIQUID', true)
+			if liquid then
+				return liquid
+			end
+			local water = model:FindFirstChild('WATER', true)
+			if water then
+				return water
+			end
+		end
+	end
+	return nil
+end
+
+local function burstWaterVfx(root)
+	local template = findWaterVfxTemplate()
+	if not template or not root then
+		return false
+	end
+	local emitterNames = { 'WATER SPRAY', 'MAIN SPRAY', 'RIPPLE', 'GLOW', 'SPECKS', 'SPIKES', 'FLAMEPILLAR' }
+	local any = false
+	for _, name in ipairs(emitterNames) do
+		local src = template:FindFirstChild(name, true)
+		if src and src:IsA('ParticleEmitter') then
+			any = true
+			local clone = src:Clone()
+			clone.Enabled = true
+			clone.Parent = root
+			pcall(function()
+				clone:Emit(math.max(clone:GetAttribute('EmitCount') or 12, 8))
+			end)
+			task.delay(1.25, function()
+				pcall(function()
+					clone:Destroy()
+				end)
+			end)
+		end
+	end
+	for _, child in ipairs(template:GetChildren()) do
+		if child:IsA('Sound') then
+			any = true
+			local snd = child:Clone()
+			snd.Parent = root
+			snd.Looped = false
+			snd:Play()
+			task.delay(snd.TimeLength > 0 and snd.TimeLength + 0.2 or 2, function()
+				pcall(function()
+					snd:Destroy()
+				end)
+			end)
+		end
+	end
+	return any
+end
+
+local function doSwimSplash()
+	local char = getCharacter()
+	local hum = char and char:FindFirstChildOfClass('Humanoid')
+	local root = getHumanoidRoot()
+	if not hum or not root then
+		return false
+	end
+	pcall(function()
+		hum:ChangeState(Enum.HumanoidStateType.Swimming)
+	end)
+	local splash = root:FindFirstChild('VapeSplashSound')
+	if not splash then
+		splash = Instance.new('Sound')
+		splash.Name = 'VapeSplashSound'
+		splash.SoundId = 'rbxasset://sounds/impact_water.mp3'
+		splash.RollOffMaxDistance = 120
+		splash.RollOffMinDistance = 5
+		splash.EmitterSize = 10
+		splash.Parent = root
+	end
+	splash.Volume = 1
+	splash.TimePosition = 0
+	splash:Play()
+	return true
+end
+
+local function doTerramancerStun()
 	local folder = getHalloweenRemotes()
-	return folder and folder:FindFirstChild(name)
+	if folder then
+		local remote = folder:FindFirstChild('Terramancer_Stunned')
+		if remote then
+			pcall(function()
+				remote:FireServer()
+			end)
+		end
+	end
+	local char = getCharacter()
+	if not char then
+		return
+	end
+	local hum = char:FindFirstChildOfClass('Humanoid')
+	local torso = char:FindFirstChild('UpperTorso') or char:FindFirstChild('Torso')
+	if not hum or not torso then
+		return
+	end
+	pcall(function()
+		hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
+		hum.PlatformStand = true
+		hum:ChangeState(Enum.HumanoidStateType.Ragdoll)
+		torso.AssemblyLinearVelocity = Vector3.new(math.random(-250, -100), 50, math.random(-150, 150))
+		torso.AssemblyAngularVelocity = Vector3.new(
+			math.rad(math.random(-1000, 1000)),
+			math.rad(math.random(-1000, 1000)),
+			math.rad(math.random(-1000, 1000))
+		)
+	end)
 end
 
--- RP chat bubbles above your character (server_message_sent -> OnClientEvent -> Chat on all clients)
+local function stopTerramancerStun()
+	local char = getCharacter()
+	local hum = char and char:FindFirstChildOfClass('Humanoid')
+	if hum then
+		pcall(function()
+			hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+			hum.PlatformStand = false
+			hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+		end)
+	end
+end
+
+local ghostAcquireNames = {}
+for _, color in ipairs({ 'Red', 'Green', 'Blue' }) do
+	table.insert(ghostAcquireNames, color)
+	for i = 1, 4 do
+		table.insert(ghostAcquireNames, color .. '_' .. i)
+	end
+end
+
+-- server_message_sent -> OnClientEvent(player, message) -> Chat:Chat on all clients
 run(function()
 	local RPBubbleSpam
 	local Delay
+	local CustomText
+	local SendMode
+	local warnedCharacter = false
+	local warnedRemote = false
+
+	local presetLines = {
+		'...',
+		'hello?',
+		'can you hear me',
+		'lag?',
+		'brb',
+		'what',
+		'stop',
+		'help',
+		'???',
+		'ok',
+		'AAAAAAAA',
+		'why is everyone staring',
+		'*splash*',
+		'help im drowning',
+		'water water water'
+	}
+	local presetIndex = 1
 
 	RPBubbleSpam = minigames:CreateModule({
 		Name = 'RP Bubble Spam',
 		Function = function(enabled)
 			if enabled then
-				local remote = waitRemote(replicatedStorage, 'server_message_sent')
+				local remote = replicatedStorage:FindFirstChild('server_message_sent')
+				if not remote then
+					remote = waitRemote(replicatedStorage, 'server_message_sent', 4)
+				end
 				if not remote then
 					notif('RP Bubble Spam', 'server_message_sent missing', 5, 'warning')
 					disableModule(RPBubbleSpam)
 					return
 				end
-				local lines = {
-					'...',
-					'hello?',
-					'can you hear me',
-					'lag?',
-					'brb',
-					'what',
-					'stop',
-					'help',
-					'???',
-					'ok'
-				}
-				local index = 1
+				if optValue(SendMode, 'Game path') == 'Game path' and not isInCharacter() then
+					notif('RP Bubble Spam', 'Game path needs IsInCharacter', 6, 'warning')
+				end
 				task.spawn(function()
 					while RPBubbleSpam.Enabled do
-						if replicatedStorage:GetAttribute('IsInCharacter') then
-							pcall(function()
-								remote:FireServer(lines[index])
-							end)
-							index = index % #lines + 1
+						local text = CustomText and CustomText.Value or ''
+						if text == '' then
+							text = presetLines[presetIndex]
+							presetIndex = presetIndex % #presetLines + 1
 						end
-						task.wait(math.max(optValue(Delay, 0.35), 0.05))
+						local mode = optValue(SendMode, 'Game path')
+						local ok, reason = fireRpBubble(text, mode)
+						if not ok then
+							if reason == 'not_in_character' and not warnedCharacter then
+								warnedCharacter = true
+								notif('RP Bubble Spam', 'Use Direct mode or spawn in role', 5, 'warning')
+							elseif reason == 'missing_remote' and not warnedRemote then
+								warnedRemote = true
+								notif('RP Bubble Spam', 'server_message_sent missing', 5, 'warning')
+								disableModule(RPBubbleSpam)
+								break
+							end
+						else
+							warnedCharacter = false
+						end
+						task.wait(math.max(optValue(Delay, 0.25), 0.05))
 					end
 				end)
+			else
+				warnedCharacter = false
+				warnedRemote = false
 			end
 		end,
-		Tooltip = 'Spams roleplay bubbles via ReplicatedStorage.server_message_sent (visible to nearby players). Needs IsInCharacter.'
+		Tooltip = 'TRUE server broadcast: FireServer(string) -> Chat bubbles on every client (client_message_receiver). Game path uses message_sent bindable like typing RP chat.'
 	})
 	Delay = RPBubbleSpam:CreateSlider({
 		Name = 'Delay',
 		Min = 0.05,
 		Max = 3,
-		Default = 0.35,
+		Default = 0.25,
 		Suffix = 's'
+	})
+	SendMode = RPBubbleSpam:CreateDropdown({
+		Name = 'Send Path',
+		List = { 'Game path', 'Direct' }
+	})
+	CustomText = RPBubbleSpam:CreateTextBox({
+		Name = 'Custom Bubble',
+		Placeholder = 'leave empty for presets'
 	})
 end)
 
--- Halloween death/emote animations from Halloween24_Client script (replicate on your character)
+-- Halloween24_Client Animation children on Humanoid (replicates to nearby players)
 run(function()
 	local HalloweenAnimSpam
 	local Delay
@@ -141,7 +347,9 @@ run(function()
 	local function refreshAnimations()
 		table.clear(loaded)
 		local scriptRef = getHalloweenClientScript()
-		if not scriptRef then return end
+		if not scriptRef then
+			return
+		end
 		for _, child in ipairs(scriptRef:GetChildren()) do
 			if child:IsA('Animation') then
 				table.insert(loaded, child.Name)
@@ -163,11 +371,12 @@ run(function()
 		Name = 'Halloween Anim Spam',
 		Function = function(enabled)
 			if enabled then
+				refreshAnimations()
 				if AnimPick then
 					AnimPick:Change(getAnimationList())
 				end
 				if #loaded == 0 then
-					notif('Halloween Anim Spam', 'No Animation children on Halloween24_Client', 5, 'warning')
+					notif('Halloween Anim Spam', 'Halloween24_Client animations missing', 5, 'warning')
 					disableModule(HalloweenAnimSpam)
 					return
 				end
@@ -213,7 +422,7 @@ run(function()
 				end)
 			end
 		end,
-		Tooltip = 'Loops Halloween24_Client Animation instances on your character (others see the anims).'
+		Tooltip = 'Nearby replication: loops Halloween24_Client animations on YOUR Humanoid. Other players see your character emote.'
 	})
 	Delay = HalloweenAnimSpam:CreateSlider({
 		Name = 'Delay',
@@ -224,13 +433,13 @@ run(function()
 	})
 	AnimPick = HalloweenAnimSpam:CreateDropdown({
 		Name = 'Animation',
-		List = {'Random'}
+		List = getAnimationList()
 	})
 end)
 
--- Loud replicated sounds parented to Head (Halloween23_Remotes + Halloween24_Client Sounds)
+-- Halloween23_Remotes + Halloween24_Client sounds (Terramancer_Stone etc. from decompile line 718-724)
 run(function()
-	local HalloweenSoundSpam
+	local HalloweenSFXSpam
 	local Delay
 	local Volume
 	local SoundPick
@@ -238,25 +447,19 @@ run(function()
 	local soundNames = {}
 	local function refreshSounds()
 		table.clear(soundNames)
-		local folder = replicatedStorage:FindFirstChild('Halloween23_Remotes')
-		if folder then
-			for _, v in ipairs(folder:GetChildren()) do
-				if v:IsA('Sound') then
-					table.insert(soundNames, 'Remote:' .. v.Name)
-				elseif v:IsA('Model') or v:IsA('BasePart') then
-					for _, d in ipairs(v:GetDescendants()) do
-						if d:IsA('Sound') then
-							table.insert(soundNames, v.Name .. '/' .. d.Name)
-						end
-					end
-				end
-			end
-		end
 		local scriptRef = getHalloweenClientScript()
 		if scriptRef then
 			for _, v in ipairs(scriptRef:GetChildren()) do
 				if v:IsA('Sound') then
 					table.insert(soundNames, 'Client:' .. v.Name)
+				end
+			end
+		end
+		local folder = getHalloweenRemotes()
+		if folder then
+			for _, v in ipairs(folder:GetChildren()) do
+				if v:IsA('Sound') then
+					table.insert(soundNames, 'Remote:' .. v.Name)
 				end
 			end
 		end
@@ -270,201 +473,293 @@ run(function()
 		return list
 	end
 
-	refreshSounds()
-
 	local function resolveSound(name)
-		if name:sub(1, 7) == 'Remote:' then
-			local folder = replicatedStorage:FindFirstChild('Halloween23_Remotes')
-			return folder and folder:FindFirstChild(name:sub(8))
-		end
 		if name:sub(1, 7) == 'Client:' then
 			local scriptRef = getHalloweenClientScript()
 			return scriptRef and scriptRef:FindFirstChild(name:sub(8))
 		end
-		local slash = name:find('/')
-		if slash then
-			local folder = replicatedStorage:FindFirstChild('Halloween23_Remotes')
-			local parent = folder and folder:FindFirstChild(name:sub(1, slash - 1))
-			return parent and parent:FindFirstChild(name:sub(slash + 1), true)
+		if name:sub(1, 7) == 'Remote:' then
+			local folder = getHalloweenRemotes()
+			return folder and folder:FindFirstChild(name:sub(8))
 		end
 	end
 
-	HalloweenSoundSpam = minigames:CreateModule({
-		Name = 'Halloween Sound Spam',
+	local function playReplicatedSound(template, vol)
+		local root = getHumanoidRoot()
+		if not root or not template or not template:IsA('Sound') then
+			return
+		end
+		local clone = template:Clone()
+		clone.Volume = vol
+		clone.Looped = false
+		clone.RollOffMaxDistance = 1000
+		clone.RollOffMinDistance = 5
+		clone.EmitterSize = math.max(clone.EmitterSize, 12)
+		clone.Parent = root
+		clone:Play()
+		local lifetime = clone.TimeLength > 0 and clone.TimeLength + 0.25 or 2
+		task.delay(lifetime, function()
+			pcall(function()
+				clone:Destroy()
+			end)
+		end)
+	end
+
+	refreshSounds()
+
+	HalloweenSFXSpam = minigames:CreateModule({
+		Name = 'Halloween SFX Spam',
 		Function = function(enabled)
 			if enabled then
+				refreshSounds()
 				if SoundPick then
 					SoundPick:Change(getSoundList())
 				end
 				if #soundNames == 0 then
-					notif('Halloween Sound Spam', 'No Halloween sounds found', 5, 'warning')
-					disableModule(HalloweenSoundSpam)
+					notif('Halloween SFX Spam', 'No Halloween sounds found', 5, 'warning')
+					disableModule(HalloweenSFXSpam)
 					return
 				end
 				task.spawn(function()
-					while HalloweenSoundSpam.Enabled do
-						local head = getHead()
+					while HalloweenSFXSpam.Enabled do
 						local pick = optValue(SoundPick, 'Random')
 						if pick == 'Random' then
 							pick = soundNames[math.random(1, #soundNames)]
 						end
-						local template = resolveSound(pick)
-						if head and template and template:IsA('Sound') then
-							pcall(function()
-								local clone = template:Clone()
-								clone.Volume = optValue(Volume, 100) / 100
-								clone.RollOffMaxDistance = 500
-								clone.Parent = head
-								clone:Play()
-								task.delay(clone.TimeLength > 0 and clone.TimeLength + 0.2 or 2, function()
-									pcall(function()
-										clone:Destroy()
-									end)
-								end)
-							end)
-						end
-						task.wait(math.max(optValue(Delay, 0.25), 0.05))
+						pcall(function()
+							playReplicatedSound(resolveSound(pick), optValue(Volume, 100) / 100)
+						end)
+						task.wait(math.max(optValue(Delay, 0.2), 0.05))
 					end
 				end)
 			end
 		end,
-		Tooltip = 'Plays cloned Halloween23_Remotes / Halloween24_Client sounds on your Head (others hear them).'
+		Tooltip = 'Clones Halloween23_Remotes / Halloween24_Client sounds onto HumanoidRootPart (same pattern as Terramancer_Stone in decompile). Nearby 3D audio; not a server-targeted remote.'
 	})
-	Delay = HalloweenSoundSpam:CreateSlider({
+	Delay = HalloweenSFXSpam:CreateSlider({
 		Name = 'Delay',
 		Min = 0.05,
 		Max = 3,
-		Default = 0.25,
+		Default = 0.2,
 		Suffix = 's'
 	})
-	Volume = HalloweenSoundSpam:CreateSlider({
+	Volume = HalloweenSFXSpam:CreateSlider({
 		Name = 'Volume',
 		Min = 10,
 		Max = 100,
 		Default = 100,
 		Suffix = '%'
 	})
-	SoundPick = HalloweenSoundSpam:CreateDropdown({
+	SoundPick = HalloweenSFXSpam:CreateDropdown({
 		Name = 'Sound',
-		List = {'Random'}
+		List = getSoundList()
 	})
 end)
 
--- Ghost_Acquired remote (Ghost.ModuleScript.lua:143) — ghost names Red/Green/Blue from GhostSpawner
+-- No FireServer for water splash in decompile; RbxCharacterSounds Splash + Swimming state (line 145-176)
+run(function()
+	local SwimSplashSpam
+	local Delay
+	local ModePick
+	local warned = false
+
+	SwimSplashSpam = minigames:CreateModule({
+		Name = 'Swim Splash Spam',
+		Function = function(enabled)
+			if enabled then
+				task.spawn(function()
+					while SwimSplashSpam.Enabled do
+						local mode = optValue(ModePick, 'Splash + Swim')
+						local ok = false
+						if mode == 'Splash + Swim' or mode == 'Splash only' then
+							ok = doSwimSplash() or ok
+						end
+						if mode == 'Splash + Swim' or mode == 'VFX burst' then
+							ok = burstWaterVfx(getHumanoidRoot()) or ok
+						end
+						if not ok and not warned then
+							warned = true
+							notif('Swim Splash Spam', 'Need character / workspace water assets', 5, 'warning')
+						end
+						task.wait(math.max(optValue(Delay, 0.35), 0.08))
+					end
+				end)
+			end
+		end,
+		Tooltip = 'No water-splash remote exists. Uses Swimming state + impact_water (RbxCharacterSounds) and/or cloned CAULDRON_LIQUID particles from workspace Halloween maps. Nearby visibility only.'
+	})
+	Delay = SwimSplashSpam:CreateSlider({
+		Name = 'Delay',
+		Min = 0.08,
+		Max = 3,
+		Default = 0.35,
+		Suffix = 's'
+	})
+	ModePick = SwimSplashSpam:CreateDropdown({
+		Name = 'Mode',
+		List = { 'Splash + Swim', 'Splash only', 'VFX burst' }
+	})
+end)
+
+-- Terramancer_Stunned:FireServer() with no args (Halloween24_Client line 744) + client ragdoll
+run(function()
+	local TerramancerStunSpam
+	local Delay
+
+	TerramancerStunSpam = minigames:CreateModule({
+		Name = 'Terramancer Stun Spam',
+		Function = function(enabled)
+			if enabled then
+				local folder = getHalloweenRemotes()
+				if not folder or not folder:FindFirstChild('Terramancer_Stunned') then
+					notif('Terramancer Stun Spam', 'Halloween23_Remotes.Terramancer_Stunned missing', 5, 'warning')
+					disableModule(TerramancerStunSpam)
+					return
+				end
+				task.spawn(function()
+					while TerramancerStunSpam.Enabled do
+						doTerramancerStun()
+						task.wait(math.max(optValue(Delay, 1), 0.35))
+					end
+					stopTerramancerStun()
+				end)
+			else
+				stopTerramancerStun()
+			end
+		end,
+		Tooltip = 'Fires Halloween23_Remotes.Terramancer_Stunned:FireServer() (no args) then local ragdoll like terra wall hit. Server may replicate stun; others see you ragdoll.'
+	})
+	TerramancerStunSpam:Clean(stopTerramancerStun)
+	Delay = TerramancerStunSpam:CreateSlider({
+		Name = 'Delay',
+		Min = 0.35,
+		Max = 5,
+		Default = 1,
+		Suffix = 's'
+	})
+end)
+
+-- Ghost_Acquired:FireServer(ghostName) per Ghost.ModuleScript line 143
 run(function()
 	local GhostAcquireSpam
 	local Delay
-	local GhostColor
+	local NamePick
+	local ghostIndex = 1
+
+	local function getGhostList()
+		local list = cloneList(ghostAcquireNames)
+		table.insert(list, 1, 'Random')
+		return list
+	end
 
 	GhostAcquireSpam = minigames:CreateModule({
 		Name = 'Ghost Acquire Spam',
 		Function = function(enabled)
 			if enabled then
-				local remote = findHalloweenRemote('Ghost_Acquired')
+				local folder = getHalloweenRemotes()
+				local remote = folder and folder:FindFirstChild('Ghost_Acquired')
 				if not remote then
-					notif('Ghost Acquire Spam', 'Halloween23_Remotes.Ghost_Acquired missing', 5, 'warning')
+					notif('Ghost Acquire Spam', 'Ghost_Acquired missing', 5, 'warning')
 					disableModule(GhostAcquireSpam)
 					return
 				end
 				task.spawn(function()
 					while GhostAcquireSpam.Enabled do
+						local pick = optValue(NamePick, 'Random')
+						if pick == 'Random' then
+							pick = ghostAcquireNames[ghostIndex]
+							ghostIndex = ghostIndex % #ghostAcquireNames + 1
+						end
 						pcall(function()
-							remote:FireServer(optValue(GhostColor, 'Red'))
+							remote:FireServer(pick)
 						end)
-						task.wait(math.max(optValue(Delay, 0.5), 0.1))
+						task.wait(math.max(optValue(Delay, 0.5), 0.15))
 					end
 				end)
 			end
 		end,
-		Tooltip = 'Spams Halloween23_Remotes.Ghost_Acquired with ghost color name (Red/Green/Blue).'
+		Tooltip = 'Server: Halloween23_Remotes.Ghost_Acquired:FireServer(ghostName) e.g. Red, Green_2. May spam ghost catch events if server accepts fake names.'
 	})
 	Delay = GhostAcquireSpam:CreateSlider({
 		Name = 'Delay',
-		Min = 0.1,
+		Min = 0.15,
 		Max = 5,
 		Default = 0.5,
 		Suffix = 's'
 	})
-	GhostColor = GhostAcquireSpam:CreateDropdown({
-		Name = 'Ghost',
-		List = {'Red', 'Green', 'Blue'}
+	NamePick = GhostAcquireSpam:CreateDropdown({
+		Name = 'Ghost Name',
+		List = getGhostList()
 	})
 end)
 
--- EasterItems.EggObtain FireServer from EasterEvent.LocalScript.lua (Touch/Taste/Sound/Smell/Sight)
+-- Reverse_Walkspeed BindableEvent :Fire(bool) — local movement flip (ControlModule line 8)
 run(function()
-	local EasterEggSpam
-	local Delay
-	local EggMode
+	local ReverseWalkSpam
 
-	EasterEggSpam = minigames:CreateModule({
-		Name = 'Easter Egg Spam',
+	ReverseWalkSpam = minigames:CreateModule({
+		Name = 'Reverse Walk Spam',
 		Function = function(enabled)
 			if enabled then
-				local folder = waitRemote(replicatedStorage, 'EasterItems')
-				local remote = folder and folder:FindFirstChild('EggObtain')
-				if not remote then
-					notif('Easter Egg Spam', 'EasterItems.EggObtain missing', 5, 'warning')
-					disableModule(EasterEggSpam)
+				local folder = getHalloweenRemotes()
+				local bindable = folder and folder:FindFirstChild('Reverse_Walkspeed')
+				if not bindable then
+					notif('Reverse Walk Spam', 'Reverse_Walkspeed missing', 5, 'warning')
+					disableModule(ReverseWalkSpam)
 					return
 				end
-				task.spawn(function()
-					while EasterEggSpam.Enabled do
-						pcall(function()
-							remote:FireServer(optValue(EggMode, 'Sound'))
-						end)
-						task.wait(math.max(optValue(Delay, 0.35), 0.1))
-					end
+				pcall(function()
+					bindable:Fire(true)
 				end)
+				notif('Reverse Walk Spam', 'Movement inverted locally until disabled', 4, 'info')
+			else
+				local folder = getHalloweenRemotes()
+				local bindable = folder and folder:FindFirstChild('Reverse_Walkspeed')
+				if bindable then
+					pcall(function()
+						bindable:Fire(false)
+					end)
+				end
 			end
 		end,
-		Tooltip = 'Spams ReplicatedStorage.EasterItems.EggObtain with sense mode (Touch/Taste/Sound/Smell/Sight).'
-	})
-	Delay = EasterEggSpam:CreateSlider({
-		Name = 'Delay',
-		Min = 0.1,
-		Max = 5,
-		Default = 0.35,
-		Suffix = 's'
-	})
-	EggMode = EasterEggSpam:CreateDropdown({
-		Name = 'Mode',
-		List = {'Sound', 'Touch', 'Taste', 'Smell', 'Sight'}
+		Tooltip = 'LOCAL only: Reverse_Walkspeed:Fire(true/false) flips ControlModule walk direction. Others see erratic movement replication, not a server effect remote.'
 	})
 end)
 
--- Terramancer_Stunned FireServer from Halloween24_Client.LocalScript.lua:744 (local ragdoll; server may relay)
+-- Hydromancer_Death:FireServer() no args when touching flood water (line 3668)
 run(function()
-	local StunRemoteSpam
+	local HydromancerDeathSpam
 	local Delay
 
-	StunRemoteSpam = minigames:CreateModule({
-		Name = 'Terramancer Stun Spam',
+	HydromancerDeathSpam = minigames:CreateModule({
+		Name = 'Hydromancer Death Spam',
 		Function = function(enabled)
 			if enabled then
-				local remote = findHalloweenRemote('Terramancer_Stunned')
+				local folder = getHalloweenRemotes()
+				local remote = folder and folder:FindFirstChild('Hydromancer_Death')
 				if not remote then
-					notif('Terramancer Stun Spam', 'Terramancer_Stunned missing', 5, 'warning')
-					disableModule(StunRemoteSpam)
+					notif('Hydromancer Death Spam', 'Hydromancer_Death missing', 5, 'warning')
+					disableModule(HydromancerDeathSpam)
 					return
 				end
+				notif('Hydromancer Death Spam', 'Fires death remote; may move YOU (not others)', 5, 'info')
 				task.spawn(function()
-					while StunRemoteSpam.Enabled do
+					while HydromancerDeathSpam.Enabled do
 						pcall(function()
 							remote:FireServer()
 						end)
-						task.wait(math.max(optValue(Delay, 1), 0.25))
+						task.wait(math.max(optValue(Delay, 2), 0.5))
 					end
 				end)
 			end
 		end,
-		Tooltip = 'Spams Halloween23_Remotes.Terramancer_Stunned (ragdoll/knockback when server accepts it).'
+		Tooltip = 'Fires Halloween23_Remotes.Hydromancer_Death:FireServer() with no args. Decompile uses this for flood death cutscene on YOU — Hydromancer_FloodBegun is server->client only.'
 	})
-	Delay = StunRemoteSpam:CreateSlider({
+	Delay = HydromancerDeathSpam:CreateSlider({
 		Name = 'Delay',
-		Min = 0.25,
-		Max = 5,
-		Default = 1,
+		Min = 0.5,
+		Max = 10,
+		Default = 2,
 		Suffix = 's'
 	})
 end)
@@ -487,246 +782,12 @@ run(function()
 				pcall(function()
 					remote:FireServer()
 				end)
+				notif('Sunset Get', 'Fired SunsetGet once', 3, 'info')
 				task.defer(function()
 					disableModule(SunsetGet)
 				end)
 			end
 		end,
-		Tooltip = 'Fires Remotes.SunsetGet once (Gear Man sunset reward remote).'
-	})
-end)
-
--- Ghost_Data sync remote from GhostSpawner.ModuleScript.lua:37
-run(function()
-	local GhostDataSpam
-	local Delay
-
-	GhostDataSpam = minigames:CreateModule({
-		Name = 'Ghost Data Spam',
-		Function = function(enabled)
-			if enabled then
-				local remote = findHalloweenRemote('Ghost_Data')
-				if not remote then
-					notif('Ghost Data Spam', 'Ghost_Data missing', 5, 'warning')
-					disableModule(GhostDataSpam)
-					return
-				end
-				task.spawn(function()
-					while GhostDataSpam.Enabled do
-						pcall(function()
-							remote:FireServer()
-						end)
-						task.wait(math.max(optValue(Delay, 0.5), 0.2))
-					end
-				end)
-			end
-		end,
-		Tooltip = 'Spams Halloween23_Remotes.Ghost_Data:FireServer() (ghost event sync).'
-	})
-	Delay = GhostDataSpam:CreateSlider({
-		Name = 'Delay',
-		Min = 0.2,
-		Max = 5,
-		Default = 0.5,
-		Suffix = 's'
-	})
-end)
-
--- Halloween win remotes from Halloween24_Client.LocalScript.lua
-run(function()
-	local HalloweenWinSpam
-	local Delay
-	local WinRemote
-
-	local winRemotes = {
-		Terramancer_Win = function(remote)
-			remote:FireServer()
-		end,
-		Necromancer_Win = function(remote)
-			remote:FireServer()
-		end,
-		PlagueDoctor_Win = function(remote)
-			remote:FireServer()
-		end,
-		Fisherman_Win = function(remote)
-			remote:FireServer()
-		end,
-		Cryomancer_Win = function(remote)
-			remote:FireServer(0)
-		end
-	}
-
-	HalloweenWinSpam = minigames:CreateModule({
-		Name = 'Halloween Win Spam',
-		Function = function(enabled)
-			if enabled then
-				local remoteName = optValue(WinRemote, 'Terramancer_Win')
-				local remote = findHalloweenRemote(remoteName)
-				if not remote then
-					notif('Halloween Win Spam', 'Halloween23_Remotes.' .. remoteName .. ' missing', 5, 'warning')
-					disableModule(HalloweenWinSpam)
-					return
-				end
-				local fire = winRemotes[remoteName]
-				task.spawn(function()
-					while HalloweenWinSpam.Enabled do
-						pcall(function()
-							fire(remote)
-						end)
-						task.wait(math.max(optValue(Delay, 1), 0.25))
-					end
-				end)
-			end
-		end,
-		Tooltip = 'Spams Halloween23_Remotes win remotes (Terramancer/Necromancer/PlagueDoctor/Fisherman/Cryomancer).'
-	})
-	Delay = HalloweenWinSpam:CreateSlider({
-		Name = 'Delay',
-		Min = 0.25,
-		Max = 5,
-		Default = 1,
-		Suffix = 's'
-	})
-	WinRemote = HalloweenWinSpam:CreateDropdown({
-		Name = 'Remote',
-		List = {'Terramancer_Win', 'Necromancer_Win', 'PlagueDoctor_Win', 'Fisherman_Win', 'Cryomancer_Win'}
-	})
-end)
-
--- Halloween death remotes from Halloween24_Client.LocalScript.lua
-run(function()
-	local HalloweenDeathSpam
-	local Delay
-	local DeathRemote
-
-	local deathRemotes = {
-		Carnomancer_Death = function(remote)
-			remote:FireServer()
-		end,
-		Hydromancer_Death = function(remote)
-			remote:FireServer()
-		end,
-		Alchemist_Death = function(remote)
-			remote:FireServer(1)
-		end
-	}
-
-	HalloweenDeathSpam = minigames:CreateModule({
-		Name = 'Halloween Death Spam',
-		Function = function(enabled)
-			if enabled then
-				local remoteName = optValue(DeathRemote, 'Carnomancer_Death')
-				local remote = findHalloweenRemote(remoteName)
-				if not remote then
-					notif('Halloween Death Spam', 'Halloween23_Remotes.' .. remoteName .. ' missing', 5, 'warning')
-					disableModule(HalloweenDeathSpam)
-					return
-				end
-				local fire = deathRemotes[remoteName]
-				task.spawn(function()
-					while HalloweenDeathSpam.Enabled do
-						pcall(function()
-							fire(remote)
-						end)
-						task.wait(math.max(optValue(Delay, 1), 0.25))
-					end
-				end)
-			end
-		end,
-		Tooltip = 'Spams Halloween23_Remotes death remotes (Carnomancer/Hydromancer/Alchemist).'
-	})
-	Delay = HalloweenDeathSpam:CreateSlider({
-		Name = 'Delay',
-		Min = 0.25,
-		Max = 5,
-		Default = 1,
-		Suffix = 's'
-	})
-	DeathRemote = HalloweenDeathSpam:CreateDropdown({
-		Name = 'Remote',
-		List = {'Carnomancer_Death', 'Hydromancer_Death', 'Alchemist_Death'}
-	})
-end)
-
--- Cabinet opened remotes from Halloween24_Client.LocalScript.lua
-run(function()
-	local CabinetOpenSpam
-	local Delay
-	local CabinetRemote
-
-	CabinetOpenSpam = minigames:CreateModule({
-		Name = 'Cabinet Open Spam',
-		Function = function(enabled)
-			if enabled then
-				local remoteName = optValue(CabinetRemote, 'Carnomancer_CabinetOpened')
-				local remote = findHalloweenRemote(remoteName)
-				if not remote then
-					notif('Cabinet Open Spam', 'Halloween23_Remotes.' .. remoteName .. ' missing', 5, 'warning')
-					disableModule(CabinetOpenSpam)
-					return
-				end
-				task.spawn(function()
-					while CabinetOpenSpam.Enabled do
-						pcall(function()
-							remote:FireServer()
-						end)
-						task.wait(math.max(optValue(Delay, 1), 0.25))
-					end
-				end)
-			end
-		end,
-		Tooltip = 'Spams Halloween23_Remotes cabinet-open remotes (Carnomancer/Pyromancer/Luxomancer).'
-	})
-	Delay = CabinetOpenSpam:CreateSlider({
-		Name = 'Delay',
-		Min = 0.25,
-		Max = 5,
-		Default = 1,
-		Suffix = 's'
-	})
-	CabinetRemote = CabinetOpenSpam:CreateDropdown({
-		Name = 'Remote',
-		List = {'Carnomancer_CabinetOpened', 'Pyromancer_CabinetOpened', 'Luxomancer_CabinetOpened'}
-	})
-end)
-
--- Carnomancer_PlayerInChallenge FireServer(true/false) from Halloween24_Client.LocalScript.lua
-run(function()
-	local ChallengeStateSpam
-	local Delay
-	local ChallengeState
-
-	ChallengeStateSpam = minigames:CreateModule({
-		Name = 'Challenge State Spam',
-		Function = function(enabled)
-			if enabled then
-				local remote = findHalloweenRemote('Carnomancer_PlayerInChallenge')
-				if not remote then
-					notif('Challenge State Spam', 'Carnomancer_PlayerInChallenge missing', 5, 'warning')
-					disableModule(ChallengeStateSpam)
-					return
-				end
-				task.spawn(function()
-					while ChallengeStateSpam.Enabled do
-						pcall(function()
-							remote:FireServer(optValue(ChallengeState, 'Not In Challenge') == 'In Challenge')
-						end)
-						task.wait(math.max(optValue(Delay, 1), 0.25))
-					end
-				end)
-			end
-		end,
-		Tooltip = 'Spams Halloween23_Remotes.Carnomancer_PlayerInChallenge with true/false.'
-	})
-	Delay = ChallengeStateSpam:CreateSlider({
-		Name = 'Delay',
-		Min = 0.25,
-		Max = 5,
-		Default = 1,
-		Suffix = 's'
-	})
-	ChallengeState = ChallengeStateSpam:CreateDropdown({
-		Name = 'State',
-		List = {'In Challenge', 'Not In Challenge'}
+		Tooltip = 'Fires Remotes.SunsetGet once (Gear Man reward). Does not annoy other players.'
 	})
 end)
