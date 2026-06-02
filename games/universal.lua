@@ -10190,20 +10190,104 @@ end)
 run(function()
 	local Scriptdumper
 
-	local function makevalid(str, invalid_chars)
-		for _, c in invalid_chars do
-			str = str:gsub(c, '_')
+	local INVALID_PATH_CHARS = {'\\', '/', ':', '*', '?', '"', '<', '>', '|'}
+	local WINDOWS_RESERVED = {
+		CON = true, PRN = true, AUX = true, NUL = true,
+		COM1 = true, COM2 = true, COM3 = true, COM4 = true, COM5 = true, COM6 = true, COM7 = true, COM8 = true, COM9 = true,
+		LPT1 = true, LPT2 = true, LPT3 = true, LPT4 = true, LPT5 = true, LPT6 = true, LPT7 = true, LPT8 = true, LPT9 = true
+	}
+
+	local function sanitizeName(name)
+		if type(name) ~= 'string' or name == '' then
+			return 'Unnamed'
 		end
-		return str:sub(1, 200)
+		for _, c in INVALID_PATH_CHARS do
+			name = name:gsub(c, '_')
+		end
+		name = name:gsub('[%z]', '_')
+		name = name:gsub('[%s%.]+$', '')
+		name = name:gsub('[_%-]%d{6,}$', '')
+		name = name:gsub('[_%-][0-9a-fA-F]{8,}$', '')
+		if name:match('^[%x%-_]+$') and #name >= 12 then
+			return 'Instance'
+		end
+		if name == '' then
+			return 'Unnamed'
+		end
+		if WINDOWS_RESERVED[name:upper()] then
+			name = name .. '_'
+		end
+		return name:sub(1, 200)
 	end
 
-	local function gatherScripts(inst, scripts, coreGuiRef, corePackagesRef)
-		if (inst.ClassName == 'LocalScript' or inst.ClassName == 'ModuleScript') and not (inst:IsDescendantOf(coreGuiRef) or inst:IsDescendantOf(corePackagesRef)) then
-			table.insert(scripts, inst)
+	local function normalizeInstancePath(path)
+		return path:gsub('[/\\]', '.')
+	end
+
+	local function buildDumpPrefix()
+		local placeName = sanitizeName(game.Name)
+		if placeName == 'Unnamed' or placeName == 'Instance' then
+			return 'decompiled/' .. tostring(game.PlaceId)
 		end
-		for _, v in inst:GetChildren() do
-			gatherScripts(v, scripts, coreGuiRef, corePackagesRef)
+		return 'decompiled/' .. placeName .. '_' .. tostring(game.PlaceId)
+	end
+
+	local function ensureFolderExists(folderPath)
+		local built = ''
+		for part in folderPath:gmatch('[^/]+') do
+			built = built == '' and part or (built .. '/' .. part)
+			if not isfolder(built) then
+				pcall(makefolder, built)
+			end
 		end
+	end
+
+	local function buildOutputPath(script, prefix, usedPaths)
+		local dirParts = {}
+		local current = script.Parent
+		while current and current ~= game do
+			table.insert(dirParts, 1, sanitizeName(current.Name))
+			current = current.Parent
+		end
+		local baseName = sanitizeName(script.Name) .. '.' .. script.ClassName
+		local fileName = baseName .. '.lua'
+		local dirPath = table.concat(dirParts, '/')
+		local fullPath = dirPath == '' and (prefix .. '/' .. fileName) or (prefix .. '/' .. dirPath .. '/' .. fileName)
+		local suffix = 1
+		while usedPaths[fullPath] do
+			suffix += 1
+			fileName = baseName .. '_' .. suffix .. '.lua'
+			fullPath = dirPath == '' and (prefix .. '/' .. fileName) or (prefix .. '/' .. dirPath .. '/' .. fileName)
+		end
+		usedPaths[fullPath] = true
+		return fullPath, dirPath
+	end
+
+	local function ensureFolderPath(prefix, dirPath)
+		if dirPath == '' then
+			return
+		end
+		ensureFolderExists(prefix .. '/' .. dirPath)
+	end
+
+	local function formatSource(script, src)
+		local header = string.format(
+			'-- Decompiled from: %s\n-- Class: %s\n-- Place: %s (%s)\n\n',
+			script:GetFullName(),
+			script.ClassName,
+			game.Name,
+			tostring(game.PlaceId)
+		)
+		src = src:gsub('\r\n', '\n'):gsub('\r', '\n'):gsub('\n\n\n+', '\n\n')
+		if src:sub(1, 1) ~= '\n' and not src:match('^%-%-') then
+			src = header .. src
+		elseif not src:match('^%-%- Decompiled from:') then
+			src = header .. src
+		end
+		if not src:match('\n$') then
+			src = src .. '\n'
+		end
+		return src
 	end
 
 	local function dumpScripts()
@@ -10216,33 +10300,33 @@ run(function()
 			return
 		end
 
-		local prefix = 'scripts_'..tostring(game.PlaceId)..'_'..math.random(100000, 999999)
+		local prefix = buildDumpPrefix()
 		local coreGuiRef = game.CoreGui
 		local corePackagesRef = game.CorePackages
 		local scripts = {}
 		local seenPaths = {}
 
 		local function isRobloxDefault(script)
-			local path = script:GetFullName()
-			if path:find('ReplicatedStorage[/\\]Default') then return true end
-			if path:find('ReplicatedStorage[/\\]Shared[/\\]Modules') then return true end
-			if path:find('ReplicatedStorage[/\\]Studio[/\\]') then return true end
-			if path:find('ServerScriptService[/\\]Default') then return true end
-			if path:find('StarterPlayer[/\\]Default') then return true end
-			if path:find('StarterGui[/\\]Default') then return true end
-			if path:find('StarterPlayerScripts[/\\]Default') then return true end
-			if path:find('StarterCharacterScripts[/\\]Default') then return true end
-			if path:find('Lighting[/\\]Default') then return true end
-			if path:find('GameInsight[/\\]') then return true end
-			if path:find('CoreGui[/\\]Roboto[/\\]') then return true end
-			if path:find('CorePackages[/\\]') then return true end
-			if path:find('Players[/\\]LocalPlayer[/\\]PlayerScripts[/\\]') then return true end
-			if path:find('Players[/\\]LocalPlayer[/\\]Backpack[/\\]') then return true end
-			if path:find('Players[/\\]LocalPlayer[/\\]Character[/\\]') then return true end
-			if path:find('PlayerScriptsLoader[/\\]') then return true end
-			if path:find('GameSettings[/\\]') then return true end
-			if path:find('SessionService[/\\]') then return true end
-			if path:find('Chat[/\\]') and not path:find('Chat[/\\]CustomChat') then return true end
+			local path = normalizeInstancePath(script:GetFullName())
+			if path:find('ReplicatedStorage%.Default') then return true end
+			if path:find('ReplicatedStorage%.Shared%.Modules') then return true end
+			if path:find('ReplicatedStorage%.Studio%.') then return true end
+			if path:find('ServerScriptService%.Default') then return true end
+			if path:find('StarterPlayer%.Default') then return true end
+			if path:find('StarterGui%.Default') then return true end
+			if path:find('StarterPlayerScripts%.Default') then return true end
+			if path:find('StarterCharacterScripts%.Default') then return true end
+			if path:find('Lighting%.Default') then return true end
+			if path:find('GameInsight%.') then return true end
+			if path:find('CoreGui%.Roboto%.') then return true end
+			if path:find('CorePackages%.') then return true end
+			if path:find('Players%.LocalPlayer%.PlayerScripts%.') then return true end
+			if path:find('Players%.LocalPlayer%.Backpack%.') then return true end
+			if path:find('Players%.LocalPlayer%.Character%.') then return true end
+			if path:find('PlayerScriptsLoader%.') then return true end
+			if path:find('GameSettings%.') then return true end
+			if path:find('SessionService%.') then return true end
+			if path:find('Chat%.') and not path:find('Chat%.CustomChat') then return true end
 			return false
 		end
 
@@ -10270,57 +10354,47 @@ run(function()
 			gatherScripts(settingsobj, scripts, coreGuiRef, corePackagesRef)
 		end
 
-		if not isfolder(prefix) then
-			pcall(makefolder, prefix)
+		local usedOutputPaths = {}
+		local scriptJobs = {}
+		ensureFolderExists(prefix)
+		for _, script in scripts do
+			local outputPath, dirPath = buildOutputPath(script, prefix, usedOutputPaths)
+			ensureFolderPath(prefix, dirPath)
+			table.insert(scriptJobs, {script, outputPath})
 		end
 
 		print('Starting dump to folder:', prefix)
-		notif('Scriptdumper', 'Dumping '..#scripts..' scripts...', 3)
-		
+		notif('Scriptdumper', 'Dumping '..#scriptJobs..' scripts...', 3)
+
 		local idx = 0
 		local threads = 0
 		local batch_size = 50
 		local pendingWrites = {}
-		
-		local function writeFolderPath(path)
-			local parts = {}
-			for part in path:gmatch('([^/\\]+)') do
-				table.insert(parts, part)
-			end
-			local currentPath = prefix
-			for i = 1, #parts - 1 do
-				currentPath = currentPath..'/'..parts[i]
-				if not isfolder(currentPath) then
-					pcall(makefolder, currentPath)
-				end
-			end
-		end
-		
-		for _, v in scripts do
+
+		for _, job in scriptJobs do
+			local script, outputPath = job[1], job[2]
 			idx += 1
-			if idx % 100 == 0 or idx == #scripts then
-				print(string.format('Decompiling %d/%d', idx, #scripts))
+			if idx % 100 == 0 or idx == #scriptJobs then
+				print(string.format('Decompiling %d/%d', idx, #scriptJobs))
 			end
-			
+
 			while threads >= batch_size do task.wait() end
 			threads += 1
-			
+
 			task.spawn(function()
-				local success, src = pcall(decompile, v)
-				if success and src and #src > 10 then
-					local fullname = v:GetFullName()
-					writeFolderPath(fullname)
-					local sanitized = fullname:gsub('[\\/:*?"<>|]', '_'):gsub(string.char(0):rep(32), '_')
-					sanitized = sanitized:gsub('^Game%.' , ''):gsub('^Workspace%.', 'Workspace/')
-					local full_path = prefix..'/'..sanitized..'.lua'
-					table.insert(pendingWrites, {full_path, src})
+				local success, src = pcall(decompile, script)
+				if success and src and type(src) == 'string' and #src > 0 then
+					if src:find('Failed to decompile') or src:find('decompile failed') then
+						src = '-- ' .. src
+					end
+					table.insert(pendingWrites, {outputPath, formatSource(script, src)})
 				end
 				threads -= 1
 			end)
 		end
-		
+
 		while threads > 0 do task.wait() end
-		
+
 		notif('Scriptdumper', 'Writing '..#pendingWrites..' files...', 3)
 		local write_idx = 0
 		for _, entry in pendingWrites do
@@ -10342,7 +10416,7 @@ run(function()
 				task.spawn(dumpScripts)
 			end
 		end,
-		Tooltip = 'Dumps decompiled scripts into a folder in your workspace'
+		Tooltip = 'Dumps decompiled scripts into decompiled/<place> with Roblox folder hierarchy'
 	})
 end)
 	
