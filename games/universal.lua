@@ -2286,12 +2286,27 @@ run(function()
 		end
 	end
 
-	local function getTarget(origin, obj)
+	local function getTarget(origin, obj, prisonOpts)
 		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then return end
 		local targetPart = (rand.NextNumber(rand, 0, 100) < (AutoFire.Enabled and 100 or HeadshotChance.Value)) and 'Head' or 'RootPart'
+		local range = Range.Value
+		local rangePosition, attackCheck, wallbang
+		if prisonOpts then
+			if prisonOpts.rangeLimit then
+				range = Mode.Value == 'Position' and math.min(Range.Value, prisonOpts.rangeLimit) or Range.Value
+				rangePosition = prisonOpts.rangeLimit
+			end
+			attackCheck = prisonOpts.attackCheck
+			if Wallbang.Enabled and entitylib.isAlive then
+				wallbang = entitylib.character.RootPart.Position
+			end
+		end
 		local ent = entitylib['Entity'..Mode.Value]({
-			Range = Range.Value,
+			Range = range,
+			RangePosition = rangePosition,
+			AttackCheck = attackCheck,
 			Wallcheck = Target.Walls.Enabled and (obj or true) or nil,
+			Wallbang = wallbang,
 			Part = targetPart,
 			Origin = origin,
 			Players = Target.Players.Enabled,
@@ -2327,17 +2342,31 @@ run(function()
 	end
 
 	local function getShootFunction()
+		local prisonPl = vape.Libraries.prisonlife and vape.Libraries.prisonlife.pl or pl
 		local gui = lplr.PlayerGui:FindFirstChild('Home')
 		gui = gui and gui.hud and gui.hud.ActionArea
 		if gui then
 			for _, v in getconnections(gui.InputBegan) do
 				if v.Function then
-					pl.Shoot = debug.getupvalue(v.Function, 2)
-					pl.Reload = debug.getupvalue(pl.Shoot, 2)
-					pl.Bullet = debug.getupvalue(pl.Shoot, 16)
+					prisonPl.Shoot = debug.getupvalue(v.Function, 2)
+					prisonPl.Reload = debug.getupvalue(prisonPl.Shoot, 2)
+					prisonPl.Bullet = debug.getupvalue(prisonPl.Shoot, 16)
 					break
 				end
 			end
+		end
+		if vape.Libraries.prisonlife then
+			pl = prisonPl
+		end
+	end
+
+	local function getPrisonGunData()
+		local prison = vape.Libraries.prisonlife
+		if prison and prison.getGunData then
+			return prison.getGunData()
+		end
+		if pl.Shoot then
+			return debug.getupvalue(pl.Shoot, 10)
 		end
 	end
 
@@ -2363,7 +2392,11 @@ run(function()
 
 	local function PrisonBulletHook(...)
 		local origin, direction = ...
-		local ent, targetPart, origin = getTarget(origin)
+		local gundata = getPrisonGunData()
+		local ent, targetPart, origin = getTarget(origin, nil, gundata and {
+			rangeLimit = gundata.Range or 1000,
+			attackCheck = not gundata or gundata.Behavior ~= 'Taser'
+		})
 		if not ent then return oldPrisonBulletHook(...) end
 
 		local args = table.pack(...)
@@ -2379,7 +2412,12 @@ run(function()
 			local ray = workspace:Raycast(args[2], (origin - args[2]), rayParams)
 
 			if ray then
-				local neworigin = resolveOrigin(origin, ray.Position + ray.Normal * 0.05, args[2])
+				local prison = vape.Libraries.prisonlife
+				local neworigin, hitbox = prison and prison.OriginScanner and prison.OriginScanner:Scan(entitylib.character.RootPart.Position, args[2], ray.Position + ray.Normal * 0.01, targetPart)
+
+				if not neworigin then
+					neworigin = resolveOrigin(origin, ray.Position + ray.Normal * 0.05, args[2])
+				end
 
 				if neworigin then
 					for i, v in debug.getstack(3) do
@@ -2389,6 +2427,9 @@ run(function()
 					end
 
 					args[1] = neworigin
+					if hitbox then
+						return targetPart, hitbox
+					end
 				end
 			end
 		end
@@ -2620,6 +2661,36 @@ run(function()
 					
 					local ent
 					if AutoFire.Enabled then
+						if game.PlaceId == 155615604 and vape.Libraries.prisonlife and pl.Shoot then
+							local gundata = getPrisonGunData()
+							local tool = lplr.Character and lplr.Character:FindFirstChildWhichIsA('Tool')
+							if gundata and tool and (tool:GetAttribute('Local_CurrentAmmo') or 0) > 0 and not tool:GetAttribute('Local_IsShooting') then
+								local limit = gundata.Range or 1000
+								local taser = gundata.Behavior == 'Taser'
+								ent = entitylib['Entity'..Mode.Value]({
+									Range = Mode.Value == 'Position' and math.min(Range.Value, limit) or Range.Value,
+									RangePosition = limit,
+									AttackCheck = not taser,
+									Wallcheck = Target.Walls.Enabled and true or nil,
+									Wallbang = Wallbang.Enabled and entitylib.isAlive and entitylib.character.RootPart.Position or nil,
+									Part = 'Head',
+									Origin = entitylib.isAlive and entitylib.character.Head.Position or Vector3.zero,
+									Players = Target.Players.Enabled,
+									NPCs = Target.NPCs.Enabled
+								})
+
+								if ent and entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
+									if not (taser and ent.Character:GetAttribute('Tased')) then
+										if delayCheck < tick() then
+											delayCheck = tick() + (gundata.FireRate or AutoFireShootDelay.Value)
+											local obj = {UserInputState = Enum.UserInputState.Begin, UserInputType = Enum.UserInputType.MouseButton1, Position = Vector3.zero}
+											task.spawn(pl.Shoot, obj)
+											obj.UserInputState = Enum.UserInputState.End
+										end
+									end
+								end
+							end
+						else
 						local origin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
 						local effectiveOrigin = origin
 						
@@ -2659,6 +2730,7 @@ run(function()
 								end
 								mouseClicked = false
 							end
+						end
 						end
 					end
 					
@@ -2744,6 +2816,9 @@ run(function()
 			end
 		end,
 		ExtraText = function()
+			if game.PlaceId == 155615604 then
+				return 'PrisonLife'
+			end
 			return Method.Value:gsub('FindPartOnRay', '')
 		end,
 		Tooltip = 'Silently adjusts your aim towards the enemy'
