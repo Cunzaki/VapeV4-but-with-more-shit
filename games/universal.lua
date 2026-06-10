@@ -1839,21 +1839,6 @@ run(function()
 		return gameCamera.CFrame.Position
 	end
 
-	local function firePrisonTracers(shootOrigin, targetPosition, ent)
-		lastMb1Click = tick()
-		local prison = vape.Libraries.prisonlife
-		local legitTracers = vape.Legit and vape.Legit.Modules and vape.Legit.Modules.BulletTracers
-		if legitTracers and legitTracers.Enabled and prison and prison.fireTracers then
-			prison.fireTracers(shootOrigin, targetPosition)
-		end
-		if BulletTracers and BulletTracers.Enabled and ent then
-			spawnBulletTracer(ent, {
-				Origin = shootOrigin,
-				TargetPosition = targetPosition,
-			}, tick(), getTracerColors())
-		end
-	end
-
 	local function clearBulletTracers()
 		for _, record in bulletTracerActive do
 			pcall(function()
@@ -2313,6 +2298,22 @@ run(function()
 			local glowAlpha = visible and (1 - math.clamp(baseAlpha * 0.5, 0, 1)) or 1
 			tracer.Main.Transparency = NumberSequence.new(mainAlpha)
 			tracer.Glow.Transparency = NumberSequence.new(glowAlpha)
+		end
+	end
+
+	local function firePrisonTracers(shootOrigin, targetPosition, ent)
+		lastMb1Click = tick()
+		local prison = vape.Libraries.prisonlife
+		local legitTracers = vape.Legit and vape.Legit.Modules and vape.Legit.Modules.BulletTracers
+		if legitTracers and legitTracers.Enabled and prison and prison.fireTracers then
+			prison.fireTracers(shootOrigin, targetPosition)
+		end
+		if BulletTracers and BulletTracers.Enabled and ent then
+			local mainColor, glowColor = getTracerColors()
+			spawnBulletTracer(ent, {
+				Origin = shootOrigin,
+				TargetPosition = targetPosition,
+			}, tick(), mainColor, glowColor)
 		end
 	end
 
