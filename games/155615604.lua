@@ -34,7 +34,7 @@ local getfontsize = vape.Libraries.getfontsize
 
 local pl = {}
 local Spring = {}
-local TracerHook = {Hooks = {}}
+local TracerHook = {Hooks = {}, LastFire = 0}
 local oldshoot, oldequip
 local aimTimer, shootTimer, aimVec = os.clock(), os.clock()
 local gamepasses = {}
@@ -452,6 +452,9 @@ run(function()
 		getGunData = function()
 			if not pl.Shoot then return end
 			return debug.getupvalue(pl.Shoot, 10)
+		end,
+		fireTracers = function(origin, dir)
+			return TracerHook:Fire(origin, dir)
 		end
 	}
 
@@ -561,7 +564,10 @@ run(function()
 	end))
 
 	vape:Clean(function()
-		table.clear(pl)
+		pl.Shoot = nil
+		pl.Reload = nil
+		pl.Bullet = nil
+		pl.Equip = nil
 	end)
 end)
 
@@ -607,7 +613,15 @@ end
 do
 	local oldtracer, oldtracersniper
 
+	local function getPrisonPl()
+		return (vape.Libraries.prisonlife and vape.Libraries.prisonlife.pl) or pl
+	end
+
 	local function Hook(...)
+		if os.clock() - TracerHook.LastFire < 0.05 then
+			return oldtracer(...)
+		end
+
 		if debug.info(3, 's') ~= 'ReplicatedStorage.Scripts.Replication.ClientReplicator' then
 			for _, v in TracerHook.Hooks do
 				if v[2](...) then return end
@@ -627,18 +641,30 @@ do
 		return oldtracersniper(...)
 	end
 
+	function TracerHook:Fire(origin, dir)
+		self.LastFire = os.clock()
+		for _, v in self.Hooks do
+			if v[2](origin, dir) then
+				return true
+			end
+		end
+	end
+
 	function TracerHook:Add(key, val, priority)
 		table.insert(self.Hooks, {key, val, priority or 0})
 		table.sort(self.Hooks, function(a, b)
 			return a[3] < b[3]
 		end)
 
+		local prisonPl = getPrisonPl()
+		if not prisonPl.GunTracers then return end
+
 		if not oldtracer then
-			oldtracer = hookfunction(pl.GunTracers.createBullet, function(...)
+			oldtracer = hookfunction(prisonPl.GunTracers.createBullet, function(...)
 				return Hook(...)
 			end)
 
-			oldtracersniper = hookfunction(pl.GunTracers.createSniper, function(...)
+			oldtracersniper = hookfunction(prisonPl.GunTracers.createSniper, function(...)
 				return HookSniper(...)
 			end)
 		end
@@ -653,16 +679,24 @@ do
 		end
 
 		if oldtracer and not next(self.Hooks) then
+			local prisonPl = getPrisonPl()
 			if restorefunction then
-				restorefunction(pl.GunTracers.createBullet)
-				restorefunction(pl.GunTracers.createSniper)
+				restorefunction(prisonPl.GunTracers.createBullet)
+				restorefunction(prisonPl.GunTracers.createSniper)
 			else
-				hookfunction(pl.GunTracers.createBullet, oldtracer)
-				hookfunction(pl.GunTracers.createSniper, oldtracersniper)
+				hookfunction(prisonPl.GunTracers.createBullet, oldtracer)
+				hookfunction(prisonPl.GunTracers.createSniper, oldtracersniper)
 			end
 
 			oldtracer = nil
 			oldtracersniper = nil
+		end
+	end
+
+	if vape.Libraries.prisonlife then
+		vape.Libraries.prisonlife.TracerHook = TracerHook
+		vape.Libraries.prisonlife.fireTracers = function(origin, dir)
+			return TracerHook:Fire(origin, dir)
 		end
 	end
 end
@@ -2412,6 +2446,12 @@ run(function()
 					local origin, dir = ...
 					if vtool then
 						origin = vtool.Muzzle.Position
+					else
+						local tool = lplr.Character and lplr.Character:FindFirstChildWhichIsA('Tool')
+						local muzzle = tool and tool:FindFirstChild('Muzzle')
+						if muzzle then
+							origin = muzzle.Position
+						end
 					end
 	
 					local velocity = CFrame.lookAt(origin, dir).LookVector * 1000

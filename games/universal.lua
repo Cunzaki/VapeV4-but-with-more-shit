@@ -1818,10 +1818,40 @@ run(function()
 	end
 
 	local function getLocalTracerOrigin()
+		if game.PlaceId == 155615604 then
+			local prison = vape.Libraries.prisonlife
+			local tool = lplr.Character and lplr.Character:FindFirstChildWhichIsA('Tool')
+			local muzzle = tool and tool:FindFirstChild('Muzzle')
+			if muzzle then
+				return muzzle.Position
+			end
+			if prison and prison.pl and prison.pl.Shoot then
+				local shootTool = debug.getupvalue(prison.pl.Shoot, 1)
+				muzzle = shootTool and shootTool:FindFirstChild('Muzzle')
+				if muzzle then
+					return muzzle.Position
+				end
+			end
+		end
 		if entitylib.isAlive and entitylib.character then
 			return (entitylib.character.Head and entitylib.character.Head.Position) or entitylib.character.RootPart.Position
 		end
 		return gameCamera.CFrame.Position
+	end
+
+	local function firePrisonTracers(shootOrigin, targetPosition, ent)
+		lastMb1Click = tick()
+		local prison = vape.Libraries.prisonlife
+		local legitTracers = vape.Legit and vape.Legit.Modules and vape.Legit.Modules.BulletTracers
+		if legitTracers and legitTracers.Enabled and prison and prison.fireTracers then
+			prison.fireTracers(shootOrigin, targetPosition)
+		end
+		if BulletTracers and BulletTracers.Enabled and ent then
+			spawnBulletTracer(ent, {
+				Origin = shootOrigin,
+				TargetPosition = targetPosition,
+			}, tick(), getTracerColors())
+		end
 	end
 
 	local function clearBulletTracers()
@@ -2428,12 +2458,14 @@ run(function()
 
 					args[1] = neworigin
 					if hitbox then
+						firePrisonTracers(args[1], args[2], ent)
 						return targetPart, hitbox
 					end
 				end
 			end
 		end
 
+		firePrisonTracers(args[1], args[2], ent)
 		return oldPrisonBulletHook(unpack(args, 1, args.n))
 	end
 
@@ -2681,11 +2713,14 @@ run(function()
 
 								if ent and entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
 									if not (taser and ent.Character:GetAttribute('Tased')) then
+										registerShot(ent, ent.Head or ent.RootPart, entitylib.character.Head.Position)
 										if delayCheck < tick() then
 											delayCheck = tick() + (gundata.FireRate or AutoFireShootDelay.Value)
+											local shootOrigin = entitylib.character.Head.Position
 											local obj = {UserInputState = Enum.UserInputState.Begin, UserInputType = Enum.UserInputType.MouseButton1, Position = Vector3.zero}
 											task.spawn(pl.Shoot, obj)
 											obj.UserInputState = Enum.UserInputState.End
+											firePrisonTracers(shootOrigin, ent.Head.Position, ent)
 										end
 									end
 								end
