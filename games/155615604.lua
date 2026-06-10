@@ -491,6 +491,28 @@ run(function()
 		end
 	end))
 
+	whitelist.tagcallback = whitelist.tagcallback or {}
+	if not whitelist.__prisonlifetagpatched then
+		whitelist.__prisonlifetagpatched = true
+		function whitelist:tag(plr, text, rich)
+			local plrtag = table.clone(select(3, self:get(plr)) or self.customtags[plr.Name] or {})
+			for _, v in self.tagcallback do
+				v(plr, plrtag, rich)
+			end
+
+			if not text then
+				return plrtag
+			end
+
+			local newtag = ''
+			for _, v in plrtag do
+				newtag = newtag..(rich and v.color and '<font color="#'..v.color:ToHex()..'">['..v.text..']</font>' or '['..removeTags(v.text)..']')..' '
+			end
+
+			return newtag
+		end
+	end
+
 	table.insert(whitelist.tagcallback, function(plr, plrtag, rich)
 		if plr then
 			local ent = entitylib.getEntity(plr)
