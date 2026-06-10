@@ -265,11 +265,11 @@ run(function()
 	end
 
 	entitylib.isVulnerable = function(ent, attackcheck)
-		if attackcheck and lplr.Team == teams.Guards and ent.Player.Team == teams.Inmates and not ent.Character:GetAttribute('Hostile') then
+		if attackcheck and ent.Player and lplr.Team == teams.Guards and ent.Player.Team == teams.Inmates and not ent.Character:GetAttribute('Hostile') then
 			return false
 		end
 
-		return ent.Health > 0 and ent.SpawnTime < os.clock() and not ent.Character.FindFirstChildWhichIsA(ent.Character, 'ForceField') and (ent.Player.Team ~= teams.Inmates or (ent.Character:GetAttribute('Trespassing') or ent.Character:GetAttribute('Hostile')))
+		return ent.Health > 0 and (ent.SpawnTime or 0) < os.clock() and not ent.Character.FindFirstChildWhichIsA(ent.Character, 'ForceField') and (not ent.Player or ent.Player.Team ~= teams.Inmates or (ent.Character:GetAttribute('Trespassing') or ent.Character:GetAttribute('Hostile')))
 	end
 
 	entitylib.EntityMouse = function(entitysettings)
