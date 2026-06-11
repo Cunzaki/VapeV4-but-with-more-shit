@@ -1386,6 +1386,7 @@ run(function()
 		end
 		return false
 	end
+	local SILENT_AIM_HOOK_RETURN = newproxy and newproxy(true) or {}
 	local TracerClickWindow = 0.4
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
@@ -2525,12 +2526,19 @@ run(function()
 
 	local Hooks = {
 		FindPartOnRayWithIgnoreList = function(args)
-			local ent, targetPart, origin = getTarget(args[1].Origin, {args[2]})
-			if not ent then return end
+			local ent, targetPart, origin = getTarget(args[1].Origin, args[2])
+			if not ent or not targetPart then return end
+			local hitPos = targetPart.Position
+			local toTarget = hitPos - origin
+			local normal = toTarget.Magnitude > 0.001 and -toTarget.Unit or Vector3.yAxis
 			if Wallbang.Enabled then
-				return true, targetPart, targetPart.Position, targetPart.GetClosestPointOnSurface(targetPart, origin), targetPart.Material
+				return SILENT_AIM_HOOK_RETURN, targetPart, hitPos, normal, targetPart.Material
 			end
-			args[1] = Ray.new(origin, CFrame.lookAt(origin, targetPart.Position).LookVector * args[1].Direction.Magnitude)
+			if toTarget.Magnitude > 0.001 then
+				args[1] = Ray.new(origin, toTarget.Unit * args[1].Direction.Magnitude)
+			else
+				args[1] = Ray.new(origin, CFrame.lookAt(origin, hitPos).LookVector * args[1].Direction.Magnitude)
+			end
 		end,
 		Raycast = function(args)
 			if MethodRay.Value ~= 'All' and args[3] and args[3].FilterType ~= Enum.RaycastFilterType[MethodRay.Value] then return end
@@ -2551,7 +2559,7 @@ run(function()
 				if not calc then return end
 				direction = CFrame.lookAt(origin, calc)
 			end
-			return true, Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)
+			return SILENT_AIM_HOOK_RETURN, Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)
 		end,
 		Ray = function(args)
 			local ent, targetPart, origin = getTarget(args[1])
@@ -2679,8 +2687,8 @@ run(function()
 						end
 
 						local self, args = ..., {select(2, ...)}
-						local handled, r1, r2, r3, r4, r5 = Hooks[Method.Value](args)
-						if handled then
+						local marker, r1, r2, r3, r4, r5 = Hooks[Method.Value](args)
+						if marker == SILENT_AIM_HOOK_RETURN then
 							return r1, r2, r3, r4, r5
 						end
 						return oldnamecall(self, unpack(args))
