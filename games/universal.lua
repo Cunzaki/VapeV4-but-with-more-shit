@@ -58,6 +58,47 @@ local assetfunction = getcustomasset
 
 local vape = shared.vape
 vape.VisualizerTracerOrigins = vape.VisualizerTracerOrigins or {}
+vape.VisualizerIgnoreInstances = vape.VisualizerIgnoreInstances or {}
+
+local function registerVisualizerIgnore(inst)
+	if inst then
+		vape.VisualizerIgnoreInstances[inst] = true
+	end
+end
+
+local function unregisterVisualizerIgnore(inst)
+	if inst then
+		vape.VisualizerIgnoreInstances[inst] = nil
+	end
+end
+
+local function appendVisualizerIgnores(ignoreList)
+	if type(ignoreList) ~= 'table' then return end
+	for inst in pairs(vape.VisualizerIgnoreInstances) do
+		if inst and inst.Parent then
+			local found = false
+			for _, v in ignoreList do
+				if v == inst then
+					found = true
+					break
+				end
+			end
+			if not found then
+				table.insert(ignoreList, inst)
+			end
+		end
+	end
+end
+
+local function getVisualizerWallcheckIgnores()
+	local extras = {}
+	for inst in pairs(vape.VisualizerIgnoreInstances) do
+		if inst and inst.Parent then
+			table.insert(extras, inst)
+		end
+	end
+	return #extras > 0 and extras or nil
+end
 local tween = vape.Libraries.tween
 local targetinfo = vape.Libraries.targetinfo
 local getfontsize = vape.Libraries.getfontsize
@@ -1477,6 +1518,7 @@ run(function()
 			if cam and cam.CameraSubject == pmCameraProxy then
 				cam.CameraSubject = nil
 			end
+			unregisterVisualizerIgnore(pmCameraProxy)
 			pmCameraProxy:Destroy()
 			pmCameraProxy = nil
 		end
@@ -1515,6 +1557,7 @@ run(function()
 		pmCameraProxy.Size = Vector3.new(0.1, 0.1, 0.1)
 		pmCameraProxy.Parent = workspace
 		
+		registerVisualizerIgnore(pmCameraProxy)
 		cam.CameraSubject = pmCameraProxy
 	end
 
@@ -1909,6 +1952,7 @@ run(function()
 	
 	local function cleanupPMClone()
 		if pmClone then
+			unregisterVisualizerIgnore(pmClone)
 			pmClone:Destroy()
 		end
 		pmClone = nil
@@ -2025,10 +2069,12 @@ run(function()
 			cleanupPMClone()
 			return
 		end
+		registerVisualizerIgnore(pmClone)
 	end
 	
 	local function cleanupPMRadius()
 		if pmRadiusPart then
+			unregisterVisualizerIgnore(pmRadiusPart)
 			pmRadiusPart:Destroy()
 		end
 		pmRadiusPart = nil
@@ -2049,6 +2095,7 @@ run(function()
 		pmRadiusPart.Transparency = 0.7
 		pmRadiusPart.Color = Color3.fromHSV(PositionManipulationRadiusVisualizerColor.Hue, PositionManipulationRadiusVisualizerColor.Sat, PositionManipulationRadiusVisualizerColor.Value)
 		pmRadiusPart.Parent = workspace
+		registerVisualizerIgnore(pmRadiusPart)
 	end
 	
 	local lastPMFrame = 0
@@ -2389,7 +2436,7 @@ run(function()
 			Range = range,
 			RangePosition = rangePosition,
 			AttackCheck = attackCheck,
-			Wallcheck = Target.Walls.Enabled and (obj or true) or nil,
+			Wallcheck = Target.Walls.Enabled and (getVisualizerWallcheckIgnores() or obj or true) or nil,
 			Wallbang = wallbang,
 			Part = targetPart,
 			Origin = origin,
@@ -2417,7 +2464,13 @@ run(function()
 				end
 			end
 			if Projectile.Enabled then
-				ProjectileRaycast.FilterDescendantsInstances = {gameCamera, ent.Character}
+				local filter = {gameCamera, ent.Character}
+				for inst in pairs(vape.VisualizerIgnoreInstances) do
+					if inst and inst.Parent then
+						table.insert(filter, inst)
+					end
+				end
+				ProjectileRaycast.FilterDescendantsInstances = filter
 				ProjectileRaycast.CollisionGroup = ent[targetPart].CollisionGroup
 			end
 		end
@@ -2525,9 +2578,13 @@ run(function()
 
 	local Hooks = {
 		FindPartOnRayWithIgnoreList = function(args)
+			if type(args[2]) == 'table' then
+				appendVisualizerIgnores(args[2])
+			end
 			local ent, targetPart, origin = getTarget(args[1].Origin)
-			if not ent then return end
-			args[1] = Ray.new(origin, CFrame.lookAt(origin, targetPart.Position).LookVector * args[1].Direction.Magnitude)
+			if ent then
+				args[1] = Ray.new(origin, CFrame.lookAt(origin, targetPart.Position).LookVector * args[1].Direction.Magnitude)
+			end
 		end,
 		Raycast = function(args)
 			if MethodRay.Value ~= 'All' and args[3] and args[3].FilterType ~= Enum.RaycastFilterType[MethodRay.Value] then return end
@@ -2708,7 +2765,7 @@ run(function()
 
 						local self, args = ..., {select(2, ...)}
 						local r1 = hookFn(args)
-						if typeof(r1) == 'Ray' then
+						if typeof(r1) == 'Ray' and (methodName == 'ScreenPointToRay' or methodName == 'ViewportPointToRay') then
 							return r1
 						end
 						return oldnamecall(self, table.unpack(args))
@@ -8741,6 +8798,7 @@ run(function()
 
 	local function clearVisualizer()
 		if visualClone then
+			unregisterVisualizerIgnore(visualClone)
 			visualClone:Destroy()
 			visualClone = nil
 		end
@@ -8885,6 +8943,7 @@ run(function()
 
 		-- Parent to workspace ONLY after all physics are disabled
 		clone.Parent = workspace
+		registerVisualizerIgnore(clone)
 
 		local charRoot = entitylib.character.RootPart
 		local charTorso = entitylib.character.Character and (entitylib.character.Character:FindFirstChild('UpperTorso') or entitylib.character.Character:FindFirstChild('Torso'))
@@ -9132,6 +9191,7 @@ run(function()
 			if cam and cam.CameraSubject == cameraProxy then
 				cam.CameraSubject = nil
 			end
+			unregisterVisualizerIgnore(cameraProxy)
 			cameraProxy:Destroy()
 			cameraProxy = nil
 		end
@@ -9171,12 +9231,14 @@ run(function()
 		cameraProxy.Size = Vector3.new(0.1, 0.1, 0.1)
 		cameraProxy.Parent = workspace
 		
+		registerVisualizerIgnore(cameraProxy)
 		cam.CameraSubject = cameraProxy
 	end
 	
 	-- Cleanup desync clone
 	local function cleanupDesyncClone()
 		if desyncClone then
+			unregisterVisualizerIgnore(desyncClone)
 			desyncClone:Destroy()
 		end
 		desyncClone = nil
@@ -9299,6 +9361,7 @@ run(function()
 			cleanupDesyncClone()
 			return
 		end
+		registerVisualizerIgnore(desyncClone)
 	end
 	
 	-- Calculate desync rotation for a specific axis
