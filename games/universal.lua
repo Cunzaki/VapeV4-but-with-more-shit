@@ -1386,7 +1386,6 @@ run(function()
 		end
 		return false
 	end
-	local SILENT_AIM_HOOK_RETURN = newproxy and newproxy(true) or {}
 	local TracerClickWindow = 0.4
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
@@ -2527,18 +2526,11 @@ run(function()
 	local Hooks = {
 		FindPartOnRayWithIgnoreList = function(args)
 			local ent, targetPart, origin = getTarget(args[1].Origin, args[2])
-			if not ent or not targetPart then return end
-			local hitPos = targetPart.Position
-			local toTarget = hitPos - origin
-			local normal = toTarget.Magnitude > 0.001 and -toTarget.Unit or Vector3.yAxis
+			if not ent then return end
 			if Wallbang.Enabled then
-				return SILENT_AIM_HOOK_RETURN, targetPart, hitPos, normal, targetPart.Material
+				return targetPart, targetPart.Position, targetPart.GetClosestPointOnSurface(targetPart, origin), targetPart.Material
 			end
-			if toTarget.Magnitude > 0.001 then
-				args[1] = Ray.new(origin, toTarget.Unit * args[1].Direction.Magnitude)
-			else
-				args[1] = Ray.new(origin, CFrame.lookAt(origin, hitPos).LookVector * args[1].Direction.Magnitude)
-			end
+			args[1] = Ray.new(origin, CFrame.lookAt(origin, targetPart.Position).LookVector * args[1].Direction.Magnitude)
 		end,
 		Raycast = function(args)
 			if MethodRay.Value ~= 'All' and args[3] and args[3].FilterType ~= Enum.RaycastFilterType[MethodRay.Value] then return end
@@ -2559,7 +2551,7 @@ run(function()
 				if not calc then return end
 				direction = CFrame.lookAt(origin, calc)
 			end
-			return SILENT_AIM_HOOK_RETURN, Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)
+			return Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)
 		end,
 		Ray = function(args)
 			local ent, targetPart, origin = getTarget(args[1])
@@ -2576,6 +2568,31 @@ run(function()
 	Hooks.FindPartOnRayWithWhitelist = Hooks.FindPartOnRayWithIgnoreList
 	Hooks.FindPartOnRay = Hooks.FindPartOnRayWithIgnoreList
 	Hooks.ViewportPointToRay = Hooks.ScreenPointToRay
+	local SILENT_AIM_METHOD_ALIASES = {
+		FindPartOnRay = {
+			FindPartOnRayWithIgnoreList = true,
+			FindPartOnRayWithWhitelist = true
+		},
+		ViewportPointToRay = {
+			ScreenPointToRay = true
+		}
+	}
+	local function getSilentAimHook(methodName)
+		if Hooks[methodName] then
+			return Hooks[methodName]
+		end
+		local aliases = SILENT_AIM_METHOD_ALIASES[Method.Value]
+		if aliases and aliases[methodName] then
+			return Hooks[Method.Value]
+		end
+	end
+	local function shouldRunSilentAimHook(methodName)
+		if methodName == Method.Value then
+			return true
+		end
+		local aliases = SILENT_AIM_METHOD_ALIASES[Method.Value]
+		return aliases and aliases[methodName] or false
+	end
 
 	SilentAim = vape.Categories.Combat:CreateModule({
 		Name = 'SilentAim',
@@ -2674,7 +2691,8 @@ run(function()
 					end)
 				else
 					oldnamecall = hookmetamethod(game, '__namecall', function(...)
-						if getnamecallmethod() ~= Method.Value then
+						local methodName = getnamecallmethod()
+						if not shouldRunSilentAimHook(methodName) then
 							return oldnamecall(...)
 						end
 						if checkcaller() then
@@ -2686,12 +2704,17 @@ run(function()
 							return oldnamecall(...)
 						end
 
-						local self, args = ..., {select(2, ...)}
-						local marker, r1, r2, r3, r4, r5 = Hooks[Method.Value](args)
-						if marker == SILENT_AIM_HOOK_RETURN then
-							return r1, r2, r3, r4, r5
+						local hookFn = getSilentAimHook(methodName)
+						if not hookFn then
+							return oldnamecall(...)
 						end
-						return oldnamecall(self, unpack(args))
+
+						local self, args = ..., {select(2, ...)}
+						local hookReturns = table.pack(hookFn(args))
+						if hookReturns.n > 0 then
+							return table.unpack(hookReturns, 1, hookReturns.n)
+						end
+						return oldnamecall(self, table.unpack(args))
 					end)
 				end
 				
