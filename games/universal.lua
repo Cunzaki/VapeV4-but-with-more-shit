@@ -2576,14 +2576,31 @@ run(function()
 		return oldPrisonBulletHook(unpack(args, 1, args.n))
 	end
 
+	local FIND_PART_RAY_METHODS = {
+		FindPartOnRayWithIgnoreList = true,
+		FindPartOnRayWithWhitelist = true,
+		FindPartOnRay = true
+	}
+	local function copyIgnoreList(ignoreList)
+		local copy = {}
+		for i, v in ignoreList do
+			copy[i] = v
+		end
+		return copy
+	end
 	local Hooks = {
 		FindPartOnRayWithIgnoreList = function(args)
+			if typeof(args[1]) ~= 'Ray' then return end
 			if type(args[2]) == 'table' then
-				appendVisualizerIgnores(args[2])
+				local ignore = copyIgnoreList(args[2])
+				appendVisualizerIgnores(ignore)
+				args[2] = ignore
 			end
 			local ent, targetPart, origin = getTarget(args[1].Origin)
-			if ent then
-				args[1] = Ray.new(origin, CFrame.lookAt(origin, targetPart.Position).LookVector * args[1].Direction.Magnitude)
+			if ent and targetPart then
+				local magnitude = args[1].Direction.Magnitude
+				local direction = CFrame.lookAt(origin, targetPart.Position).LookVector * magnitude
+				args[1] = Ray.new(origin, direction)
 			end
 		end,
 		Raycast = function(args)
@@ -2763,12 +2780,18 @@ run(function()
 							return oldnamecall(...)
 						end
 
-						local self, args = ..., {select(2, ...)}
+						local self = ...
+						local argc = select('#', ...) - 1
+						local args = table.pack(select(2, ...))
+						if FIND_PART_RAY_METHODS[methodName] then
+							hookFn(args)
+							return oldnamecall(self, table.unpack(args, 1, argc))
+						end
 						local r1 = hookFn(args)
 						if typeof(r1) == 'Ray' and (methodName == 'ScreenPointToRay' or methodName == 'ViewportPointToRay') then
 							return r1
 						end
-						return oldnamecall(self, table.unpack(args))
+						return oldnamecall(self, table.unpack(args, 1, argc))
 					end)
 				end
 				
