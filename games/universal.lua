@@ -2525,11 +2525,8 @@ run(function()
 
 	local Hooks = {
 		FindPartOnRayWithIgnoreList = function(args)
-			local ent, targetPart, origin = getTarget(args[1].Origin, args[2])
+			local ent, targetPart, origin = getTarget(args[1].Origin)
 			if not ent then return end
-			if Wallbang.Enabled then
-				return targetPart, targetPart.Position, targetPart.GetClosestPointOnSurface(targetPart, origin), targetPart.Material
-			end
 			args[1] = Ray.new(origin, CFrame.lookAt(origin, targetPart.Position).LookVector * args[1].Direction.Magnitude)
 		end,
 		Raycast = function(args)
@@ -2710,9 +2707,9 @@ run(function()
 						end
 
 						local self, args = ..., {select(2, ...)}
-						local hookReturns = table.pack(hookFn(args))
-						if hookReturns.n > 0 then
-							return table.unpack(hookReturns, 1, hookReturns.n)
+						local r1 = hookFn(args)
+						if typeof(r1) == 'Ray' then
+							return r1
 						end
 						return oldnamecall(self, table.unpack(args))
 					end)
