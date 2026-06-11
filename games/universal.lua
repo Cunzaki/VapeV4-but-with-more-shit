@@ -240,68 +240,6 @@ vape.Libraries.esp = ESPLibrary
 vape.Libraries.whitelist = whitelist
 vape.Libraries.prediction = prediction
 vape.Libraries.hash = hash
-vape.Libraries.visualizerClones = {}
-
-local function getOriginFromVisualizerClone(clone)
-	if not (clone and clone.Parent) then return nil end
-
-	local cloneRoot = clone:FindFirstChild('HumanoidRootPart') or clone.PrimaryPart
-	local charRoot = entitylib.isAlive and entitylib.character and entitylib.character.RootPart
-	local tool = lplr.Character and lplr.Character:FindFirstChildWhichIsA('Tool')
-	local muzzle = tool and tool:FindFirstChild('Muzzle')
-
-	if muzzle and charRoot and cloneRoot then
-		return cloneRoot.Position + (muzzle.Position - charRoot.Position)
-	end
-
-	local head = clone:FindFirstChild('Head')
-	if head then
-		return head.Position
-	end
-
-	if cloneRoot then
-		return cloneRoot.Position
-	end
-end
-
-vape.Libraries.unregisterVisualizerClone = function(clone)
-	local list = vape.Libraries.visualizerClones
-	for i = #list, 1, -1 do
-		if list[i].clone == clone then
-			table.remove(list, i)
-		end
-	end
-end
-
-vape.Libraries.registerVisualizerClone = function(clone, isEnabled)
-	vape.Libraries.unregisterVisualizerClone(clone)
-	table.insert(vape.Libraries.visualizerClones, {
-		clone = clone,
-		time = os.clock(),
-		isEnabled = isEnabled
-	})
-end
-
-vape.Libraries.getVisualizerTracerOrigin = function()
-	local list = vape.Libraries.visualizerClones
-	local bestClone, bestTime = nil, -math.huge
-
-	for i = #list, 1, -1 do
-		local entry = list[i]
-		if entry.clone and entry.clone.Parent and (not entry.isEnabled or entry.isEnabled()) then
-			if entry.time > bestTime then
-				bestTime = entry.time
-				bestClone = entry.clone
-			end
-		elseif not entry.clone or not entry.clone.Parent then
-			table.remove(list, i)
-		end
-	end
-
-	if bestClone then
-		return getOriginFromVisualizerClone(bestClone)
-	end
-end
 vape.Libraries.auraanims = {
 	Normal = {
 		{CFrame = CFrame.new(-0.17, -0.14, -0.12) * CFrame.Angles(math.rad(-53), math.rad(50), math.rad(-64)), Time = 0.1},
@@ -1349,25 +1287,16 @@ local HitSoundVolume
 local HITSOUND_PRESETS = {
 	['None'] = '',
 	['Rust'] = 'rbxassetid://4764109000',
+	['Fatality'] = 'rbxassetid://5991770206',
 	['Neverlose'] = 'rbxassetid://8679627751',
-	['Skeet'] = 'rbxassetid://5633695679',
-	['Fatality'] = 'rbxassetid://6534947869',
-	['Bameware'] = 'rbxassetid://3124331820',
-	['Bell'] = 'rbxassetid://6534947240',
-	['Bubble'] = 'rbxassetid://6534947588',
-	['Bonk'] = 'rbxassetid://5766898159',
-	['Bruh'] = 'rbxassetid://4578740568',
-	['Minecraft'] = 'rbxassetid://4018616850',
-	['Pick'] = 'rbxassetid://1347140027',
-	['Pop'] = 'rbxassetid://198598793',
-	['Sans'] = 'rbxassetid://3188795283',
-	['Vine'] = 'rbxassetid://5332680810',
-	['Fart'] = 'rbxassetid://130833677',
-	['Big'] = 'rbxassetid://5332005053',
 	['TF2'] = 'rbxassetid://6909318500',
+	['Minecraft'] = 'rbxassetid://4018615234',
+	['Punch'] = 'rbxassetid://6822606558',
 	['Double Kill'] = 'rbxassetid://130819307',
 	['Boom Headshot'] = 'rbxassetid://7361085557',
 	['Windows Error'] = 'rbxassetid://2661731024',
+	['Anime Ping'] = 'rbxassetid://8120788861',
+	['Bells'] = 'rbxassetid://1053865439',
 	['Custom'] = 'CUSTOM'
 }
 local function getHitSoundId()
@@ -1889,11 +1818,6 @@ run(function()
 	end
 
 	local function getLocalTracerOrigin()
-		local visualOrigin = vape.Libraries.getVisualizerTracerOrigin and vape.Libraries.getVisualizerTracerOrigin()
-		if visualOrigin then
-			return visualOrigin
-		end
-
 		if game.PlaceId == 155615604 then
 			local prison = vape.Libraries.prisonlife
 			local tool = lplr.Character and lplr.Character:FindFirstChildWhichIsA('Tool')
@@ -1933,7 +1857,6 @@ run(function()
 	
 	local function cleanupPMClone()
 		if pmClone then
-			vape.Libraries.unregisterVisualizerClone(pmClone)
 			pmClone:Destroy()
 		end
 		pmClone = nil
@@ -2050,10 +1973,6 @@ run(function()
 			cleanupPMClone()
 			return
 		end
-
-		vape.Libraries.registerVisualizerClone(pmClone, function()
-			return PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled
-		end)
 	end
 	
 	local function cleanupPMRadius()
@@ -2382,17 +2301,8 @@ run(function()
 		end
 	end
 
-	local function resolveTracerOrigin(fallbackOrigin)
-		local visualOrigin = vape.Libraries.getVisualizerTracerOrigin and vape.Libraries.getVisualizerTracerOrigin()
-		if visualOrigin then
-			return visualOrigin
-		end
-		return fallbackOrigin or getLocalTracerOrigin()
-	end
-
 	local function firePrisonTracers(shootOrigin, targetPosition, ent)
 		lastMb1Click = tick()
-		shootOrigin = resolveTracerOrigin(shootOrigin)
 		local prison = vape.Libraries.prisonlife
 		local legitTracers = vape.Legit and vape.Legit.Modules and vape.Legit.Modules.BulletTracers
 		if legitTracers and legitTracers.Enabled and prison and prison.fireTracers then
@@ -8723,7 +8633,6 @@ run(function()
 
 	local function clearVisualizer()
 		if visualClone then
-			vape.Libraries.unregisterVisualizerClone(visualClone)
 			visualClone:Destroy()
 			visualClone = nil
 		end
@@ -8885,10 +8794,6 @@ run(function()
 		end
 
 		clone:PivotTo(visualServerCFrame)
-
-		vape.Libraries.registerVisualizerClone(visualClone, function()
-			return Visualizer and Visualizer.Enabled
-		end)
 	end
 	
 	Blink = vape.Categories.Utility:CreateModule({
@@ -9087,13 +8992,13 @@ run(function()
 	local randAngleX = 0
 	local randAngleY = 0
 	local currentRot = CFrame.identity
-	local savedDesyncCFrame = nil
+	local returnthis = nil
 	
 	-- Position desync variables
 	local lastposjittick = 0
 	local posjitflip = false
 	local posspinangle = 0
-	local posrandval = Vector3.zero
+	local posrandval = 0
 	local currentPosOffset = Vector3.zero
 	
 	-- Camera stabilization
@@ -9148,7 +9053,6 @@ run(function()
 	-- Cleanup desync clone
 	local function cleanupDesyncClone()
 		if desyncClone then
-			vape.Libraries.unregisterVisualizerClone(desyncClone)
 			desyncClone:Destroy()
 		end
 		desyncClone = nil
@@ -9271,10 +9175,6 @@ run(function()
 			cleanupDesyncClone()
 			return
 		end
-
-		vape.Libraries.registerVisualizerClone(desyncClone, function()
-			return Visualizer and Visualizer.Enabled
-		end)
 	end
 	
 	-- Calculate desync rotation for a specific axis
@@ -9375,9 +9275,6 @@ run(function()
 		
 		-- Update state
 		lastposjittick, posjitflip, posspinangle, posrandval = newPosTick, newPosFlip, newPosSpin, newPosRand
-		if typeof(result) ~= 'Vector3' then
-			result = Vector3.zero
-		end
 		currentPosOffset = result
 		return result
 	end
@@ -9413,34 +9310,54 @@ run(function()
 		return rot
 	end
 	
-	-- Spoof CFrame only during physics replication so client gun scripts keep the real CFrame.
-	local function onPreSimulation()
-		if not Desync.Enabled or not desyncEnabled then return end
+	-- Main desync loop
+	local function onHeartbeat()
+		if not Desync.Enabled then return end
 		
 		local char = entitylib.character and entitylib.character.Character
 		local hum = char and char:FindFirstChild("Humanoid")
 		local root = char and char:FindFirstChild("HumanoidRootPart")
 		
-		if not (hum and root and hum.Health > 0) then return end
+		if not (hum and root) then return end
 		
-		calculateRotation()
-		local posOffset = calculatePositionOffset()
-		savedDesyncCFrame = root.CFrame
-		root.CFrame = (savedDesyncCFrame + posOffset) * currentRot
-	end
-	
-	local function onPostSimulation()
-		if not savedDesyncCFrame then return end
-		
-		local root = entitylib.character and entitylib.character.RootPart
-		if root then
-			root.CFrame = savedDesyncCFrame
+		-- Calculate and apply desync
+		if desyncEnabled and hum.Health > 0 then
+			local rot = calculateRotation()
+			local posOffset = calculatePositionOffset()
+			returnthis = root.CFrame
+			
+			-- Apply desync CFrame spoof (both rotation and position)
+			root.CFrame = (root.CFrame + posOffset) * rot
+			
+			-- Restore after a frame
+			RunService.RenderStepped:Wait()
+			root.CFrame = returnthis
 		end
-		savedDesyncCFrame = nil
 	end
 	
 	-- Visualizer loop
 	local function onRenderStepped()
+		local char = entitylib.character and entitylib.character.Character
+		local hum = char and char:FindFirstChild("Humanoid")
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		
+		-- Handle camera proxy
+		if cameraProxy then
+			if not hum or hum.Health <= 0 then
+				cleanupCameraProxy()
+			elseif root then
+				local camPos = (returnthis or root.CFrame).Position
+				local camOffset = hum.CameraOffset
+				
+				-- If sitting, follow the seat instead to prevent bugs
+				if hum.Sit and hum.SeatPart then
+					camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
+				end
+				
+				cameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
+			end
+		end
+		
 		if not Visualizer.Enabled or not desyncCloneRoot then return end
 		
 		local baseCF = entitylib.character and entitylib.character.RootPart and entitylib.character.RootPart.CFrame
@@ -9552,8 +9469,8 @@ run(function()
 					raknet.add_send_hook(serverDesyncHook)
 				else
 					desyncEnabled = true
-					Desync:Clean(RunService.PreSimulation:Connect(onPreSimulation))
-					Desync:Clean(RunService.PostSimulation:Connect(onPostSimulation))
+					setupCameraProxy()
+					Desync:Clean(RunService.Heartbeat:Connect(onHeartbeat))
 					Desync:Clean(RunService.RenderStepped:Connect(onRenderStepped))
 					
 					if Visualizer.Enabled then
@@ -9562,6 +9479,7 @@ run(function()
 					
 					-- Connect to character changes
 					Desync:Clean(entitylib.Events.LocalAdded:Connect(function()
+						setupCameraProxy()
 						if Visualizer.Enabled then
 							setupDesyncClone()
 						end
@@ -9576,7 +9494,6 @@ run(function()
 					currentDesyncRotation = CFrame.identity
 					currentPosOffset = Vector3.zero
 					currentRot = CFrame.identity
-					savedDesyncCFrame = nil
 					cleanupCameraProxy()
 					cleanupDesyncClone()
 				end

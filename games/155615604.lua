@@ -2444,10 +2444,7 @@ run(function()
 			if callback then
 				TracerHook:Add('BulletTracers', function(...)
 					local origin, dir = ...
-					local visualOrigin = vape.Libraries.getVisualizerTracerOrigin and vape.Libraries.getVisualizerTracerOrigin()
-					if visualOrigin then
-						origin = visualOrigin
-					elseif vtool then
+					if vtool then
 						origin = vtool.Muzzle.Position
 					else
 						local tool = lplr.Character and lplr.Character:FindFirstChildWhichIsA('Tool')
