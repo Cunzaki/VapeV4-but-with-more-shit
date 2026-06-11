@@ -9087,13 +9087,13 @@ run(function()
 	local randAngleX = 0
 	local randAngleY = 0
 	local currentRot = CFrame.identity
-	local returnthis = nil
+	local savedDesyncCFrame = nil
 	
 	-- Position desync variables
 	local lastposjittick = 0
 	local posjitflip = false
 	local posspinangle = 0
-	local posrandval = 0
+	local posrandval = Vector3.zero
 	local currentPosOffset = Vector3.zero
 	
 	-- Camera stabilization
@@ -9375,6 +9375,9 @@ run(function()
 		
 		-- Update state
 		lastposjittick, posjitflip, posspinangle, posrandval = newPosTick, newPosFlip, newPosSpin, newPosRand
+		if typeof(result) ~= 'Vector3' then
+			result = Vector3.zero
+		end
 		currentPosOffset = result
 		return result
 	end
@@ -9410,54 +9413,34 @@ run(function()
 		return rot
 	end
 	
-	-- Main desync loop
-	local function onHeartbeat()
-		if not Desync.Enabled then return end
+	-- Spoof CFrame only during physics replication so client gun scripts keep the real CFrame.
+	local function onPreSimulation()
+		if not Desync.Enabled or not desyncEnabled then return end
 		
 		local char = entitylib.character and entitylib.character.Character
 		local hum = char and char:FindFirstChild("Humanoid")
 		local root = char and char:FindFirstChild("HumanoidRootPart")
 		
-		if not (hum and root) then return end
+		if not (hum and root and hum.Health > 0) then return end
 		
-		-- Calculate and apply desync
-		if desyncEnabled and hum.Health > 0 then
-			local rot = calculateRotation()
-			local posOffset = calculatePositionOffset()
-			returnthis = root.CFrame
-			
-			-- Apply desync CFrame spoof (both rotation and position)
-			root.CFrame = (root.CFrame + posOffset) * rot
-			
-			-- Restore after a frame
-			RunService.RenderStepped:Wait()
-			root.CFrame = returnthis
+		calculateRotation()
+		local posOffset = calculatePositionOffset()
+		savedDesyncCFrame = root.CFrame
+		root.CFrame = (savedDesyncCFrame + posOffset) * currentRot
+	end
+	
+	local function onPostSimulation()
+		if not savedDesyncCFrame then return end
+		
+		local root = entitylib.character and entitylib.character.RootPart
+		if root then
+			root.CFrame = savedDesyncCFrame
 		end
+		savedDesyncCFrame = nil
 	end
 	
 	-- Visualizer loop
 	local function onRenderStepped()
-		local char = entitylib.character and entitylib.character.Character
-		local hum = char and char:FindFirstChild("Humanoid")
-		local root = char and char:FindFirstChild("HumanoidRootPart")
-		
-		-- Handle camera proxy
-		if cameraProxy then
-			if not hum or hum.Health <= 0 then
-				cleanupCameraProxy()
-			elseif root then
-				local camPos = (returnthis or root.CFrame).Position
-				local camOffset = hum.CameraOffset
-				
-				-- If sitting, follow the seat instead to prevent bugs
-				if hum.Sit and hum.SeatPart then
-					camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
-				end
-				
-				cameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
-			end
-		end
-		
 		if not Visualizer.Enabled or not desyncCloneRoot then return end
 		
 		local baseCF = entitylib.character and entitylib.character.RootPart and entitylib.character.RootPart.CFrame
@@ -9569,8 +9552,8 @@ run(function()
 					raknet.add_send_hook(serverDesyncHook)
 				else
 					desyncEnabled = true
-					setupCameraProxy()
-					Desync:Clean(RunService.Heartbeat:Connect(onHeartbeat))
+					Desync:Clean(RunService.PreSimulation:Connect(onPreSimulation))
+					Desync:Clean(RunService.PostSimulation:Connect(onPostSimulation))
 					Desync:Clean(RunService.RenderStepped:Connect(onRenderStepped))
 					
 					if Visualizer.Enabled then
@@ -9579,7 +9562,6 @@ run(function()
 					
 					-- Connect to character changes
 					Desync:Clean(entitylib.Events.LocalAdded:Connect(function()
-						setupCameraProxy()
 						if Visualizer.Enabled then
 							setupDesyncClone()
 						end
@@ -9594,6 +9576,7 @@ run(function()
 					currentDesyncRotation = CFrame.identity
 					currentPosOffset = Vector3.zero
 					currentRot = CFrame.identity
+					savedDesyncCFrame = nil
 					cleanupCameraProxy()
 					cleanupDesyncClone()
 				end
