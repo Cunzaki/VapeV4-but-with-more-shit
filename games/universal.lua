@@ -1304,23 +1304,17 @@ local HITSOUND_PRESETS = {
 	['None'] = '',
 	['Rust'] = 'rbxassetid://4764109000',
 	['Neverlose'] = 'rbxassetid://8679627751',
-	['Apple Pay'] = 'rbxassetid://10238167983',
-	['Water Drop'] = 'rbxassetid://9113700967',
-	['Steel'] = 'rbxassetid://9114380462',
-	['Rubber'] = 'rbxassetid://9114436310',
-	['Headshot'] = 'rbxassetid://6535963277',
-	['Sparkle'] = 'rbxassetid://6534948093',
-	['Fatality'] = 'rbxassetid://6534941713',
-	['Among Us'] = 'rbxassetid://7443530127',
-	['Slime'] = 'rbxassetid://6733581099',
-	['Cash'] = 'rbxassetid://6254085650',
-	['Glass'] = 'rbxassetid://6974878389',
-	['Laser'] = 'rbxassetid://5130934727',
-	['Vine Boom'] = 'rbxassetid://6338487295',
-	['Cartoon'] = 'rbxassetid://5568215942',
-	['Apex'] = 'rbxassetid://5763724879',
-	['Click'] = 'rbxassetid://6534940039',
-	['Bubble Pop'] = 'rbxassetid://9185220884',
+	['Bam'] = 'rbxassetid://9125630967',
+	['Bell'] = 'rbxassetid://6535970226',
+	['Bubble'] = 'rbxassetid://6534948093',
+	['CS:GO'] = 'rbxassetid://5447626404',
+	['Ding'] = 'rbxassetid://8883380537',
+	['Minecraft'] = 'rbxassetid://6026980354',
+	['Pop'] = 'rbxassetid://699082167',
+	['Quake'] = 'rbxassetid://160432334',
+	['Bonk'] = 'rbxassetid://5763724879',
+	['TF2 Crit'] = 'rbxassetid://345514498',
+	['Roblox Classic'] = 'rbxassetid://12222002',
 	['Custom'] = 'CUSTOM'
 }
 local function getHitSoundId()
@@ -1371,6 +1365,27 @@ run(function()
 	local BulletTracerDuration
 	playHitSound = function() end
 	lastHitsoundTime = 0
+	local DEFAULT_IGNORED_SCRIPTS = {
+		'ControlScript', 'ControlModule', 'PlayerModule', 'CameraModule',
+		'Popper', 'Poppercam', 'ZoomController', 'BaseCamera', 'ClassicCamera',
+		'OrbitalCamera', 'LegacyCamera', 'Invisicam', 'MouseLockController', 'CameraInput'
+	}
+	local function shouldIgnoreSilentAimHook(calling)
+		if not calling then return false end
+		local list = (IgnoredScripts and #IgnoredScripts.ListEnabled > 0) and IgnoredScripts.ListEnabled or DEFAULT_IGNORED_SCRIPTS
+		local name = calling.Name or tostring(calling)
+		if table.find(list, name) or table.find(list, tostring(calling)) then
+			return true
+		end
+		local parent = calling
+		while parent do
+			if parent.Name == 'CameraModule' or parent.Name == 'PlayerModule' or parent.Name == 'ZoomController' then
+				return true
+			end
+			parent = parent.Parent
+		end
+		return false
+	end
 	local TracerClickWindow = 0.4
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
@@ -2512,8 +2527,8 @@ run(function()
 		FindPartOnRayWithIgnoreList = function(args)
 			local ent, targetPart, origin = getTarget(args[1].Origin, {args[2]})
 			if not ent then return end
-			if Wallbang.Enabled then 
-				return {targetPart, targetPart.Position, targetPart.GetClosestPointOnSurface(targetPart, origin), targetPart.Material} 
+			if Wallbang.Enabled then
+				return true, targetPart, targetPart.Position, targetPart.GetClosestPointOnSurface(targetPart, origin), targetPart.Material
 			end
 			args[1] = Ray.new(origin, CFrame.lookAt(origin, targetPart.Position).LookVector * args[1].Direction.Magnitude)
 		end,
@@ -2536,7 +2551,7 @@ run(function()
 				if not calc then return end
 				direction = CFrame.lookAt(origin, calc)
 			end
-			return {Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)}
+			return true, Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)
 		end,
 		Ray = function(args)
 			local ent, targetPart, origin = getTarget(args[1])
@@ -2641,11 +2656,8 @@ run(function()
 						end
 						local calling = getcallingscript()
 
-						if calling then
-							local list = #IgnoredScripts.ListEnabled > 0 and IgnoredScripts.ListEnabled or {'ControlScript', 'ControlModule'}
-							if table.find(list, tostring(calling)) then
-								return oldray(origin, direction)
-							end
+						if shouldIgnoreSilentAimHook(calling) then
+							return oldray(origin, direction)
 						end
 
 						local args = {origin, direction}
@@ -2662,17 +2674,14 @@ run(function()
 						end
 
 						local calling = getcallingscript()
-						if calling then
-							local list = #IgnoredScripts.ListEnabled > 0 and IgnoredScripts.ListEnabled or {'ControlScript', 'ControlModule'}
-							if table.find(list, tostring(calling)) then
-								return oldnamecall(...)
-							end
+						if shouldIgnoreSilentAimHook(calling) then
+							return oldnamecall(...)
 						end
 
 						local self, args = ..., {select(2, ...)}
-						local res = Hooks[Method.Value](args)
-						if res then
-							return unpack(res)
+						local handled, r1, r2, r3, r4, r5 = Hooks[Method.Value](args)
+						if handled then
+							return r1, r2, r3, r4, r5
 						end
 						return oldnamecall(self, unpack(args))
 					end)
@@ -2750,8 +2759,14 @@ run(function()
 					end
 					
 					local ent
+					local autofireWindowActive = not mouse1click or (isrbxactive or iswindowactive)()
 					if AutoFire.Enabled then
-						if game.PlaceId == 155615604 and vape.Libraries.prisonlife and pl.Shoot then
+						if not autofireWindowActive then
+							if mouseClicked then
+								mouse1release()
+								mouseClicked = false
+							end
+						elseif game.PlaceId == 155615604 and vape.Libraries.prisonlife and pl.Shoot then
 							local gundata = getPrisonGunData()
 							local tool = lplr.Character and lplr.Character:FindFirstChildWhichIsA('Tool')
 							if gundata and tool and (tool:GetAttribute('Local_CurrentAmmo') or 0) > 0 and not tool:GetAttribute('Local_IsShooting') then
@@ -2804,8 +2819,7 @@ run(function()
 							registerShot(ent, ent.Head or ent.RootPart, (effectiveOrigin * fireoffset).Position)
 						end
 
-						if mouse1click and (isrbxactive or iswindowactive)() then
-							if ent and canClick() then
+						if ent and canClick() then
 								if delayCheck < tick() then
 									if mouseClicked then
 										mouse1release()
@@ -2815,13 +2829,12 @@ run(function()
 										lastMb1Click = tick()
 									end
 									mouseClicked = not mouseClicked
-								end
-							else
-								if mouseClicked then
-									mouse1release()
-								end
-								mouseClicked = false
 							end
+						else
+							if mouseClicked then
+								mouse1release()
+							end
+							mouseClicked = false
 						end
 						end
 					end
