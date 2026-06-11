@@ -57,6 +57,7 @@ local lplr = playersService.LocalPlayer
 local assetfunction = getcustomasset
 
 local vape = shared.vape
+vape.VisualizerTracerOrigins = vape.VisualizerTracerOrigins or {}
 local tween = vape.Libraries.tween
 local targetinfo = vape.Libraries.targetinfo
 local getfontsize = vape.Libraries.getfontsize
@@ -66,6 +67,21 @@ local TargetStrafeVector, SpiderShift, WaypointFolder
 local currentDesyncRotation = CFrame.identity
 local Spider = {Enabled = false}
 local Phase = {Enabled = false}
+
+local function getVisualizerClonePartPosition(clone)
+	if not clone or not clone.Parent then return end
+	local head = clone:FindFirstChild('Head')
+	if head then return head.Position end
+	local hrp = clone:FindFirstChild('HumanoidRootPart')
+	if hrp then return hrp.Position + Vector3.new(0, 1.5, 0) end
+end
+
+local function getActiveVisualizerTracerOrigin()
+	for _, getter in pairs(vape.VisualizerTracerOrigins) do
+		local origin = getter()
+		if origin then return origin end
+	end
+end
 
 local function addBlur(parent)
 	local blur = Instance.new('ImageLabel')
@@ -1288,23 +1304,23 @@ local HITSOUND_PRESETS = {
 	['None'] = '',
 	['Rust'] = 'rbxassetid://4764109000',
 	['Neverlose'] = 'rbxassetid://8679627751',
-	['Skeet'] = 'rbxassetid://4753603610',
-	['Gamesense'] = 'rbxassetid://4817809188',
-	['Quake'] = 'rbxassetid://4868633804',
-	['Bubble'] = 'rbxassetid://6534947588',
-	['Bell'] = 'rbxassetid://6534947240',
-	['Pop'] = 'rbxassetid://198598793',
-	['Bonk'] = 'rbxassetid://3765689841',
-	['Boink'] = 'rbxassetid://5451260445',
-	['Cod'] = 'rbxassetid://160432334',
-	['TF2'] = 'rbxassetid://3455144981',
-	['TF2 Critical'] = 'rbxassetid://296102734',
-	['Minecraft'] = 'rbxassetid://4018616850',
-	['OSU'] = 'rbxassetid://7147454322',
-	['RIFK7'] = 'rbxassetid://9102080552',
-	['Bameware'] = 'rbxassetid://3124331820',
-	['Pick'] = 'rbxassetid://1347140027',
-	['Lazer'] = 'rbxassetid://1624609598',
+	['Apple Pay'] = 'rbxassetid://10238167983',
+	['Water Drop'] = 'rbxassetid://9113700967',
+	['Steel'] = 'rbxassetid://9114380462',
+	['Rubber'] = 'rbxassetid://9114436310',
+	['Headshot'] = 'rbxassetid://6535963277',
+	['Sparkle'] = 'rbxassetid://6534948093',
+	['Fatality'] = 'rbxassetid://6534941713',
+	['Among Us'] = 'rbxassetid://7443530127',
+	['Slime'] = 'rbxassetid://6733581099',
+	['Cash'] = 'rbxassetid://6254085650',
+	['Glass'] = 'rbxassetid://6974878389',
+	['Laser'] = 'rbxassetid://5130934727',
+	['Vine Boom'] = 'rbxassetid://6338487295',
+	['Cartoon'] = 'rbxassetid://5568215942',
+	['Apex'] = 'rbxassetid://5763724879',
+	['Click'] = 'rbxassetid://6534940039',
+	['Bubble Pop'] = 'rbxassetid://9185220884',
 	['Custom'] = 'CUSTOM'
 }
 local function getHitSoundId()
@@ -1826,6 +1842,9 @@ run(function()
 	end
 
 	local function getLocalTracerOrigin()
+		local visualOrigin = getActiveVisualizerTracerOrigin()
+		if visualOrigin then return visualOrigin end
+
 		if game.PlaceId == 155615604 then
 			local prison = vape.Libraries.prisonlife
 			local tool = lplr.Character and lplr.Character:FindFirstChildWhichIsA('Tool')
@@ -2311,15 +2330,16 @@ run(function()
 
 	local function firePrisonTracers(shootOrigin, targetPosition, ent)
 		lastMb1Click = tick()
+		local origin = getLocalTracerOrigin()
 		local prison = vape.Libraries.prisonlife
 		local legitTracers = vape.Legit and vape.Legit.Modules and vape.Legit.Modules.BulletTracers
 		if legitTracers and legitTracers.Enabled and prison and prison.fireTracers then
-			prison.fireTracers(shootOrigin, targetPosition)
+			prison.fireTracers(origin, targetPosition)
 		end
 		if BulletTracers and BulletTracers.Enabled and ent then
 			local mainColor, glowColor = getTracerColors()
 			spawnBulletTracer(ent, {
-				Origin = shootOrigin,
+				Origin = origin,
 				TargetPosition = targetPosition,
 			}, tick(), mainColor, glowColor)
 		end
@@ -2722,14 +2742,13 @@ run(function()
 
 								if ent and entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
 									if not (taser and ent.Character:GetAttribute('Tased')) then
-										registerShot(ent, ent.Head or ent.RootPart, entitylib.character.Head.Position)
+										registerShot(ent, ent.Head or ent.RootPart, getLocalTracerOrigin())
 										if delayCheck < tick() then
 											delayCheck = tick() + (gundata.FireRate or AutoFireShootDelay.Value)
-											local shootOrigin = entitylib.character.Head.Position
 											local obj = {UserInputState = Enum.UserInputState.Begin, UserInputType = Enum.UserInputType.MouseButton1, Position = Vector3.zero}
 											task.spawn(pl.Shoot, obj)
 											obj.UserInputState = Enum.UserInputState.End
-											firePrisonTracers(shootOrigin, ent.Head.Position, ent)
+											firePrisonTracers(getLocalTracerOrigin(), ent.Head.Position, ent)
 										end
 									end
 								end
@@ -3279,6 +3298,17 @@ run(function()
 		Darker = true,
 		Tooltip = 'Low - Fastest, least accurate\nMedium - Balanced\nHigh - More accurate, slower\nUltra - Most accurate, slowest'
 	})
+	vape.VisualizerTracerOrigins.PositionManipulation = function()
+		if not (PositionManipulation and PositionManipulation.Enabled and PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled) then
+			return
+		end
+		if pmClone and pmClone.Parent then
+			return getVisualizerClonePartPosition(pmClone)
+		end
+		if pmTargetPosition then
+			return pmTargetPosition + Vector3.new(0, 1.5, 0)
+		end
+	end
 	vape:Clean(BulletTracerFolder)
 end)
 
@@ -8955,6 +8985,12 @@ run(function()
 		Darker = true,
 		Function = applyVisualizerStyle
 	})
+	vape.VisualizerTracerOrigins.Blink = function()
+		if not (Blink and Blink.Enabled and Visualizer and Visualizer.Enabled) then return end
+		if visualClone and visualClone.Parent then
+			return getVisualizerClonePartPosition(visualClone)
+		end
+	end
 end)
 
 run(function()
@@ -9769,6 +9805,13 @@ run(function()
 			end
 		end
 	})
+
+	vape.VisualizerTracerOrigins.Desync = function()
+		if not (Desync and Desync.Enabled and Visualizer and Visualizer.Enabled) then return end
+		if desyncClone and desyncClone.Parent then
+			return getVisualizerClonePartPosition(desyncClone)
+		end
+	end
 	
 	updateUIVisibility()
 end)
