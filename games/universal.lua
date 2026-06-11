@@ -1456,29 +1456,39 @@ run(function()
 	local pmCameraProxy
 	local pmOriginalCameraSubject
 	
-	local function cleanupPMCameraProxy()
+	local function cleanupPMCameraProxy(restore)
+		local cam = workspace.CurrentCamera
 		if pmCameraProxy then
+			if cam and cam.CameraSubject == pmCameraProxy then
+				cam.CameraSubject = nil
+			end
 			pmCameraProxy:Destroy()
 			pmCameraProxy = nil
 		end
-		local cam = workspace.CurrentCamera
-		if cam and pmOriginalCameraSubject then
-			cam.CameraSubject = pmOriginalCameraSubject
+		if restore == false then
 			pmOriginalCameraSubject = nil
+			return
 		end
+		if cam and pmOriginalCameraSubject and pmOriginalCameraSubject.Parent then
+			cam.CameraSubject = pmOriginalCameraSubject
+		end
+		pmOriginalCameraSubject = nil
 	end
 	
 	local function setupPMCameraProxy()
-		cleanupPMCameraProxy()
-		
 		local cam = workspace.CurrentCamera
 		if not cam then return end
 		
 		local char = entitylib.character and entitylib.character.Character
-		local hum = char and char:FindFirstChild("Humanoid")
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
 		if not hum or hum.Health <= 0 then return end
 		
-		pmOriginalCameraSubject = cam.CameraSubject
+		if pmCameraProxy then
+			pmCameraProxy:Destroy()
+			pmCameraProxy = nil
+		end
+		
+		pmOriginalCameraSubject = hum
 		
 		pmCameraProxy = Instance.new("Part")
 		pmCameraProxy.Name = "VapePositionManipulationCameraProxy"
@@ -2576,31 +2586,50 @@ run(function()
 						setupPMRadius()
 					end
 					SilentAim:Clean(entitylib.Events.LocalAdded:Connect(function()
-						setupPMCameraProxy()
-						if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
-							setupPMClone()
-						end
-						if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled then
-							setupPMRadius()
-						end
+						task.defer(function()
+							if not (PositionManipulation and PositionManipulation.Enabled) then return end
+							setupPMCameraProxy()
+							if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
+								setupPMClone()
+							end
+							if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled then
+								setupPMRadius()
+							end
+						end)
+					end))
+					SilentAim:Clean(entitylib.Events.LocalRemoved:Connect(function()
+						cleanupPMCameraProxy(false)
+						cleanupPMClone()
+						cleanupPMRadius()
+						pmTargetPosition = nil
 					end))
 					SilentAim:Clean(runService.RenderStepped:Connect(function()
-						if pmCameraProxy then
-							local char = entitylib.character and entitylib.character.Character
-							local hum = char and char:FindFirstChild("Humanoid")
-							local root = char and char:FindFirstChild("HumanoidRootPart")
-							if hum and root and hum.Health > 0 then
-								local camPos = root.CFrame.Position
-								local camOffset = hum.CameraOffset
-								
-								if hum.Sit and hum.SeatPart then
-									camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
-								end
-								
-								pmCameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
-							elseif not hum or hum.Health <= 0 then
-								cleanupPMCameraProxy()
+						if not (PositionManipulation and PositionManipulation.Enabled) then return end
+						local char = entitylib.character and entitylib.character.Character
+						local hum = char and char:FindFirstChildOfClass("Humanoid")
+						local root = char and char:FindFirstChild("HumanoidRootPart")
+						if not hum or hum.Health <= 0 then
+							if pmCameraProxy then
+								cleanupPMCameraProxy(false)
 							end
+							return
+						end
+						if not pmCameraProxy then
+							setupPMCameraProxy()
+						end
+						local cam = workspace.CurrentCamera
+						if pmCameraProxy and cam and cam.CameraSubject ~= pmCameraProxy then
+							cam.CameraSubject = pmCameraProxy
+						end
+						if pmCameraProxy and root then
+							local camPos = root.CFrame.Position
+							local camOffset = hum.CameraOffset
+							
+							if hum.Sit and hum.SeatPart then
+								camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
+							end
+							
+							pmCameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
 						end
 					end))
 				end
@@ -2865,7 +2894,7 @@ run(function()
 				oldnamecall, oldray, oldPrisonBulletHook = nil, nil, nil
 				cleanupPMClone()
 				cleanupPMRadius()
-				cleanupPMCameraProxy()
+				cleanupPMCameraProxy(true)
 				
 				if isFrozen then
 					local char = entitylib.character.Character
@@ -9056,30 +9085,40 @@ run(function()
 	local desyncMotorMap = {}
 	
 	-- Cleanup camera proxy
-	local function cleanupCameraProxy()
+	local function cleanupCameraProxy(restore)
+		local cam = workspace.CurrentCamera
 		if cameraProxy then
+			if cam and cam.CameraSubject == cameraProxy then
+				cam.CameraSubject = nil
+			end
 			cameraProxy:Destroy()
 			cameraProxy = nil
 		end
-		local cam = workspace.CurrentCamera
-		if cam and originalCameraSubject then
-			cam.CameraSubject = originalCameraSubject
+		if restore == false then
 			originalCameraSubject = nil
+			return
 		end
+		if cam and originalCameraSubject and originalCameraSubject.Parent then
+			cam.CameraSubject = originalCameraSubject
+		end
+		originalCameraSubject = nil
 	end
 	
 	-- Setup camera proxy
 	local function setupCameraProxy()
-		cleanupCameraProxy()
-		
 		local cam = workspace.CurrentCamera
 		if not cam then return end
 		
 		local char = entitylib.character and entitylib.character.Character
-		local hum = char and char:FindFirstChild("Humanoid")
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
 		if not hum or hum.Health <= 0 then return end
 		
-		originalCameraSubject = cam.CameraSubject
+		if cameraProxy then
+			cameraProxy:Destroy()
+			cameraProxy = nil
+		end
+		
+		originalCameraSubject = hum
 		
 		cameraProxy = Instance.new("Part")
 		cameraProxy.Name = "VapeDesyncCameraProxy"
@@ -9382,24 +9421,37 @@ run(function()
 	-- Visualizer loop
 	local function onRenderStepped()
 		local char = entitylib.character and entitylib.character.Character
-		local hum = char and char:FindFirstChild("Humanoid")
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
 		local root = char and char:FindFirstChild("HumanoidRootPart")
 		
-		-- Handle camera proxy
-		if cameraProxy then
+		if desyncEnabled then
 			if not hum or hum.Health <= 0 then
-				cleanupCameraProxy()
-			elseif root then
-				local camPos = (returnthis or root.CFrame).Position
-				local camOffset = hum.CameraOffset
-				
-				-- If sitting, follow the seat instead to prevent bugs
-				if hum.Sit and hum.SeatPart then
-					camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
+				if cameraProxy then
+					cleanupCameraProxy(false)
 				end
-				
-				cameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
+			else
+				if not cameraProxy then
+					setupCameraProxy()
+				end
+				local cam = workspace.CurrentCamera
+				if cameraProxy and cam and cam.CameraSubject ~= cameraProxy then
+					cam.CameraSubject = cameraProxy
+				end
+				if cameraProxy and root then
+					local camPos = (returnthis or root.CFrame).Position
+					local camOffset = hum.CameraOffset
+					
+					if hum.Sit and hum.SeatPart then
+						camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
+					end
+					
+					cameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
+				end
 			end
+		end
+		
+		if Visualizer.Enabled and desyncEnabled and hum and hum.Health > 0 and not desyncCloneRoot then
+			setupDesyncClone()
 		end
 		
 		if not Visualizer.Enabled or not desyncCloneRoot then return end
@@ -9523,10 +9575,19 @@ run(function()
 					
 					-- Connect to character changes
 					Desync:Clean(entitylib.Events.LocalAdded:Connect(function()
-						setupCameraProxy()
-						if Visualizer.Enabled then
-							setupDesyncClone()
-						end
+						task.defer(function()
+							if not Desync.Enabled or Mode.Value ~= 'CFrame Desync' then return end
+							returnthis = nil
+							setupCameraProxy()
+							if Visualizer.Enabled then
+								setupDesyncClone()
+							end
+						end)
+					end))
+					Desync:Clean(entitylib.Events.LocalRemoved:Connect(function()
+						cleanupCameraProxy(false)
+						cleanupDesyncClone()
+						returnthis = nil
 					end))
 				end
 			else
@@ -9538,7 +9599,7 @@ run(function()
 					currentDesyncRotation = CFrame.identity
 					currentPosOffset = Vector3.zero
 					currentRot = CFrame.identity
-					cleanupCameraProxy()
+					cleanupCameraProxy(true)
 					cleanupDesyncClone()
 				end
 			end
