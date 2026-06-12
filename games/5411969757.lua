@@ -61,16 +61,33 @@ end
 
 local InfiniteAmmo, FireRate, FireDelay, InstantReload
 local weaponHeartbeat
+local weaponHeartbeatAccum = 0
+local WEAPON_HEARTBEAT_INTERVAL = 0.15
 local gunHookOriginals = {wait = nil, taskWait = nil}
 local gunHookState = {fireDelay = nil, instantReload = false}
 local wrappedLegacyReloads = setmetatable({}, {__mode = 'k'})
 local wrappedVAKReloads = setmetatable({}, {__mode = 'k'})
 
 local function isVAKWeaponTable(weapon)
-	return type(weapon) == 'table'
-		and type(rawget(weapon, 'RoF')) == 'number'
-		and type(rawget(weapon, 'Ammo')) == 'number'
-		and rawget(weapon, 'Name') ~= nil
+	if type(weapon) ~= 'table' or rawget(weapon, 'Name') == nil then
+		return false
+	end
+	if type(rawget(weapon, 'RoF')) == 'number' and type(rawget(weapon, 'Ammo')) == 'number' then
+		return true
+	end
+	if type(rawget(weapon, 'Rate')) == 'number' and type(rawget(weapon, 'Charge')) == 'number' then
+		return true
+	end
+	return false
+end
+
+local function getVAKWeaponKind(weapon)
+	if type(rawget(weapon, 'RoF')) == 'number' and type(rawget(weapon, 'Ammo')) == 'number' then
+		return 'tool'
+	end
+	if type(rawget(weapon, 'Rate')) == 'number' and type(rawget(weapon, 'Charge')) == 'number' then
+		return 'medi'
+	end
 end
 
 local function tryWeaponFromTool(tool)
@@ -87,22 +104,33 @@ local function tryWeaponFromTool(tool)
 	end
 end
 
-local function getVAKWeapon()
-	local fallback
+local function getVAKWeapons()
+	local weapons = {}
+	local seen = {}
+
 	for _, parent in {lplr.Character, lplr:FindFirstChild('Backpack')} do
 		if parent then
 			for _, tool in parent:GetChildren() do
 				local weapon = tryWeaponFromTool(tool)
-				if weapon then
-					if rawget(weapon, 'Out') == true then
-						return weapon
-					end
-					fallback = fallback or weapon
+				if weapon and not seen[weapon] then
+					seen[weapon] = true
+					table.insert(weapons, weapon)
 				end
 			end
 		end
 	end
-	return fallback
+
+	return weapons
+end
+
+local function getEquippedVAKWeapons()
+	local equipped = {}
+	for _, weapon in getVAKWeapons() do
+		if rawget(weapon, 'Out') == true then
+			table.insert(equipped, weapon)
+		end
+	end
+	return equipped
 end
 
 local function getLegacyGunScript()
@@ -134,7 +162,7 @@ local function isGunWaitScript(calling)
 	if not calling then
 		return false
 	end
-	if calling.Name == 'Gun' or calling.Name == 'ToolService' then
+	if calling.Name == 'Gun' or calling.Name == 'ToolService' or calling.Name == 'MediService' then
 		return true
 	end
 	local parent = calling
@@ -158,6 +186,10 @@ local function adjustGunWait(delayTime)
 
 	if gunHookState.instantReload then
 		if delayTime == 0.4 or delayTime == 0.18 or delayTime == 0.13 or delayTime == 0.04 then
+			return 0
+		end
+		local calling = getcallingscript and getcallingscript()
+		if calling and calling.Name == 'Gun' and delayTime >= 0.03 and delayTime <= 3.5 then
 			return 0
 		end
 	end
@@ -247,10 +279,6 @@ local function wrapVAKReload(weapon)
 				rawset(self, 'Ammo', maxAmmo)
 				rawset(self, 'Reloading', false)
 				rawset(self, 'Enabled', true)
-				local checkAmmo = rawget(self, 'CheckAmmo')
-				if type(checkAmmo) == 'function' then
-					checkAmmo(self, true, maxAmmo, maxAmmo)
-				end
 			end
 			return
 		end
@@ -259,22 +287,36 @@ local function wrapVAKReload(weapon)
 end
 
 local function patchVAKWeapon(weapon, opts)
-	if opts.fireRate then
-		rawset(weapon, 'RoF', FireDelay.Value / 100)
-	end
-
-	if opts.infiniteAmmo then
-		local maxAmmo = rawget(weapon, 'MaxAmmo')
-		if type(maxAmmo) == 'number' then
-			rawset(weapon, 'Ammo', maxAmmo)
+	local kind = getVAKWeaponKind(weapon)
+	if kind == 'tool' then
+		if opts.fireRate then
+			rawset(weapon, 'RoF', FireDelay.Value / 100)
 		end
-	end
-
-	if opts.instantReload then
-		rawset(weapon, 'ReloadTime', 0)
-		rawset(weapon, 'Reloading', false)
-		rawset(weapon, 'Enabled', true)
-		wrapVAKReload(weapon)
+		if opts.infiniteAmmo then
+			local maxAmmo = rawget(weapon, 'MaxAmmo')
+			if type(maxAmmo) == 'number' then
+				rawset(weapon, 'Ammo', maxAmmo)
+			end
+		end
+		if opts.instantReload then
+			wrapVAKReload(weapon)
+			if rawget(weapon, 'Reloading') then
+				rawset(weapon, 'Reloading', false)
+			end
+			if rawget(weapon, 'Enabled') == false then
+				rawset(weapon, 'Enabled', true)
+			end
+		end
+	elseif kind == 'medi' then
+		if opts.fireRate then
+			rawset(weapon, 'Rate', FireDelay.Value / 100)
+		end
+		if opts.infiniteAmmo or opts.instantReload then
+			local maxCharge = rawget(weapon, 'MaxCharge')
+			if type(maxCharge) == 'number' then
+				rawset(weapon, 'Charge', maxCharge)
+			end
+		end
 	end
 end
 
@@ -324,9 +366,8 @@ local function applyWeaponMods()
 		return
 	end
 
-	local vakWeapon = getVAKWeapon()
-	if vakWeapon then
-		patchVAKWeapon(vakWeapon, opts)
+	for _, weapon in getEquippedVAKWeapons() do
+		patchVAKWeapon(weapon, opts)
 	end
 
 	local legacyEnv = getLegacyGunEnv()
@@ -352,11 +393,16 @@ local function startWeaponHeartbeat()
 	if weaponHeartbeat then
 		return
 	end
-	weaponHeartbeat = runService.Heartbeat:Connect(function()
-		if anyWeaponModEnabled() then
-			applyWeaponMods()
-		else
+	weaponHeartbeatAccum = 0
+	weaponHeartbeat = runService.Heartbeat:Connect(function(dt)
+		if not anyWeaponModEnabled() then
 			stopWeaponHeartbeat()
+			return
+		end
+		weaponHeartbeatAccum = weaponHeartbeatAccum + dt
+		if weaponHeartbeatAccum >= WEAPON_HEARTBEAT_INTERVAL then
+			weaponHeartbeatAccum = 0
+			applyWeaponMods()
 		end
 	end)
 end
