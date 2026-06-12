@@ -10218,13 +10218,25 @@ end)
 
 run(function()
 	local Void
+	local VoidMode
+	local OffsetX
+	local OffsetY
+	local OffsetZ
+	local VoidSpeed
+	local RandomMin
+	local RandomMax
 	local Visualizer
 	local VisualizerMaterial
 	local VisualizerColorToggle
 	local VisualizerColor
 
 	local RunService = game:GetService('RunService')
-	local VOID_OFFSET = Vector3.new(0, -99999999, 0)
+
+	local currentVoidOffset = Vector3.new(0, -500000, 0)
+	local lastVoidTick = 0
+	local voidFlip = false
+	local voidSpinAngle = 0
+	local voidRandVal = Vector3.zero
 
 	local returnthis = nil
 	local cameraProxy
@@ -10232,6 +10244,117 @@ run(function()
 	local voidClone
 	local voidCloneRoot
 	local voidMotorMap = {}
+
+	local function parseAxisValue(text, default)
+		local num = tonumber((text or ''):match('[%d%-%.eE%+]+'))
+		return num or default
+	end
+
+	local function parseVector3(text, fallback)
+		local parts = {}
+		for part in string.gmatch(text or '', '[^,]+') do
+			table.insert(parts, part)
+		end
+		if #parts >= 3 then
+			return Vector3.new(
+				parseAxisValue(parts[1], fallback.X),
+				parseAxisValue(parts[2], fallback.Y),
+				parseAxisValue(parts[3], fallback.Z)
+			)
+		end
+		return fallback
+	end
+
+	local function getBaseOffset()
+		return Vector3.new(
+			parseAxisValue(OffsetX.Value, 0),
+			parseAxisValue(OffsetY.Value, -500000),
+			parseAxisValue(OffsetZ.Value, 0)
+		)
+	end
+
+	local function calculateVoidOffset()
+		local base = getBaseOffset()
+		local mode = VoidMode.Value
+		local speed = VoidSpeed.Value
+
+		if mode == 'Static' then
+			return base
+		end
+
+		if mode == 'Jitter' then
+			local now = os.clock()
+			local delay = 1 / math.max(speed * 2, 0.01)
+			if now - lastVoidTick >= delay then
+				voidFlip = not voidFlip
+				lastVoidTick = now
+			end
+			return voidFlip and base or -base
+		end
+
+		if mode == 'Spin' or mode == 'Circle' then
+			voidSpinAngle = (voidSpinAngle + speed) % 360
+			local rad = math.rad(voidSpinAngle)
+			local radius = math.sqrt(base.X * base.X + base.Z * base.Z)
+			if radius < 0.001 then
+				radius = math.max(math.abs(base.X), math.abs(base.Z), 0.001)
+			end
+			return Vector3.new(math.cos(rad) * radius, base.Y, math.sin(rad) * radius)
+		end
+
+		if mode == 'Sphere' then
+			local now = os.clock()
+			local delay = 1 / math.max(speed * 2, 0.01)
+			if now - lastVoidTick >= delay then
+				local radius = base.Magnitude
+				if radius < 0.001 then
+					radius = 1
+				end
+				local theta = math.random() * math.pi * 2
+				local phi = math.acos(2 * math.random() - 1)
+				voidRandVal = Vector3.new(
+					math.sin(phi) * math.cos(theta) * radius,
+					math.cos(phi) * radius,
+					math.sin(phi) * math.sin(theta) * radius
+				)
+				lastVoidTick = now
+			end
+			return voidRandVal
+		end
+
+		if mode == 'Random' then
+			local now = os.clock()
+			local delay = 1 / math.max(speed * 2, 0.01)
+			if now - lastVoidTick >= delay then
+				local minVec = parseVector3(RandomMin.Value, -base)
+				local maxVec = parseVector3(RandomMax.Value, base)
+				voidRandVal = Vector3.new(
+					minVec.X + math.random() * (maxVec.X - minVec.X),
+					minVec.Y + math.random() * (maxVec.Y - minVec.Y),
+					minVec.Z + math.random() * (maxVec.Z - minVec.Z)
+				)
+				lastVoidTick = now
+			end
+			return voidRandVal
+		end
+
+		return base
+	end
+
+	local function resetVoidMotionState()
+		lastVoidTick = 0
+		voidFlip = false
+		voidSpinAngle = 0
+		voidRandVal = Vector3.zero
+		currentVoidOffset = getBaseOffset()
+	end
+
+	local function updateVoidUIVisibility()
+		local mode = VoidMode.Value
+		VoidSpeed.Object.Visible = mode ~= 'Static'
+		RandomMin.Object.Visible = mode == 'Random'
+		RandomMax.Object.Visible = mode == 'Random'
+	end
 
 	local function cleanupCameraProxy(restore)
 		if cameraProxy then
@@ -10400,8 +10523,9 @@ run(function()
 		if not (hum and root) or hum.Health <= 0 then return end
 		if vape.Libraries.silentAimHookBusy then return end
 
+		currentVoidOffset = calculateVoidOffset()
 		returnthis = root.CFrame
-		root.CFrame = root.CFrame + VOID_OFFSET
+		root.CFrame = root.CFrame + currentVoidOffset
 		RunService.RenderStepped:Wait()
 		root.CFrame = returnthis
 	end
@@ -10443,7 +10567,7 @@ run(function()
 			end
 		end
 
-		voidClone:PivotTo(baseCF + VOID_OFFSET)
+		voidClone:PivotTo(baseCF + currentVoidOffset)
 		vape.Libraries.refreshVisualizerTracerOrigin()
 	end
 
@@ -10454,6 +10578,7 @@ run(function()
 				if vape.Modules.Desync and vape.Modules.Desync.Enabled then
 					vape.Modules.Desync:Toggle()
 				end
+				resetVoidMotionState()
 				setupCameraProxy()
 				Void:Clean(RunService.Heartbeat:Connect(onHeartbeat))
 				Void:Clean(RunService.RenderStepped:Connect(onRenderStepped))
@@ -10461,6 +10586,7 @@ run(function()
 					setupVoidClone()
 				end
 				Void:Clean(entitylib.Events.LocalAdded:Connect(function()
+					resetVoidMotionState()
 					setupCameraProxy()
 					if Visualizer.Enabled then
 						setupVoidClone()
@@ -10471,12 +10597,70 @@ run(function()
 					cleanupVoidClone()
 				end))
 			else
+				resetVoidMotionState()
 				cleanupCameraProxy()
 				cleanupVoidClone()
 			end
 		end,
-		Tooltip = 'Spoofs your server position deep underground to break aimbots while keeping your camera at your real location'
+		Tooltip = 'Spoofs your server position using a configurable offset to break aimbots while keeping your camera at your real location'
 	})
+
+	VoidMode = Void:CreateDropdown({
+		Name = 'Mode',
+		List = {'Static', 'Jitter', 'Spin', 'Circle', 'Sphere', 'Random'},
+		Default = 'Static',
+		Tooltip = 'Static - Fixed XYZ offset\nJitter - Alternates between offset and inverted offset\nSpin/Circle - Rotates X/Z radius from your XYZ values\nSphere - Random points on a sphere using XYZ magnitude as radius\nRandom - Random points between min/max vectors',
+		Function = updateVoidUIVisibility
+	})
+
+	OffsetX = Void:CreateTextBox({
+		Name = 'Offset X',
+		Default = '0',
+		Darker = true,
+		Tooltip = 'X offset in studs (also used as radius basis for animated modes)'
+	})
+
+	OffsetY = Void:CreateTextBox({
+		Name = 'Offset Y',
+		Default = '-500000',
+		Darker = true,
+		Tooltip = 'Y offset in studs (negative = down). Used as radius basis for animated modes'
+	})
+
+	OffsetZ = Void:CreateTextBox({
+		Name = 'Offset Z',
+		Default = '0',
+		Darker = true,
+		Tooltip = 'Z offset in studs (also used as radius basis for animated modes)'
+	})
+
+	VoidSpeed = Void:CreateSlider({
+		Name = 'Speed',
+		Min = 1,
+		Max = 100,
+		Default = 15,
+		Darker = true,
+		Visible = false,
+		Tooltip = 'How fast animated modes switch or rotate between offset points'
+	})
+
+	RandomMin = Void:CreateTextBox({
+		Name = 'Random Min',
+		Default = '0, -500000, 0',
+		Darker = true,
+		Visible = false,
+		Tooltip = 'Minimum XYZ for Random mode (x, y, z)'
+	})
+
+	RandomMax = Void:CreateTextBox({
+		Name = 'Random Max',
+		Default = '0, 500000, 0',
+		Darker = true,
+		Visible = false,
+		Tooltip = 'Maximum XYZ for Random mode (x, y, z)'
+	})
+
+	updateVoidUIVisibility()
 
 	Visualizer = Void:CreateToggle({
 		Name = 'Visualizer',
