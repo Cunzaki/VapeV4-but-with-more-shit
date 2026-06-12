@@ -22,6 +22,10 @@ if not vape.Categories.Minigames then
 end
 local minigames = vape.Categories.Minigames
 
+local function notif(...)
+	return vape:CreateNotification(...)
+end
+
 local function isFriend(plr, recolor)
 	if vape.Categories.Friends.Options['Use friends'].Enabled then
 		local friend = table.find(vape.Categories.Friends.ListEnabled, plr.Name) and true
@@ -61,82 +65,9 @@ local function canTargetPlayer(plr)
 end
 
 local InfiniteAmmo, TeamDamage, FireRate, FireDelay, NoSpread, NoRecoil, InstantReload, AlwaysSprint, SprintSpeed
-local serverVars = {infammo = false}
 local teamFFAFlag = nil
 local gamemodeValue = nil
-local requirementInstalled = false
-
-local function findServerVarsTable()
-	if getgc then
-		for _, v in getgc(true) do
-			if type(v) == 'table' and rawget(v, 'infammo') ~= nil then
-				return v
-			end
-		end
-	end
-	return serverVars
-end
-
-local function getIgnorable()
-	local gameObjects = workspace:FindFirstChild('GameObjects')
-	return (gameObjects and gameObjects:FindFirstChild('__Ignorable')) or workspace:FindFirstChild('__Ignorable')
-end
-
-local function requirementHandler(action, ...)
-	local args = {...}
-
-	if InfiniteAmmo and InfiniteAmmo.Enabled and action == 'getsvar' and args[1] == 'infammo' then
-		return true
-	end
-	if TeamDamage and TeamDamage.Enabled and action == 'damage_check' then
-		return true
-	end
-
-	if action == 'hitpart_check' then
-		local part = args[1]
-		if not part then
-			return
-		end
-		local targetPlr = playersService:GetPlayerFromCharacter(part.Parent) or playersService:GetPlayerFromCharacter(part.Parent and part.Parent.Parent)
-		local hum = part.Parent and part.Parent:FindFirstChild('Humanoid') or part.Parent and part.Parent.Parent and part.Parent.Parent:FindFirstChild('Humanoid')
-		if targetPlr and hum then
-			return {targetPlr, hum}
-		end
-	elseif action == 'damage_check' then
-		local targetPlr = args[1]
-		if not targetPlr then
-			return
-		end
-		local mode = gamemodeValue
-		if mode == 'ffa' and teamFFAFlag ~= nil then
-			if lplr.TeamColor == targetPlr.TeamColor then
-				return true
-			end
-		elseif lplr.TeamColor ~= targetPlr.TeamColor then
-			return true
-		end
-	elseif action == 'get_ignorable' then
-		local spectateFolder = workspace:FindFirstChild('SpectateFolder')
-		return {
-			lplr.Character,
-			getIgnorable(),
-			workspace:FindFirstChild('FE_Ignorable', true),
-			spectateFolder
-		}
-	elseif action == 'getsvar' then
-		local vars = findServerVarsTable()
-		return vars[args[1]]
-	end
-end
-
-local function installRequirementHandler()
-	local req = lplr:FindFirstChild('Requirement')
-	if not req or not req:IsA('BindableFunction') then
-		return
-	end
-	req.OnInvoke = requirementHandler
-	requirementInstalled = true
-end
+local weaponLoop
 
 local function getLegacyGunScript()
 	local function scan(parent)
@@ -160,7 +91,7 @@ local function getLegacyGunEnv()
 	if gun and getsenv then
 		local ok, env = pcall(getsenv, gun)
 		if ok and type(env) == 'table' then
-			return env, gun
+			return env
 		end
 	end
 end
@@ -169,73 +100,42 @@ local function hasVAKUI()
 	return lplr.PlayerGui:FindFirstChild('VAK_UI') ~= nil
 end
 
-local WEAPON_KEYS = {
-	FireRate = 'fireRate', fireRate = 'fireRate', RPM = 'fireRate', rpm = 'fireRate',
-	FireDelay = 'fireRate', fireDelay = 'fireRate', Cooldown = 'fireRate', cooldown = 'fireRate',
-	ShotDelay = 'fireRate', shotDelay = 'fireRate', Rate = 'fireRate',
-	Recoil = 'recoil', recoil = 'recoil', RecoilMult = 'recoil', recoilMult = 'recoil',
-	Kick = 'recoil', kick = 'recoil', CameraKick = 'recoil',
-	Spread = 'spread', spread = 'spread', SpreadMult = 'spread', spreadMult = 'spread',
-	ReloadTime = 'reload', Reload = 'reload', reloadTime = 'reload', reload = 'reload',
-	Ammo = 'ammo', ammo = 'ammo', CurrentAmmo = 'ammo', currentAmmo = 'ammo',
-	Clip = 'ammo', clip = 'ammo', MaxAmmo = 'maxAmmo', maxAmmo = 'maxAmmo', Mag = 'ammo'
-}
-
-local function patchWeaponTable(tbl, seen, opts)
-	if type(tbl) ~= 'table' or seen[tbl] then
+local function getVAKGunEnv()
+	if not hasVAKUI() or not getsenv then
 		return
 	end
-	seen[tbl] = true
-
-	local matches = 0
-	for key in WEAPON_KEYS do
-		if tbl[key] ~= nil then
-			matches += 1
-		end
+	local vak = lplr.PlayerGui:FindFirstChild('VAK_UI')
+	if not vak then
+		return
 	end
-
-	if matches >= 2 then
-		for key, kind in WEAPON_KEYS do
-			local val = tbl[key]
-			if type(val) == 'number' then
-				if kind == 'fireRate' and opts.fireRate then
-					local lk = key:lower()
-					if lk:find('rpm') or (lk:find('rate') and not lk:find('delay')) then
-						tbl[key] = math.max(val, math.floor(1 / opts.fireRate))
-					else
-						tbl[key] = opts.fireRate
-					end
-				elseif kind == 'recoil' and opts.noRecoil then
-					tbl[key] = 0
-				elseif kind == 'spread' and opts.noSpread then
-					tbl[key] = 0
-				elseif kind == 'reload' and opts.instantReload then
-					tbl[key] = 0
-				elseif kind == 'ammo' and opts.infiniteAmmo then
-					tbl[key] = math.max(val, 999)
-				elseif kind == 'maxAmmo' and opts.infiniteAmmo then
-					tbl[key] = math.max(val, 999)
-				end
+	for _, inst in vak:GetDescendants() do
+		if inst:IsA('LocalScript') and (inst.Name == 'gunModule' or inst.Name:lower():find('gun')) then
+			local ok, env = pcall(getsenv, inst)
+			if ok and type(env) == 'table' then
+				return env, inst
 			end
-		end
-	end
-
-	for _, v in tbl do
-		if type(v) == 'table' then
-			patchWeaponTable(v, seen, opts)
 		end
 	end
 end
 
-local function patchVAKWeaponTables(opts)
-	if not hasVAKUI() or not getgc then
+local function patchNumericField(tbl, key, val)
+	if type(tbl) == 'table' and type(tbl[key]) == 'number' then
+		tbl[key] = val
+		return true
+	end
+	return false
+end
+
+local function patchEnvNumbers(env, map)
+	if type(env) ~= 'table' then
 		return
 	end
-
-	local seen = {}
-	for _, v in getgc(true) do
+	for key, val in map do
+		patchNumericField(env, key, val)
+	end
+	for _, v in env do
 		if type(v) == 'table' then
-			patchWeaponTable(v, seen, opts)
+			patchEnvNumbers(v, map)
 		end
 	end
 end
@@ -251,7 +151,7 @@ local function applyLegacyGunMods(opts)
 			env.u6 = true
 		end
 		if type(env.u13) == 'number' then
-			env.u13 = math.max(env.u13, 35)
+			env.u13 = 35
 		end
 	end
 
@@ -268,29 +168,89 @@ local function applyLegacyGunMods(opts)
 		env.u17 = true
 	end
 
-	if opts.noSpread and env.u25 and type(env.u25.Fire) == 'function' then
-		if not env.u25.__vapeWrapped then
-			local oldFire = env.u25.Fire
-			env.u25.Fire = function(target, clickState)
-				if not (NoSpread and NoSpread.Enabled) then
-					return oldFire(target, clickState)
-				end
-				local oldRandom = math.random
-				math.random = function(a, b)
-					if a and b and typeof(a) == 'number' and typeof(b) == 'number' and a < 0 and b > 0 then
-						return 0
-					end
-					return oldRandom(a, b)
-				end
-				local ok, res = pcall(oldFire, target, clickState)
-				math.random = oldRandom
-				if not ok then
-					error(res)
-				end
-				return res
+	if opts.noSpread and env.u25 and type(env.u25.Fire) == 'function' and not env.u25.__vapeWrapped then
+		local oldFire = env.u25.Fire
+		env.u25.Fire = function(target, clickState)
+			if not (NoSpread and NoSpread.Enabled) then
+				return oldFire(target, clickState)
 			end
-			env.u25.__vapeWrapped = true
+			local oldRandom = math.random
+			math.random = function(a, b)
+				if a and b and typeof(a) == 'number' and typeof(b) == 'number' and a < 0 and b > 0 then
+					return 0
+				end
+				return oldRandom(a, b)
+			end
+			local ok, res = pcall(oldFire, target, clickState)
+			math.random = oldRandom
+			if not ok then
+				error(res)
+			end
+			return res
 		end
+		env.u25.__vapeWrapped = true
+	end
+end
+
+local function applyVAKGunMods(opts)
+	local env = getVAKGunEnv()
+	if not env then
+		return
+	end
+
+	if opts.fireRate then
+		patchEnvNumbers(env, {
+			fireDelay = opts.fireRate,
+			FireDelay = opts.fireRate,
+			cooldown = opts.fireRate,
+			Cooldown = opts.fireRate,
+			shotDelay = opts.fireRate,
+			ShotDelay = opts.fireRate
+		})
+	end
+
+	if opts.noSpread then
+		patchEnvNumbers(env, {
+			spread = 0,
+			Spread = 0,
+			spreadMult = 0,
+			SpreadMult = 0
+		})
+	end
+
+	if opts.noRecoil then
+		patchEnvNumbers(env, {
+			recoil = 0,
+			Recoil = 0,
+			recoilMult = 0,
+			RecoilMult = 0,
+			kick = 0,
+			Kick = 0,
+			cameraKick = 0,
+			CameraKick = 0
+		})
+	end
+
+	if opts.instantReload then
+		patchEnvNumbers(env, {
+			reloadTime = 0,
+			ReloadTime = 0,
+			reload = 0,
+			Reload = 0
+		})
+	end
+
+	if opts.infiniteAmmo then
+		patchEnvNumbers(env, {
+			ammo = 999,
+			Ammo = 999,
+			currentAmmo = 999,
+			CurrentAmmo = 999,
+			clip = 999,
+			Clip = 999,
+			mag = 999,
+			Mag = 999
+		})
 	end
 end
 
@@ -303,26 +263,32 @@ local function applyWeaponMods()
 		instantReload = InstantReload and InstantReload.Enabled
 	}
 
-	if (InfiniteAmmo and InfiniteAmmo.Enabled) or (TeamDamage and TeamDamage.Enabled) then
-		installRequirementHandler()
-	end
-
-	if opts.infiniteAmmo then
-		local vars = findServerVarsTable()
-		vars.infammo = true
+	if not (opts.infiniteAmmo or opts.fireRate or opts.noSpread or opts.noRecoil or opts.instantReload) then
+		return
 	end
 
 	applyLegacyGunMods(opts)
-	patchVAKWeaponTables(opts)
+	applyVAKGunMods(opts)
+end
 
-	if opts.noRecoil then
-		local cam = workspace.CurrentCamera
-		if cam then
-			for _, v in cam:GetChildren() do
-				if v.Name:find('Blur') or v.Name:find('Color') or v.Name:find('Recoil') then
-					v:Destroy()
+local function anyWeaponModEnabled()
+	return (InfiniteAmmo and InfiniteAmmo.Enabled)
+		or (FireRate and FireRate.Enabled)
+		or (NoSpread and NoSpread.Enabled)
+		or (NoRecoil and NoRecoil.Enabled)
+		or (InstantReload and InstantReload.Enabled)
+end
+
+local function syncWeaponLoop()
+	if anyWeaponModEnabled() then
+		if not weaponLoop then
+			weaponLoop = task.spawn(function()
+				while anyWeaponModEnabled() do
+					applyWeaponMods()
+					task.wait(0.1)
 				end
-			end
+				weaponLoop = nil
+			end)
 		end
 	end
 end
@@ -378,38 +344,6 @@ run(function()
 	end))
 	if lplr.Team then
 		teamFFAFlag = lplr.Team:FindFirstChild('isFFA')
-	end
-
-	local requestRemote = replicatedStorage:WaitForChild('FTPStorage', 30)
-	requestRemote = requestRemote and requestRemote:WaitForChild('Remotes', 30)
-	requestRemote = requestRemote and requestRemote:WaitForChild('Request', 30)
-	if requestRemote then
-		vape:Clean(requestRemote.OnClientEvent:Connect(function(key, val)
-			if key == 'infammo' and (val == true or val == false) then
-				serverVars.infammo = val
-			end
-		end))
-		pcall(function()
-			requestRemote:FireServer('getvars')
-		end)
-	end
-
-	local function onRequirement()
-		installRequirementHandler()
-	end
-
-	vape:Clean(lplr.ChildAdded:Connect(function(child)
-		if child.Name == 'Requirement' then
-			task.defer(onRequirement)
-		end
-	end))
-	if lplr:FindFirstChild('Requirement') then
-		onRequirement()
-	else
-		task.spawn(function()
-			lplr:WaitForChild('Requirement', 30)
-			onRequirement()
-		end)
 	end
 end)
 
@@ -469,47 +403,14 @@ run(function()
 end)
 
 run(function()
-	local weaponLoop
-
-	local function anyWeaponModEnabled()
-		return (InfiniteAmmo and InfiniteAmmo.Enabled)
-			or (FireRate and FireRate.Enabled)
-			or (NoSpread and NoSpread.Enabled)
-			or (NoRecoil and NoRecoil.Enabled)
-			or (InstantReload and InstantReload.Enabled)
-	end
-
-	local function syncWeaponLoop()
-		if anyWeaponModEnabled() then
-			if not weaponLoop then
-				weaponLoop = task.spawn(function()
-					while anyWeaponModEnabled() do
-						applyWeaponMods()
-						task.wait()
-					end
-					weaponLoop = nil
-				end)
-			end
-		end
-	end
-
-	local function refreshRequirement()
-		installRequirementHandler()
-	end
-
-	local function bindWeaponModule(mod, extra)
+	local function bindWeaponModule(mod)
 		local oldFunc = mod.Function
 		mod.Function = function(callback)
-			if extra then
-				extra(callback)
-			end
 			if oldFunc then
 				oldFunc(callback)
 			end
 			if callback then
 				syncWeaponLoop()
-			else
-				applyWeaponMods()
 			end
 		end
 	end
@@ -517,19 +418,24 @@ run(function()
 	InfiniteAmmo = minigames:CreateModule({
 		Name = 'InfiniteAmmo',
 		Function = function() end,
-		Tooltip = 'Never run out of ammo (legacy SMG + VAK).'
+		Tooltip = 'Refills legacy SMG / VAK ammo client-side while equipped.'
 	})
 
 	TeamDamage = minigames:CreateModule({
 		Name = 'TeamDamage',
-		Function = function() end,
-		Tooltip = 'Allows damaging teammates in team gamemodes.'
+		Function = function(callback)
+			if callback then
+				notif('TeamDamage', 'Disabled for this game anti-cheat.', 5, 'warning')
+				TeamDamage:Toggle()
+			end
+		end,
+		Tooltip = 'Not available on this game (anti-cheat).'
 	})
 
 	FireRate = minigames:CreateModule({
 		Name = 'FireRate',
 		Function = function() end,
-		Tooltip = 'Increases fire rate for SMG and VAK weapons.'
+		Tooltip = 'Lowers shot delay while your weapon is equipped.'
 	})
 	FireDelay = FireRate:CreateSlider({
 		Name = 'Delay',
@@ -548,27 +454,24 @@ run(function()
 	NoSpread = minigames:CreateModule({
 		Name = 'NoSpread',
 		Function = function() end,
-		Tooltip = 'Removes bullet spread.'
+		Tooltip = 'Removes bullet spread while equipped.'
 	})
 
 	NoRecoil = minigames:CreateModule({
 		Name = 'NoRecoil',
 		Function = function() end,
-		Tooltip = 'Removes gun recoil and camera shake.'
+		Tooltip = 'Removes recoil values while equipped.'
 	})
 
 	InstantReload = minigames:CreateModule({
 		Name = 'InstantReload',
 		Function = function() end,
-		Tooltip = 'Instantly finishes reloads.'
+		Tooltip = 'Skips reload timers while equipped.'
 	})
 
-	bindWeaponModule(InfiniteAmmo, refreshRequirement)
-	bindWeaponModule(TeamDamage, refreshRequirement)
-	bindWeaponModule(FireRate)
-	bindWeaponModule(NoSpread)
-	bindWeaponModule(NoRecoil)
-	bindWeaponModule(InstantReload)
+	for _, mod in {InfiniteAmmo, FireRate, NoSpread, NoRecoil, InstantReload} do
+		bindWeaponModule(mod)
+	end
 
 	AlwaysSprint = minigames:CreateModule({
 		Name = 'AlwaysSprint',
