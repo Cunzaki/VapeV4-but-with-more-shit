@@ -241,6 +241,42 @@ vape.Libraries.whitelist = whitelist
 vape.Libraries.prediction = prediction
 vape.Libraries.hash = hash
 vape.Libraries.tracerOriginProviders = {}
+vape.Libraries.visualizerModels = {}
+vape.Libraries.cachedVisualizerTracerOrigin = nil
+vape.Libraries.silentAimHookBusy = false
+vape.Libraries.registerVisualizerModel = function(model)
+	if model and not table.find(vape.Libraries.visualizerModels, model) then
+		table.insert(vape.Libraries.visualizerModels, model)
+	end
+end
+vape.Libraries.unregisterVisualizerModel = function(model)
+	local idx = table.find(vape.Libraries.visualizerModels, model)
+	if idx then
+		table.remove(vape.Libraries.visualizerModels, idx)
+	end
+	if model and vape.Libraries.cachedVisualizerTracerOrigin then
+		vape.Libraries.cachedVisualizerTracerOrigin = nil
+	end
+end
+vape.Libraries.getVisualizerWallcheckIgnores = function()
+	local ignores = {}
+	for _, model in vape.Libraries.visualizerModels do
+		if model and model.Parent then
+			table.insert(ignores, model)
+		end
+	end
+	return #ignores > 0 and ignores or true
+end
+vape.Libraries.refreshVisualizerTracerOrigin = function()
+	vape.Libraries.cachedVisualizerTracerOrigin = nil
+	for _, provider in vape.Libraries.tracerOriginProviders do
+		local ok, origin = pcall(provider)
+		if ok and origin then
+			vape.Libraries.cachedVisualizerTracerOrigin = origin
+			break
+		end
+	end
+end
 vape.Libraries.getCloneTracerOrigin = function(clone)
 	if not clone or not clone.Parent then return end
 	local head = clone:FindFirstChild('Head')
@@ -249,12 +285,7 @@ vape.Libraries.getCloneTracerOrigin = function(clone)
 	if root then return root.Position + Vector3.new(0, 1.5, 0) end
 end
 vape.Libraries.getVisualizerTracerOrigin = function()
-	for _, provider in vape.Libraries.tracerOriginProviders do
-		local ok, origin = pcall(provider)
-		if ok and origin then
-			return origin
-		end
-	end
+	return vape.Libraries.cachedVisualizerTracerOrigin
 end
 vape.Libraries.auraanims = {
 	Normal = {
@@ -1864,7 +1895,7 @@ run(function()
 	end
 
 	local function getLocalTracerOrigin()
-		local visualOrigin = vape.Libraries.getVisualizerTracerOrigin and vape.Libraries.getVisualizerTracerOrigin()
+		local visualOrigin = vape.Libraries.getVisualizerTracerOrigin()
 		if visualOrigin then
 			return visualOrigin
 		end
@@ -1907,6 +1938,7 @@ run(function()
 	
 	local function cleanupPMClone()
 		if pmClone then
+			vape.Libraries.unregisterVisualizerModel(pmClone)
 			pmClone:Destroy()
 		end
 		pmClone = nil
@@ -2017,6 +2049,7 @@ run(function()
 		end
 		
 		pmClone.Parent = workspace
+		vape.Libraries.registerVisualizerModel(pmClone)
 		
 		pmCloneRoot = pmClone:FindFirstChild("HumanoidRootPart")
 		if not pmCloneRoot then
@@ -2054,7 +2087,7 @@ run(function()
 	
 	local function findBestPosition()
 		if not PositionManipulation or not PositionManipulation.Enabled then return nil end
-		if silentAimHookBusy then return pmTargetPosition end
+		if silentAimHookBusy or vape.Libraries.silentAimHookBusy then return pmTargetPosition end
 		
 		local now = tick()
 		if now - lastPMFrame < PM_THROTTLE then
@@ -2208,15 +2241,15 @@ run(function()
 		local wantsSounds = HitSounds and HitSounds.Enabled
 		if not wantsTracers and not wantsSounds then return end
 		if not (ent and targetPart and origin) then return end
+		local tracerOrigin = vape.Libraries.cachedVisualizerTracerOrigin or origin
 		local existing = bulletTracerPending[ent]
 		if existing then
 			if tick() - (existing.Time or 0) < 0.05 then
 				existing.TargetPosition = targetPart.Position
 				return
 			end
-			-- Keep the highest pre-hit health seen so rapid target polling doesn't erase pending damage context.
 			existing.Health = math.max(existing.Health or ent.Health, ent.Health)
-			existing.Origin = getLocalTracerOrigin() or origin
+			existing.Origin = tracerOrigin
 			existing.TargetPosition = targetPart.Position
 			existing.Time = tick()
 			return
@@ -2224,7 +2257,7 @@ run(function()
 		bulletTracerPending[ent] = {
 			Entity = ent,
 			Health = ent.Health,
-			Origin = getLocalTracerOrigin() or origin,
+			Origin = tracerOrigin,
 			TargetPosition = targetPart.Position,
 			Time = tick()
 		}
@@ -2311,7 +2344,13 @@ run(function()
 
 				local allowHit = true
 				if Target.Walls.Enabled then
-					BulletTracerWallcheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
+					local wallIgnores = {lplr.Character, gameCamera}
+					for _, model in vape.Libraries.visualizerModels do
+						if model and model.Parent then
+							table.insert(wallIgnores, model)
+						end
+					end
+					BulletTracerWallcheck.FilterDescendantsInstances = wallIgnores
 					local ray = workspace:Raycast(pending.Origin, pending.TargetPosition - pending.Origin, BulletTracerWallcheck)
 					allowHit = ray == nil or (ray.Instance and ray.Instance:IsDescendantOf(ent.Character))
 				end
@@ -2324,7 +2363,10 @@ run(function()
 					end
 				end
 				pending.Health = math.max(currentHealth, 0)
-				pending.Origin = getLocalTracerOrigin()
+				local cachedOrigin = vape.Libraries.cachedVisualizerTracerOrigin
+				if cachedOrigin then
+					pending.Origin = cachedOrigin
+				end
 				pending.TargetPosition = (ent.Head or ent.RootPart).Position
 				pending.Time = now
 			end
@@ -2391,10 +2433,12 @@ run(function()
 	end
 
 	local function getTarget(origin, obj, prisonOpts)
-		if silentAimHookBusy then return end
+		if silentAimHookBusy or vape.Libraries.silentAimHookBusy then return end
 		silentAimHookBusy = true
+		vape.Libraries.silentAimHookBusy = true
 		local function finish(...)
 			silentAimHookBusy = false
+			vape.Libraries.silentAimHookBusy = false
 			return ...
 		end
 
@@ -2418,7 +2462,7 @@ run(function()
 			Range = range,
 			RangePosition = rangePosition,
 			AttackCheck = attackCheck,
-			Wallcheck = Target.Walls.Enabled and (obj or true) or nil,
+			Wallcheck = Target.Walls.Enabled and vape.Libraries.getVisualizerWallcheckIgnores() or nil,
 			Wallbang = wallbang,
 			Part = targetPart,
 			Origin = origin,
@@ -2428,7 +2472,9 @@ run(function()
 		})
 
 		if ent then
-			registerShot(ent, ent[targetPart], origin)
+			if isMb1Held or (tick() - lastMb1Click) <= TracerClickWindow then
+				registerShot(ent, ent[targetPart], origin)
+			end
 			targetinfo.Targets[ent] = tick() + 1
 			local resolvedPos, jitterDetected, rawPos = nil, false, nil
 			if Resolver.Enabled then
@@ -2511,6 +2557,7 @@ run(function()
 			attackCheck = not gundata or gundata.Behavior ~= 'Taser'
 		})
 		if not ent then return oldPrisonBulletHook(...) end
+		registerShot(ent, targetPart, origin)
 
 		local args = table.pack(...)
 		args[2] = targetPart.Position
@@ -2519,6 +2566,11 @@ run(function()
 			local ignore = {lplr.Character}
 			for _, v in entitylib.List do
 				table.insert(ignore, v.Character)
+			end
+			for _, model in vape.Libraries.visualizerModels do
+				if model and model.Parent then
+					table.insert(ignore, model)
+				end
 			end
 			rayParams.FilterDescendantsInstances = ignore
 			rayParams2.FilterDescendantsInstances = ignore
@@ -2556,12 +2608,26 @@ run(function()
 		FindPartOnRayWithIgnoreList = function(args)
 			local ent, targetPart, origin = getTarget(args[1].Origin)
 			if not ent then return end
+			if typeof(args[2]) == 'table' then
+				for _, model in vape.Libraries.visualizerModels do
+					if model and model.Parent then
+						table.insert(args[2], model)
+					end
+				end
+			end
 			args[1] = Ray.new(origin, CFrame.lookAt(origin, targetPart.Position).LookVector * args[1].Direction.Magnitude)
 		end,
 		Raycast = function(args)
 			if MethodRay.Value ~= 'All' and args[3] and args[3].FilterType ~= Enum.RaycastFilterType[MethodRay.Value] then return end
 			local ent, targetPart, origin = getTarget(args[1])
 			if not ent then return end
+			if args[3] and args[3].FilterType == Enum.RaycastFilterType.Exclude and typeof(args[3].FilterDescendantsInstances) == 'table' then
+				for _, model in vape.Libraries.visualizerModels do
+					if model and model.Parent and not table.find(args[3].FilterDescendantsInstances, model) then
+						table.insert(args[3].FilterDescendantsInstances, model)
+					end
+				end
+			end
 			args[2] = CFrame.lookAt(origin, targetPart.Position).LookVector * args[2].Magnitude
 			if Wallbang.Enabled then
 				RaycastWhitelist.FilterDescendantsInstances = {targetPart}
@@ -2642,6 +2708,9 @@ run(function()
 				end))
 				SilentAim:Clean(entitylib.Events.LocalRemoved:Connect(resetTracerTracking))
 				SilentAim:Clean(entitylib.Events.LocalAdded:Connect(resetTracerTracking))
+				SilentAim:Clean(runService.RenderStepped:Connect(function()
+					vape.Libraries.refreshVisualizerTracerOrigin()
+				end))
 				
 				if PositionManipulation then
 					if PositionManipulation.Enabled then
@@ -2701,6 +2770,9 @@ run(function()
 								local targetCF = pmTargetPosition and CFrame.new(pmTargetPosition) * baseCF.Rotation or baseCF
 								pmClone:PivotTo(targetCF)
 							end
+						end
+						if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
+							vape.Libraries.refreshVisualizerTracerOrigin()
 						end
 
 						if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled and pmRadiusPart then
@@ -8740,6 +8812,7 @@ run(function()
 
 	local function clearVisualizer()
 		if visualClone then
+			vape.Libraries.unregisterVisualizerModel(visualClone)
 			visualClone:Destroy()
 			visualClone = nil
 		end
@@ -8884,6 +8957,7 @@ run(function()
 
 		-- Parent to workspace ONLY after all physics are disabled
 		clone.Parent = workspace
+		vape.Libraries.registerVisualizerModel(visualClone)
 
 		local charRoot = entitylib.character.RootPart
 		local charTorso = entitylib.character.Character and (entitylib.character.Character:FindFirstChild('UpperTorso') or entitylib.character.Character:FindFirstChild('Torso'))
@@ -8972,6 +9046,9 @@ run(function()
 								finalCF = finalCF * currentDesyncRotation
 							end
 							visualClone:PivotTo(finalCF)
+						end
+						if Visualizer.Enabled then
+							vape.Libraries.refreshVisualizerTracerOrigin()
 						end
 					end
 					wasSending = sendingNow
@@ -9165,6 +9242,7 @@ run(function()
 	-- Cleanup desync clone
 	local function cleanupDesyncClone()
 		if desyncClone then
+			vape.Libraries.unregisterVisualizerModel(desyncClone)
 			desyncClone:Destroy()
 		end
 		desyncClone = nil
@@ -9281,6 +9359,7 @@ run(function()
 
 		-- Parent to workspace ONLY after all setup is COMPLETE
 		desyncClone.Parent = workspace
+		vape.Libraries.registerVisualizerModel(desyncClone)
 		
 		desyncCloneRoot = desyncClone:FindFirstChild("HumanoidRootPart")
 		if not desyncCloneRoot then
@@ -9433,7 +9512,7 @@ run(function()
 		if not (hum and root) then return end
 		
 		-- Calculate and apply desync
-		if desyncEnabled and hum.Health > 0 then
+		if desyncEnabled and hum.Health > 0 and not vape.Libraries.silentAimHookBusy then
 			local rot = calculateRotation()
 			local posOffset = calculatePositionOffset()
 			returnthis = root.CFrame
@@ -9484,6 +9563,7 @@ run(function()
 		
 		-- Apply both rotation and position offset to clone model
 		desyncClone:PivotTo((baseCF + currentPosOffset) * currentRot)
+		vape.Libraries.refreshVisualizerTracerOrigin()
 	end
 	
 	-- Function to update visibility
