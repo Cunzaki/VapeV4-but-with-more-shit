@@ -1461,24 +1461,15 @@ local HitSoundVolume
 local HITSOUND_PRESETS = {
 	['None'] = '',
 	['Rust'] = 'rbxassetid://4764109000',
-	['Neverlose'] = 'rbxassetid://8679627751',
-	['Minecraft'] = 'rbxassetid://4018616850',
-	['Quake'] = 'rbxassetid://4868633804',
-	['OSU'] = 'rbxassetid://7147454322',
-	['Hitmarker'] = 'rbxassetid://705502934',
-	['Fatality'] = 'rbxassetid://2447018199',
-	['Primordial'] = 'rbxassetid://5153731546',
-	['Apex'] = 'rbxassetid://6026984224',
-	['Metallic'] = 'rbxassetid://6979714884',
-	['Bubble'] = 'rbxassetid://6534947588',
-	['Bell'] = 'rbxassetid://6534947240',
-	['Click'] = 'rbxassetid://421058931',
-	['Ding'] = 'rbxassetid://6396788153',
-	['Thud'] = 'rbxassetid://3779091610',
-	['TF2 Critical'] = 'rbxassetid://296102734',
-	['Rainbow Six'] = 'rbxassetid://6586970979',
-	['Valorant'] = 'rbxassetid://9114489658',
-	['Cod'] = 'rbxassetid://160432334',
+	['Classic'] = 'rbxassetid://12222216',
+	['Ding'] = 'rbxassetid://278886974',
+	['Bonk'] = 'rbxassetid://3398620862',
+	['Pop'] = 'rbxassetid://6895079853',
+	['Snap'] = 'rbxassetid://68664479',
+	['Punch'] = 'rbxassetid://6241448980',
+	['Crunch'] = 'rbxassetid://287390459',
+	['Bell'] = 'rbxassetid://4612375807',
+	['Bubble'] = 'rbxassetid://9125980992',
 	['Custom'] = 'CUSTOM'
 }
 local function getHitSoundId()
@@ -3740,12 +3731,20 @@ run(function()
 				soundId = res
 			end
 		end
-		
+
+		local soundService = game:GetService('SoundService')
 		local sound = Instance.new('Sound')
 		sound.SoundId = soundId
 		sound.Volume = (HitSoundVolume.Value or 50) / 100
-		sound.Parent = game:GetService('SoundService')
-		game:GetService('SoundService'):PlayLocalSound(sound)
+		sound.Parent = soundService
+		if not sound.IsLoaded then
+			pcall(function()
+				sound.Loaded:Wait()
+			end)
+		end
+		if sound.IsLoaded then
+			soundService:PlayLocalSound(sound)
+		end
 		task.delay(5, function()
 			if sound then sound:Destroy() end
 		end)
@@ -3781,11 +3780,19 @@ run(function()
 				local suc, res = pcall(function() return getcustomasset(soundId) end)
 				if suc and res then soundId = res end
 			end
+			local soundService = game:GetService('SoundService')
 			local preview = Instance.new('Sound')
 			preview.SoundId = soundId
 			preview.Volume = (HitSoundVolume.Value or 50) / 100
-			preview.Parent = game:GetService('SoundService')
-			game:GetService('SoundService'):PlayLocalSound(preview)
+			preview.Parent = soundService
+			if not preview.IsLoaded then
+				pcall(function()
+					preview.Loaded:Wait()
+				end)
+			end
+			if preview.IsLoaded then
+				soundService:PlayLocalSound(preview)
+			end
 			task.delay(5, function() preview:Destroy() end)
 		end
 	})
@@ -9472,14 +9479,32 @@ run(function()
 	local desyncMotorMap = {}
 	
 	-- Cleanup camera proxy
+	local function getValidCameraSubject()
+		local char = lplr.Character or (entitylib.character and entitylib.character.Character)
+		if char then
+			local hum = char:FindFirstChildOfClass('Humanoid')
+			if hum and hum.Health > 0 then
+				return hum
+			end
+		end
+	end
+
 	local function cleanupCameraProxy()
 		if cameraProxy then
 			cameraProxy:Destroy()
 			cameraProxy = nil
 		end
 		local cam = workspace.CurrentCamera
-		if cam and originalCameraSubject then
-			cam.CameraSubject = originalCameraSubject
+		if cam then
+			local subject = getValidCameraSubject()
+			if subject then
+				cam.CameraSubject = subject
+			elseif originalCameraSubject and originalCameraSubject.Parent then
+				local hum = originalCameraSubject:IsA('Humanoid') and originalCameraSubject or nil
+				if hum and hum.Health > 0 then
+					cam.CameraSubject = hum
+				end
+			end
 			originalCameraSubject = nil
 		end
 	end
@@ -9520,6 +9545,12 @@ run(function()
 		desyncCloneRoot = nil
 		desyncRealRoot = nil
 		desyncMotorMap = {}
+	end
+
+	local function handleCharacterReset()
+		returnthis = nil
+		cleanupDesyncClone()
+		cleanupCameraProxy()
 	end
 	
 	-- Setup desync clone for visualization
@@ -9806,7 +9837,7 @@ run(function()
 		-- Handle camera proxy
 		if cameraProxy then
 			if not hum or hum.Health <= 0 then
-				cleanupCameraProxy()
+				handleCharacterReset()
 			elseif root then
 				local camPos = (returnthis or root.CFrame).Position
 				local camOffset = hum.CameraOffset
@@ -9944,11 +9975,18 @@ run(function()
 					end
 					
 					-- Connect to character changes
+					Desync:Clean(entitylib.Events.LocalRemoved:Connect(handleCharacterReset))
 					Desync:Clean(entitylib.Events.LocalAdded:Connect(function()
-						setupCameraProxy()
-						if Visualizer.Enabled then
-							setupDesyncClone()
-						end
+						task.defer(function()
+							if not Desync.Enabled or Mode.Value == 'Server Desync' then
+								return
+							end
+							handleCharacterReset()
+							setupCameraProxy()
+							if Visualizer.Enabled then
+								setupDesyncClone()
+							end
+						end)
 					end))
 				end
 			else
@@ -12704,6 +12742,43 @@ run(function()
 	local Atmosphere
 	local Toggles = {}
 	local newobjects, oldobjects = {}, {}
+	local SKYBOX_PRESETS = {
+		['Default'] = {},
+		['Galaxy'] = {
+			SkyboxBk = 'rbxassetid://159454288',
+			SkyboxDn = 'rbxassetid://159454296',
+			SkyboxFt = 'rbxassetid://159454301',
+			SkyboxLf = 'rbxassetid://159454293',
+			SkyboxRt = 'rbxassetid://159454286',
+			SkyboxUp = 'rbxassetid://159454299'
+		},
+		['Sunset'] = {
+			SkyboxBk = 'rbxassetid://4919862900',
+			SkyboxDn = 'rbxassetid://4919862337',
+			SkyboxFt = 'rbxassetid://4919862953',
+			SkyboxLf = 'rbxassetid://4919862438',
+			SkyboxRt = 'rbxassetid://4919862717',
+			SkyboxUp = 'rbxassetid://4919862776'
+		},
+		['Purple Nebula'] = {
+			SkyboxBk = 'rbxassetid://1417494407',
+			SkyboxDn = 'rbxassetid://1417494146',
+			SkyboxFt = 'rbxassetid://1417494593',
+			SkyboxLf = 'rbxassetid://1417494030',
+			SkyboxRt = 'rbxassetid://1417494253',
+			SkyboxUp = 'rbxassetid://1417494495'
+		},
+		['Snow'] = {
+			SkyboxBk = 'rbxassetid://6280405839',
+			SkyboxDn = 'rbxassetid://6280405380',
+			SkyboxFt = 'rbxassetid://6280405933',
+			SkyboxLf = 'rbxassetid://6280405626',
+			SkyboxRt = 'rbxassetid://6280405786',
+			SkyboxUp = 'rbxassetid://6280405228'
+		},
+		['Custom'] = nil
+	}
+	local SKYBOX_FACE_KEYS = {'SkyboxUp', 'SkyboxDn', 'SkyboxLf', 'SkyboxRt', 'SkyboxFt', 'SkyboxBk'}
 	local apidump = {
 		Sky = {
 			SkyboxUp = 'Text',
@@ -12748,9 +12823,80 @@ run(function()
 			Brightness = 'Number'
 		}
 	}
-	
+	local numberDefaults = {
+		Sky = {
+			SunAngularSize = {Min = 0, Max = 30, Default = 11, Decimal = 10},
+			MoonAngularSize = {Min = 0, Max = 30, Default = 11, Decimal = 10},
+			StarCount = {Min = 0, Max = 5000, Default = 3000, Decimal = 1}
+		},
+		Atmosphere = {
+			Density = {Min = 0, Max = 1, Default = 0.3, Decimal = 100},
+			Offset = {Min = 0, Max = 1, Default = 0, Decimal = 100},
+			Glare = {Min = 0, Max = 1, Default = 0, Decimal = 100},
+			Haze = {Min = 0, Max = 2.5, Default = 0, Decimal = 100}
+		},
+		BloomEffect = {
+			Intensity = {Min = 0, Max = 2, Default = 0.4, Decimal = 100},
+			Size = {Min = 0, Max = 56, Default = 24, Decimal = 1},
+			Threshold = {Min = 0, Max = 2, Default = 0.8, Decimal = 100}
+		},
+		DepthOfFieldEffect = {
+			FarIntensity = {Min = 0, Max = 1, Default = 0.1, Decimal = 100},
+			FocusDistance = {Min = 0, Max = 500, Default = 10, Decimal = 1},
+			InFocusRadius = {Min = 0, Max = 50, Default = 10, Decimal = 1},
+			NearIntensity = {Min = 0, Max = 1, Default = 0.75, Decimal = 100}
+		},
+		SunRaysEffect = {
+			Intensity = {Min = 0, Max = 1, Default = 0.15, Decimal = 100},
+			Spread = {Min = 0, Max = 1, Default = 0.8, Decimal = 100}
+		},
+		ColorCorrectionEffect = {
+			Saturation = {Min = -1, Max = 1, Default = 0, Decimal = 100},
+			Contrast = {Min = -1, Max = 1, Default = 0, Decimal = 100},
+			Brightness = {Min = -1, Max = 1, Default = 0, Decimal = 100}
+		}
+	}
+	local SkyPreset
+
+	local function refreshAtmosphere()
+		if Atmosphere.Enabled then
+			Atmosphere:Toggle()
+			Atmosphere:Toggle()
+		end
+	end
+
+	local function applySkyPreset(presetName)
+		local preset = SKYBOX_PRESETS[presetName]
+		if not preset or not Toggles.Sky then return end
+		for _, key in SKYBOX_FACE_KEYS do
+			local field = Toggles.Sky.Objects[key]
+			if field then
+				field.Value = preset[key] or ''
+			end
+		end
+	end
+
+	local function updateSkyCustomVisibility()
+		if not SkyPreset or not Toggles.Sky then return end
+		local isCustom = SkyPreset.Value == 'Custom'
+		for _, key in SKYBOX_FACE_KEYS do
+			local field = Toggles.Sky.Objects[key]
+			if field then
+				field.Object.Visible = Toggles.Sky.Toggle.Enabled and isCustom
+			end
+		end
+		local sunTex = Toggles.Sky.Objects.SunTextureId
+		local moonTex = Toggles.Sky.Objects.MoonTextureId
+		if sunTex then
+			sunTex.Object.Visible = Toggles.Sky.Toggle.Enabled and isCustom
+		end
+		if moonTex then
+			moonTex.Object.Visible = Toggles.Sky.Toggle.Enabled and isCustom
+		end
+	end
+
 	local function removeObject(v)
-		if not table.find(newobjects, v) then 
+		if not table.find(newobjects, v) then
 			local toggle = Toggles[v.ClassName]
 			if toggle and toggle.Toggle.Enabled then
 				table.insert(oldobjects, v)
@@ -12758,7 +12904,7 @@ run(function()
 			end
 		end
 	end
-	
+
 	Atmosphere = vape.Legit:CreateModule({
 		Name = 'Atmosphere',
 		Function = function(callback)
@@ -12769,15 +12915,26 @@ run(function()
 				Atmosphere:Clean(lightingService.ChildAdded:Connect(function(v)
 					task.defer(removeObject, v)
 				end))
-	
+
+				if Toggles.Sky and Toggles.Sky.Toggle.Enabled and SkyPreset and SkyPreset.Value ~= 'Custom' then
+					applySkyPreset(SkyPreset.Value)
+				end
+
 				for i, v in Toggles do
 					if v.Toggle.Enabled then
 						local obj = Instance.new(i)
 						for i2, v2 in v.Objects do
+							if i2 == 'SkyPreset' then
+								continue
+							end
 							if v2.Type == 'ColorSlider' then
 								obj[i2] = Color3.fromHSV(v2.Hue, v2.Sat, v2.Value)
+							elseif v2.Type == 'Dropdown' or v2.Type == 'TextBox' then
+								if apidump[i][i2] ~= 'Number' then
+									obj[i2] = v2.Value or ''
+								end
 							else
-								obj[i2] = apidump[i][i2] ~= 'Number' and v2.Value or tonumber(v2.Value) or 0
+								obj[i2] = tonumber(v2.Value) or 0
 							end
 						end
 						obj.Parent = lightingService
@@ -12795,8 +12952,9 @@ run(function()
 				table.clear(oldobjects)
 			end
 		end,
-		Tooltip = 'Custom lighting objects'
+		Tooltip = 'Custom sky, atmosphere, and post-processing'
 	})
+
 	for i, v in apidump do
 		Toggles[i] = {Objects = {}}
 		Toggles[i].Toggle = Atmosphere:CreateToggle({
@@ -12807,39 +12965,109 @@ run(function()
 					Atmosphere:Toggle()
 				end
 				for _, toggle in Toggles[i].Objects do
-					toggle.Object.Visible = callback
+					if toggle.Type ~= 'Dropdown' or i == 'Sky' then
+						toggle.Object.Visible = callback
+					end
+				end
+				if i == 'Sky' then
+					updateSkyCustomVisibility()
 				end
 			end
 		})
-	
+
+		if i == 'Sky' then
+			local presetList = {}
+			for name in SKYBOX_PRESETS do
+				table.insert(presetList, name)
+			end
+			table.sort(presetList)
+
+			SkyPreset = Atmosphere:CreateDropdown({
+				Name = 'Skybox Preset',
+				List = presetList,
+				Default = 'Galaxy',
+				Function = function(val)
+					if val ~= 'Custom' then
+						applySkyPreset(val)
+					end
+					updateSkyCustomVisibility()
+					refreshAtmosphere()
+				end
+			})
+			SkyPreset.Type = 'Dropdown'
+			SkyPreset.Object.Visible = false
+			Toggles.Sky.Objects.SkyPreset = SkyPreset
+		end
+
 		for i2, v2 in v do
-			if v2 == 'Text' or v2 == 'Number' then
+			if i == 'Sky' and table.find(SKYBOX_FACE_KEYS, i2) then
 				Toggles[i].Objects[i2] = Atmosphere:CreateTextBox({
-					Name = i2,
-					Function = function(enter)
-						if Atmosphere.Enabled and enter then
-							Atmosphere:Toggle()
-							Atmosphere:Toggle()
+					Name = i2:gsub('Skybox', ''),
+					Function = function()
+						if SkyPreset then
+							SkyPreset.Value = 'Custom'
 						end
+						refreshAtmosphere()
 					end,
 					Darker = true,
-					Default = v2 == 'Number' and '0' or nil,
+					Default = '',
+					Visible = false
+				})
+			elseif v2 == 'Text' then
+				Toggles[i].Objects[i2] = Atmosphere:CreateTextBox({
+					Name = i2,
+					Function = function()
+						refreshAtmosphere()
+					end,
+					Darker = true,
+					Default = '',
+					Visible = false
+				})
+			elseif v2 == 'Number' then
+				local defaults = numberDefaults[i] and numberDefaults[i][i2] or {Min = 0, Max = 100, Default = 0, Decimal = 100}
+				Toggles[i].Objects[i2] = Atmosphere:CreateSlider({
+					Name = i2,
+					Min = defaults.Min,
+					Max = defaults.Max,
+					Default = defaults.Default,
+					Decimal = defaults.Decimal,
+					Function = function()
+						refreshAtmosphere()
+					end,
+					Darker = true,
 					Visible = false
 				})
 			elseif v2 == 'Color' then
 				Toggles[i].Objects[i2] = Atmosphere:CreateColorSlider({
 					Name = i2,
 					Function = function()
-						if Atmosphere.Enabled then
-							Atmosphere:Toggle()
-							Atmosphere:Toggle()
-						end
+						refreshAtmosphere()
 					end,
 					Darker = true,
 					Visible = false
 				})
 			end
 		end
+	end
+
+	Toggles.Sky.Toggle.Function = function(callback)
+		if Atmosphere.Enabled then
+			Atmosphere:Toggle()
+			Atmosphere:Toggle()
+		end
+		if SkyPreset then
+			SkyPreset.Object.Visible = callback
+		end
+		for i2, toggle in Toggles.Sky.Objects do
+			if i2 == 'SkyPreset' then
+				continue
+			end
+			if table.find(SKYBOX_FACE_KEYS, i2) or i2 == 'SunTextureId' or i2 == 'MoonTextureId' then
+				continue
+			end
+			toggle.Object.Visible = callback
+		end
+		updateSkyCustomVisibility()
 	end
 end)
 	
