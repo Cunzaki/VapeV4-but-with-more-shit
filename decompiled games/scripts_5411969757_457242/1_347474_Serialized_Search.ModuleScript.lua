@@ -1,0 +1,30 @@
+-- Decompiled with Potassium's decompiler.
+
+local v1 = Instance.new("Frame");
+v1.Name = "Search";
+v1.ZIndex = 6;
+v1.Size = UDim2.new(1, 0, 0, 20);
+v1.BorderColor3 = Color3.fromRGB(0, 0, 0);
+v1.BackgroundTransparency = 1;
+v1.Position = UDim2.new(0, 0, 0, 222);
+v1.BorderSizePixel = 0;
+v1.BackgroundColor3 = Color3.fromRGB(0, 0, 0);
+local v2 = Instance.new("TextBox");
+v2.Name = "BG";
+v2.AutoLocalize = false;
+v2.Localize = false;
+v2.Size = UDim2.new(1, 0, 1, 0);
+v2.ClipsDescendants = true;
+v2.BorderColor3 = Color3.fromRGB(0, 0, 0);
+v2.BackgroundTransparency = 0.75;
+v2.BorderSizePixel = 0;
+v2.BackgroundColor3 = Color3.fromRGB(0, 0, 0);
+v2.FontSize = 5;
+v2.TextStrokeTransparency = 0.75;
+v2.TextSize = 14;
+v2.TextColor3 = Color3.fromRGB(255, 255, 255);
+v2.Text = "Type here to search";
+v2.Font = 4;
+v2.TextXAlignment = 1;
+v2.Parent = v1;
+return v1;

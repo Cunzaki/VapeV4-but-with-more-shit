@@ -1,0 +1,30 @@
+-- Decompiled with Potassium's decompiler.
+
+local v1 = Instance.new("Frame");
+v1.Name = "Hint";
+v1.Visible = false;
+v1.Size = UDim2.new(1, 0, 1, 0);
+v1.BorderColor3 = Color3.fromRGB(0, 0, 0);
+v1.BackgroundTransparency = 1;
+v1.BorderSizePixel = 0;
+v1.BackgroundColor3 = Color3.fromRGB(0, 0, 0);
+local v2 = Instance.new("TextLabel");
+v2.Name = "BG";
+v2.AutoLocalize = false;
+v2.Localize = false;
+v2.ZIndex = 10;
+v2.Size = UDim2.new(1, 0, 0, 24);
+v2.BorderColor3 = Color3.fromRGB(0, 0, 0);
+v2.BackgroundTransparency = 0.8;
+v2.BorderSizePixel = 0;
+v2.BackgroundColor3 = Color3.fromRGB(0, 0, 0);
+v2.FontSize = 6;
+v2.TextStrokeTransparency = 0.7;
+v2.TextSize = 18;
+v2.TextColor3 = Color3.fromRGB(255, 255, 255);
+v2.Text = "";
+v2.TextWrapped = true;
+v2.TextWrap = true;
+v2.Font = 4;
+v2.Parent = v1;
+return v1;
