@@ -1518,6 +1518,19 @@ run(function()
 	local BulletTracerTransparency
 	local BulletTracerThickness
 	local BulletTracerDuration
+	local BulletTracerStyle
+	local BulletTracerAnimSpeed
+	local BulletTracerGlow
+	local BulletTracerLightEmission
+	local BulletTracerTexture
+	local TRACER_TEXTURES = {
+		['None'] = '',
+		['Lightning'] = 'rbxassetid://446111271',
+		['Chain'] = 'rbxassetid://6031094678',
+		['Smoke'] = 'rbxassetid://4416694302',
+		['Energy'] = 'rbxassetid://127818522',
+		['Slash'] = 'rbxassetid://3926307971'
+	}
 	playHitSound = function() end
 	lastHitsoundTime = 0
 	local DEFAULT_IGNORED_SCRIPTS = {
@@ -2149,6 +2162,106 @@ run(function()
 		return mainColor, mainColor:Lerp(Color3.new(1, 1, 1), 0.45)
 	end
 
+	local function getTracerTextureId()
+		if not BulletTracerTexture then return '' end
+		return TRACER_TEXTURES[BulletTracerTexture.Value] or ''
+	end
+
+	local function applyTracerBeamProps(main, glow, mainColor, glowColor)
+		local thickness = BulletTracerThickness.Value
+		local emission = BulletTracerLightEmission and BulletTracerLightEmission.Value or 1
+		local tex = getTracerTextureId()
+		local texSpeed = BulletTracerAnimSpeed and BulletTracerAnimSpeed.Value or 1
+
+		main.FaceCamera = true
+		glow.FaceCamera = true
+		main.LightEmission = emission
+		glow.LightEmission = emission * 0.75
+		main.Width0 = thickness * 0.045
+		main.Width1 = thickness * 0.045
+		glow.Width0 = (thickness + 2) * 0.045
+		glow.Width1 = (thickness + 2) * 0.045
+		main.Color = ColorSequence.new(mainColor)
+		glow.Color = ColorSequence.new(glowColor)
+		main.CurveSize0 = 0
+		main.CurveSize1 = 0
+		glow.CurveSize0 = 0
+		glow.CurveSize1 = 0
+
+		if tex ~= '' then
+			main.Texture = tex
+			glow.Texture = tex
+			main.TextureSpeed = texSpeed
+			glow.TextureSpeed = texSpeed * 0.8
+			main.TextureLength = 1
+			glow.TextureLength = 1
+		else
+			main.Texture = ''
+			glow.Texture = ''
+		end
+
+		local showGlow = not BulletTracerGlow or BulletTracerGlow.Enabled
+		glow.Enabled = showGlow
+	end
+
+	local function applyTracerAnimation(tracer, now)
+		local lifeAlpha = math.clamp((tracer.DieAt - now) / math.max(BulletTracerDuration.Value, 0.001), 0, 1)
+		local progress = 1 - lifeAlpha
+		local style = BulletTracerStyle and BulletTracerStyle.Value or 'Fade'
+		local speed = BulletTracerAnimSpeed and BulletTracerAnimSpeed.Value or 1
+		local trans = BulletTracerTransparency.Value
+		local thickness = BulletTracerThickness.Value
+		local baseWidth = thickness * 0.045
+		local glowWidth = (thickness + 2) * 0.045
+		local visible = SilentAim.Enabled and BulletTracers.Enabled
+
+		local widthMul = 1
+		local mainAlpha = (1 - trans) * lifeAlpha
+		local glowAlpha = 1 - math.clamp((1 - mainAlpha) * 0.5, 0, 1)
+		local targetPos = tracer.TargetPosition
+		local curve = 0
+
+		if style == 'Shrink' then
+			widthMul = lifeAlpha
+		elseif style == 'Grow' then
+			targetPos = tracer.Origin:Lerp(tracer.TargetPosition, progress)
+			widthMul = 0.25 + progress * 0.75
+			mainAlpha = 1 - trans
+			glowAlpha = 1 - math.clamp(trans * 0.5, 0, 1)
+		elseif style == 'Pulse' then
+			widthMul = 0.6 + 0.4 * math.sin(now * speed * 14)
+			mainAlpha = (1 - trans) * lifeAlpha
+		elseif style == 'Expand' then
+			widthMul = math.max(0.05, math.sin(lifeAlpha * math.pi))
+			mainAlpha = (1 - trans) * lifeAlpha
+		elseif style == 'Flicker' then
+			local flicker = math.floor(now * speed * 18) % 2 == 0 and 1 or 0.35
+			mainAlpha = (1 - trans) * lifeAlpha * flicker
+		elseif style == 'Arc' then
+			local dist = (tracer.TargetPosition - tracer.Origin).Magnitude
+			curve = dist * 0.15 * math.sin(progress * math.pi)
+			mainAlpha = (1 - trans) * lifeAlpha
+		end
+
+		tracer.Part1.Position = targetPos
+		tracer.Main.Width0 = baseWidth * widthMul
+		tracer.Main.Width1 = baseWidth * widthMul
+		tracer.Glow.Width0 = glowWidth * widthMul
+		tracer.Glow.Width1 = glowWidth * widthMul
+		tracer.Main.CurveSize0 = curve
+		tracer.Main.CurveSize1 = -curve
+		tracer.Glow.CurveSize0 = curve
+		tracer.Glow.CurveSize1 = -curve
+
+		if not visible then
+			mainAlpha = 0
+			glowAlpha = 0
+		end
+
+		tracer.Main.Transparency = NumberSequence.new(1 - mainAlpha)
+		tracer.Glow.Transparency = NumberSequence.new(1 - glowAlpha)
+	end
+
 	local function getLocalTracerOrigin()
 		local visualOrigin = vape.Libraries.getVisualizerTracerOrigin()
 		if visualOrigin then
@@ -2541,21 +2654,11 @@ run(function()
 		attach1.Parent = part1
 		local main = Instance.new('Beam')
 		local glow = Instance.new('Beam')
-		local thickness = BulletTracerThickness.Value
 		main.Attachment0 = attach0
 		main.Attachment1 = attach1
 		glow.Attachment0 = attach0
 		glow.Attachment1 = attach1
-		main.FaceCamera = true
-		glow.FaceCamera = true
-		main.LightEmission = 1
-		glow.LightEmission = 1
-		main.Width0 = thickness * 0.045
-		main.Width1 = thickness * 0.045
-		glow.Width0 = (thickness + 2) * 0.045
-		glow.Width1 = (thickness + 2) * 0.045
-		main.Color = ColorSequence.new(mainColor)
-		glow.Color = ColorSequence.new(glowColor)
+		applyTracerBeamProps(main, glow, mainColor, glowColor)
 		main.Parent = part0
 		glow.Parent = part0
 		table.insert(bulletTracerActive, {
@@ -2639,13 +2742,7 @@ run(function()
 				continue
 			end
 
-			local lifeAlpha = math.clamp((tracer.DieAt - now) / math.max(BulletTracerDuration.Value, 0.001), 0, 1)
-			local baseAlpha = (1 - BulletTracerTransparency.Value) * lifeAlpha
-			local visible = SilentAim.Enabled and BulletTracers.Enabled
-			local mainAlpha = visible and (1 - baseAlpha) or 1
-			local glowAlpha = visible and (1 - math.clamp(baseAlpha * 0.5, 0, 1)) or 1
-			tracer.Main.Transparency = NumberSequence.new(mainAlpha)
-			tracer.Glow.Transparency = NumberSequence.new(glowAlpha)
+			applyTracerAnimation(tracer, now)
 		end
 	end
 
@@ -3483,8 +3580,84 @@ run(function()
 			BulletTracerTransparency.Object.Visible = callback
 			BulletTracerThickness.Object.Visible = callback
 			BulletTracerDuration.Object.Visible = callback
+			BulletTracerStyle.Object.Visible = callback
+			BulletTracerAnimSpeed.Object.Visible = callback
+			BulletTracerGlow.Object.Visible = callback
+			BulletTracerLightEmission.Object.Visible = callback
+			BulletTracerTexture.Object.Visible = callback
 			if not callback then
 				clearBulletTracers()
+			end
+		end
+	})
+	BulletTracerStyle = SilentAim:CreateDropdown({
+		Name = 'Animation',
+		List = {'Fade', 'Shrink', 'Grow', 'Pulse', 'Expand', 'Flicker', 'Arc'},
+		Default = 'Fade',
+		Darker = true,
+		Visible = false,
+		Tooltip = 'Fade - opacity out\nShrink - thin out\nGrow - travel to target\nPulse - breathing width\nExpand - bulge mid-life\nFlicker - strobe fade\nArc - curved path'
+	})
+	BulletTracerAnimSpeed = SilentAim:CreateSlider({
+		Name = 'Anim Speed',
+		Min = 0.25,
+		Max = 3,
+		Default = 1,
+		Decimal = 100,
+		Darker = true,
+		Visible = false,
+		Function = function(val)
+			for _, tracer in bulletTracerActive do
+				tracer.Main.TextureSpeed = val
+				tracer.Glow.TextureSpeed = val * 0.8
+			end
+		end
+	})
+	BulletTracerGlow = SilentAim:CreateToggle({
+		Name = 'Outer Glow',
+		Default = true,
+		Darker = true,
+		Visible = false,
+		Function = function()
+			for _, tracer in bulletTracerActive do
+				tracer.Glow.Enabled = BulletTracerGlow.Enabled
+			end
+		end
+	})
+	BulletTracerLightEmission = SilentAim:CreateSlider({
+		Name = 'Glow Brightness',
+		Min = 0,
+		Max = 1,
+		Default = 1,
+		Decimal = 100,
+		Darker = true,
+		Visible = false,
+		Function = function(val)
+			for _, tracer in bulletTracerActive do
+				tracer.Main.LightEmission = val
+				tracer.Glow.LightEmission = val * 0.75
+			end
+		end
+	})
+	local tracerTextureList = {}
+	for name in TRACER_TEXTURES do
+		table.insert(tracerTextureList, name)
+	end
+	table.sort(tracerTextureList)
+	BulletTracerTexture = SilentAim:CreateDropdown({
+		Name = 'Texture',
+		List = tracerTextureList,
+		Default = 'None',
+		Darker = true,
+		Visible = false,
+		Function = function()
+			local tex = getTracerTextureId()
+			local texSpeed = BulletTracerAnimSpeed.Value
+			for _, tracer in bulletTracerActive do
+				tracer.Main.Texture = tex
+				tracer.Glow.Texture = tex
+				tracer.Main.TextureSpeed = texSpeed
+				tracer.Glow.TextureSpeed = texSpeed * 0.8
 			end
 		end
 	})
