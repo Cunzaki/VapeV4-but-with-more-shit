@@ -1503,8 +1503,145 @@ run(function()
 	local pmMotorMap = {}
 	local pmRadiusPart
 	local pmTargetPosition = nil
+	local pmLockedTarget = nil
 	local silentAimHookBusy = false
 	local pmRaycastParams = RaycastParams.new()
+	local pmFloorParams = RaycastParams.new()
+	pmFloorParams.FilterType = Enum.RaycastFilterType.Exclude
+	pmFloorParams.RespectCanCollide = true
+	local pmIgnoreInstances = {}
+	local lastPMFrame = 0
+	local pmScanAngleIdx = 0
+	local pmScanRadiusIdx = 0
+	local pmScanYIdx = 0
+	local PM_SCAN = {
+		Low = {throttle = 0.1, budget = 20, angles = 8, radii = 3, y = 2},
+		Medium = {throttle = 0.06, budget = 40, angles = 12, radii = 4, y = 2},
+		High = {throttle = 0.04, budget = 72, angles = 16, radii = 6, y = 3},
+		Ultra = {throttle = 0.025, budget = 120, angles = 24, radii = 8, y = 3},
+	}
+	
+	local function pmClearLock()
+		pmTargetPosition = nil
+		pmLockedTarget = nil
+	end
+	
+	local function refreshPMRaycastFilter()
+		table.clear(pmIgnoreInstances)
+		pmIgnoreInstances[1] = lplr.Character
+		pmIgnoreInstances[2] = gameCamera
+		if pmClone then pmIgnoreInstances[3] = pmClone end
+		if pmRadiusPart then pmIgnoreInstances[4] = pmRadiusPart end
+		local idx = #pmIgnoreInstances
+		for _, model in vape.Libraries.visualizerModels do
+			if model and model.Parent then
+				idx += 1
+				pmIgnoreInstances[idx] = model
+			end
+		end
+		pmRaycastParams.FilterType = Enum.RaycastFilterType.Exclude
+		pmRaycastParams.FilterDescendantsInstances = pmIgnoreInstances
+		pmRaycastParams.RespectCanCollide = true
+		pmFloorParams.FilterDescendantsInstances = pmIgnoreInstances
+	end
+	
+	local function pmIsFloorValid(pos)
+		local down = workspace:Raycast(pos + Vector3.new(0, 2.5, 0), Vector3.new(0, -5, 0), pmFloorParams)
+		if not down then return false end
+		if workspace:Raycast(pos + Vector3.new(0, 0.5, 0), Vector3.new(0, 2.5, 0), pmFloorParams) then
+			return false
+		end
+		return true
+	end
+	
+	local function pmGetRayOrigins(testPos, localChar, localPos)
+		local origins = {testPos + Vector3.new(0, 1.5, 0)}
+		if localChar.Head then
+			table.insert(origins, testPos + Vector3.new(0, localChar.Head.Position.Y - localPos.Y, 0))
+		end
+		return origins
+	end
+	
+	local function pmHasLineOfSight(testPos, targetEnt, aimPart, localChar, localPos)
+		for _, rayOrigin in pmGetRayOrigins(testPos, localChar, localPos) do
+			local delta = aimPart.Position - rayOrigin
+			local dist = delta.Magnitude
+			if dist < 0.5 then return true end
+			local result = workspace:Raycast(rayOrigin, delta, pmRaycastParams)
+			if not result then
+				return true
+			end
+			local hitChar = result.Instance and result.Instance:FindFirstAncestorOfClass('Model')
+			if hitChar == targetEnt.Character then
+				return true
+			end
+		end
+		return false
+	end
+	
+	local function pmTryPosition(testPos, localPos, radius, targetEnt, aimPart, localChar)
+		if (testPos - localPos).Magnitude > radius + 0.25 then return end
+		if not pmIsFloorValid(testPos) then return end
+		if not pmHasLineOfSight(testPos, targetEnt, aimPart, localChar, localPos) then return end
+		return (testPos - localPos).Magnitude
+	end
+	
+	local function validatePMLock()
+		if not pmTargetPosition or not pmLockedTarget then return false end
+		if not pmLockedTarget.Character or not pmLockedTarget.RootPart then return false end
+		if not entitylib.targetCheck(pmLockedTarget) then return false end
+		if not entitylib.isVulnerable(pmLockedTarget, (Target.Forcefield and Target.Forcefield.Enabled) or false) then return false end
+		local localChar = entitylib.character
+		if not localChar or not localChar.RootPart then return false end
+		if (pmTargetPosition - localChar.RootPart.Position).Magnitude > PositionManipulationRadius.Value + 1 then return false end
+		local aimPart = pmLockedTarget.Head or pmLockedTarget.RootPart
+		if not aimPart then return false end
+		if not pmIsFloorValid(pmTargetPosition) then return false end
+		return pmHasLineOfSight(pmTargetPosition, pmLockedTarget, aimPart, localChar, localChar.RootPart.Position)
+	end
+	
+	local function pmTargetInFov(ent)
+		local part = ent.Head or ent.RootPart
+		if not part then return false end
+		if Mode.Value == 'Mouse' then
+			local mouseLocation = inputService:GetMouseLocation()
+			local screenPos, onScreen = gameCamera:WorldToViewportPoint(part.Position)
+			if not onScreen then return false end
+			return (Vector2.new(screenPos.X, screenPos.Y) - mouseLocation).Magnitude <= Range.Value
+		end
+		if not pmTargetPosition then return false end
+		return (part.Position - pmTargetPosition).Magnitude <= Range.Value
+	end
+	
+	local function getPMAutoFireEntity()
+		if not validatePMLock() then
+			pmClearLock()
+			return nil
+		end
+		if not pmTargetInFov(pmLockedTarget) then return nil end
+		if Target.Walls.Enabled then
+			local aimPart = pmLockedTarget.Head or pmLockedTarget.RootPart
+			if aimPart and entitylib.Wallcheck(pmTargetPosition, aimPart.Position, vape.Libraries.getVisualizerWallcheckIgnores()) then
+				return nil
+			end
+		end
+		return pmLockedTarget
+	end
+	
+	local function getAutoFireEntity(effectiveOriginCF)
+		if PositionManipulation and PositionManipulation.Enabled then
+			return getPMAutoFireEntity()
+		end
+		return entitylib['Entity'..Mode.Value]({
+			Range = Range.Value,
+			Wallcheck = Target.Walls.Enabled and vape.Libraries.getVisualizerWallcheckIgnores() or nil,
+			Part = 'Head',
+			Origin = (effectiveOriginCF * fireoffset).Position,
+			Players = Target.Players.Enabled,
+			NPCs = Target.NPCs.Enabled,
+			Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
+		})
+	end
 	
 	local pmCameraProxy
 	local pmOriginalCameraSubject
@@ -2082,158 +2219,154 @@ run(function()
 		pmRadiusPart.Parent = workspace
 	end
 	
-	local lastPMFrame = 0
-	local PM_THROTTLE = 0.15
-	
 	local function findBestPosition()
-		if not PositionManipulation or not PositionManipulation.Enabled then return nil end
-		if silentAimHookBusy or vape.Libraries.silentAimHookBusy then return pmTargetPosition end
+		if not PositionManipulation or not PositionManipulation.Enabled then
+			pmClearLock()
+			return nil
+		end
+		if silentAimHookBusy or vape.Libraries.silentAimHookBusy then
+			return pmTargetPosition
+		end
 		
 		local now = tick()
-		if now - lastPMFrame < PM_THROTTLE then
+		local quality = PositionManipulationScanQuality and PositionManipulationScanQuality.Value or 'Medium'
+		local cfg = PM_SCAN[quality] or PM_SCAN.Medium
+		
+		if pmTargetPosition and pmLockedTarget and not validatePMLock() then
+			pmClearLock()
+			lastPMFrame = 0
+		end
+		
+		if now - lastPMFrame < cfg.throttle then
 			return pmTargetPosition
 		end
 		lastPMFrame = now
 		
 		local localChar = entitylib.character
-		if not localChar or not localChar.RootPart then return nil end
+		if not localChar or not localChar.RootPart then
+			pmClearLock()
+			return nil
+		end
 		
-		local localRoot = localChar.RootPart
-		local localPos = localRoot.Position
+		local localPos = localChar.RootPart.Position
 		local radius = PositionManipulationRadius.Value
+		local weaponRange = Range.Value
+		refreshPMRaycastFilter()
 		
-		local validTargets = {}
+		local sortedTargets = {}
 		for _, ent in entitylib.List do
 			if ent == entitylib.character then continue end
 			if not ent.Character or not ent.RootPart then continue end
 			if not entitylib.targetCheck(ent) then continue end
-			table.insert(validTargets, ent)
+			if not entitylib.isVulnerable(ent, (Target.Forcefield and Target.Forcefield.Enabled) or false) then continue end
+			local dist = (ent.RootPart.Position - localPos).Magnitude
+			if dist <= weaponRange + radius then
+				table.insert(sortedTargets, {Entity = ent, Distance = dist})
+			end
 		end
 		
-		if #validTargets == 0 then return nil end
+		table.sort(sortedTargets, function(a, b)
+			return a.Distance < b.Distance
+		end)
 		
-		local bestPosition = nil
-		local bestPositionScore = math.huge
-		
-		pmRaycastParams.FilterType = Enum.RaycastFilterType.Exclude
-		pmRaycastParams.FilterDescendantsInstances = {lplr.Character, gameCamera, pmClone, pmRadiusPart}
-		pmRaycastParams.RespectCanCollide = true
-		
-		local function isPositionValid(pos)
-			local checkParams = RaycastParams.new()
-			checkParams.FilterType = Enum.RaycastFilterType.Exclude
-			checkParams.FilterDescendantsInstances = {lplr.Character, gameCamera, pmClone, pmRadiusPart}
-			checkParams.RespectCanCollide = true
-			
-			local checkRay = workspace:Raycast(pos, Vector3.new(0, 0.1, 0), checkParams)
-			if checkRay then
-				return false
-			end
-			
-			checkRay = workspace:Raycast(pos, Vector3.new(0, -0.1, 0), checkParams)
-			if checkRay then
-				return false
-			end
-			
-			local directions = {
-				Vector3.new(1, 0, 0),
-				Vector3.new(-1, 0, 0),
-				Vector3.new(0, 0, 1),
-				Vector3.new(0, 0, -1)
-			}
-			
-			for _, dir in directions do
-				checkRay = workspace:Raycast(pos, dir * 0.6, checkParams)
-				if checkRay then
-					return false
-				end
-			end
-			
-			return true
+		if #sortedTargets == 0 then
+			pmClearLock()
+			pmScanAngleIdx, pmScanRadiusIdx, pmScanYIdx = 0, 0, 0
+			return nil
 		end
 		
-		local numAngleSamples, numRadiusSamples, numYSamples
-		local quality = PositionManipulationScanQuality and PositionManipulationScanQuality.Value or 'Medium'
+		local bestPosition, bestScore, bestTarget = nil, math.huge, nil
+		local raysUsed = 0
 		
-		if quality == 'Low' then
-			numAngleSamples = 8
-			numRadiusSamples = 2
-			numYSamples = 2
-		elseif quality == 'Medium' then
-			numAngleSamples = 16
-			numRadiusSamples = 4
-			numYSamples = 3
-		elseif quality == 'High' then
-			numAngleSamples = 32
-			numRadiusSamples = 8
-			numYSamples = 3
-		elseif quality == 'Ultra' then
-			numAngleSamples = 48
-			numRadiusSamples = 12
-			numYSamples = 4
-		end
-		
-		local function getRayOrigins(testPos)
-			local origins = {}
-			
-			table.insert(origins, testPos + Vector3.new(0, 2, 0))
-			
-			if localChar.Head then
-				table.insert(origins, testPos + Vector3.new(0, (localChar.Head.Position.Y - localPos.Y) + 0.5, 0))
+		local function consider(testPos, targetEnt)
+			local aimPart = targetEnt.Head or targetEnt.RootPart
+			if not aimPart then return end
+			local score = pmTryPosition(testPos, localPos, radius, targetEnt, aimPart, localChar)
+			raysUsed += 3
+			if score and score < bestScore then
+				bestScore = score
+				bestPosition = testPos
+				bestTarget = targetEnt
 			end
-			
-			return origins
 		end
 		
-		for ySample = 0, numYSamples - 1 do
-			local yOffset = numYSamples <= 1 and 0 or (ySample / (numYSamples - 1)) * 4 - 2
-			for radiusSample = 0, numRadiusSamples - 1 do
-				local currentRadius = numRadiusSamples <= 1 and 0 or (radiusSample / (numRadiusSamples - 1)) * radius
-				for angleSample = 0, numAngleSamples - 1 do
-					local angle = (angleSample / numAngleSamples) * math.pi * 2
-					local x = math.cos(angle) * currentRadius
-					local z = math.sin(angle) * currentRadius
-					local testPos = localPos + Vector3.new(x, yOffset, z)
-					
-					if not isPositionValid(testPos) then
-						continue
+		-- Fast path: sample toward each nearby target before a full sphere scan
+		for i = 1, math.min(5, #sortedTargets) do
+			local targetEnt = sortedTargets[i].Entity
+			local aimPart = targetEnt.Head or targetEnt.RootPart
+			if not aimPart then continue end
+			
+			local flat = Vector3.new(aimPart.Position.X - localPos.X, 0, aimPart.Position.Z - localPos.Z)
+			if flat.Magnitude < 0.05 then
+				flat = Vector3.new(0, 0, -1)
+			else
+				flat = flat.Unit
+			end
+			local perp = Vector3.new(-flat.Z, 0, flat.X)
+			
+			local radiusSteps = cfg.radii <= 1 and {0} or {0, 0.35, 0.7, 1}
+			local ySteps = cfg.y <= 1 and {0} or {0, -1.5, 1.5}
+			for _, rf in radiusSteps do
+				local r = radius * rf
+				for _, yOff in ySteps do
+					consider(localPos + flat * r + Vector3.new(0, yOff, 0), targetEnt)
+					if r > 2 then
+						consider(localPos + flat * r + perp * 2 + Vector3.new(0, yOff, 0), targetEnt)
+						consider(localPos + flat * r - perp * 2 + Vector3.new(0, yOff, 0), targetEnt)
 					end
-					
-					local rayOrigins = getRayOrigins(testPos)
-					
-					for _, target in validTargets do
-						local targetHead = target.Head or target.RootPart
-						if not targetHead then continue end
-						
-						for _, rayOrigin in ipairs(rayOrigins) do
-							local rayDirection = (targetHead.Position - rayOrigin).Unit
-							local rayResult = workspace:Raycast(rayOrigin, rayDirection * 1000, pmRaycastParams)
-							
-							if rayResult then
-								local hitPart = rayResult.Instance
-								local hitChar = hitPart and hitPart:FindFirstAncestorOfClass("Model")
-								if hitChar and hitChar == target.Character then
-									local score = (testPos - localPos).Magnitude
-									if score < bestPositionScore then
-										bestPositionScore = score
-										bestPosition = testPos
-										
-										if bestPositionScore <= 1 then
-											pmTargetPosition = bestPosition
-											return bestPosition
-										end
-									end
-									break
-								end
-							end
+					if bestScore <= 1 then break end
+				end
+				if bestScore <= 1 then break end
+			end
+			if bestScore <= 1 then break end
+		end
+		
+		-- Budgeted sphere scan for edge cases / wider radius coverage
+		if raysUsed < cfg.budget and (not bestPosition or bestScore > radius * 0.25) then
+			local numAngleSamples = cfg.angles
+			local numRadiusSamples = cfg.radii
+			local numYSamples = cfg.y
+			local scansDone = 0
+			
+			while raysUsed < cfg.budget and scansDone < cfg.budget do
+				if pmScanAngleIdx >= numAngleSamples then
+					pmScanAngleIdx = 0
+					pmScanRadiusIdx += 1
+					if pmScanRadiusIdx >= numRadiusSamples then
+						pmScanRadiusIdx = 0
+						pmScanYIdx += 1
+						if pmScanYIdx >= numYSamples then
+							pmScanAngleIdx, pmScanRadiusIdx, pmScanYIdx = 0, 0, 0
+							break
 						end
 					end
 				end
+				
+				local yOffset = numYSamples <= 1 and 0 or (pmScanYIdx / (numYSamples - 1)) * 4 - 2
+				local currentRadius = numRadiusSamples <= 1 and 0 or (pmScanRadiusIdx / (numRadiusSamples - 1)) * radius
+				local angle = (pmScanAngleIdx / numAngleSamples) * math.pi * 2
+				pmScanAngleIdx += 1
+				scansDone += 1
+				
+				local testPos = localPos + Vector3.new(math.cos(angle) * currentRadius, yOffset, math.sin(angle) * currentRadius)
+				for i = 1, math.min(3, #sortedTargets) do
+					consider(testPos, sortedTargets[i].Entity)
+					if bestScore <= 1 then break end
+				end
+				if bestScore <= 1 then break end
 			end
+		else
+			pmScanAngleIdx, pmScanRadiusIdx, pmScanYIdx = 0, 0, 0
 		end
 		
-		pmTargetPosition = bestPosition
-		return bestPosition
+		if bestPosition then
+			pmTargetPosition = bestPosition
+			pmLockedTarget = bestTarget
+		elseif pmScanAngleIdx == 0 and pmScanRadiusIdx == 0 and pmScanYIdx == 0 then
+			pmClearLock()
+		end
+		
+		return pmTargetPosition
 	end
 
 	local function registerShot(ent, targetPart, origin)
@@ -2426,7 +2559,7 @@ run(function()
 		else
 			baseCF = (entitylib.isAlive and entitylib.character.RootPart and entitylib.character.RootPart.CFrame) or gameCamera.CFrame
 		end
-		if PositionManipulation and PositionManipulation.Enabled and pmTargetPosition then
+		if PositionManipulation and PositionManipulation.Enabled and pmTargetPosition and pmLockedTarget then
 			baseCF = CFrame.new(pmTargetPosition) * (baseCF - baseCF.Position)
 		end
 		return baseCF.Position, baseCF
@@ -2735,7 +2868,7 @@ run(function()
 					end))
 					SilentAim:Clean(runService.RenderStepped:Connect(function()
 						if not PositionManipulation.Enabled then
-							pmTargetPosition = nil
+							pmClearLock()
 							return
 						end
 
@@ -2874,17 +3007,21 @@ run(function()
 							if gundata and tool and (tool:GetAttribute('Local_CurrentAmmo') or 0) > 0 and not tool:GetAttribute('Local_IsShooting') then
 								local limit = gundata.Range or 1000
 								local taser = gundata.Behavior == 'Taser'
-								ent = entitylib['Entity'..Mode.Value]({
-									Range = Mode.Value == 'Position' and math.min(Range.Value, limit) or Range.Value,
-									RangePosition = limit,
-									AttackCheck = not taser,
-									Wallcheck = Target.Walls.Enabled and true or nil,
-									Wallbang = Wallbang.Enabled and entitylib.isAlive and entitylib.character.RootPart.Position or nil,
-									Part = 'Head',
-									Origin = entitylib.isAlive and entitylib.character.Head.Position or Vector3.zero,
-									Players = Target.Players.Enabled,
-									NPCs = Target.NPCs.Enabled
-								})
+								if PositionManipulation and PositionManipulation.Enabled then
+									ent = getPMAutoFireEntity()
+								else
+									ent = entitylib['Entity'..Mode.Value]({
+										Range = Mode.Value == 'Position' and math.min(Range.Value, limit) or Range.Value,
+										RangePosition = limit,
+										AttackCheck = not taser,
+										Wallcheck = Target.Walls.Enabled and true or nil,
+										Wallbang = Wallbang.Enabled and entitylib.isAlive and entitylib.character.RootPart.Position or nil,
+										Part = 'Head',
+										Origin = entitylib.isAlive and entitylib.character.Head.Position or Vector3.zero,
+										Players = Target.Players.Enabled,
+										NPCs = Target.NPCs.Enabled
+									})
+								end
 
 								if ent and entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
 									if not (taser and ent.Character:GetAttribute('Tased')) then
@@ -2908,15 +3045,7 @@ run(function()
 							effectiveOrigin = CFrame.new(pmTargetPosition) * origin.Rotation
 						end
 						
-						ent = entitylib['Entity'..Mode.Value]({
-							Range = Range.Value,
-							Wallcheck = Target.Walls.Enabled or nil,
-							Part = 'Head',
-							Origin = (effectiveOrigin * fireoffset).Position,
-							Players = Target.Players.Enabled,
-							NPCs = Target.NPCs.Enabled,
-							Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
-						})
+						ent = getAutoFireEntity(effectiveOrigin)
 						
 						if ent then
 							registerShot(ent, ent.Head or ent.RootPart, (effectiveOrigin * fireoffset).Position)
@@ -2952,15 +3081,19 @@ run(function()
 							effectiveOrigin = CFrame.new(pmTargetPosition) * origin.Rotation
 						end
 						
-						ent = entitylib['Entity'..Mode.Value]({
-							Range = Range.Value,
-							Wallcheck = Target.Walls.Enabled or nil,
-							Part = 'Head',
-							Origin = effectiveOrigin.Position,
-							Players = Target.Players.Enabled,
-							NPCs = Target.NPCs.Enabled,
-							Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
-						})
+						if PositionManipulation and PositionManipulation.Enabled then
+							ent = getPMAutoFireEntity()
+						else
+							ent = entitylib['Entity'..Mode.Value]({
+								Range = Range.Value,
+								Wallcheck = Target.Walls.Enabled and vape.Libraries.getVisualizerWallcheckIgnores() or nil,
+								Part = 'Head',
+								Origin = effectiveOrigin.Position,
+								Players = Target.Players.Enabled,
+								NPCs = Target.NPCs.Enabled,
+								Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
+							})
+						end
 					end
 
 					if AutoStop and AutoStop.Enabled then
@@ -3323,6 +3456,9 @@ run(function()
 		Name = 'Position Manipulation',
 		Tooltip = 'Manipulates your position to make targets visible',
 		Function = function(callback)
+			if not callback then
+				pmClearLock()
+			end
 			PositionManipulationRadius.Object.Visible = callback
 			PositionManipulationVisualizer.Object.Visible = callback
 			PositionManipulationScanQuality.Object.Visible = callback
@@ -3443,7 +3579,7 @@ run(function()
 		Default = 'Medium',
 		Visible = false,
 		Darker = true,
-		Tooltip = 'Low - Fastest, least accurate\nMedium - Balanced\nHigh - More accurate, slower\nUltra - Most accurate, slowest'
+		Tooltip = 'Low - Fastest, samples toward targets only\nMedium - Balanced with incremental scan\nHigh - Wider coverage per frame\nUltra - Maximum scan budget'
 	})
 	table.insert(vape.Libraries.tracerOriginProviders, function()
 		if PositionManipulation and PositionManipulation.Enabled and PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled and pmClone then
@@ -9660,6 +9796,9 @@ run(function()
 					
 					raknet.add_send_hook(serverDesyncHook)
 				else
+					if vape.Modules.Void and vape.Modules.Void.Enabled then
+						vape.Modules.Void:Toggle()
+					end
 					desyncEnabled = true
 					setupCameraProxy()
 					Desync:Clean(RunService.Heartbeat:Connect(onHeartbeat))
@@ -9958,6 +10097,335 @@ run(function()
 	table.insert(vape.Libraries.tracerOriginProviders, function()
 		if Desync and Desync.Enabled and Visualizer and Visualizer.Enabled and desyncClone then
 			return vape.Libraries.getCloneTracerOrigin(desyncClone)
+		end
+	end)
+end)
+
+run(function()
+	local Void
+	local Visualizer
+	local VisualizerMaterial
+	local VisualizerColorToggle
+	local VisualizerColor
+
+	local RunService = game:GetService('RunService')
+	local VOID_OFFSET = Vector3.new(0, -500000, 0)
+
+	local returnthis = nil
+	local cameraProxy
+	local originalCameraSubject
+	local voidClone
+	local voidCloneRoot
+	local voidMotorMap = {}
+
+	local function cleanupCameraProxy(restore)
+		if cameraProxy then
+			if workspace.CurrentCamera and workspace.CurrentCamera.CameraSubject == cameraProxy then
+				workspace.CurrentCamera.CameraSubject = originalCameraSubject
+			end
+			cameraProxy:Destroy()
+			cameraProxy = nil
+		end
+		if restore == false then
+			originalCameraSubject = nil
+			return
+		end
+		local cam = workspace.CurrentCamera
+		if cam and originalCameraSubject and originalCameraSubject.Parent then
+			cam.CameraSubject = originalCameraSubject
+		end
+		originalCameraSubject = nil
+	end
+
+	local function setupCameraProxy()
+		local cam = workspace.CurrentCamera
+		if not cam then return end
+
+		local char = entitylib.character and entitylib.character.Character
+		local hum = char and char:FindFirstChildOfClass('Humanoid')
+		if not hum or hum.Health <= 0 then return end
+
+		if not cameraProxy then
+			originalCameraSubject = cam.CameraSubject
+			cameraProxy = Instance.new('Part')
+			cameraProxy.Name = 'VapeVoidCameraProxy'
+			cameraProxy.Transparency = 1
+			cameraProxy.CanCollide = false
+			cameraProxy.CanQuery = false
+			cameraProxy.CanTouch = false
+			cameraProxy.Anchored = true
+			cameraProxy.Size = Vector3.new(0.1, 0.1, 0.1)
+			cameraProxy.Parent = workspace
+		end
+
+		cam.CameraSubject = cameraProxy
+	end
+
+	local function cleanupVoidClone()
+		if voidClone then
+			vape.Libraries.unregisterVisualizerModel(voidClone)
+			voidClone:Destroy()
+		end
+		voidClone = nil
+		voidCloneRoot = nil
+		voidMotorMap = {}
+	end
+
+	local function applyVisualizerStyle()
+		if not voidClone then return end
+		local mat = Enum.Material[VisualizerMaterial.Value] or Enum.Material.ForceField
+		local customColor = VisualizerColorToggle.Enabled and Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value) or nil
+		for _, obj in voidClone:GetDescendants() do
+			if obj:IsA('BasePart') then
+				obj.Material = mat
+				obj.Transparency = 0.4
+				if customColor then
+					obj.Color = customColor
+				end
+			end
+		end
+	end
+
+	local function setupVoidClone()
+		cleanupVoidClone()
+
+		local char = entitylib.character and entitylib.character.Character
+		if not char then return end
+
+		char.Archivable = true
+		local realRoot = char:FindFirstChild('HumanoidRootPart')
+		if not realRoot then return end
+
+		voidClone = char:Clone()
+		if not voidClone then return end
+
+		voidClone.Name = 'VoidVisualizer'
+		voidMotorMap = {}
+		local realMotors = {}
+		for _, v in char:GetDescendants() do
+			if v:IsA('Motor6D') then
+				realMotors[v.Name] = v
+			end
+		end
+		for _, d in voidClone:GetDescendants() do
+			if d:IsA('Motor6D') then
+				local realMotor = realMotors[d.Name]
+				if realMotor then
+					voidMotorMap[d] = realMotor
+				end
+			end
+		end
+
+		local hrp = voidClone:FindFirstChild('HumanoidRootPart')
+		local torso = voidClone:FindFirstChild('UpperTorso') or voidClone:FindFirstChild('Torso') or hrp
+		if hrp then
+			voidClone.PrimaryPart = hrp
+		elseif torso then
+			voidClone.PrimaryPart = torso
+		end
+
+		for _, obj in voidClone:GetDescendants() do
+			if obj:IsA('BasePart') then
+				local isAccessoryPart = false
+				local parent = obj.Parent
+				while parent and parent ~= voidClone do
+					if parent:IsA('Accessory') then
+						isAccessoryPart = true
+						break
+					end
+					parent = parent.Parent
+				end
+
+				if obj.Name == 'HumanoidRootPart' or isAccessoryPart then
+					obj.Anchored = true
+				else
+					obj.Anchored = false
+				end
+
+				obj.CanCollide = false
+				obj.CanTouch = false
+				obj.CanQuery = false
+				obj.Massless = true
+				obj.CastShadow = false
+			elseif obj:IsA('Humanoid') then
+				obj:Destroy()
+			elseif obj:IsA('Script') or obj:IsA('LocalScript') or obj:IsA('Tool') then
+				obj:Destroy()
+			elseif obj:IsA('WeldConstraint') or obj:IsA('Weld') then
+				local keep = false
+				local parent = obj.Parent
+				while parent and parent ~= voidClone do
+					if parent:IsA('Accessory') then
+						keep = true
+						break
+					end
+					parent = parent.Parent
+				end
+				if not keep and not (obj.Part0 and (obj.Part0.Name == 'Head' or obj.Part0.Name == 'Torso' or obj.Part0.Name == 'UpperTorso' or obj.Part0.Name == 'HumanoidRootPart')) then
+					obj:Destroy()
+				end
+			end
+		end
+
+		applyVisualizerStyle()
+		voidClone.Parent = workspace
+		vape.Libraries.registerVisualizerModel(voidClone)
+		voidCloneRoot = voidClone:FindFirstChild('HumanoidRootPart')
+		if not voidCloneRoot then
+			cleanupVoidClone()
+		end
+	end
+
+	local function onHeartbeat()
+		if not Void.Enabled then return end
+
+		local char = entitylib.character and entitylib.character.Character
+		local hum = char and char:FindFirstChildOfClass('Humanoid')
+		local root = char and char:FindFirstChild('HumanoidRootPart')
+		if not (hum and root) or hum.Health <= 0 then return end
+		if vape.Libraries.silentAimHookBusy then return end
+
+		returnthis = root.CFrame
+		root.CFrame = root.CFrame + VOID_OFFSET
+		RunService.RenderStepped:Wait()
+		root.CFrame = returnthis
+	end
+
+	local function onRenderStepped()
+		local char = entitylib.character and entitylib.character.Character
+		local hum = char and char:FindFirstChildOfClass('Humanoid')
+		local root = char and char:FindFirstChild('HumanoidRootPart')
+		local cam = workspace.CurrentCamera
+
+		if cameraProxy then
+			if not hum or hum.Health <= 0 then
+				cleanupCameraProxy()
+			elseif root and cam then
+				local camPos = (returnthis or root.CFrame).Position
+				local camOffset = hum.CameraOffset
+				if hum.Sit and hum.SeatPart then
+					camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
+				end
+				cameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
+				if cam.CameraSubject ~= cameraProxy then
+					cam.CameraSubject = cameraProxy
+				end
+			end
+		end
+
+		if Visualizer.Enabled and not voidCloneRoot and Void.Enabled and hum and hum.Health > 0 then
+			setupVoidClone()
+		end
+
+		if not Visualizer.Enabled or not voidCloneRoot then return end
+
+		local baseCF = entitylib.character and entitylib.character.RootPart and entitylib.character.RootPart.CFrame
+		if not baseCF then return end
+
+		for cloneMotor, realMotor in pairs(voidMotorMap) do
+			if cloneMotor and realMotor and cloneMotor.Parent and realMotor.Parent then
+				cloneMotor.Transform = realMotor.Transform
+			end
+		end
+
+		voidClone:PivotTo(baseCF + VOID_OFFSET)
+		vape.Libraries.refreshVisualizerTracerOrigin()
+	end
+
+	Void = vape.Categories.Utility:CreateModule({
+		Name = 'Void',
+		Function = function(callback)
+			if callback then
+				if vape.Modules.Desync and vape.Modules.Desync.Enabled then
+					vape.Modules.Desync:Toggle()
+				end
+				setupCameraProxy()
+				Void:Clean(RunService.Heartbeat:Connect(onHeartbeat))
+				Void:Clean(RunService.RenderStepped:Connect(onRenderStepped))
+				if Visualizer.Enabled then
+					setupVoidClone()
+				end
+				Void:Clean(entitylib.Events.LocalAdded:Connect(function()
+					setupCameraProxy()
+					if Visualizer.Enabled then
+						setupVoidClone()
+					end
+				end))
+				Void:Clean(entitylib.Events.LocalRemoved:Connect(function()
+					cleanupCameraProxy(false)
+					cleanupVoidClone()
+				end))
+			else
+				cleanupCameraProxy()
+				cleanupVoidClone()
+			end
+		end,
+		Tooltip = 'Spoofs your server position deep underground to break aimbots while keeping your camera at your real location'
+	})
+
+	Visualizer = Void:CreateToggle({
+		Name = 'Visualizer',
+		Function = function(enabled)
+			VisualizerMaterial.Object.Visible = enabled
+			VisualizerColorToggle.Object.Visible = enabled
+			VisualizerColor.Object.Visible = enabled and VisualizerColorToggle.Enabled
+			if enabled then
+				if Void.Enabled then
+					setupVoidClone()
+				end
+			else
+				cleanupVoidClone()
+			end
+		end,
+		Tooltip = 'Shows a clone at your voided server-side position'
+	})
+
+	VisualizerMaterial = Void:CreateDropdown({
+		Name = 'Material',
+		List = {'ForceField', 'Neon', 'Glass', 'Plastic'},
+		Default = 'ForceField',
+		Visible = false,
+		Darker = true,
+		Tooltip = 'Material for visualizer clone',
+		Function = function()
+			if Visualizer.Enabled and voidClone then
+				applyVisualizerStyle()
+			elseif Visualizer.Enabled and Void.Enabled then
+				setupVoidClone()
+			end
+		end
+	})
+
+	VisualizerColorToggle = Void:CreateToggle({
+		Name = 'Custom Color',
+		Default = false,
+		Visible = false,
+		Darker = true,
+		Tooltip = 'Use custom color for visualizer',
+		Function = function(enabled)
+			VisualizerColor.Object.Visible = enabled and Visualizer.Enabled
+			if Visualizer.Enabled and voidClone then
+				applyVisualizerStyle()
+			elseif Visualizer.Enabled and Void.Enabled then
+				setupVoidClone()
+			end
+		end
+	})
+
+	VisualizerColor = Void:CreateColorSlider({
+		Name = 'Color',
+		Visible = false,
+		Darker = true,
+		Function = function()
+			if Visualizer.Enabled and VisualizerColorToggle.Enabled and voidClone then
+				applyVisualizerStyle()
+			end
+		end
+	})
+
+	table.insert(vape.Libraries.tracerOriginProviders, function()
+		if Void and Void.Enabled and Visualizer and Visualizer.Enabled and voidClone then
+			return vape.Libraries.getCloneTracerOrigin(voidClone)
 		end
 	end)
 end)
