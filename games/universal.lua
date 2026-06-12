@@ -997,6 +997,8 @@ run(function()
 	local AimAssist
 	local Targets
 	local Part
+	local AimMode
+	local StickyAim
 	local FOV
 	local Speed
 	local CircleColor
@@ -1006,6 +1008,7 @@ run(function()
 	local RightClick
 	local LeftClick
 	local Strength
+	local stickyTarget = nil
 	local moveConst = Vector2.new(1, 0.77) * math.rad(0.5)
 	
 	local function wrapAngle(num)
@@ -1014,6 +1017,118 @@ run(function()
 		num += num < -(math.pi / 2) and math.pi or 0
 		return num
 	end
+
+	local function getFOVCenter()
+		if AimMode.Value == 'Camera' then
+			return gameCamera.ViewportSize / 2
+		end
+		return inputService:GetMouseLocation()
+	end
+
+	local function areModuleBindKeysHeld()
+		if #AimAssist.Bind == 0 then
+			return true
+		end
+		local heldKeys = vape.HeldKeybinds or {}
+		for _, key in AimAssist.Bind do
+			if not table.find(heldKeys, key) then
+				return false
+			end
+		end
+		return true
+	end
+
+	local function clearStickyTarget()
+		stickyTarget = nil
+	end
+
+	local function isStickyTargetValid(ent)
+		if not ent or not ent.Character then return false end
+		local aimPart = ent[Part.Value]
+		if not aimPart or not aimPart.Parent then return false end
+		if not entitylib.targetCheck(ent) then return false end
+		if not entitylib.isVulnerable(ent, (Targets.Forcefield and Targets.Forcefield.Enabled) or false) then return false end
+		if Targets.Walls.Enabled and entitylib.Wallcheck(gameCamera.CFrame.Position, aimPart.Position, true) then
+			return false
+		end
+		return true
+	end
+
+	local function acquireTarget(skipFOV)
+		if not entitylib.isAlive then return nil end
+		local fovCenter = getFOVCenter()
+		local sortingTable = {}
+		for _, v in entitylib.List do
+			if not Targets.Players.Enabled and v.Player then continue end
+			if not Targets.NPCs.Enabled and v.NPC then continue end
+			if not v.Targetable then continue end
+			local aimPart = v[Part.Value]
+			if not aimPart then continue end
+			local position, vis = gameCamera:WorldToViewportPoint(aimPart.Position)
+			if not vis then continue end
+			if not skipFOV then
+				local mag = (fovCenter - Vector2.new(position.X, position.Y)).Magnitude
+				if mag > FOV.Value then continue end
+			end
+			if entitylib.isVulnerable(v, (Targets.Forcefield and Targets.Forcefield.Enabled) or false) then
+				table.insert(sortingTable, {
+					Entity = v,
+					Magnitude = v.Target and -1 or (fovCenter - Vector2.new(position.X, position.Y)).Magnitude
+				})
+			end
+		end
+		table.sort(sortingTable, function(a, b)
+			return a.Magnitude < b.Magnitude
+		end)
+		for _, v in sortingTable do
+			if Targets.Walls.Enabled and entitylib.Wallcheck(gameCamera.CFrame.Position, v.Entity[Part.Value].Position, true) then
+				continue
+			end
+			return v.Entity
+		end
+	end
+
+	local function resolveTarget()
+		if not StickyAim.Enabled then
+			return acquireTarget(false)
+		end
+		if not areModuleBindKeysHeld() then
+			clearStickyTarget()
+		end
+		if stickyTarget and isStickyTargetValid(stickyTarget) and areModuleBindKeysHeld() then
+			return stickyTarget
+		end
+		local ent = acquireTarget(false)
+		if ent and areModuleBindKeysHeld() then
+			stickyTarget = ent
+		elseif not ent then
+			stickyTarget = nil
+		end
+		return ent
+	end
+
+	local function applyAim(ent, dt)
+		local aimPart = ent[Part.Value]
+		if not aimPart then return end
+		local targetPos = aimPart.Position
+		if AimMode.Value == 'Camera' then
+			local camCF = gameCamera.CFrame
+			local goalCF = CFrame.lookAt(camCF.Position, targetPos)
+			local alpha = math.min(Speed.Value * dt, 1) * (Strength and Strength.Value or 1)
+			gameCamera.CFrame = camCF:Lerp(goalCF, alpha)
+			return
+		end
+		local facing = gameCamera.CFrame.LookVector
+		local new = (targetPos - gameCamera.CFrame.Position).Unit
+		new = new == new and new or Vector3.zero
+		if new == Vector3.zero then return end
+		local diffYaw = wrapAngle(math.atan2(facing.X, facing.Z) - math.atan2(new.X, new.Z))
+		local diffPitch = math.asin(facing.Y) - math.asin(new.Y)
+		local angle = Vector2.new(diffYaw, diffPitch) // (moveConst * UserSettings():GetService('UserGameSettings').MouseSensitivity)
+		angle *= math.min(Speed.Value * dt, 1)
+		angle *= Strength and Strength.Value or 1
+		mousemoverel(angle.X, angle.Y)
+	end
 	
 	AimAssist = vape.Categories.Combat:CreateModule({
 		Name = 'AimAssist',
@@ -1021,74 +1136,54 @@ run(function()
 			if CircleObject then
 				CircleObject.Visible = callback
 			end
-			if callback then 
-				local ent
-				local rightClicked = not RightClick.Enabled or inputService:IsMouseButtonPressed(1)
-				local leftClicked = not LeftClick.Enabled or inputService:IsMouseButtonPressed(0)
-				AimAssist:Clean(runService.RenderStepped:Connect(function(dt)
-					if CircleObject then 
-						CircleObject.Position = inputService:GetMouseLocation() 
-					end
-					
-					rightClicked = not RightClick.Enabled or inputService:IsMouseButtonPressed(1)
-					leftClicked = not LeftClick.Enabled or inputService:IsMouseButtonPressed(0)
-					
-					if rightClicked and leftClicked and not vape.gui.ScaledGui.ClickGui.Visible then
-						ent = entitylib.EntityMouse({
-							Range = FOV.Value,
-							Part = Part.Value,
-							Players = Targets.Players.Enabled,
-							NPCs = Targets.NPCs.Enabled,
-							Forcefield = (Targets.Forcefield and Targets.Forcefield.Enabled) or false,
-							Wallcheck = Targets.Walls.Enabled,
-							Origin = gameCamera.CFrame.Position
-						})
-	
-						if ent then 
-							local facing = gameCamera.CFrame.LookVector
-							local new = (ent[Part.Value].Position - gameCamera.CFrame.Position).Unit
-							new = new == new and new or Vector3.zero
-							
-							if new ~= Vector3.zero then 
-								local diffYaw = wrapAngle(math.atan2(facing.X, facing.Z) - math.atan2(new.X, new.Z))
-								local diffPitch = math.asin(facing.Y) - math.asin(new.Y)
-								local angle = Vector2.new(diffYaw, diffPitch) // (moveConst * UserSettings():GetService('UserGameSettings').MouseSensitivity)
-								
-								angle *= math.min(Speed.Value * dt, 1)
-								angle *= Strength and Strength.Value or 1
-								mousemoverel(angle.X, angle.Y)
-							end
-						end
-					end
-				end))
-	
-				if RightClick.Enabled then 
-					AimAssist:Clean(inputService.InputBegan:Connect(function(input)
-						if input.UserInputType == Enum.UserInputType.MouseButton2 then 
-							ent = nil
-							rightClicked = true
-						end
-					end))
-					AimAssist:Clean(inputService.InputEnded:Connect(function(input)
-						if input.UserInputType == Enum.UserInputType.MouseButton2 then 
-							rightClicked = false
-						end
-					end))
+			if not callback then
+				clearStickyTarget()
+				return
+			end
+			local rightClicked = not RightClick.Enabled or inputService:IsMouseButtonPressed(1)
+			local leftClicked = not LeftClick.Enabled or inputService:IsMouseButtonPressed(0)
+			AimAssist:Clean(runService.RenderStepped:Connect(function(dt)
+				if CircleObject then
+					CircleObject.Position = getFOVCenter()
 				end
 				
-				if LeftClick.Enabled then 
-					AimAssist:Clean(inputService.InputBegan:Connect(function(input)
-						if input.UserInputType == Enum.UserInputType.MouseButton1 then 
-							ent = nil
-							leftClicked = true
-						end
-					end))
-					AimAssist:Clean(inputService.InputEnded:Connect(function(input)
-						if input.UserInputType == Enum.UserInputType.MouseButton1 then 
-							leftClicked = false
-						end
-					end))
+				rightClicked = not RightClick.Enabled or inputService:IsMouseButtonPressed(1)
+				leftClicked = not LeftClick.Enabled or inputService:IsMouseButtonPressed(0)
+				
+				if not (rightClicked and leftClicked and not vape.gui.ScaledGui.ClickGui.Visible) then
+					return
 				end
+
+				local ent = resolveTarget()
+				if ent then
+					applyAim(ent, dt)
+				end
+			end))
+
+			if RightClick.Enabled then
+				AimAssist:Clean(inputService.InputBegan:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton2 then
+						rightClicked = true
+					end
+				end))
+				AimAssist:Clean(inputService.InputEnded:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton2 then
+						rightClicked = false
+					end
+				end))
+			end
+			
+			if LeftClick.Enabled then
+				AimAssist:Clean(inputService.InputBegan:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+						leftClicked = true
+					end
+				end))
+				AimAssist:Clean(inputService.InputEnded:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+						leftClicked = false
+					end
+				end))
 			end
 		end,
 		Tooltip = 'Smoothly aims to closest valid target'
@@ -1097,6 +1192,26 @@ run(function()
 	Part = AimAssist:CreateDropdown({
 		Name = 'Part',
 		List = {'RootPart', 'Head'}
+	})
+	AimMode = AimAssist:CreateDropdown({
+		Name = 'Aim Mode',
+		List = {'Mouse', 'Camera'},
+		Default = 'Mouse',
+		Tooltip = 'Mouse - Moves the mouse to aim\nCamera - Rotates the camera directly',
+		Function = function()
+			if CircleObject then
+				CircleObject.Position = getFOVCenter()
+			end
+		end
+	})
+	StickyAim = AimAssist:CreateToggle({
+		Name = 'Sticky Aim',
+		Function = function(callback)
+			if not callback then
+				clearStickyTarget()
+			end
+		end,
+		Tooltip = 'Keeps your locked target outside the FOV circle until the module bind is released or the module is disabled. Without a module bind, the lock persists until the module is turned off.'
 	})
 	FOV = AimAssist:CreateSlider({
 		Name = 'FOV',
