@@ -62,42 +62,52 @@ end
 local InfiniteAmmo, FireRate, FireDelay, InstantReload
 local weaponHeartbeat
 local weaponHeartbeatAccum = 0
-local WEAPON_HEARTBEAT_INTERVAL = 0.15
+local WEAPON_HEARTBEAT_INTERVAL = 0.05
 local gunHookOriginals = {wait = nil, taskWait = nil}
 local gunHookState = {fireDelay = nil, instantReload = false}
+local knownFireDelays = {[0.09] = true, [0.1] = true}
 local wrappedLegacyReloads = setmetatable({}, {__mode = 'k'})
 local wrappedVAKReloads = setmetatable({}, {__mode = 'k'})
+local wrappedVAKMediRecharges = setmetatable({}, {__mode = 'k'})
+local trackedWeaponStats = setmetatable({}, {__mode = 'k'})
 
-local function isVAKWeaponTable(weapon)
-	if type(weapon) ~= 'table' or rawget(weapon, 'Name') == nil then
-		return false
+local WEAPON_STAT_KEYS = {'RoF', 'Rate', 'Ammo', 'MaxAmmo', 'Charge', 'MaxCharge', 'ReloadTime', 'Recharge', 'BaseDamage', 'BaseHeal'}
+
+local function registerFireDelay(delayTime)
+	if type(delayTime) == 'number' and delayTime > 0 and delayTime <= 0.5 then
+		knownFireDelays[delayTime] = true
 	end
-	if type(rawget(weapon, 'RoF')) == 'number' and type(rawget(weapon, 'Ammo')) == 'number' then
-		return true
-	end
-	if type(rawget(weapon, 'Rate')) == 'number' and type(rawget(weapon, 'Charge')) == 'number' then
-		return true
-	end
-	return false
 end
 
-local function getVAKWeaponKind(weapon)
-	if type(rawget(weapon, 'RoF')) == 'number' and type(rawget(weapon, 'Ammo')) == 'number' then
-		return 'tool'
+local function isVAKWeaponTable(weapon)
+	if type(weapon) ~= 'table' then
+		return false
 	end
-	if type(rawget(weapon, 'Rate')) == 'number' and type(rawget(weapon, 'Charge')) == 'number' then
-		return 'medi'
+
+	local model = rawget(weapon, 'Model')
+	if not (model and typeof(model) == 'Instance') and rawget(weapon, 'Name') == nil then
+		return false
 	end
+
+	for _, key in WEAPON_STAT_KEYS do
+		if type(rawget(weapon, key)) == 'number' then
+			return true
+		end
+	end
+
+	return false
 end
 
 local function tryWeaponFromTool(tool)
 	if not tool or not tool:IsA('Tool') then
 		return
 	end
-	local client = tool:FindFirstChild('Client')
+
+	local client = tool:FindFirstChild('Client', true)
 	if not client or not client:IsA('ModuleScript') then
 		return
 	end
+
 	local ok, weapon = pcall(require, client)
 	if ok and isVAKWeaponTable(weapon) then
 		return weapon
@@ -123,51 +133,80 @@ local function getVAKWeapons()
 	return weapons
 end
 
-local function getEquippedVAKWeapons()
-	local equipped = {}
-	for _, weapon in getVAKWeapons() do
-		if rawget(weapon, 'Out') == true then
-			table.insert(equipped, weapon)
-		end
+local function isWeaponEquipped(weapon)
+	if rawget(weapon, 'Out') == true or rawget(weapon, 'IsActive') == true then
+		return true
 	end
-	return equipped
+
+	local model = rawget(weapon, 'Model')
+	local char = lplr.Character
+	if model and typeof(model) == 'Instance' and char and model:IsDescendantOf(char) then
+		return true
+	end
+
+	return false
 end
 
-local function getLegacyGunScript()
+local function getActiveVAKWeapons()
+	local active = {}
+	for _, weapon in getVAKWeapons() do
+		if isWeaponEquipped(weapon) then
+			table.insert(active, weapon)
+		end
+	end
+	return active
+end
+
+local function isToolEquipped(tool)
+	local char = lplr.Character
+	return char and tool:IsDescendantOf(char)
+end
+
+local function findLegacyGunScript(tool)
+	local gun = tool:FindFirstChild('Gun', true)
+	if gun and gun:IsA('LocalScript') then
+		return gun
+	end
+end
+
+local function getLegacyGunEnvs()
+	local envs = {}
+	local seen = {}
+
+	if not getsenv then
+		return envs
+	end
+
 	for _, parent in {lplr.Character, lplr:FindFirstChild('Backpack')} do
 		if parent then
 			for _, tool in parent:GetChildren() do
-				if tool:IsA('Tool') then
-					local gun = tool:FindFirstChild('Gun')
-					if gun and gun:IsA('LocalScript') then
-						return gun
+				if tool:IsA('Tool') and isToolEquipped(tool) then
+					local gun = findLegacyGunScript(tool)
+					if gun and not seen[gun] then
+						local ok, env = pcall(getsenv, gun)
+						if ok and type(env) == 'table' then
+							seen[gun] = true
+							table.insert(envs, env)
+						end
 					end
 				end
 			end
 		end
 	end
-end
 
-local function getLegacyGunEnv()
-	local gun = getLegacyGunScript()
-	if gun and getsenv then
-		local ok, env = pcall(getsenv, gun)
-		if ok and type(env) == 'table' then
-			return env
-		end
-	end
+	return envs
 end
 
 local function isGunWaitScript(calling)
 	if not calling then
 		return false
 	end
-	if calling.Name == 'Gun' or calling.Name == 'ToolService' or calling.Name == 'MediService' then
+	if calling.Name == 'Gun' or calling.Name == 'ToolService' or calling.Name == 'MediService' or calling.Name == 'Client' or calling.Name == 'Connector' then
 		return true
 	end
 	local parent = calling
 	while parent do
-		if parent.Name == 'VAK_UI' then
+		if parent.Name == 'VAK_UI' or (parent:IsA('Tool') and parent:FindFirstChild('Client', true)) then
 			return true
 		end
 		parent = parent.Parent
@@ -175,21 +214,32 @@ local function isGunWaitScript(calling)
 	return false
 end
 
+local function isReloadWait(delayTime)
+	return delayTime == 0.4 or delayTime == 0.18 or delayTime == 0.13 or delayTime == 0.04
+end
+
+local function isFireWait(delayTime)
+	if knownFireDelays[delayTime] then
+		return true
+	end
+	return delayTime >= 0.005 and delayTime <= 0.35 and not isReloadWait(delayTime)
+end
+
 local function adjustGunWait(delayTime)
 	if type(delayTime) ~= 'number' then
 		return delayTime
 	end
 
-	if gunHookState.fireDelay and (delayTime == 0.09 or delayTime == 0.1 or (delayTime >= 0.07 and delayTime <= 0.12)) then
+	if gunHookState.fireDelay and isFireWait(delayTime) then
 		return gunHookState.fireDelay
 	end
 
 	if gunHookState.instantReload then
-		if delayTime == 0.4 or delayTime == 0.18 or delayTime == 0.13 or delayTime == 0.04 then
+		if isReloadWait(delayTime) then
 			return 0
 		end
 		local calling = getcallingscript and getcallingscript()
-		if calling and calling.Name == 'Gun' and delayTime >= 0.03 and delayTime <= 3.5 then
+		if calling and (calling.Name == 'Gun' or calling.Name == 'Client') and delayTime >= 0.03 and delayTime <= 3.5 then
 			return 0
 		end
 	end
@@ -286,36 +336,94 @@ local function wrapVAKReload(weapon)
 	end)
 end
 
-local function patchVAKWeapon(weapon, opts)
-	local kind = getVAKWeaponKind(weapon)
-	if kind == 'tool' then
-		if opts.fireRate then
-			rawset(weapon, 'RoF', FireDelay.Value / 100)
+local function wrapVAKMediRecharge(weapon)
+	if wrappedVAKMediRecharges[weapon] then
+		return
+	end
+
+	local oldRecharge = rawget(weapon, 'MediRecharge')
+	if type(oldRecharge) ~= 'function' then
+		local mt = getmetatable(weapon)
+		if mt and type(mt.MediRecharge) == 'function' then
+			oldRecharge = mt.MediRecharge
+		else
+			return
 		end
-		if opts.infiniteAmmo then
-			local maxAmmo = rawget(weapon, 'MaxAmmo')
-			if type(maxAmmo) == 'number' then
-				rawset(weapon, 'Ammo', maxAmmo)
-			end
-		end
-		if opts.instantReload then
-			wrapVAKReload(weapon)
-			if rawget(weapon, 'Reloading') then
-				rawset(weapon, 'Reloading', false)
-			end
-			if rawget(weapon, 'Enabled') == false then
-				rawset(weapon, 'Enabled', true)
-			end
-		end
-	elseif kind == 'medi' then
-		if opts.fireRate then
-			rawset(weapon, 'Rate', FireDelay.Value / 100)
-		end
-		if opts.infiniteAmmo or opts.instantReload then
-			local maxCharge = rawget(weapon, 'MaxCharge')
+	end
+
+	wrappedVAKMediRecharges[weapon] = true
+	rawset(weapon, 'MediRecharge', function(self, ...)
+		if InstantReload and InstantReload.Enabled then
+			local maxCharge = rawget(self, 'MaxCharge')
 			if type(maxCharge) == 'number' then
-				rawset(weapon, 'Charge', maxCharge)
+				rawset(self, 'Charge', maxCharge)
 			end
+			rawset(self, 'Recharging', false)
+			return
+		end
+		return oldRecharge(self, ...)
+	end)
+end
+
+local function trackWeaponStats(weapon)
+	if trackedWeaponStats[weapon] then
+		return
+	end
+
+	local stats = {}
+	for _, key in {'RoF', 'Rate', 'ReloadTime', 'Recharge'} do
+		local value = rawget(weapon, key)
+		if type(value) == 'number' then
+			stats[key] = value
+			registerFireDelay(value)
+		end
+	end
+	trackedWeaponStats[weapon] = stats
+end
+
+local function patchVAKWeapon(weapon, opts)
+	trackWeaponStats(weapon)
+
+	local fireDelay = FireDelay.Value / 100
+
+	if opts.fireRate then
+		if type(rawget(weapon, 'RoF')) == 'number' then
+			rawset(weapon, 'RoF', fireDelay)
+		end
+		if type(rawget(weapon, 'Rate')) == 'number' then
+			rawset(weapon, 'Rate', fireDelay)
+		end
+	end
+
+	if opts.infiniteAmmo then
+		local maxAmmo = rawget(weapon, 'MaxAmmo')
+		if type(maxAmmo) == 'number' then
+			rawset(weapon, 'Ammo', maxAmmo)
+		end
+		local maxCharge = rawget(weapon, 'MaxCharge')
+		if type(maxCharge) == 'number' then
+			rawset(weapon, 'Charge', maxCharge)
+		end
+	end
+
+	if opts.instantReload then
+		wrapVAKReload(weapon)
+		wrapVAKMediRecharge(weapon)
+
+		if type(rawget(weapon, 'ReloadTime')) == 'number' then
+			rawset(weapon, 'ReloadTime', 0)
+		end
+		if type(rawget(weapon, 'Recharge')) == 'number' then
+			rawset(weapon, 'Recharge', 0)
+		end
+		if rawget(weapon, 'Reloading') then
+			rawset(weapon, 'Reloading', false)
+		end
+		if rawget(weapon, 'Recharging') then
+			rawset(weapon, 'Recharging', false)
+		end
+		if rawget(weapon, 'Enabled') == false then
+			rawset(weapon, 'Enabled', true)
 		end
 	end
 end
@@ -366,14 +474,20 @@ local function applyWeaponMods()
 		return
 	end
 
-	for _, weapon in getEquippedVAKWeapons() do
+	for _, weapon in getActiveVAKWeapons() do
 		patchVAKWeapon(weapon, opts)
 	end
 
-	local legacyEnv = getLegacyGunEnv()
-	if legacyEnv then
+	for _, legacyEnv in getLegacyGunEnvs() do
 		patchLegacyGunEnv(legacyEnv, opts)
 	end
+end
+
+local function scheduleWeaponMods()
+	applyWeaponMods()
+	task.defer(applyWeaponMods)
+	task.delay(0.05, applyWeaponMods)
+	task.delay(0.2, applyWeaponMods)
 end
 
 local function anyWeaponModEnabled()
@@ -420,24 +534,42 @@ local function syncWeaponMods()
 end
 
 run(function()
-	local function hookCharacter(char)
-		vape:Clean(char.ChildAdded:Connect(function(child)
+	local function hookToolParent(parent)
+		if not parent then
+			return
+		end
+		vape:Clean(parent.ChildAdded:Connect(function(child)
 			if child:IsA('Tool') and anyWeaponModEnabled() then
-				applyWeaponMods()
+				scheduleWeaponMods()
 			end
 		end))
+	end
+
+	local function hookCharacter(char)
+		hookToolParent(char)
 	end
 
 	if lplr.Character then
 		hookCharacter(lplr.Character)
 	end
 	vape:Clean(lplr.CharacterAdded:Connect(hookCharacter))
+	vape:Clean(lplr.ChildAdded:Connect(function(child)
+		if child.Name == 'Backpack' then
+			hookToolParent(child)
+		end
+	end))
+	if lplr:FindFirstChild('Backpack') then
+		hookToolParent(lplr.Backpack)
+	end
 
 	vape:Clean(lplr.PlayerGui.ChildAdded:Connect(function(child)
 		if child.Name == 'VAK_UI' and anyWeaponModEnabled() then
-			task.defer(applyWeaponMods)
+			scheduleWeaponMods()
 		end
 	end))
+	if lplr.PlayerGui:FindFirstChild('VAK_UI') and anyWeaponModEnabled() then
+		scheduleWeaponMods()
+	end
 end)
 
 run(function()
@@ -557,7 +689,7 @@ run(function()
 	InfiniteAmmo = minigames:CreateModule({
 		Name = 'InfiniteAmmo',
 		Function = function() end,
-		Tooltip = 'Unlimited ammo for SMG and VAK weapons.'
+		Tooltip = 'Unlimited ammo for all equipped weapons (VAK, medi, legacy SMG).'
 	})
 
 	FireRate = minigames:CreateModule({
