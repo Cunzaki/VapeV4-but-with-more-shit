@@ -57,48 +57,6 @@ local lplr = playersService.LocalPlayer
 local assetfunction = getcustomasset
 
 local vape = shared.vape
-vape.VisualizerTracerOrigins = vape.VisualizerTracerOrigins or {}
-vape.VisualizerIgnoreInstances = vape.VisualizerIgnoreInstances or {}
-
-local function registerVisualizerIgnore(inst)
-	if inst then
-		vape.VisualizerIgnoreInstances[inst] = true
-	end
-end
-
-local function unregisterVisualizerIgnore(inst)
-	if inst then
-		vape.VisualizerIgnoreInstances[inst] = nil
-	end
-end
-
-local function appendVisualizerIgnores(ignoreList)
-	if type(ignoreList) ~= 'table' then return end
-	for inst in pairs(vape.VisualizerIgnoreInstances) do
-		if inst and inst.Parent then
-			local found = false
-			for _, v in ignoreList do
-				if v == inst then
-					found = true
-					break
-				end
-			end
-			if not found then
-				table.insert(ignoreList, inst)
-			end
-		end
-	end
-end
-
-local function getVisualizerWallcheckIgnores()
-	local extras = {}
-	for inst in pairs(vape.VisualizerIgnoreInstances) do
-		if inst and inst.Parent then
-			table.insert(extras, inst)
-		end
-	end
-	return #extras > 0 and extras or nil
-end
 local tween = vape.Libraries.tween
 local targetinfo = vape.Libraries.targetinfo
 local getfontsize = vape.Libraries.getfontsize
@@ -108,21 +66,6 @@ local TargetStrafeVector, SpiderShift, WaypointFolder
 local currentDesyncRotation = CFrame.identity
 local Spider = {Enabled = false}
 local Phase = {Enabled = false}
-
-local function getVisualizerClonePartPosition(clone)
-	if not clone or not clone.Parent then return end
-	local head = clone:FindFirstChild('Head')
-	if head then return head.Position end
-	local hrp = clone:FindFirstChild('HumanoidRootPart')
-	if hrp then return hrp.Position + Vector3.new(0, 1.5, 0) end
-end
-
-local function getActiveVisualizerTracerOrigin()
-	for _, getter in pairs(vape.VisualizerTracerOrigins) do
-		local origin = getter()
-		if origin then return origin end
-	end
-end
 
 local function addBlur(parent)
 	local blur = Instance.new('ImageLabel')
@@ -297,6 +240,22 @@ vape.Libraries.esp = ESPLibrary
 vape.Libraries.whitelist = whitelist
 vape.Libraries.prediction = prediction
 vape.Libraries.hash = hash
+vape.Libraries.tracerOriginProviders = {}
+vape.Libraries.getCloneTracerOrigin = function(clone)
+	if not clone or not clone.Parent then return end
+	local head = clone:FindFirstChild('Head')
+	if head then return head.Position end
+	local root = clone:FindFirstChild('HumanoidRootPart')
+	if root then return root.Position + Vector3.new(0, 1.5, 0) end
+end
+vape.Libraries.getVisualizerTracerOrigin = function()
+	for _, provider in vape.Libraries.tracerOriginProviders do
+		local ok, origin = pcall(provider)
+		if ok and origin then
+			return origin
+		end
+	end
+end
 vape.Libraries.auraanims = {
 	Normal = {
 		{CFrame = CFrame.new(-0.17, -0.14, -0.12) * CFrame.Angles(math.rad(-53), math.rad(50), math.rad(-64)), Time = 0.1},
@@ -1345,17 +1304,23 @@ local HITSOUND_PRESETS = {
 	['None'] = '',
 	['Rust'] = 'rbxassetid://4764109000',
 	['Neverlose'] = 'rbxassetid://8679627751',
-	['Bam'] = 'rbxassetid://9125630967',
-	['Bell'] = 'rbxassetid://6535970226',
-	['Bubble'] = 'rbxassetid://6534948093',
-	['CS:GO'] = 'rbxassetid://5447626404',
-	['Ding'] = 'rbxassetid://8883380537',
-	['Minecraft'] = 'rbxassetid://6026980354',
-	['Pop'] = 'rbxassetid://699082167',
-	['Quake'] = 'rbxassetid://160432334',
-	['Bonk'] = 'rbxassetid://5763724879',
-	['TF2 Crit'] = 'rbxassetid://345514498',
-	['Roblox Classic'] = 'rbxassetid://12222002',
+	['Minecraft'] = 'rbxassetid://4018616850',
+	['Quake'] = 'rbxassetid://4868633804',
+	['OSU'] = 'rbxassetid://7147454322',
+	['Hitmarker'] = 'rbxassetid://705502934',
+	['Fatality'] = 'rbxassetid://2447018199',
+	['Primordial'] = 'rbxassetid://5153731546',
+	['Apex'] = 'rbxassetid://6026984224',
+	['Metallic'] = 'rbxassetid://6979714884',
+	['Bubble'] = 'rbxassetid://6534947588',
+	['Bell'] = 'rbxassetid://6534947240',
+	['Click'] = 'rbxassetid://421058931',
+	['Ding'] = 'rbxassetid://6396788153',
+	['Thud'] = 'rbxassetid://3779091610',
+	['TF2 Critical'] = 'rbxassetid://296102734',
+	['Rainbow Six'] = 'rbxassetid://6586970979',
+	['Valorant'] = 'rbxassetid://9114489658',
+	['Cod'] = 'rbxassetid://160432334',
 	['Custom'] = 'CUSTOM'
 }
 local function getHitSoundId()
@@ -1406,27 +1371,6 @@ run(function()
 	local BulletTracerDuration
 	playHitSound = function() end
 	lastHitsoundTime = 0
-	local DEFAULT_IGNORED_SCRIPTS = {
-		'ControlScript', 'ControlModule', 'PlayerModule', 'CameraModule',
-		'Popper', 'Poppercam', 'ZoomController', 'BaseCamera', 'ClassicCamera',
-		'OrbitalCamera', 'LegacyCamera', 'Invisicam', 'MouseLockController', 'CameraInput'
-	}
-	local function shouldIgnoreSilentAimHook(calling)
-		if not calling then return false end
-		local list = (IgnoredScripts and #IgnoredScripts.ListEnabled > 0) and IgnoredScripts.ListEnabled or DEFAULT_IGNORED_SCRIPTS
-		local name = calling.Name or tostring(calling)
-		if table.find(list, name) or table.find(list, tostring(calling)) then
-			return true
-		end
-		local parent = calling
-		while parent do
-			if parent.Name == 'CameraModule' or parent.Name == 'PlayerModule' or parent.Name == 'ZoomController' then
-				return true
-			end
-			parent = parent.Parent
-		end
-		return false
-	end
 	local TracerClickWindow = 0.4
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
@@ -1512,40 +1456,29 @@ run(function()
 	local pmCameraProxy
 	local pmOriginalCameraSubject
 	
-	local function cleanupPMCameraProxy(restore)
-		local cam = workspace.CurrentCamera
+	local function cleanupPMCameraProxy()
 		if pmCameraProxy then
-			if cam and cam.CameraSubject == pmCameraProxy then
-				cam.CameraSubject = nil
-			end
-			unregisterVisualizerIgnore(pmCameraProxy)
 			pmCameraProxy:Destroy()
 			pmCameraProxy = nil
 		end
-		if restore == false then
-			pmOriginalCameraSubject = nil
-			return
-		end
-		if cam and pmOriginalCameraSubject and pmOriginalCameraSubject.Parent then
+		local cam = workspace.CurrentCamera
+		if cam and pmOriginalCameraSubject then
 			cam.CameraSubject = pmOriginalCameraSubject
+			pmOriginalCameraSubject = nil
 		end
-		pmOriginalCameraSubject = nil
 	end
 	
 	local function setupPMCameraProxy()
+		cleanupPMCameraProxy()
+		
 		local cam = workspace.CurrentCamera
 		if not cam then return end
 		
 		local char = entitylib.character and entitylib.character.Character
-		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local hum = char and char:FindFirstChild("Humanoid")
 		if not hum or hum.Health <= 0 then return end
 		
-		if pmCameraProxy then
-			pmCameraProxy:Destroy()
-			pmCameraProxy = nil
-		end
-		
-		pmOriginalCameraSubject = hum
+		pmOriginalCameraSubject = cam.CameraSubject
 		
 		pmCameraProxy = Instance.new("Part")
 		pmCameraProxy.Name = "VapePositionManipulationCameraProxy"
@@ -1557,7 +1490,6 @@ run(function()
 		pmCameraProxy.Size = Vector3.new(0.1, 0.1, 0.1)
 		pmCameraProxy.Parent = workspace
 		
-		registerVisualizerIgnore(pmCameraProxy)
 		cam.CameraSubject = pmCameraProxy
 	end
 
@@ -1910,9 +1842,10 @@ run(function()
 	end
 
 	local function getLocalTracerOrigin()
-		local visualOrigin = getActiveVisualizerTracerOrigin()
-		if visualOrigin then return visualOrigin end
-
+		local visualOrigin = vape.Libraries.getVisualizerTracerOrigin and vape.Libraries.getVisualizerTracerOrigin()
+		if visualOrigin then
+			return visualOrigin
+		end
 		if game.PlaceId == 155615604 then
 			local prison = vape.Libraries.prisonlife
 			local tool = lplr.Character and lplr.Character:FindFirstChildWhichIsA('Tool')
@@ -1952,7 +1885,6 @@ run(function()
 	
 	local function cleanupPMClone()
 		if pmClone then
-			unregisterVisualizerIgnore(pmClone)
 			pmClone:Destroy()
 		end
 		pmClone = nil
@@ -2069,12 +2001,10 @@ run(function()
 			cleanupPMClone()
 			return
 		end
-		registerVisualizerIgnore(pmClone)
 	end
 	
 	local function cleanupPMRadius()
 		if pmRadiusPart then
-			unregisterVisualizerIgnore(pmRadiusPart)
 			pmRadiusPart:Destroy()
 		end
 		pmRadiusPart = nil
@@ -2095,7 +2025,6 @@ run(function()
 		pmRadiusPart.Transparency = 0.7
 		pmRadiusPart.Color = Color3.fromHSV(PositionManipulationRadiusVisualizerColor.Hue, PositionManipulationRadiusVisualizerColor.Sat, PositionManipulationRadiusVisualizerColor.Value)
 		pmRadiusPart.Parent = workspace
-		registerVisualizerIgnore(pmRadiusPart)
 	end
 	
 	local lastPMFrame = 0
@@ -2402,16 +2331,16 @@ run(function()
 
 	local function firePrisonTracers(shootOrigin, targetPosition, ent)
 		lastMb1Click = tick()
-		local origin = getLocalTracerOrigin()
+		local tracerOrigin = getLocalTracerOrigin()
 		local prison = vape.Libraries.prisonlife
 		local legitTracers = vape.Legit and vape.Legit.Modules and vape.Legit.Modules.BulletTracers
 		if legitTracers and legitTracers.Enabled and prison and prison.fireTracers then
-			prison.fireTracers(origin, targetPosition)
+			prison.fireTracers(tracerOrigin, targetPosition)
 		end
 		if BulletTracers and BulletTracers.Enabled and ent then
 			local mainColor, glowColor = getTracerColors()
 			spawnBulletTracer(ent, {
-				Origin = origin,
+				Origin = tracerOrigin,
 				TargetPosition = targetPosition,
 			}, tick(), mainColor, glowColor)
 		end
@@ -2436,7 +2365,7 @@ run(function()
 			Range = range,
 			RangePosition = rangePosition,
 			AttackCheck = attackCheck,
-			Wallcheck = Target.Walls.Enabled and (getVisualizerWallcheckIgnores() or obj or true) or nil,
+			Wallcheck = Target.Walls.Enabled and (obj or true) or nil,
 			Wallbang = wallbang,
 			Part = targetPart,
 			Origin = origin,
@@ -2464,13 +2393,7 @@ run(function()
 				end
 			end
 			if Projectile.Enabled then
-				local filter = {gameCamera, ent.Character}
-				for inst in pairs(vape.VisualizerIgnoreInstances) do
-					if inst and inst.Parent then
-						table.insert(filter, inst)
-					end
-				end
-				ProjectileRaycast.FilterDescendantsInstances = filter
+				ProjectileRaycast.FilterDescendantsInstances = {gameCamera, ent.Character}
 				ProjectileRaycast.CollisionGroup = ent[targetPart].CollisionGroup
 			end
 		end
@@ -2576,32 +2499,14 @@ run(function()
 		return oldPrisonBulletHook(unpack(args, 1, args.n))
 	end
 
-	local FIND_PART_RAY_METHODS = {
-		FindPartOnRayWithIgnoreList = true,
-		FindPartOnRayWithWhitelist = true,
-		FindPartOnRay = true
-	}
-	local function copyIgnoreList(ignoreList)
-		local copy = {}
-		for i, v in ignoreList do
-			copy[i] = v
-		end
-		return copy
-	end
 	local Hooks = {
 		FindPartOnRayWithIgnoreList = function(args)
-			if typeof(args[1]) ~= 'Ray' then return end
-			if type(args[2]) == 'table' then
-				local ignore = copyIgnoreList(args[2])
-				appendVisualizerIgnores(ignore)
-				args[2] = ignore
+			local ent, targetPart, origin = getTarget(args[1].Origin, {args[2]})
+			if not ent then return end
+			if Wallbang.Enabled then 
+				return {targetPart, targetPart.Position, targetPart.GetClosestPointOnSurface(targetPart, origin), targetPart.Material} 
 			end
-			local ent, targetPart, origin = getTarget(args[1].Origin)
-			if ent and targetPart then
-				local magnitude = args[1].Direction.Magnitude
-				local direction = CFrame.lookAt(origin, targetPart.Position).LookVector * magnitude
-				args[1] = Ray.new(origin, direction)
-			end
+			args[1] = Ray.new(origin, CFrame.lookAt(origin, targetPart.Position).LookVector * args[1].Direction.Magnitude)
 		end,
 		Raycast = function(args)
 			if MethodRay.Value ~= 'All' and args[3] and args[3].FilterType ~= Enum.RaycastFilterType[MethodRay.Value] then return end
@@ -2622,7 +2527,7 @@ run(function()
 				if not calc then return end
 				direction = CFrame.lookAt(origin, calc)
 			end
-			return Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)
+			return {Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)}
 		end,
 		Ray = function(args)
 			local ent, targetPart, origin = getTarget(args[1])
@@ -2639,31 +2544,6 @@ run(function()
 	Hooks.FindPartOnRayWithWhitelist = Hooks.FindPartOnRayWithIgnoreList
 	Hooks.FindPartOnRay = Hooks.FindPartOnRayWithIgnoreList
 	Hooks.ViewportPointToRay = Hooks.ScreenPointToRay
-	local SILENT_AIM_METHOD_ALIASES = {
-		FindPartOnRay = {
-			FindPartOnRayWithIgnoreList = true,
-			FindPartOnRayWithWhitelist = true
-		},
-		ViewportPointToRay = {
-			ScreenPointToRay = true
-		}
-	}
-	local function getSilentAimHook(methodName)
-		if Hooks[methodName] then
-			return Hooks[methodName]
-		end
-		local aliases = SILENT_AIM_METHOD_ALIASES[Method.Value]
-		if aliases and aliases[methodName] then
-			return Hooks[Method.Value]
-		end
-	end
-	local function shouldRunSilentAimHook(methodName)
-		if methodName == Method.Value then
-			return true
-		end
-		local aliases = SILENT_AIM_METHOD_ALIASES[Method.Value]
-		return aliases and aliases[methodName] or false
-	end
 
 	SilentAim = vape.Categories.Combat:CreateModule({
 		Name = 'SilentAim',
@@ -2697,50 +2577,31 @@ run(function()
 						setupPMRadius()
 					end
 					SilentAim:Clean(entitylib.Events.LocalAdded:Connect(function()
-						task.defer(function()
-							if not (PositionManipulation and PositionManipulation.Enabled) then return end
-							setupPMCameraProxy()
-							if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
-								setupPMClone()
-							end
-							if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled then
-								setupPMRadius()
-							end
-						end)
-					end))
-					SilentAim:Clean(entitylib.Events.LocalRemoved:Connect(function()
-						cleanupPMCameraProxy(false)
-						cleanupPMClone()
-						cleanupPMRadius()
-						pmTargetPosition = nil
+						setupPMCameraProxy()
+						if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
+							setupPMClone()
+						end
+						if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled then
+							setupPMRadius()
+						end
 					end))
 					SilentAim:Clean(runService.RenderStepped:Connect(function()
-						if not (PositionManipulation and PositionManipulation.Enabled) then return end
-						local char = entitylib.character and entitylib.character.Character
-						local hum = char and char:FindFirstChildOfClass("Humanoid")
-						local root = char and char:FindFirstChild("HumanoidRootPart")
-						if not hum or hum.Health <= 0 then
-							if pmCameraProxy then
-								cleanupPMCameraProxy(false)
+						if pmCameraProxy then
+							local char = entitylib.character and entitylib.character.Character
+							local hum = char and char:FindFirstChild("Humanoid")
+							local root = char and char:FindFirstChild("HumanoidRootPart")
+							if hum and root and hum.Health > 0 then
+								local camPos = root.CFrame.Position
+								local camOffset = hum.CameraOffset
+								
+								if hum.Sit and hum.SeatPart then
+									camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
+								end
+								
+								pmCameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
+							elseif not hum or hum.Health <= 0 then
+								cleanupPMCameraProxy()
 							end
-							return
-						end
-						if not pmCameraProxy then
-							setupPMCameraProxy()
-						end
-						local cam = workspace.CurrentCamera
-						if pmCameraProxy and cam and cam.CameraSubject ~= pmCameraProxy then
-							cam.CameraSubject = pmCameraProxy
-						end
-						if pmCameraProxy and root then
-							local camPos = root.CFrame.Position
-							local camOffset = hum.CameraOffset
-							
-							if hum.Sit and hum.SeatPart then
-								camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
-							end
-							
-							pmCameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
 						end
 					end))
 				end
@@ -2752,8 +2613,11 @@ run(function()
 						end
 						local calling = getcallingscript()
 
-						if shouldIgnoreSilentAimHook(calling) then
-							return oldray(origin, direction)
+						if calling then
+							local list = #IgnoredScripts.ListEnabled > 0 and IgnoredScripts.ListEnabled or {'ControlScript', 'ControlModule'}
+							if table.find(list, tostring(calling)) then
+								return oldray(origin, direction)
+							end
 						end
 
 						local args = {origin, direction}
@@ -2762,8 +2626,7 @@ run(function()
 					end)
 				else
 					oldnamecall = hookmetamethod(game, '__namecall', function(...)
-						local methodName = getnamecallmethod()
-						if not shouldRunSilentAimHook(methodName) then
+						if getnamecallmethod() ~= Method.Value then
 							return oldnamecall(...)
 						end
 						if checkcaller() then
@@ -2771,27 +2634,19 @@ run(function()
 						end
 
 						local calling = getcallingscript()
-						if shouldIgnoreSilentAimHook(calling) then
-							return oldnamecall(...)
+						if calling then
+							local list = #IgnoredScripts.ListEnabled > 0 and IgnoredScripts.ListEnabled or {'ControlScript', 'ControlModule'}
+							if table.find(list, tostring(calling)) then
+								return oldnamecall(...)
+							end
 						end
 
-						local hookFn = getSilentAimHook(methodName)
-						if not hookFn then
-							return oldnamecall(...)
+						local self, args = ..., {select(2, ...)}
+						local res = Hooks[Method.Value](args)
+						if res then
+							return unpack(res)
 						end
-
-						local self = ...
-						local argc = select('#', ...) - 1
-						local args = table.pack(select(2, ...))
-						if FIND_PART_RAY_METHODS[methodName] then
-							hookFn(args)
-							return oldnamecall(self, table.unpack(args, 1, argc))
-						end
-						local r1 = hookFn(args)
-						if typeof(r1) == 'Ray' and (methodName == 'ScreenPointToRay' or methodName == 'ViewportPointToRay') then
-							return r1
-						end
-						return oldnamecall(self, table.unpack(args, 1, argc))
+						return oldnamecall(self, unpack(args))
 					end)
 				end
 				
@@ -2867,14 +2722,8 @@ run(function()
 					end
 					
 					local ent
-					local autofireWindowActive = not mouse1click or (isrbxactive or iswindowactive)()
 					if AutoFire.Enabled then
-						if not autofireWindowActive then
-							if mouseClicked then
-								mouse1release()
-								mouseClicked = false
-							end
-						elseif game.PlaceId == 155615604 and vape.Libraries.prisonlife and pl.Shoot then
+						if game.PlaceId == 155615604 and vape.Libraries.prisonlife and pl.Shoot then
 							local gundata = getPrisonGunData()
 							local tool = lplr.Character and lplr.Character:FindFirstChildWhichIsA('Tool')
 							if gundata and tool and (tool:GetAttribute('Local_CurrentAmmo') or 0) > 0 and not tool:GetAttribute('Local_IsShooting') then
@@ -2894,13 +2743,14 @@ run(function()
 
 								if ent and entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
 									if not (taser and ent.Character:GetAttribute('Tased')) then
-										registerShot(ent, ent.Head or ent.RootPart, getLocalTracerOrigin())
+										registerShot(ent, ent.Head or ent.RootPart, entitylib.character.Head.Position)
 										if delayCheck < tick() then
 											delayCheck = tick() + (gundata.FireRate or AutoFireShootDelay.Value)
+											local shootOrigin = entitylib.character.Head.Position
 											local obj = {UserInputState = Enum.UserInputState.Begin, UserInputType = Enum.UserInputType.MouseButton1, Position = Vector3.zero}
 											task.spawn(pl.Shoot, obj)
 											obj.UserInputState = Enum.UserInputState.End
-											firePrisonTracers(getLocalTracerOrigin(), ent.Head.Position, ent)
+											firePrisonTracers(shootOrigin, ent.Head.Position, ent)
 										end
 									end
 								end
@@ -2927,7 +2777,8 @@ run(function()
 							registerShot(ent, ent.Head or ent.RootPart, (effectiveOrigin * fireoffset).Position)
 						end
 
-						if ent and canClick() then
+						if mouse1click and (isrbxactive or iswindowactive)() then
+							if ent and canClick() then
 								if delayCheck < tick() then
 									if mouseClicked then
 										mouse1release()
@@ -2937,12 +2788,13 @@ run(function()
 										lastMb1Click = tick()
 									end
 									mouseClicked = not mouseClicked
+								end
+							else
+								if mouseClicked then
+									mouse1release()
+								end
+								mouseClicked = false
 							end
-						else
-							if mouseClicked then
-								mouse1release()
-							end
-							mouseClicked = false
 						end
 						end
 					end
@@ -3015,7 +2867,7 @@ run(function()
 				oldnamecall, oldray, oldPrisonBulletHook = nil, nil, nil
 				cleanupPMClone()
 				cleanupPMRadius()
-				cleanupPMCameraProxy(true)
+				cleanupPMCameraProxy()
 				
 				if isFrozen then
 					local char = entitylib.character.Character
@@ -3448,17 +3300,11 @@ run(function()
 		Darker = true,
 		Tooltip = 'Low - Fastest, least accurate\nMedium - Balanced\nHigh - More accurate, slower\nUltra - Most accurate, slowest'
 	})
-	vape.VisualizerTracerOrigins.PositionManipulation = function()
-		if not (PositionManipulation and PositionManipulation.Enabled and PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled) then
-			return
+	table.insert(vape.Libraries.tracerOriginProviders, function()
+		if PositionManipulation and PositionManipulation.Enabled and PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled and pmClone then
+			return vape.Libraries.getCloneTracerOrigin(pmClone)
 		end
-		if pmClone and pmClone.Parent then
-			return getVisualizerClonePartPosition(pmClone)
-		end
-		if pmTargetPosition then
-			return pmTargetPosition + Vector3.new(0, 1.5, 0)
-		end
-	end
+	end)
 	vape:Clean(BulletTracerFolder)
 end)
 
@@ -8821,7 +8667,6 @@ run(function()
 
 	local function clearVisualizer()
 		if visualClone then
-			unregisterVisualizerIgnore(visualClone)
 			visualClone:Destroy()
 			visualClone = nil
 		end
@@ -8966,7 +8811,6 @@ run(function()
 
 		-- Parent to workspace ONLY after all physics are disabled
 		clone.Parent = workspace
-		registerVisualizerIgnore(clone)
 
 		local charRoot = entitylib.character.RootPart
 		local charTorso = entitylib.character.Character and (entitylib.character.Character:FindFirstChild('UpperTorso') or entitylib.character.Character:FindFirstChild('Torso'))
@@ -9137,12 +8981,11 @@ run(function()
 		Darker = true,
 		Function = applyVisualizerStyle
 	})
-	vape.VisualizerTracerOrigins.Blink = function()
-		if not (Blink and Blink.Enabled and Visualizer and Visualizer.Enabled) then return end
-		if visualClone and visualClone.Parent then
-			return getVisualizerClonePartPosition(visualClone)
+	table.insert(vape.Libraries.tracerOriginProviders, function()
+		if Blink and Blink.Enabled and Visualizer and Visualizer.Enabled and visualClone then
+			return vape.Libraries.getCloneTracerOrigin(visualClone)
 		end
-	end
+	end)
 end)
 
 run(function()
@@ -9208,41 +9051,30 @@ run(function()
 	local desyncMotorMap = {}
 	
 	-- Cleanup camera proxy
-	local function cleanupCameraProxy(restore)
-		local cam = workspace.CurrentCamera
+	local function cleanupCameraProxy()
 		if cameraProxy then
-			if cam and cam.CameraSubject == cameraProxy then
-				cam.CameraSubject = nil
-			end
-			unregisterVisualizerIgnore(cameraProxy)
 			cameraProxy:Destroy()
 			cameraProxy = nil
 		end
-		if restore == false then
-			originalCameraSubject = nil
-			return
-		end
-		if cam and originalCameraSubject and originalCameraSubject.Parent then
+		local cam = workspace.CurrentCamera
+		if cam and originalCameraSubject then
 			cam.CameraSubject = originalCameraSubject
+			originalCameraSubject = nil
 		end
-		originalCameraSubject = nil
 	end
 	
 	-- Setup camera proxy
 	local function setupCameraProxy()
+		cleanupCameraProxy()
+		
 		local cam = workspace.CurrentCamera
 		if not cam then return end
 		
 		local char = entitylib.character and entitylib.character.Character
-		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local hum = char and char:FindFirstChild("Humanoid")
 		if not hum or hum.Health <= 0 then return end
 		
-		if cameraProxy then
-			cameraProxy:Destroy()
-			cameraProxy = nil
-		end
-		
-		originalCameraSubject = hum
+		originalCameraSubject = cam.CameraSubject
 		
 		cameraProxy = Instance.new("Part")
 		cameraProxy.Name = "VapeDesyncCameraProxy"
@@ -9254,14 +9086,12 @@ run(function()
 		cameraProxy.Size = Vector3.new(0.1, 0.1, 0.1)
 		cameraProxy.Parent = workspace
 		
-		registerVisualizerIgnore(cameraProxy)
 		cam.CameraSubject = cameraProxy
 	end
 	
 	-- Cleanup desync clone
 	local function cleanupDesyncClone()
 		if desyncClone then
-			unregisterVisualizerIgnore(desyncClone)
 			desyncClone:Destroy()
 		end
 		desyncClone = nil
@@ -9384,7 +9214,6 @@ run(function()
 			cleanupDesyncClone()
 			return
 		end
-		registerVisualizerIgnore(desyncClone)
 	end
 	
 	-- Calculate desync rotation for a specific axis
@@ -9548,37 +9377,24 @@ run(function()
 	-- Visualizer loop
 	local function onRenderStepped()
 		local char = entitylib.character and entitylib.character.Character
-		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local hum = char and char:FindFirstChild("Humanoid")
 		local root = char and char:FindFirstChild("HumanoidRootPart")
 		
-		if desyncEnabled then
+		-- Handle camera proxy
+		if cameraProxy then
 			if not hum or hum.Health <= 0 then
-				if cameraProxy then
-					cleanupCameraProxy(false)
+				cleanupCameraProxy()
+			elseif root then
+				local camPos = (returnthis or root.CFrame).Position
+				local camOffset = hum.CameraOffset
+				
+				-- If sitting, follow the seat instead to prevent bugs
+				if hum.Sit and hum.SeatPart then
+					camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
 				end
-			else
-				if not cameraProxy then
-					setupCameraProxy()
-				end
-				local cam = workspace.CurrentCamera
-				if cameraProxy and cam and cam.CameraSubject ~= cameraProxy then
-					cam.CameraSubject = cameraProxy
-				end
-				if cameraProxy and root then
-					local camPos = (returnthis or root.CFrame).Position
-					local camOffset = hum.CameraOffset
-					
-					if hum.Sit and hum.SeatPart then
-						camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
-					end
-					
-					cameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
-				end
+				
+				cameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
 			end
-		end
-		
-		if Visualizer.Enabled and desyncEnabled and hum and hum.Health > 0 and not desyncCloneRoot then
-			setupDesyncClone()
 		end
 		
 		if not Visualizer.Enabled or not desyncCloneRoot then return end
@@ -9702,19 +9518,10 @@ run(function()
 					
 					-- Connect to character changes
 					Desync:Clean(entitylib.Events.LocalAdded:Connect(function()
-						task.defer(function()
-							if not Desync.Enabled or Mode.Value ~= 'CFrame Desync' then return end
-							returnthis = nil
-							setupCameraProxy()
-							if Visualizer.Enabled then
-								setupDesyncClone()
-							end
-						end)
-					end))
-					Desync:Clean(entitylib.Events.LocalRemoved:Connect(function()
-						cleanupCameraProxy(false)
-						cleanupDesyncClone()
-						returnthis = nil
+						setupCameraProxy()
+						if Visualizer.Enabled then
+							setupDesyncClone()
+						end
 					end))
 				end
 			else
@@ -9726,7 +9533,7 @@ run(function()
 					currentDesyncRotation = CFrame.identity
 					currentPosOffset = Vector3.zero
 					currentRot = CFrame.identity
-					cleanupCameraProxy(true)
+					cleanupCameraProxy()
 					cleanupDesyncClone()
 				end
 			end
@@ -9993,15 +9800,13 @@ run(function()
 			end
 		end
 	})
-
-	vape.VisualizerTracerOrigins.Desync = function()
-		if not (Desync and Desync.Enabled and Visualizer and Visualizer.Enabled) then return end
-		if desyncClone and desyncClone.Parent then
-			return getVisualizerClonePartPosition(desyncClone)
-		end
-	end
 	
 	updateUIVisibility()
+	table.insert(vape.Libraries.tracerOriginProviders, function()
+		if Desync and Desync.Enabled and Visualizer and Visualizer.Enabled and desyncClone then
+			return vape.Libraries.getCloneTracerOrigin(desyncClone)
+		end
+	end)
 end)
 
 run(function()
