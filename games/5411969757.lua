@@ -61,41 +61,18 @@ end
 
 local InfiniteAmmo, FireRate, FireDelay, InstantReload
 local weaponLoop
-local gunHooks = {wait = nil, taskWait = nil}
+local gunHookOriginals = {wait = nil, taskWait = nil}
 local gunHookState = {fireDelay = nil, instantReload = false}
-local cachedWeaponTables = {}
-local weaponTablesScanned = false
+local wrappedReloads = setmetatable({}, {__mode = 'k'})
 
-local GUN_SCRIPT_NAMES = {
+local GUN_WAIT_SCRIPT_NAMES = {
 	Gun = true,
 	gunModule = true,
 	ToolService = true
 }
 
-local function isGunCallingScript(calling)
-	if not calling then
-		return false
-	end
-	if GUN_SCRIPT_NAMES[calling.Name] then
-		return true
-	end
-
-	local lower = calling.Name:lower()
-	if lower:find('gun') or lower:find('tool') or lower:find('wolfram') then
-		return true
-	end
-
-	local parent = calling
-	while parent do
-		if parent.Name == 'VAK_UI' then
-			return true
-		end
-		if parent:IsA('Tool') and parent:FindFirstChild('Gun') then
-			return true
-		end
-		parent = parent.Parent
-	end
-	return false
+local function isGunWaitScript(calling)
+	return calling and GUN_WAIT_SCRIPT_NAMES[calling.Name] or false
 end
 
 local function adjustGunWait(delayTime)
@@ -103,54 +80,56 @@ local function adjustGunWait(delayTime)
 		return delayTime
 	end
 
-	if gunHookState.fireDelay and (delayTime == 0.09 or (delayTime >= 0.05 and delayTime <= 0.12)) then
+	if gunHookState.fireDelay and (delayTime == 0.09 or (delayTime >= 0.07 and delayTime <= 0.12)) then
 		return gunHookState.fireDelay
 	end
-	if gunHookState.instantReload and delayTime >= 0.13 then
-		return 0
+
+	if gunHookState.instantReload then
+		if delayTime == 0.4 or delayTime == 0.18 or delayTime == 0.13 then
+			return 0
+		end
 	end
+
 	return delayTime
 end
 
-local function syncGunHooks()
-	if not hookfunction then
+local function installGunWaitHook(target, storageKey)
+	if gunHookOriginals[storageKey] or not hookfunction then
 		return
 	end
 
+	gunHookOriginals[storageKey] = hookfunction(target, function(delayTime, ...)
+		if not checkcaller() and isGunWaitScript(getcallingscript and getcallingscript()) then
+			delayTime = adjustGunWait(delayTime)
+		end
+		return gunHookOriginals[storageKey](delayTime, ...)
+	end)
+end
+
+local function removeGunWaitHook(target, storageKey)
+	if not gunHookOriginals[storageKey] or not restorefunction then
+		return
+	end
+	pcall(restorefunction, target)
+	gunHookOriginals[storageKey] = nil
+end
+
+local function syncGunHooks()
 	gunHookState.fireDelay = FireRate and FireRate.Enabled and (FireDelay.Value / 100) or nil
 	gunHookState.instantReload = InstantReload and InstantReload.Enabled or false
 
 	local active = gunHookState.fireDelay or gunHookState.instantReload
 	if not active then
-		if gunHooks.wait and restorefunction then
-			pcall(restorefunction, wait)
-			gunHooks.wait = nil
-		end
-		if gunHooks.taskWait and restorefunction and task.wait ~= wait then
-			pcall(restorefunction, task.wait)
-			gunHooks.taskWait = nil
+		removeGunWaitHook(wait, 'wait')
+		if task.wait ~= wait then
+			removeGunWaitHook(task.wait, 'taskWait')
 		end
 		return
 	end
 
-	if not gunHooks.wait then
-		local oldWait = wait
-		gunHooks.wait = hookfunction(wait, function(delayTime, ...)
-			if isGunCallingScript(getcallingscript and getcallingscript()) then
-				delayTime = adjustGunWait(delayTime)
-			end
-			return oldWait(delayTime, ...)
-		end)
-	end
-
-	if not gunHooks.taskWait then
-		local oldTaskWait = task.wait
-		gunHooks.taskWait = hookfunction(task.wait, function(delayTime, ...)
-			if isGunCallingScript(getcallingscript and getcallingscript()) then
-				delayTime = adjustGunWait(delayTime)
-			end
-			return oldTaskWait(delayTime, ...)
-		end)
+	installGunWaitHook(wait, 'wait')
+	if task.wait ~= wait then
+		installGunWaitHook(task.wait, 'taskWait')
 	end
 end
 
@@ -159,7 +138,7 @@ local function collectGunScripts()
 
 	local function add(script)
 		if script and script:IsA('LocalScript') then
-			scripts[script] = true
+			scripts[#scripts + 1] = script
 		end
 	end
 
@@ -179,9 +158,10 @@ local function collectGunScripts()
 
 	local vak = lplr.PlayerGui:FindFirstChild('VAK_UI')
 	if vak then
-		for _, inst in vak:GetDescendants() do
-			if inst:IsA('LocalScript') then
-				add(inst)
+		for _, name in {'gunModule', 'ToolService'} do
+			local script = vak:FindFirstChild(name, true)
+			if script and script:IsA('LocalScript') then
+				add(script)
 			end
 		end
 	end
@@ -189,85 +169,74 @@ local function collectGunScripts()
 	return scripts
 end
 
-local function looksLikeWeaponTable(tbl)
-	if type(tbl) ~= 'table' then
-		return false
-	end
-
-	if type(tbl.Mag) == 'number' or type(tbl.HealMag) == 'number' then
-		return true
-	end
-	if tbl.u6 ~= nil and type(tbl.u13) == 'number' then
-		return true
-	end
-	if tbl.u25 and type(tbl.u25.Fire) == 'function' and type(tbl.u25.Reload) == 'function' then
-		return true
-	end
-
-	local matches = 0
-	for key, val in tbl do
-		if type(key) == 'string' and type(val) == 'number' then
-			local lk = key:lower()
-			if lk == 'ammo' or lk == 'mag' or lk == 'clip' or lk == 'currentammo' then
-				matches += 1
-			end
-		end
-	end
-	return matches >= 2
-end
-
-local function scanWeaponTables()
-	if weaponTablesScanned or not getgc then
-		return
-	end
-	weaponTablesScanned = true
-
-	local seen = {}
-	for _, value in getgc(true) do
-		if type(value) == 'table' and not seen[value] and looksLikeWeaponTable(value) then
-			seen[value] = true
-			table.insert(cachedWeaponTables, value)
-		end
-	end
-end
-
-local function patchNumericFields(tbl, map, depth)
-	if type(tbl) ~= 'table' or depth > 2 then
-		return
-	end
-
-	for key, val in map do
-		if type(tbl[key]) == 'number' then
-			tbl[key] = val
-		end
-	end
-
-	for _, child in tbl do
-		if type(child) == 'table' then
-			patchNumericFields(child, map, depth + 1)
-		end
-	end
-end
-
 local function wrapReloadTable(tbl)
-	if type(tbl) ~= 'table' or type(tbl.Reload) ~= 'function' or tbl.__vapeReload then
+	if type(tbl) ~= 'table' or wrappedReloads[tbl] then
 		return
 	end
 
-	local oldReload = tbl.Reload
-	tbl.Reload = function(...)
+	local oldReload = rawget(tbl, 'Reload')
+	if type(oldReload) ~= 'function' then
+		return
+	end
+
+	wrappedReloads[tbl] = true
+	rawset(tbl, 'Reload', function(...)
 		if InstantReload and InstantReload.Enabled then
-			if type(tbl.Mag) == 'number' then
-				tbl.Mag = 999999
+			local mag = rawget(tbl, 'Mag')
+			if type(mag) == 'number' then
+				rawset(tbl, 'Mag', 999999)
 			end
-			if type(tbl.HealMag) == 'number' then
-				tbl.HealMag = 999999
+			local healMag = rawget(tbl, 'HealMag')
+			if type(healMag) == 'number' then
+				rawset(tbl, 'HealMag', 999999)
 			end
 			return
 		end
 		return oldReload(...)
+	end)
+end
+
+local function patchFunctionUpvalues(fn, opts, depth)
+	if type(fn) ~= 'function' or depth > 3 or not debug or not debug.getupvalue then
+		return
 	end
-	tbl.__vapeReload = true
+
+	for i = 1, 60 do
+		local ok, name, val = pcall(debug.getupvalue, fn, i)
+		if not ok or name == nil or name == '' then
+			break
+		end
+
+		if opts.infiniteAmmo then
+			if name == 'u6' then
+				pcall(debug.setupvalue, fn, i, true)
+			elseif name == 'u13' and type(val) == 'number' then
+				pcall(debug.setupvalue, fn, i, 35)
+			elseif (name == 'Mag' or name == 'HealMag') and type(val) == 'number' then
+				pcall(debug.setupvalue, fn, i, 999999)
+			end
+		end
+
+		if opts.instantReload then
+			if name == 'u16' then
+				pcall(debug.setupvalue, fn, i, false)
+			elseif name == 'u13' and type(val) == 'number' then
+				pcall(debug.setupvalue, fn, i, 35)
+			end
+		end
+
+		if opts.fireRate and name == 'u17' then
+			pcall(debug.setupvalue, fn, i, true)
+		end
+
+		if type(val) == 'function' then
+			patchFunctionUpvalues(val, opts, depth + 1)
+		elseif type(val) == 'table' then
+			if opts.instantReload then
+				wrapReloadTable(val)
+			end
+		end
+	end
 end
 
 local function patchGunEnv(env, opts)
@@ -276,89 +245,49 @@ local function patchGunEnv(env, opts)
 	end
 
 	if opts.infiniteAmmo then
-		if env.u6 ~= nil then
-			env.u6 = true
+		if rawget(env, 'u6') ~= nil then
+			rawset(env, 'u6', true)
 		end
-		if type(env.u13) == 'number' then
-			env.u13 = 35
+		if type(rawget(env, 'u13')) == 'number' then
+			rawset(env, 'u13', 35)
 		end
-		if type(env.Mag) == 'number' then
-			env.Mag = 999999
+		if type(rawget(env, 'Mag')) == 'number' then
+			rawset(env, 'Mag', 999999)
 		end
-		if type(env.HealMag) == 'number' then
-			env.HealMag = 999999
+		if type(rawget(env, 'HealMag')) == 'number' then
+			rawset(env, 'HealMag', 999999)
 		end
-
-		patchNumericFields(env, {
-			ammo = 999999,
-			Ammo = 999999,
-			currentAmmo = 999999,
-			CurrentAmmo = 999999,
-			clip = 999999,
-			Clip = 999999,
-			mag = 999999,
-			Mag = 999999
-		}, 0)
 	end
 
 	if opts.instantReload then
-		if env.u16 ~= nil then
-			env.u16 = false
+		if rawget(env, 'u16') ~= nil then
+			rawset(env, 'u16', false)
 		end
-		if type(env.u13) == 'number' then
-			env.u13 = 35
+		if type(rawget(env, 'u13')) == 'number' then
+			rawset(env, 'u13', 35)
 		end
-		if env.u25 then
-			wrapReloadTable(env.u25)
+		local u25 = rawget(env, 'u25')
+		if type(u25) == 'table' then
+			wrapReloadTable(u25)
 		end
 	end
 
-	if opts.fireRate and env.u17 ~= nil then
-		env.u17 = true
-	end
-end
-
-local function patchWeaponTable(tbl, opts)
-	if opts.infiniteAmmo then
-		if tbl.u6 ~= nil then
-			tbl.u6 = true
-		end
-		if type(tbl.u13) == 'number' then
-			tbl.u13 = 35
-		end
-		if type(tbl.Mag) == 'number' then
-			tbl.Mag = 999999
-		end
-		if type(tbl.HealMag) == 'number' then
-			tbl.HealMag = 999999
-		end
-		patchNumericFields(tbl, {
-			ammo = 999999,
-			Ammo = 999999,
-			currentAmmo = 999999,
-			CurrentAmmo = 999999,
-			clip = 999999,
-			Clip = 999999,
-			mag = 999999,
-			Mag = 999999
-		}, 0)
+	if opts.fireRate and rawget(env, 'u17') ~= nil then
+		rawset(env, 'u17', true)
 	end
 
-	if opts.instantReload then
-		if tbl.u16 ~= nil then
-			tbl.u16 = false
+	for _, key in {'u50', 'u25', 'u24', 'u22'} do
+		local val = rawget(env, key)
+		if type(val) == 'function' then
+			patchFunctionUpvalues(val, opts, 0)
+		elseif type(val) == 'table' then
+			for _, subKey in {'MouseClick', 'Reload', 'Fire', 'KeyPressed'} do
+				local subVal = rawget(val, subKey)
+				if type(subVal) == 'function' then
+					patchFunctionUpvalues(subVal, opts, 0)
+				end
+			end
 		end
-		if type(tbl.u13) == 'number' then
-			tbl.u13 = 35
-		end
-		if tbl.u25 then
-			wrapReloadTable(tbl.u25)
-		end
-		wrapReloadTable(tbl)
-	end
-
-	if opts.fireRate and tbl.u17 ~= nil then
-		tbl.u17 = true
 	end
 end
 
@@ -373,21 +302,15 @@ local function applyWeaponMods()
 		return
 	end
 
-	if opts.infiniteAmmo or opts.instantReload then
-		scanWeaponTables()
+	if not getsenv then
+		return
 	end
 
-	if getsenv then
-		for gunScript in collectGunScripts() do
-			local ok, env = pcall(getsenv, gunScript)
-			if ok then
-				patchGunEnv(env, opts)
-			end
+	for _, gunScript in collectGunScripts() do
+		local ok, env = pcall(getsenv, gunScript)
+		if ok then
+			patchGunEnv(env, opts)
 		end
-	end
-
-	for _, tbl in cachedWeaponTables do
-		patchWeaponTable(tbl, opts)
 	end
 end
 
@@ -401,8 +324,6 @@ local function syncWeaponMods()
 	syncGunHooks()
 
 	if not anyWeaponModEnabled() then
-		cachedWeaponTables = {}
-		weaponTablesScanned = false
 		return
 	end
 
@@ -412,7 +333,7 @@ local function syncWeaponMods()
 		weaponLoop = task.spawn(function()
 			while anyWeaponModEnabled() do
 				applyWeaponMods()
-				task.wait(0.1)
+				task.wait(0.25)
 			end
 			weaponLoop = nil
 		end)
