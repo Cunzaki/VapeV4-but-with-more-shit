@@ -10109,7 +10109,7 @@ run(function()
 	local VisualizerColor
 
 	local RunService = game:GetService('RunService')
-	local VOID_OFFSET = Vector3.new(0, -500000, 0)
+	local VOID_OFFSET = Vector3.new(0, -99999999, 0)
 
 	local returnthis = nil
 	local cameraProxy
