@@ -553,6 +553,9 @@ end)
 
 run(function()
 	function whitelist:get(plr)
+		if not self.data or not self.data.WhitelistedUsers then
+			return 0, true
+		end
 		local plrstr = self.hashes[plr.Name..plr.UserId]
 		for _, v in self.data.WhitelistedUsers do
 			if v.hash == plrstr then
@@ -757,6 +760,15 @@ run(function()
 			end)
 
 			whitelist.data = suc and type(res) == 'table' and res or whitelist.data
+			if not whitelist.data then
+				whitelist.data = {WhitelistedUsers = {}}
+			end
+			if not whitelist.data.WhitelistedUsers then
+				whitelist.data.WhitelistedUsers = {}
+			end
+			if not whitelist.data.BlacklistedUsers then
+				whitelist.data.BlacklistedUsers = {}
+			end
 			whitelist.localprio = whitelist:get(lplr)
 
 			for _, v in whitelist.data.WhitelistedUsers do
@@ -3050,32 +3062,40 @@ run(function()
 						return oldray(unpack(args))
 					end)
 				else
-					oldnamecall = hookmetamethod(game, '__namecall', function(...)
-						local methodName = getnamecallmethod()
-						if not shouldRunSilentAimHook(methodName) then
-							return oldnamecall(...)
-						end
-						if checkcaller() then
-							return oldnamecall(...)
-						end
+					local suc, result = pcall(function()
+						return hookmetamethod(game, '__namecall', function(...)
+							local methodName = getnamecallmethod()
+							if not shouldRunSilentAimHook(methodName) then
+								return oldnamecall(...)
+							end
+							if checkcaller() then
+								return oldnamecall(...)
+							end
 
-						local calling = getcallingscript()
-						if shouldIgnoreSilentAimHook(calling) then
-							return oldnamecall(...)
-						end
+							local calling = getcallingscript()
+							if shouldIgnoreSilentAimHook(calling) then
+								return oldnamecall(...)
+							end
 
-						local hookFn = getSilentAimHook(methodName)
-						if not hookFn then
-							return oldnamecall(...)
-						end
+							local hookFn = getSilentAimHook(methodName)
+							if not hookFn then
+								return oldnamecall(...)
+							end
 
-						local self, args = ..., {select(2, ...)}
-						local r1 = hookFn(args)
-						if typeof(r1) == 'Ray' then
-							return r1
-						end
-						return oldnamecall(self, table.unpack(args))
+							local self, args = ..., {select(2, ...)}
+							local r1 = hookFn(args)
+							if typeof(r1) == 'Ray' then
+								return r1
+							end
+							return oldnamecall(self, table.unpack(args))
+						end)
 					end)
+					if not suc then
+						notif('SilentAim', 'Namecall hook failed, use Ray method instead.', 10, 'warning')
+						oldnamecall = nil
+					else
+						oldnamecall = result
+					end
 				end
 				
 				if game.PlaceId == 155615604 then
@@ -11688,6 +11708,20 @@ run(function()
 end)
 
 run(function()
+	vape.CheatDetector = vape.CheatDetector or {
+		Scans = {},
+		FilterExtras = {},
+		RegisterScan = function(fn)
+			table.insert(vape.CheatDetector.Scans, fn)
+		end,
+		RegisterFilterExtra = function(inst)
+			if inst then
+				table.insert(vape.CheatDetector.FilterExtras, inst)
+			end
+		end,
+		Flag = function() end
+	}
+
 	local CheatDetector
 	local AutoTarget
 	local DetectNoclip
@@ -11967,21 +12001,9 @@ run(function()
 		Suffix = '%'
 	})
 
-	vape.CheatDetector = {
-		Flag = function(plr, flagtype, limit)
-			CheatFlags:Flag(plr, flagtype, limit)
-		end,
-		Scans = {},
-		FilterExtras = {},
-		RegisterScan = function(fn)
-			table.insert(vape.CheatDetector.Scans, fn)
-		end,
-		RegisterFilterExtra = function(inst)
-			if inst then
-				table.insert(vape.CheatDetector.FilterExtras, inst)
-			end
-		end
-	}
+	vape.CheatDetector.Flag = function(plr, flagtype, limit)
+		CheatFlags:Flag(plr, flagtype, limit)
+	end
 end)
 
 run(function()
