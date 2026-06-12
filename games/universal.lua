@@ -1371,6 +1371,27 @@ run(function()
 	local BulletTracerDuration
 	playHitSound = function() end
 	lastHitsoundTime = 0
+	local DEFAULT_IGNORED_SCRIPTS = {
+		'ControlScript', 'ControlModule', 'PlayerModule', 'CameraModule',
+		'Popper', 'Poppercam', 'ZoomController', 'BaseCamera', 'ClassicCamera',
+		'OrbitalCamera', 'LegacyCamera', 'Invisicam', 'MouseLockController', 'CameraInput'
+	}
+	local function shouldIgnoreSilentAimHook(calling)
+		if not calling then return false end
+		local list = (IgnoredScripts and #IgnoredScripts.ListEnabled > 0) and IgnoredScripts.ListEnabled or DEFAULT_IGNORED_SCRIPTS
+		local name = calling.Name or tostring(calling)
+		if table.find(list, name) or table.find(list, tostring(calling)) then
+			return true
+		end
+		local parent = calling
+		while parent do
+			if parent.Name == 'CameraModule' or parent.Name == 'PlayerModule' or parent.Name == 'ZoomController' then
+				return true
+			end
+			parent = parent.Parent
+		end
+		return false
+	end
 	local TracerClickWindow = 0.4
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
@@ -1451,6 +1472,7 @@ run(function()
 	local pmMotorMap = {}
 	local pmRadiusPart
 	local pmTargetPosition = nil
+	local silentAimHookBusy = false
 	local pmRaycastParams = RaycastParams.new()
 	
 	local pmCameraProxy
@@ -1736,7 +1758,7 @@ run(function()
 		local bestDistance = math.huge
 		local targetCount = 0
 		for _, ent in entitylib.List do
-			if ent == entitylib.Local then continue end
+			if ent == entitylib.character then continue end
 			if not ent.Character then continue end
 			targetCount = targetCount + 1
 			local entRoot = ent.RootPart
@@ -2032,6 +2054,7 @@ run(function()
 	
 	local function findBestPosition()
 		if not PositionManipulation or not PositionManipulation.Enabled then return nil end
+		if silentAimHookBusy then return pmTargetPosition end
 		
 		local now = tick()
 		if now - lastPMFrame < PM_THROTTLE then
@@ -2048,7 +2071,7 @@ run(function()
 		
 		local validTargets = {}
 		for _, ent in entitylib.List do
-			if ent == entitylib.Local then continue end
+			if ent == entitylib.character then continue end
 			if not ent.Character or not ent.RootPart then continue end
 			if not entitylib.targetCheck(ent) then continue end
 			table.insert(validTargets, ent)
@@ -2130,9 +2153,9 @@ run(function()
 		end
 		
 		for ySample = 0, numYSamples - 1 do
-			local yOffset = (ySample / (numYSamples - 1)) * 4 - 2
+			local yOffset = numYSamples <= 1 and 0 or (ySample / (numYSamples - 1)) * 4 - 2
 			for radiusSample = 0, numRadiusSamples - 1 do
-				local currentRadius = (radiusSample / numRadiusSamples) * radius
+				local currentRadius = numRadiusSamples <= 1 and 0 or (radiusSample / (numRadiusSamples - 1)) * radius
 				for angleSample = 0, numAngleSamples - 1 do
 					local angle = (angleSample / numAngleSamples) * math.pi * 2
 					local x = math.cos(angle) * currentRadius
@@ -2187,9 +2210,13 @@ run(function()
 		if not (ent and targetPart and origin) then return end
 		local existing = bulletTracerPending[ent]
 		if existing then
+			if tick() - (existing.Time or 0) < 0.05 then
+				existing.TargetPosition = targetPart.Position
+				return
+			end
 			-- Keep the highest pre-hit health seen so rapid target polling doesn't erase pending damage context.
 			existing.Health = math.max(existing.Health or ent.Health, ent.Health)
-			existing.Origin = getLocalTracerOrigin()
+			existing.Origin = getLocalTracerOrigin() or origin
 			existing.TargetPosition = targetPart.Position
 			existing.Time = tick()
 			return
@@ -2197,7 +2224,7 @@ run(function()
 		bulletTracerPending[ent] = {
 			Entity = ent,
 			Health = ent.Health,
-			Origin = getLocalTracerOrigin(),
+			Origin = getLocalTracerOrigin() or origin,
 			TargetPosition = targetPart.Position,
 			Time = tick()
 		}
@@ -2346,8 +2373,34 @@ run(function()
 		end
 	end
 
+	local function resolveSilentAimOrigin(origin)
+		local baseCF
+		if typeof(origin) == 'CFrame' then
+			baseCF = origin
+		elseif typeof(origin) == 'Vector3' then
+			baseCF = CFrame.new(origin)
+		elseif typeof(origin) == 'Ray' then
+			baseCF = CFrame.lookAt(origin.Origin, origin.Origin + origin.Direction)
+		else
+			baseCF = (entitylib.isAlive and entitylib.character.RootPart and entitylib.character.RootPart.CFrame) or gameCamera.CFrame
+		end
+		if PositionManipulation and PositionManipulation.Enabled and pmTargetPosition then
+			baseCF = CFrame.new(pmTargetPosition) * (baseCF - baseCF.Position)
+		end
+		return baseCF.Position, baseCF
+	end
+
 	local function getTarget(origin, obj, prisonOpts)
-		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then return end
+		if silentAimHookBusy then return end
+		silentAimHookBusy = true
+		local function finish(...)
+			silentAimHookBusy = false
+			return ...
+		end
+
+		local resolvedPos = select(1, resolveSilentAimOrigin(origin))
+		origin = resolvedPos
+		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then return finish() end
 		local targetPart = (rand.NextNumber(rand, 0, 100) < (AutoFire.Enabled and 100 or HeadshotChance.Value)) and 'Head' or 'RootPart'
 		local range = Range.Value
 		local rangePosition, attackCheck, wallbang
@@ -2398,7 +2451,7 @@ run(function()
 			end
 		end
 		
-		return ent, ent and ent[targetPart], origin
+		return finish(ent, ent and ent[targetPart], origin)
 	end
 
 	local function getShootFunction()
@@ -2501,11 +2554,8 @@ run(function()
 
 	local Hooks = {
 		FindPartOnRayWithIgnoreList = function(args)
-			local ent, targetPart, origin = getTarget(args[1].Origin, {args[2]})
+			local ent, targetPart, origin = getTarget(args[1].Origin)
 			if not ent then return end
-			if Wallbang.Enabled then 
-				return {targetPart, targetPart.Position, targetPart.GetClosestPointOnSurface(targetPart, origin), targetPart.Material} 
-			end
 			args[1] = Ray.new(origin, CFrame.lookAt(origin, targetPart.Position).LookVector * args[1].Direction.Magnitude)
 		end,
 		Raycast = function(args)
@@ -2527,7 +2577,7 @@ run(function()
 				if not calc then return end
 				direction = CFrame.lookAt(origin, calc)
 			end
-			return {Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)}
+			return Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)
 		end,
 		Ray = function(args)
 			local ent, targetPart, origin = getTarget(args[1])
@@ -2544,6 +2594,31 @@ run(function()
 	Hooks.FindPartOnRayWithWhitelist = Hooks.FindPartOnRayWithIgnoreList
 	Hooks.FindPartOnRay = Hooks.FindPartOnRayWithIgnoreList
 	Hooks.ViewportPointToRay = Hooks.ScreenPointToRay
+	local SILENT_AIM_METHOD_ALIASES = {
+		FindPartOnRay = {
+			FindPartOnRayWithIgnoreList = true,
+			FindPartOnRayWithWhitelist = true
+		},
+		ViewportPointToRay = {
+			ScreenPointToRay = true
+		}
+	}
+	local function getSilentAimHook(methodName)
+		if Hooks[methodName] then
+			return Hooks[methodName]
+		end
+		local aliases = SILENT_AIM_METHOD_ALIASES[Method.Value]
+		if aliases and aliases[methodName] then
+			return Hooks[Method.Value]
+		end
+	end
+	local function shouldRunSilentAimHook(methodName)
+		if methodName == Method.Value then
+			return true
+		end
+		local aliases = SILENT_AIM_METHOD_ALIASES[Method.Value]
+		return aliases and aliases[methodName] or false
+	end
 
 	SilentAim = vape.Categories.Combat:CreateModule({
 		Name = 'SilentAim',
@@ -2568,15 +2643,8 @@ run(function()
 				SilentAim:Clean(entitylib.Events.LocalRemoved:Connect(resetTracerTracking))
 				SilentAim:Clean(entitylib.Events.LocalAdded:Connect(resetTracerTracking))
 				
-				if PositionManipulation and PositionManipulation.Enabled then
-					setupPMCameraProxy()
-					if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
-						setupPMClone()
-					end
-					if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled then
-						setupPMRadius()
-					end
-					SilentAim:Clean(entitylib.Events.LocalAdded:Connect(function()
+				if PositionManipulation then
+					if PositionManipulation.Enabled then
 						setupPMCameraProxy()
 						if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
 							setupPMClone()
@@ -2584,8 +2652,24 @@ run(function()
 						if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled then
 							setupPMRadius()
 						end
+					end
+					SilentAim:Clean(entitylib.Events.LocalAdded:Connect(function()
+						if PositionManipulation.Enabled then
+							setupPMCameraProxy()
+							if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
+								setupPMClone()
+							end
+							if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled then
+								setupPMRadius()
+							end
+						end
 					end))
 					SilentAim:Clean(runService.RenderStepped:Connect(function()
+						if not PositionManipulation.Enabled then
+							pmTargetPosition = nil
+							return
+						end
+
 						if pmCameraProxy then
 							local char = entitylib.character and entitylib.character.Character
 							local hum = char and char:FindFirstChild("Humanoid")
@@ -2603,6 +2687,30 @@ run(function()
 								cleanupPMCameraProxy()
 							end
 						end
+
+						pmTargetPosition = findBestPosition()
+
+						if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled and pmCloneRoot then
+							local baseCF = entitylib.character and entitylib.character.RootPart and entitylib.character.RootPart.CFrame
+							if baseCF then
+								for cloneMotor, realMotor in pairs(pmMotorMap) do
+									if cloneMotor and realMotor and cloneMotor.Parent and realMotor.Parent then
+										cloneMotor.Transform = realMotor.Transform
+									end
+								end
+								local targetCF = pmTargetPosition and CFrame.new(pmTargetPosition) * baseCF.Rotation or baseCF
+								pmClone:PivotTo(targetCF)
+							end
+						end
+
+						if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled and pmRadiusPart then
+							local localRoot = entitylib.character and entitylib.character.RootPart
+							if localRoot then
+								pmRadiusPart.Position = localRoot.Position
+								pmRadiusPart.Size = Vector3.new(PositionManipulationRadius.Value * 2, PositionManipulationRadius.Value * 2, PositionManipulationRadius.Value * 2)
+								pmRadiusPart.Color = Color3.fromHSV(PositionManipulationRadiusVisualizerColor.Hue, PositionManipulationRadiusVisualizerColor.Sat, PositionManipulationRadiusVisualizerColor.Value)
+							end
+						end
 					end))
 				end
 				
@@ -2613,11 +2721,8 @@ run(function()
 						end
 						local calling = getcallingscript()
 
-						if calling then
-							local list = #IgnoredScripts.ListEnabled > 0 and IgnoredScripts.ListEnabled or {'ControlScript', 'ControlModule'}
-							if table.find(list, tostring(calling)) then
-								return oldray(origin, direction)
-							end
+						if shouldIgnoreSilentAimHook(calling) then
+							return oldray(origin, direction)
 						end
 
 						local args = {origin, direction}
@@ -2626,7 +2731,8 @@ run(function()
 					end)
 				else
 					oldnamecall = hookmetamethod(game, '__namecall', function(...)
-						if getnamecallmethod() ~= Method.Value then
+						local methodName = getnamecallmethod()
+						if not shouldRunSilentAimHook(methodName) then
 							return oldnamecall(...)
 						end
 						if checkcaller() then
@@ -2634,19 +2740,21 @@ run(function()
 						end
 
 						local calling = getcallingscript()
-						if calling then
-							local list = #IgnoredScripts.ListEnabled > 0 and IgnoredScripts.ListEnabled or {'ControlScript', 'ControlModule'}
-							if table.find(list, tostring(calling)) then
-								return oldnamecall(...)
-							end
+						if shouldIgnoreSilentAimHook(calling) then
+							return oldnamecall(...)
+						end
+
+						local hookFn = getSilentAimHook(methodName)
+						if not hookFn then
+							return oldnamecall(...)
 						end
 
 						local self, args = ..., {select(2, ...)}
-						local res = Hooks[Method.Value](args)
-						if res then
-							return unpack(res)
+						local r1 = hookFn(args)
+						if typeof(r1) == 'Ray' then
+							return r1
 						end
-						return oldnamecall(self, unpack(args))
+						return oldnamecall(self, table.unpack(args))
 					end)
 				end
 				
@@ -2679,41 +2787,6 @@ run(function()
 					end
 					if DebugVisualization and DebugVisualization.Enabled then
 						pcall(function() updateDebugVisualization() end)
-					end
-					
-					if PositionManipulation and PositionManipulation.Enabled then
-						pmTargetPosition = findBestPosition()
-						
-						local localChar = entitylib.character
-						if localChar and localChar.RootPart and pmTargetPosition then
-							local root = localChar.RootPart
-							local originalCF = root.CFrame
-							root.CFrame = CFrame.new(pmTargetPosition) * originalCF.Rotation
-							runService.RenderStepped:Wait()
-							root.CFrame = originalCF
-						end
-						
-						if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled and pmCloneRoot then
-							local baseCF = entitylib.character and entitylib.character.RootPart and entitylib.character.RootPart.CFrame
-							if baseCF then
-								for cloneMotor, realMotor in pairs(pmMotorMap) do
-									if cloneMotor and realMotor and cloneMotor.Parent and realMotor.Parent then
-										cloneMotor.Transform = realMotor.Transform
-									end
-								end
-								local targetCF = pmTargetPosition and CFrame.new(pmTargetPosition) * baseCF.Rotation or baseCF
-								pmClone:PivotTo(targetCF)
-							end
-						end
-						
-						if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled and pmRadiusPart then
-							local localRoot = entitylib.character and entitylib.character.RootPart
-							if localRoot then
-								pmRadiusPart.Position = localRoot.Position
-								pmRadiusPart.Size = Vector3.new(PositionManipulationRadius.Value * 2, PositionManipulationRadius.Value * 2, PositionManipulationRadius.Value * 2)
-								pmRadiusPart.Color = Color3.fromHSV(PositionManipulationRadiusVisualizerColor.Hue, PositionManipulationRadiusVisualizerColor.Sat, PositionManipulationRadiusVisualizerColor.Value)
-							end
-						end
 					end
 					
 					processHitDetection()
