@@ -12910,6 +12910,577 @@ run(function()
 		Tooltip = 'Test team check: skips players with Torso/UpperTorso material set to ForceField.'
 	})
 end)
+
+run(function()
+	if not vape.Categories.Minigames then
+		return
+	end
+
+	local AimViewer
+	local Color, Thickness, Length, Duration, Teammates, ShowSelf, UseBeams
+	local playerLines = {}
+	local beamData = {}
+	local aimSnapshots = {}
+	local raycastContextPlayer
+	local raycastContextExpire = 0
+	local aimFolder
+	local hookedRemotes = {}
+	local rayMethods = {
+		Raycast = true,
+		FindPartOnRay = true,
+		FindPartOnRayWithIgnoreList = true,
+		FindPartOnRayWithWhitelist = true,
+		Spherecast = true,
+		Blockcast = true
+	}
+	local muzzleNames = {'Barrel', 'Muzzle', 'FirePoint', 'Gun', 'Handle', 'Tip', 'ShootPoint', 'Ray'}
+	local hookState = {namecall = nil, rayNew = nil}
+
+	local function shouldShowPlayer(plr)
+		if not plr then
+			return false
+		end
+		if plr == lplr and not ShowSelf.Enabled then
+			return false
+		end
+		if not Teammates.Enabled then
+			local ent = entitylib.getEntity(plr)
+			if ent and not ent.Targetable and not isFriend(plr) then
+				return false
+			end
+		end
+		return true
+	end
+
+	local function getPlayerFromScript(scriptObj)
+		if not scriptObj then
+			return
+		end
+		local parent = scriptObj
+		while parent do
+			if parent:IsA('Model') and parent:FindFirstChildOfClass('Humanoid') then
+				return playersService:GetPlayerFromCharacter(parent)
+			end
+			parent = parent.Parent
+		end
+	end
+
+	local function getEquippedTool(char)
+		for _, child in char:GetChildren() do
+			if child:IsA('Tool') then
+				return child
+			end
+		end
+	end
+
+	local function getMuzzlePart(tool, char)
+		if not tool then
+			return
+		end
+		for _, name in muzzleNames do
+			local part = tool:FindFirstChild(name, true)
+			if part and part:IsA('BasePart') then
+				return part
+			end
+		end
+		local head = char and char:FindFirstChild('Head')
+		return head
+	end
+
+	local function raycastAim(origin, direction, ignore)
+		local dist = Length.Value
+		local rayParams = RaycastParams.new()
+		rayParams.FilterType = Enum.RaycastFilterType.Exclude
+		rayParams.FilterDescendantsInstances = ignore or {}
+		local result = workspace:Raycast(origin, direction * dist, rayParams)
+		if result then
+			return origin, result.Position
+		end
+		return origin, origin + direction * dist
+	end
+
+	local function recordAim(plr, origin, target)
+		if not (plr and origin and target) then
+			return
+		end
+		if typeof(origin) ~= 'Vector3' or typeof(target) ~= 'Vector3' then
+			return
+		end
+		if (target - origin).Magnitude < 0.25 then
+			return
+		end
+		if not shouldShowPlayer(plr) then
+			return
+		end
+		aimSnapshots[plr] = {
+			Origin = origin,
+			Target = target,
+			Expire = tick() + Duration.Value
+		}
+	end
+
+	local function collectFromValue(value, vectors, parts, players, depth)
+		if depth > 5 then
+			return
+		end
+		local valueType = typeof(value)
+		if valueType == 'Vector3' then
+			table.insert(vectors, value)
+		elseif valueType == 'Instance' then
+			if value:IsA('Player') then
+				table.insert(players, value)
+			elseif value:IsA('BasePart') then
+				table.insert(parts, value)
+			end
+		elseif valueType == 'Ray' then
+			table.insert(vectors, value.Origin)
+			table.insert(vectors, value.Origin + value.Direction)
+		elseif type(value) == 'table' then
+			for _, entry in value do
+				collectFromValue(entry, vectors, parts, players, depth + 1)
+			end
+		end
+	end
+
+	local function parseAimFromArgs(args)
+		local vectors, parts, players = {}, {}, {}
+		for _, arg in args do
+			collectFromValue(arg, vectors, parts, players, 0)
+		end
+
+		local shooter = players[1]
+		local origin = vectors[1]
+		local target = vectors[2]
+
+		if not origin and parts[1] then
+			origin = parts[1].Position
+		end
+		if not target and parts[2] then
+			target = parts[2].Position
+		elseif not target and parts[1] and vectors[1] and vectors[1] ~= origin then
+			target = vectors[1]
+		end
+
+		return shooter, origin, target
+	end
+
+	local function setRaycastContext(plr, lifetime)
+		if not plr then
+			return
+		end
+		raycastContextPlayer = plr
+		raycastContextExpire = tick() + (lifetime or 0.15)
+	end
+
+	local function getRaycastContextPlayer()
+		if raycastContextPlayer and tick() <= raycastContextExpire then
+			return raycastContextPlayer
+		end
+	end
+
+	local function resolveAimPlayer(scriptObj)
+		return getRaycastContextPlayer() or getPlayerFromScript(scriptObj)
+	end
+
+	local function extractRayFromNamecall(method, args)
+		if method == 'Raycast' then
+			local origin, direction = args[2], args[3]
+			if typeof(origin) == 'Vector3' and typeof(direction) == 'Vector3' then
+				return origin, origin + direction
+			end
+		elseif rayMethods[method] and typeof(args[2]) == 'Ray' then
+			local ray = args[2]
+			return ray.Origin, ray.Origin + ray.Direction
+		end
+	end
+
+	local function hookRemote(remote)
+		if hookedRemotes[remote] or not (remote:IsA('RemoteEvent') or remote:IsA('UnreliableRemoteEvent')) then
+			return
+		end
+		hookedRemotes[remote] = true
+		AimViewer:Clean(remote.OnClientEvent:Connect(function(...)
+			local args = {...}
+			local shooter, origin, target = parseAimFromArgs(args)
+			if shooter then
+				setRaycastContext(shooter, 0.2)
+			end
+			if shooter and origin and target then
+				recordAim(shooter, origin, target)
+			end
+		end))
+	end
+
+	local function scanRemotes(root)
+		for _, desc in root:GetDescendants() do
+			if desc:IsA('RemoteEvent') or desc:IsA('UnreliableRemoteEvent') then
+				hookRemote(desc)
+			end
+		end
+	end
+
+	local function installRayHooks()
+		if hookState.namecall or not hookmetamethod then
+			return
+		end
+
+		local oldNamecall
+		local suc = pcall(function()
+			oldNamecall = hookmetamethod(game, '__namecall', function(self, ...)
+				local method = getnamecallmethod()
+				if not checkcaller() and rayMethods[method] and (self == workspace or self:IsDescendantOf(workspace)) then
+					local args = {...}
+					local origin, target = extractRayFromNamecall(method, args)
+					if origin and target then
+						local plr = resolveAimPlayer(getcallingscript and getcallingscript())
+						if plr then
+							recordAim(plr, origin, target)
+						end
+					end
+				end
+				return oldNamecall(self, ...)
+			end)
+		end)
+		if suc then
+			hookState.namecall = oldNamecall
+		end
+
+		if hookfunction and Ray and Ray.new and not hookState.rayNew then
+			local oldRayNew
+			oldRayNew = hookfunction(Ray.new, function(origin, direction, ...)
+				if not checkcaller() then
+					local plr = resolveAimPlayer(getcallingscript and getcallingscript())
+					if plr and typeof(origin) == 'Vector3' and typeof(direction) == 'Vector3' then
+						recordAim(plr, origin, origin + direction)
+					end
+				end
+				return oldRayNew(origin, direction, ...)
+			end)
+			hookState.rayNew = oldRayNew
+		end
+	end
+
+	local function removeRayHooks()
+		if hookState.namecall then
+			hookmetamethod(game, '__namecall', hookState.namecall)
+			hookState.namecall = nil
+		end
+		if hookState.rayNew then
+			hookfunction(Ray.new, hookState.rayNew)
+			hookState.rayNew = nil
+		end
+	end
+
+	local function getLocalMouseAim()
+		local mouse = lplr:GetMouse()
+		local origin = gameCamera.CFrame.Position
+		if mouse and mouse.Hit then
+			return origin, mouse.Hit.Position
+		end
+		return raycastAim(origin, gameCamera.CFrame.LookVector, {lplr.Character})
+	end
+
+	local function getEstimatedAim(plr)
+		local char = plr.Character
+		if not char then
+			return
+		end
+
+		if plr == lplr then
+			return getLocalMouseAim()
+		end
+
+		local head = char:FindFirstChild('Head')
+		if not head then
+			return
+		end
+
+		local tool = getEquippedTool(char)
+		if not tool then
+			return
+		end
+
+		local muzzle = getMuzzlePart(tool, char)
+		local origin = muzzle and muzzle.Position or head.Position
+		local direction = head.CFrame.LookVector
+		if muzzle and muzzle ~= head then
+			direction = (head.CFrame.LookVector + (muzzle.CFrame.LookVector)).Unit
+		end
+
+		return raycastAim(origin, direction, {char})
+	end
+
+	local function getLineColor(plr)
+		local ent = plr and entitylib.getEntity(plr)
+		if ent then
+			return entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+		end
+		return Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+	end
+
+	local function ensurePlayerLine(plr)
+		if playerLines[plr] then
+			return playerLines[plr]
+		end
+		if not Drawing or not Drawing.new then
+			return
+		end
+		local main = Drawing.new('Line')
+		main.Thickness = Thickness.Value
+		main.Transparency = 1
+		main.Visible = false
+		local glow = Drawing.new('Line')
+		glow.Thickness = Thickness.Value + 1
+		glow.Transparency = 0.35
+		glow.Visible = false
+		playerLines[plr] = {Main = main, Glow = glow}
+		return playerLines[plr]
+	end
+
+	local function removePlayerLine(plr)
+		local lines = playerLines[plr]
+		if not lines then
+			return
+		end
+		playerLines[plr] = nil
+		for _, line in lines do
+			pcall(function()
+				line.Visible = false
+				line:Remove()
+			end)
+		end
+	end
+
+	local function clearBeam(plr)
+		local data = beamData[plr]
+		if not data then
+			return
+		end
+		beamData[plr] = nil
+		for _, inst in data do
+			pcall(function()
+				inst:Destroy()
+			end)
+		end
+	end
+
+	local function drawBeam(plr, origin, target, lineColor)
+		if not UseBeams.Enabled then
+			return
+		end
+		if vape.ThreadFix then
+			setthreadidentity(8)
+		end
+		if not aimFolder or not aimFolder.Parent then
+			aimFolder = Instance.new('Folder')
+			aimFolder.Name = 'AimViewerBeams'
+			aimFolder.Parent = workspace
+		end
+
+		clearBeam(plr)
+
+		local part0 = Instance.new('Part')
+		part0.Anchored = true
+		part0.CanCollide = false
+		part0.CanTouch = false
+		part0.CanQuery = false
+		part0.Transparency = 1
+		part0.Size = Vector3.new(0.1, 0.1, 0.1)
+		part0.Position = origin
+		part0.Parent = aimFolder
+
+		local part1 = part0:Clone()
+		part1.Position = target
+		part1.Parent = aimFolder
+
+		local attach0 = Instance.new('Attachment')
+		attach0.Parent = part0
+		local attach1 = Instance.new('Attachment')
+		attach1.Parent = part1
+
+		local beam = Instance.new('Beam')
+		beam.Attachment0 = attach0
+		beam.Attachment1 = attach1
+		beam.Color = ColorSequence.new(lineColor)
+		beam.LightEmission = 1
+		beam.LightInfluence = 0
+		beam.FaceCamera = true
+		beam.Width0 = Thickness.Value / 5
+		beam.Width1 = Thickness.Value / 5
+		beam.Transparency = NumberSequence.new(0.15)
+		beam.Parent = part0
+
+		beamData[plr] = {part0, part1, beam, attach0, attach1}
+	end
+
+	local function drawPlayerAim(plr, origin, target)
+		if not (origin and target) then
+			return
+		end
+
+		local lineColor = getLineColor(plr)
+		drawBeam(plr, origin, target, lineColor)
+
+		local lines = ensurePlayerLine(plr)
+		if not lines then
+			return
+		end
+
+		local fromPos, fromVis = gameCamera:WorldToViewportPoint(origin)
+		local toPos, toVis = gameCamera:WorldToViewportPoint(target)
+		local visible = fromVis or toVis
+		lines.Main.Visible = visible
+		lines.Glow.Visible = visible
+		if not visible then
+			return
+		end
+
+		lines.Main.From = Vector2.new(fromPos.X, fromPos.Y)
+		lines.Main.To = Vector2.new(toPos.X, toPos.Y)
+		lines.Main.Color = lineColor
+		lines.Glow.From = lines.Main.From
+		lines.Glow.To = lines.Main.To
+		lines.Glow.Color = lineColor
+	end
+
+	local function hidePlayerAim(plr)
+		local lines = playerLines[plr]
+		if lines then
+			lines.Main.Visible = false
+			lines.Glow.Visible = false
+		end
+		clearBeam(plr)
+	end
+
+	local function updateAimViewer()
+		local now = tick()
+
+		for plr, snapshot in aimSnapshots do
+			if snapshot.Expire < now then
+				aimSnapshots[plr] = nil
+			end
+		end
+
+		for _, plr in playersService:GetPlayers() do
+			if not shouldShowPlayer(plr) then
+				hidePlayerAim(plr)
+				continue
+			end
+
+			local origin, target
+			local snapshot = aimSnapshots[plr]
+			if snapshot and snapshot.Expire >= now then
+				origin, target = snapshot.Origin, snapshot.Target
+			else
+				origin, target = getEstimatedAim(plr)
+			end
+
+			if origin and target then
+				drawPlayerAim(plr, origin, target)
+			else
+				hidePlayerAim(plr)
+			end
+		end
+	end
+
+	local function cleanupAimViewer()
+		for plr in playerLines do
+			removePlayerLine(plr)
+		end
+		for plr in beamData do
+			clearBeam(plr)
+		end
+		table.clear(aimSnapshots)
+		table.clear(hookedRemotes)
+		raycastContextPlayer = nil
+		raycastContextExpire = 0
+		if aimFolder then
+			pcall(function()
+				aimFolder:Destroy()
+			end)
+			aimFolder = nil
+		end
+		removeRayHooks()
+	end
+
+	AimViewer = vape.Categories.Minigames:CreateModule({
+		Name = 'AimViewer',
+		Function = function(callback)
+			if callback then
+				installRayHooks()
+				scanRemotes(game)
+				AimViewer:Clean(game.DescendantAdded:Connect(function(desc)
+					if desc:IsA('RemoteEvent') or desc:IsA('UnreliableRemoteEvent') then
+						hookRemote(desc)
+					end
+				end))
+				AimViewer:Clean(playersService.PlayerRemoving:Connect(function(plr)
+					removePlayerLine(plr)
+					clearBeam(plr)
+					aimSnapshots[plr] = nil
+				end))
+				AimViewer:Clean(runService.RenderStepped:Connect(updateAimViewer))
+			else
+				cleanupAimViewer()
+			end
+		end,
+		Tooltip = 'Visualizes where players aim while holding tools. Uses replicated shot data when available, otherwise estimates from camera/head direction and mouse for you.'
+	})
+
+	Teammates = AimViewer:CreateToggle({
+		Name = 'Show Teammates',
+		Default = true,
+		Function = function() end
+	})
+	ShowSelf = AimViewer:CreateToggle({
+		Name = 'Show Self',
+		Default = false,
+		Function = function() end
+	})
+	UseBeams = AimViewer:CreateToggle({
+		Name = '3D Beams',
+		Default = true,
+		Function = function(callback)
+			if not callback then
+				for plr in beamData do
+					clearBeam(plr)
+				end
+			end
+		end
+	})
+	Color = AimViewer:CreateColorSlider({
+		Name = 'Fallback Color',
+		Function = function() end
+	})
+	Thickness = AimViewer:CreateSlider({
+		Name = 'Thickness',
+		Min = 1,
+		Max = 5,
+		Default = 2,
+		Function = function()
+			for _, lines in playerLines do
+				lines.Main.Thickness = Thickness.Value
+				lines.Glow.Thickness = Thickness.Value + 1
+			end
+		end
+	})
+	Length = AimViewer:CreateSlider({
+		Name = 'Length',
+		Min = 50,
+		Max = 2000,
+		Default = 500,
+		Suffix = ' studs'
+	})
+	Duration = AimViewer:CreateSlider({
+		Name = 'Captured Duration',
+		Min = 0.05,
+		Max = 2,
+		Default = 0.35,
+		Decimal = 100,
+		Suffix = 's',
+		Tooltip = 'How long raycast lines from replicated shots stay visible.'
+	})
+end)
 	
 run(function()
 	local Atmosphere

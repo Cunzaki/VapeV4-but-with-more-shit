@@ -43,20 +43,45 @@ local function canTargetPlayer(plr)
 	if plr == lplr then
 		return false
 	end
-	if not lplr.Team or not plr.Team then
-		return true
-	end
 
-	local localFFA, localLobby = getTeamFlags(lplr.Team)
-	local _, targetLobby = getTeamFlags(plr.Team)
+	local localTeam = lplr.Team
+	local targetTeam = plr.Team
+	local localFFA, localLobby = getTeamFlags(localTeam)
+	local targetFFA, targetLobby = getTeamFlags(targetTeam)
 
 	if localLobby or targetLobby then
 		return true
 	end
-	if localFFA then
+	if localFFA or targetFFA then
 		return true
 	end
-	return plr.Team ~= lplr.Team
+
+	if vape.Categories.Main.Options['Teams by server'].Enabled then
+		if not localTeam or not targetTeam then
+			return true
+		end
+		if targetTeam ~= localTeam then
+			return true
+		end
+		return #targetTeam:GetPlayers() == #playersService:GetPlayers()
+	end
+
+	if not localTeam or not targetTeam then
+		return true
+	end
+	return targetTeam ~= localTeam
+end
+
+local function getFTPlayerTeamColor(plr)
+	if not plr then
+		return
+	end
+	if tostring(plr.TeamColor) ~= 'White' then
+		return plr.TeamColor.Color
+	end
+	if plr.Team and tostring(plr.Team.TeamColor) ~= 'White' then
+		return plr.Team.TeamColor.Color
+	end
 end
 
 local InfiniteAmmo, FireRate, FireDelay, InstantReload
@@ -70,6 +95,8 @@ local wrappedLegacyReloads = setmetatable({}, {__mode = 'k'})
 local wrappedVAKReloads = setmetatable({}, {__mode = 'k'})
 local wrappedVAKMediRecharges = setmetatable({}, {__mode = 'k'})
 local trackedWeaponStats = setmetatable({}, {__mode = 'k'})
+local connectorWeaponRef
+local vakServiceHooksInstalled = false
 
 local WEAPON_STAT_KEYS = {'RoF', 'Rate', 'Ammo', 'MaxAmmo', 'Charge', 'MaxCharge', 'ReloadTime', 'Recharge', 'BaseDamage', 'BaseHeal'}
 
@@ -103,7 +130,11 @@ local function tryWeaponFromTool(tool)
 		return
 	end
 
-	local client = tool:FindFirstChild('Client', true)
+	if not lplr.PlayerGui:FindFirstChild('VAK_UI') then
+		return
+	end
+
+	local client = tool:FindFirstChild('Client') or tool:FindFirstChild('Client', true)
 	if not client or not client:IsA('ModuleScript') then
 		return
 	end
@@ -147,13 +178,54 @@ local function isWeaponEquipped(weapon)
 	return false
 end
 
+local function captureConnectorWeapon()
+	if not (getconnections and debug and debug.getupvalue) then
+		return connectorWeaponRef
+	end
+
+	local char = lplr.Character
+	local vakUi = lplr.PlayerGui:FindFirstChild('VAK_UI')
+	if not char or not vakUi then
+		return connectorWeaponRef
+	end
+
+	for _, conn in getconnections(char.ChildAdded) do
+		local func = conn.Function
+		if func then
+			for i = 1, 30 do
+				local ok, name, val = pcall(debug.getupvalue, func, i)
+				if not ok then
+					break
+				end
+				if name == 'u3' and isVAKWeaponTable(val) then
+					connectorWeaponRef = val
+					return val
+				end
+			end
+		end
+	end
+
+	return connectorWeaponRef
+end
+
 local function getActiveVAKWeapons()
+	captureConnectorWeapon()
+
 	local active = {}
+	local seen = {}
+
+	if connectorWeaponRef and isWeaponEquipped(connectorWeaponRef) and not seen[connectorWeaponRef] then
+		seen[connectorWeaponRef] = true
+		table.insert(active, connectorWeaponRef)
+	end
+
 	for _, weapon in getVAKWeapons() do
-		if isWeaponEquipped(weapon) then
+		if isWeaponEquipped(weapon) and not seen[weapon] then
+			seen[weapon] = true
 			table.insert(active, weapon)
 		end
 	end
+
 	return active
 end
 
@@ -484,10 +556,99 @@ local function applyWeaponMods()
 end
 
 local function scheduleWeaponMods()
+	hookVAKServices()
 	applyWeaponMods()
-	task.defer(applyWeaponMods)
-	task.delay(0.05, applyWeaponMods)
-	task.delay(0.2, applyWeaponMods)
+	task.defer(function()
+		hookVAKServices()
+		applyWeaponMods()
+	end)
+	task.delay(0.05, function()
+		hookVAKServices()
+		applyWeaponMods()
+	end)
+	task.delay(0.2, function()
+		hookVAKServices()
+		applyWeaponMods()
+	end)
+end
+
+local function resetVAKServiceHooks()
+	vakServiceHooksInstalled = false
+	connectorWeaponRef = nil
+end
+
+local function hookVAKServices()
+	if vakServiceHooksInstalled then
+		return
+	end
+
+	local vakUi = lplr.PlayerGui:FindFirstChild('VAK_UI')
+	if not vakUi then
+		return
+	end
+
+	local okTs, toolService = pcall(require, vakUi:WaitForChild('ToolService', 2))
+	if okTs and type(toolService) == 'table' and not rawget(toolService, '__vapeHooked') then
+		rawset(toolService, '__vapeHooked', true)
+
+		local oldFiring = toolService.Firing
+		toolService.Firing = function(weapon, ...)
+			if anyWeaponModEnabled() and type(weapon) == 'table' and isVAKWeaponTable(weapon) then
+				patchVAKWeapon(weapon, getWeaponModOpts())
+				connectorWeaponRef = weapon
+			end
+			return oldFiring(weapon, ...)
+		end
+
+		local oldReload = toolService.Reload
+		toolService.Reload = function(weapon, ...)
+			if InstantReload and InstantReload.Enabled and type(weapon) == 'table' then
+				local maxAmmo = rawget(weapon, 'MaxAmmo')
+				if type(maxAmmo) == 'number' then
+					rawset(weapon, 'Ammo', maxAmmo)
+					rawset(weapon, 'Reloading', false)
+					rawset(weapon, 'Enabled', true)
+					return
+				end
+			end
+			if anyWeaponModEnabled() and type(weapon) == 'table' then
+				patchVAKWeapon(weapon, getWeaponModOpts())
+			end
+			return oldReload(weapon, ...)
+		end
+	end
+
+	local okMs, mediService = pcall(require, vakUi:WaitForChild('MediService', 2))
+	if okMs and type(mediService) == 'table' and not rawget(mediService, '__vapeHooked') then
+		rawset(mediService, '__vapeHooked', true)
+
+		local oldMediFire = mediService.MediFire
+		mediService.MediFire = function(weapon, ...)
+			if anyWeaponModEnabled() and type(weapon) == 'table' then
+				patchVAKWeapon(weapon, getWeaponModOpts())
+				connectorWeaponRef = weapon
+			end
+			return oldMediFire(weapon, ...)
+		end
+
+		local oldMediRecharge = mediService.MediRecharge
+		mediService.MediRecharge = function(weapon, ...)
+			if InstantReload and InstantReload.Enabled and type(weapon) == 'table' then
+				local maxCharge = rawget(weapon, 'MaxCharge')
+				if type(maxCharge) == 'number' then
+					rawset(weapon, 'Charge', maxCharge)
+				end
+				rawset(weapon, 'Recharging', false)
+				return
+			end
+			if anyWeaponModEnabled() and type(weapon) == 'table' then
+				patchVAKWeapon(weapon, getWeaponModOpts())
+			end
+			return oldMediRecharge(weapon, ...)
+		end
+	end
+
+	vakServiceHooksInstalled = true
 end
 
 local function anyWeaponModEnabled()
@@ -523,6 +684,7 @@ end
 
 local function syncWeaponMods()
 	syncGunHooks()
+	hookVAKServices()
 
 	if not anyWeaponModEnabled() then
 		stopWeaponHeartbeat()
@@ -552,7 +714,13 @@ run(function()
 	if lplr.Character then
 		hookCharacter(lplr.Character)
 	end
-	vape:Clean(lplr.CharacterAdded:Connect(hookCharacter))
+	vape:Clean(lplr.CharacterAdded:Connect(function(char)
+		connectorWeaponRef = nil
+		hookCharacter(char)
+		if anyWeaponModEnabled() then
+			task.defer(scheduleWeaponMods)
+		end
+	end))
 	vape:Clean(lplr.ChildAdded:Connect(function(child)
 		if child.Name == 'Backpack' then
 			hookToolParent(child)
@@ -563,25 +731,64 @@ run(function()
 	end
 
 	vape:Clean(lplr.PlayerGui.ChildAdded:Connect(function(child)
-		if child.Name == 'VAK_UI' and anyWeaponModEnabled() then
-			scheduleWeaponMods()
+		if child.Name == 'VAK_UI' then
+			resetVAKServiceHooks()
+			if anyWeaponModEnabled() then
+				scheduleWeaponMods()
+			end
 		end
 	end))
-	if lplr.PlayerGui:FindFirstChild('VAK_UI') and anyWeaponModEnabled() then
-		scheduleWeaponMods()
+	if lplr.PlayerGui:FindFirstChild('VAK_UI') then
+		hookVAKServices()
+		if anyWeaponModEnabled() then
+			scheduleWeaponMods()
+		end
 	end
 end)
 
 run(function()
 	local oldTargetCheck = entitylib.targetCheck
+	local oldGetEntityColor = entitylib.getEntityColor
+
 	entitylib.targetCheck = function(ent)
-		if not oldTargetCheck(ent) then
+		if ent.Health <= 0 then
 			return false
 		end
+		if ent.NPC then
+			return true
+		end
+		if ent.TeamCheck then
+			return ent:TeamCheck()
+		end
+		if isFriend(ent.Player) then
+			return false
+		end
+		if ent.Player and not select(2, whitelist:get(ent.Player)) then
+			return false
+		end
+
+		if vape.Categories.Main.Options['Teams by torso color'].Enabled then
+			return oldTargetCheck(ent)
+		end
+
 		if ent.Player and not canTargetPlayer(ent.Player) then
 			return false
 		end
 		return true
+	end
+
+	entitylib.getEntityColor = function(ent)
+		local plr = ent.Player
+		if plr and isFriend(plr, true) then
+			return Color3.fromHSV(vape.Categories.Friends.Options['Friends color'].Hue, vape.Categories.Friends.Options['Friends color'].Sat, vape.Categories.Friends.Options['Friends color'].Value)
+		end
+		if plr and vape.Categories.Main.Options['Use team color'].Enabled then
+			local color = getFTPlayerTeamColor(plr)
+			if color then
+				return color
+			end
+		end
+		return oldGetEntityColor(ent)
 	end
 
 	local oldGetUpdateConnections = entitylib.getUpdateConnections
@@ -589,22 +796,11 @@ run(function()
 		local connections = oldGetUpdateConnections(ent)
 		if ent.Player then
 			table.insert(connections, ent.Player:GetPropertyChangedSignal('Team'))
+			table.insert(connections, ent.Player:GetPropertyChangedSignal('TeamColor'))
 		end
 		return connections
 	end
 	entitylib.getupdatedconnections = entitylib.getUpdateConnections
-
-	entitylib.getEntityColor = function(ent)
-		ent = ent.Player
-		if not ent then return end
-		if isFriend(ent, true) then
-			return Color3.fromHSV(vape.Categories.Friends.Options['Friends color'].Hue, vape.Categories.Friends.Options['Friends color'].Sat, vape.Categories.Friends.Options['Friends color'].Value)
-		end
-		if vape.Categories.Main.Options['Use team color'].Enabled then
-			return ent.TeamColor.Color
-		end
-		return nil
-	end
 end)
 
 run(function()
@@ -612,10 +808,15 @@ run(function()
 	if currentGamemode then
 		vape:Clean(currentGamemode:GetPropertyChangedSignal('Value'):Connect(function()
 			entitylib.refresh()
+			resetVAKServiceHooks()
+			task.defer(scheduleWeaponMods)
 		end))
 	end
 
 	vape:Clean(lplr:GetPropertyChangedSignal('Team'):Connect(function()
+		entitylib.refresh()
+	end))
+	vape:Clean(lplr:GetPropertyChangedSignal('TeamColor'):Connect(function()
 		entitylib.refresh()
 	end))
 end)
