@@ -11688,6 +11688,303 @@ run(function()
 end)
 
 run(function()
+	local CheatDetector
+	local AutoTarget
+	local DetectNoclip
+	local DetectTeleport
+	local DetectFlight
+	local DetectSpin
+	local DetectVoid
+	local DetectAccel
+	local Sensitivity
+
+	local overlap = OverlapParams.new()
+	overlap.FilterType = Enum.RaycastFilterType.Exclude
+	local floorParams = RaycastParams.new()
+	floorParams.FilterType = Enum.RaycastFilterType.Exclude
+
+	local CheatFlags = {Flags = {}, Flagged = {}}
+	local lastPositions = {}
+	local lastVelocities = {}
+	local spawnGrace = {}
+	local flightTicks = {}
+	local spinTicks = {}
+
+	local function checkPoint(pos, params)
+		for _, v in workspace:GetPartBoundsInRadius(pos, 0, params) do
+			if v.CanCollide and (v:GetClosestPointOnSurface(pos) - pos).Magnitude <= 0 then
+				return false
+			end
+		end
+		return true
+	end
+
+	local function updateFilters()
+		local ignore = {}
+		if workspace.CurrentCamera then
+			table.insert(ignore, workspace.CurrentCamera)
+		end
+		for _, ent in entitylib.List do
+			if ent.Character then
+				table.insert(ignore, ent.Character)
+			end
+		end
+		if vape.CheatDetector and vape.CheatDetector.FilterExtras then
+			for _, extra in vape.CheatDetector.FilterExtras do
+				table.insert(ignore, extra)
+			end
+		end
+		overlap.FilterDescendantsInstances = ignore
+		floorParams.FilterDescendantsInstances = ignore
+	end
+
+	local function isOnFriendsList(plr)
+		return table.find(vape.Categories.Friends.ListEnabled, plr.Name) ~= nil
+	end
+
+	local function getLimit(base)
+		return math.max(3, math.floor(base * (101 - (Sensitivity.Value or 50)) / 50))
+	end
+
+	local function addToTargets(plr)
+		if not AutoTarget.Enabled or plr == lplr or isOnFriendsList(plr) then
+			return
+		end
+
+		local targets = vape.Categories.Targets
+		if table.find(targets.ListEnabled, plr.Name) then
+			return
+		end
+
+		if not table.find(targets.List, plr.Name) then
+			targets:ChangeValue(plr.Name)
+		else
+			table.insert(targets.ListEnabled, plr.Name)
+			targets:ChangeValue()
+		end
+		targets.Update:Fire()
+	end
+
+	local function onCheatDetected(plr, flagtype)
+		notif('CheatDetector', 'Possible cheater ('..flagtype..'): '..plr.Name, 60, 'warning')
+		addToTargets(plr)
+
+		local ent = entitylib.getEntity(plr)
+		if ent then
+			entitylib.Events.EntityUpdated:Fire(ent)
+		end
+	end
+
+	function CheatFlags:Flag(plr, flagtype, limit)
+		if not plr or plr == lplr or CheatFlags.Flagged[plr.UserId] or isOnFriendsList(plr) then
+			return
+		end
+
+		CheatFlags.Flags[plr.UserId] = CheatFlags.Flags[plr.UserId] or {}
+		local flags = CheatFlags.Flags[plr.UserId]
+		flags[flagtype] = (flags[flagtype] or 0) + 1
+
+		if flags[flagtype] > getLimit(limit) then
+			CheatFlags.Flagged[plr.UserId] = true
+			onCheatDetected(plr, flagtype)
+		end
+	end
+
+	function CheatFlags:Clear()
+		table.clear(CheatFlags.Flags)
+		table.clear(CheatFlags.Flagged)
+		table.clear(lastPositions)
+		table.clear(lastVelocities)
+		table.clear(spawnGrace)
+		table.clear(flightTicks)
+		table.clear(spinTicks)
+	end
+
+	local function clearPlayerState(plr)
+		local id = plr.UserId
+		CheatFlags.Flags[id] = nil
+		CheatFlags.Flagged[id] = nil
+		lastPositions[id] = nil
+		lastVelocities[id] = nil
+		spawnGrace[id] = nil
+		flightTicks[id] = nil
+		spinTicks[id] = nil
+	end
+
+	local function setSpawnGrace(plr)
+		spawnGrace[plr.UserId] = tick() + 4
+		lastPositions[plr.UserId] = nil
+		lastVelocities[plr.UserId] = nil
+		flightTicks[plr.UserId] = nil
+		spinTicks[plr.UserId] = nil
+	end
+
+	CheatDetector = vape.Categories.Utility:CreateModule({
+		Name = 'CheatDetector',
+		Function = function(callback)
+			if callback then
+				updateFilters()
+
+				CheatDetector:Clean(entitylib.Events.EntityAdded:Connect(function(ent)
+					if ent.Player then
+						setSpawnGrace(ent.Player)
+					end
+					updateFilters()
+				end))
+				CheatDetector:Clean(entitylib.Events.EntityRemoved:Connect(function(ent)
+					if ent.Player then
+						clearPlayerState(ent.Player)
+					end
+					updateFilters()
+				end))
+				CheatDetector:Clean(playersService.PlayerRemoving:Connect(clearPlayerState))
+
+				for _, plr in playersService:GetPlayers() do
+					if plr.Character then
+						setSpawnGrace(plr)
+					end
+					CheatDetector:Clean(plr.CharacterAdded:Connect(function()
+						setSpawnGrace(plr)
+					end))
+				end
+
+				repeat
+					updateFilters()
+					local localRoot = entitylib.isAlive and entitylib.character.RootPart
+					local localY = localRoot and localRoot.Position.Y or 0
+
+					for _, ent in entitylib.List do
+						if ent.Player and ent.Player ~= lplr and ent.Health > 0 and ent.RootPart and ent.Head and ent.Humanoid then
+							local plr = ent.Player
+							local id = plr.UserId
+							local root = ent.RootPart
+							local pos = root.Position
+							local vel = root.AssemblyLinearVelocity
+							local grace = spawnGrace[id] and tick() < spawnGrace[id]
+
+							if DetectNoclip.Enabled and not grace and not checkPoint(ent.Head.Position, overlap) then
+								CheatFlags:Flag(plr, 'noclip', 12)
+							end
+
+							if DetectTeleport.Enabled and not grace then
+								local last = lastPositions[id]
+								if last and (pos - last).Magnitude > 120 then
+									CheatFlags:Flag(plr, 'teleport', 3)
+								end
+								lastPositions[id] = pos
+							end
+
+							if DetectAccel.Enabled and not grace and not ent.Humanoid.SeatPart then
+								local lastVel = lastVelocities[id]
+								if lastVel and (vel - lastVel).Magnitude > 180 then
+									CheatFlags:Flag(plr, 'acceleration', 4)
+								end
+								lastVelocities[id] = vel
+							end
+
+							if DetectFlight.Enabled and not grace and not ent.Humanoid.SeatPart then
+								local state = ent.Humanoid:GetState()
+								local onGround = workspace:Raycast(pos, Vector3.new(0, -(root.Size.Y / 2 + ent.Humanoid.HipHeight + 3), 0), floorParams)
+								if not onGround and math.abs(vel.Y) < 8 and state ~= Enum.HumanoidStateType.Climbing and state ~= Enum.HumanoidStateType.Swimming then
+									flightTicks[id] = (flightTicks[id] or 0) + 1
+									if flightTicks[id] > 8 then
+										CheatFlags:Flag(plr, 'flight', 6)
+									end
+								else
+									flightTicks[id] = math.max(0, (flightTicks[id] or 0) - 1)
+								end
+							end
+
+							if DetectSpin.Enabled then
+								if root.AssemblyAngularVelocity.Magnitude > 35 then
+									spinTicks[id] = (spinTicks[id] or 0) + 1
+									if spinTicks[id] > 5 then
+										CheatFlags:Flag(plr, 'spinbot', 8)
+									end
+								else
+									spinTicks[id] = math.max(0, (spinTicks[id] or 0) - 1)
+								end
+							end
+
+							if DetectVoid.Enabled and (pos.Y < -10000 or (localRoot and math.abs(pos.Y - localY) > 50000)) then
+								CheatFlags:Flag(plr, 'void', 5)
+							end
+
+							if vape.CheatDetector and vape.CheatDetector.Scans then
+								for _, scan in vape.CheatDetector.Scans do
+									scan(ent, {
+										grace = grace,
+										Flag = function(flagtype, limit)
+											CheatFlags:Flag(plr, flagtype, limit)
+										end
+									})
+								end
+							end
+						end
+					end
+
+					task.wait(0.1)
+				until not CheatDetector.Enabled
+			else
+				CheatFlags:Clear()
+			end
+		end,
+		Tooltip = 'Detects cheaters using movement exploits and auto-targets them.'
+	})
+	AutoTarget = CheatDetector:CreateToggle({
+		Name = 'Auto target',
+		Default = true
+	})
+	DetectNoclip = CheatDetector:CreateToggle({
+		Name = 'Detect noclip',
+		Default = true
+	})
+	DetectTeleport = CheatDetector:CreateToggle({
+		Name = 'Detect teleport',
+		Default = true
+	})
+	DetectFlight = CheatDetector:CreateToggle({
+		Name = 'Detect flight',
+		Default = true
+	})
+	DetectSpin = CheatDetector:CreateToggle({
+		Name = 'Detect spinbot',
+		Default = true
+	})
+	DetectVoid = CheatDetector:CreateToggle({
+		Name = 'Detect void',
+		Default = true
+	})
+	DetectAccel = CheatDetector:CreateToggle({
+		Name = 'Detect acceleration',
+		Default = true
+	})
+	Sensitivity = CheatDetector:CreateSlider({
+		Name = 'Sensitivity',
+		Min = 1,
+		Max = 100,
+		Default = 50,
+		Suffix = '%'
+	})
+
+	vape.CheatDetector = {
+		Flag = function(plr, flagtype, limit)
+			CheatFlags:Flag(plr, flagtype, limit)
+		end,
+		Scans = {},
+		FilterExtras = {},
+		RegisterScan = function(fn)
+			table.insert(vape.CheatDetector.Scans, fn)
+		end,
+		RegisterFilterExtra = function(inst)
+			if inst then
+				table.insert(vape.CheatDetector.FilterExtras, inst)
+			end
+		end
+	}
+end)
+
+run(function()
 	local StateSpoofer
 	local State
 	local hook

@@ -2132,6 +2132,8 @@ run(function()
 	})
 end)
 	
+vape:Remove('CheatDetector')
+
 run(function()
 	local CheatDetector
 	local overlap = OverlapParams.new()
