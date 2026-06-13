@@ -1,0 +1,7 @@
+-- Decompiled from: Players.9qje7.PlayerScripts.PlayerScriptsLoader
+-- Class: LocalScript
+-- Place: Ugc (14104248348)
+
+-- Decompiled with Potassium's decompiler.
+
+require(script.Parent:WaitForChild("PlayerModule"));

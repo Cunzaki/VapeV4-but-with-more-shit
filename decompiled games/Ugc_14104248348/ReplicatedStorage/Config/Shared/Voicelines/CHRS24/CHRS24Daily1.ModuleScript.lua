@@ -1,0 +1,10 @@
+-- Decompiled from: ReplicatedStorage.Config.Shared.Voicelines.CHRS24.CHRS24Daily1
+-- Class: ModuleScript
+-- Place: Ugc (14104248348)
+
+-- Decompiled with Potassium's decompiler.
+
+return {
+    SoundID = "rbxassetid://100566787314246",
+    SRTData = "1\n00:00:00,000 --> 00:00:03,000\nSee ya tomorrow!\n\n"
+};
