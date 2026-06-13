@@ -18,6 +18,7 @@ local ONTAP_PLACES = {
 	[124888106410202] = true,
 	[138408235315132] = true,
 	[118277828653151] = true,
+	[14104248348] = true,
 }
 
 if game.GameId ~= ONTAP_GAME_ID and not ONTAP_PLACES[game.PlaceId] then
