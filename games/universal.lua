@@ -12930,6 +12930,9 @@ run(function()
 	aimRayParams.FilterType = Enum.RaycastFilterType.Exclude
 	local muzzleNames = {'Barrel', 'Muzzle', 'FirePoint', 'Gun', 'Handle', 'Tip', 'ShootPoint', 'Ray', 'Flash', 'Emitter'}
 	local hookState = {namecall = nil, rayNew = nil}
+	local internalRaycast = false
+	local lastCaptureAt = {}
+	local CAPTURE_COOLDOWN = 0.06
 	local MAX_SHOT_TRACERS = 64
 	local SHOT_POOL_SIZE = 24
 	local parseScratch = {vectors = {}, parts = {}, players = {}, userIds = {}, cframes = {}}
@@ -12941,8 +12944,6 @@ run(function()
 			or method == 'FindPartOnRay'
 			or method == 'FindPartOnRayWithIgnoreList'
 			or method == 'FindPartOnRayWithWhitelist'
-			or method == 'ScreenPointToRay'
-			or method == 'ViewportPointToRay'
 	end
 
 	local function isRayTarget(self)
@@ -12994,6 +12995,65 @@ run(function()
 		end
 	end
 
+	local function isWeaponRelatedScript(scriptObj)
+		if not scriptObj then
+			return false
+		end
+		local parent = scriptObj
+		while parent do
+			if parent:IsA('Tool') or parent:IsA('Backpack') then
+				return true
+			end
+			if parent:IsA('Model') and parent:FindFirstChildOfClass('Humanoid') then
+				return true
+			end
+			parent = parent.Parent
+		end
+		return false
+	end
+
+	local function canCaptureShot(plr)
+		if not plr then
+			return false
+		end
+		local now = tick()
+		local last = lastCaptureAt[plr]
+		if last and (now - last) < CAPTURE_COOLDOWN then
+			return false
+		end
+		lastCaptureAt[plr] = now
+		return true
+	end
+
+	local function performRaycast(origin, direction, ignore)
+		internalRaycast = true
+		aimRayParams.FilterDescendantsInstances = ignore or {}
+		local result
+		if hookState.namecall then
+			result = hookState.namecall(workspace, origin, direction, aimRayParams)
+		else
+			result = workspace:Raycast(origin, direction, aimRayParams)
+		end
+		internalRaycast = false
+		return result
+	end
+
+	local function raycastAim(origin, direction, ignore)
+		local dist = Length.Value
+		local dirMag = direction.Magnitude
+		if dirMag > 0.01 then
+			dist = math.min(dist, dirMag)
+			direction = direction.Unit
+		else
+			direction = direction.Unit
+		end
+		local result = performRaycast(origin, direction * dist, ignore)
+		if result then
+			return origin, result.Position
+		end
+		return origin, origin + direction * dist
+	end
+
 	local function getEquippedTool(char)
 		if not char then
 			return
@@ -13017,23 +13077,6 @@ run(function()
 		end
 		local head = char and char:FindFirstChild('Head')
 		return head
-	end
-
-	local function raycastAim(origin, direction, ignore)
-		local dist = Length.Value
-		local dirMag = direction.Magnitude
-		if dirMag > 0.01 then
-			dist = math.min(dist, dirMag)
-			direction = direction.Unit
-		else
-			direction = direction.Unit
-		end
-		aimRayParams.FilterDescendantsInstances = ignore or {}
-		local result = workspace:Raycast(origin, direction * dist, aimRayParams)
-		if result then
-			return origin, result.Position
-		end
-		return origin, origin + direction * dist
 	end
 
 	local function getLineColor(plr)
@@ -13213,7 +13256,7 @@ run(function()
 		end
 	end
 
-	local function recordAim(plr, origin, target, spawnShot)
+	local function recordAim(plr, origin, target, spawnShot, alreadySnapped)
 		if not (plr and origin and target) then
 			return
 		end
@@ -13227,13 +13270,18 @@ run(function()
 		if not shouldShowPlayer(plr) then
 			return
 		end
-		local resolvedOrigin, resolvedTarget = raycastAim(origin, delta, plr.Character and {plr.Character} or nil)
+		local resolvedOrigin, resolvedTarget
+		if alreadySnapped then
+			resolvedOrigin, resolvedTarget = origin, target
+		else
+			resolvedOrigin, resolvedTarget = raycastAim(origin, delta, plr.Character and {plr.Character} or nil)
+		end
 		aimSnapshots[plr] = {
 			Origin = resolvedOrigin,
 			Target = resolvedTarget,
 			Expire = tick() + Duration.Value
 		}
-		if spawnShot ~= false then
+		if spawnShot ~= false and canCaptureShot(plr) then
 			spawnShotTracer(resolvedOrigin, resolvedTarget, getLineColor(plr))
 		end
 	end
@@ -13391,12 +13439,45 @@ run(function()
 		end
 	end
 
-	local function captureRaycast(plr, origin, target)
+	local function captureRaycast(plr, origin, target, calling)
 		if not (plr and origin and target) then
 			return
 		end
+		if not (getRaycastContextPlayer() or isWeaponRelatedScript(calling)) then
+			return
+		end
 		setRaycastContext(plr, 0.25)
-		recordAim(plr, origin, target, true)
+		local ignore = plr.Character and {plr.Character} or nil
+		local resolvedOrigin, resolvedTarget = raycastAim(origin, target - origin, ignore)
+		recordAim(plr, resolvedOrigin, resolvedTarget, true, true)
+	end
+
+	local function remoteMayContainAim(remote, args, argCount)
+		local name = string.lower(remote.Name)
+		if string.find(name, 'fire', 1, true)
+			or string.find(name, 'shoot', 1, true)
+			or string.find(name, 'bullet', 1, true)
+			or string.find(name, 'gun', 1, true)
+			or string.find(name, 'shot', 1, true)
+			or string.find(name, 'hit', 1, true)
+			or string.find(name, 'ray', 1, true)
+			or string.find(name, 'aim', 1, true)
+			or string.find(name, 'projectile', 1, true)
+			or string.find(name, 'damage', 1, true)
+			or string.find(name, 'replic', 1, true) then
+			return true
+		end
+		for i = 1, math.min(argCount, 4) do
+			local value = args[i]
+			local valueType = typeof(value)
+			if valueType == 'Vector3' or valueType == 'CFrame' or valueType == 'Ray' then
+				return true
+			end
+			if valueType == 'Instance' and (value:IsA('Player') or value:IsA('BasePart')) then
+				return true
+			end
+		end
+		return false
 	end
 
 	local function hookRemote(remote)
@@ -13405,7 +13486,11 @@ run(function()
 		end
 		hookedRemotes[remote] = true
 		AimViewer:Clean(remote.OnClientEvent:Connect(function(...)
-			local shooter, origin, target = parseAimFromArgs({...})
+			local args = {...}
+			if not remoteMayContainAim(remote, args, #args) then
+				return
+			end
+			local shooter, origin, target = parseAimFromArgs(args)
 			if shooter then
 				setRaycastContext(shooter, 0.35)
 			end
@@ -13413,7 +13498,7 @@ run(function()
 				recordAim(shooter, origin, target, true)
 			elseif shooter and origin then
 				local resolvedOrigin, resolvedTarget = raycastAim(origin, gameCamera.CFrame.LookVector, shooter.Character and {shooter.Character} or nil)
-				recordAim(shooter, resolvedOrigin, resolvedTarget, true)
+				recordAim(shooter, resolvedOrigin, resolvedTarget, true, true)
 			end
 		end))
 	end
@@ -13434,6 +13519,9 @@ run(function()
 		local oldNamecall
 		local suc = pcall(function()
 			oldNamecall = hookmetamethod(game, '__namecall', function(self, ...)
+				if internalRaycast then
+					return oldNamecall(self, ...)
+				end
 				local method = getnamecallmethod()
 				if not checkcaller() and isRayMethod(method) and isRayTarget(self) then
 					local args = {...}
@@ -13446,7 +13534,7 @@ run(function()
 						end
 						local plr = resolveAimPlayer(calling, partHint)
 						if plr and (plr ~= lplr or ShowSelf.Enabled) then
-							captureRaycast(plr, origin, target)
+							captureRaycast(plr, origin, target, calling)
 						end
 					end
 				end
@@ -13460,11 +13548,13 @@ run(function()
 		if hookfunction and Ray and Ray.new and not hookState.rayNew then
 			local oldRayNew
 			oldRayNew = hookfunction(Ray.new, function(origin, direction, ...)
-				if not checkcaller() then
+				if not internalRaycast and not checkcaller() then
 					local calling = getcallingscript and getcallingscript()
-					local plr = resolveAimPlayer(calling)
-					if plr and (plr ~= lplr or ShowSelf.Enabled) and typeof(origin) == 'Vector3' and typeof(direction) == 'Vector3' then
-						captureRaycast(plr, origin, origin + direction)
+					if getRaycastContextPlayer() or isWeaponRelatedScript(calling) then
+						local plr = resolveAimPlayer(calling)
+						if plr and (plr ~= lplr or ShowSelf.Enabled) and typeof(origin) == 'Vector3' and typeof(direction) == 'Vector3' then
+							captureRaycast(plr, origin, origin + direction, calling)
+						end
 					end
 				end
 				return oldRayNew(origin, direction, ...)
@@ -13590,6 +13680,7 @@ run(function()
 		end
 		table.clear(aimSnapshots)
 		table.clear(hookedRemotes)
+		table.clear(lastCaptureAt)
 		raycastContextPlayer = nil
 		raycastContextExpire = 0
 		if aimFolder then
