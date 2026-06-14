@@ -4685,37 +4685,152 @@ run(function()
 	local TargetPart
 	local Expand
 	local Visualize
-	local modified = {}
+	local hitboxes = {}
+	
+	local function isLocalEntity(ent)
+		if ent.Player == lplr then
+			return true
+		end
+		if entitylib.character and ent.Character == entitylib.character.Character then
+			return true
+		end
+		return false
+	end
+	
+	local function shouldTarget(ent)
+		if isLocalEntity(ent) then
+			return false
+		end
+		if not ent.Targetable then
+			return false
+		end
+		if not Targets.Players.Enabled and ent.Player then
+			return false
+		end
+		if not Targets.NPCs.Enabled and ent.NPC then
+			return false
+		end
+		return true
+	end
+	
+	local function removeHitbox(ent)
+		local data = hitboxes[ent]
+		if not data then
+			return
+		end
+		if data.Part then
+			pcall(function()
+				data.Part:Destroy()
+			end)
+		end
+		hitboxes[ent] = nil
+	end
+	
+	local function getExpandedSize(sourcePart)
+		local expand = Expand.Value
+		return sourcePart.Size + Vector3.new(expand, expand, expand)
+	end
+	
+	local function updateHitboxVisual(data)
+		if not data or not data.Part then
+			return
+		end
+		if Visualize.Enabled then
+			data.Part.Transparency = 0.5
+			data.Part.Color = Color3.fromRGB(255, 85, 85)
+			data.Part.Material = Enum.Material.ForceField
+		else
+			data.Part.Transparency = 1
+		end
+	end
+	
+	local function createHitbox(ent)
+		removeHitbox(ent)
+		if not shouldTarget(ent) then
+			return
+		end
+		if not ent.Character or not ent.Character.Parent then
+			return
+		end
+		
+		local sourcePart = ent[TargetPart.Value]
+		if not sourcePart or not sourcePart.Parent then
+			return
+		end
+		
+		local hitbox = Instance.new('Part')
+		hitbox.Name = 'VapeExpandedHitbox'
+		hitbox.Size = getExpandedSize(sourcePart)
+		hitbox.CFrame = sourcePart.CFrame
+		hitbox.CanCollide = false
+		hitbox.CanTouch = true
+		hitbox.CanQuery = true
+		hitbox.Massless = true
+		hitbox.Anchored = false
+		hitbox.CastShadow = false
+		hitbox.Parent = ent.Character
+		
+		local weld = Instance.new('Weld')
+		weld.Part0 = sourcePart
+		weld.Part1 = hitbox
+		weld.C0 = CFrame.new()
+		weld.C1 = CFrame.new()
+		weld.Parent = hitbox
+		
+		hitboxes[ent] = {
+			Part = hitbox,
+			Source = sourcePart
+		}
+		updateHitboxVisual(hitboxes[ent])
+	end
+	
+	local function refreshAllHitboxes()
+		for _, ent in entitylib.List do
+			if shouldTarget(ent) then
+				local data = hitboxes[ent]
+				local sourcePart = ent[TargetPart.Value]
+				if not sourcePart or not sourcePart.Parent then
+					removeHitbox(ent)
+					continue
+				end
+				if not data or not data.Part or not data.Part.Parent or data.Source ~= sourcePart then
+					createHitbox(ent)
+					continue
+				end
+				local expandedSize = getExpandedSize(sourcePart)
+				if data.Part.Size ~= expandedSize then
+					data.Part.Size = expandedSize
+				end
+				updateHitboxVisual(data)
+			else
+				removeHitbox(ent)
+			end
+		end
+		for ent in pairs(hitboxes) do
+			if not table.find(entitylib.List, ent) then
+				removeHitbox(ent)
+			end
+		end
+	end
+	
+	local function clearAllHitboxes()
+		for ent in pairs(hitboxes) do
+			removeHitbox(ent)
+		end
+	end
 	
 	HitBoxes = vape.Categories.Blatant:CreateModule({
 		Name = 'HitBoxes',
 		Function = function(callback)
 			if callback then
-				repeat
-					for _, v in entitylib.List do
-						if v.Targetable then
-							if not Targets.Players.Enabled and v.Player then continue end
-							if not Targets.NPCs.Enabled and v.NPC then continue end
-							local part = v[TargetPart.Value]
-							if not modified[part] then
-								modified[part] = {Size = part.Size, Transparency = part.Transparency}
-							end
-							part.Size = modified[part].Size + Vector3.new(Expand.Value, Expand.Value, Expand.Value)
-							if Visualize.Enabled then
-								part.Transparency = 0.5
-							else
-								part.Transparency = modified[part].Transparency
-							end
-						end
-					end
-					task.wait()
-				until not HitBoxes.Enabled
-			else
-				for i, v in modified do
-					i.Size = v.Size
-					i.Transparency = v.Transparency
+				for _, ent in entitylib.List do
+					createHitbox(ent)
 				end
-				table.clear(modified)
+				HitBoxes:Clean(entitylib.Events.EntityAdded:Connect(createHitbox))
+				HitBoxes:Clean(entitylib.Events.EntityRemoved:Connect(removeHitbox))
+				HitBoxes:Clean(runService.RenderStepped:Connect(refreshAllHitboxes))
+			else
+				clearAllHitboxes()
 			end
 		end,
 		Tooltip = 'Expands entities hitboxes'
@@ -4723,24 +4838,40 @@ run(function()
 	Targets = HitBoxes:CreateTargets({Players = true})
 	TargetPart = HitBoxes:CreateDropdown({
 		Name = 'Part',
-		List = {'RootPart', 'Head'}
+		List = {'RootPart', 'Head'},
+		Function = function()
+			if HitBoxes.Enabled then
+				clearAllHitboxes()
+				for _, ent in entitylib.List do
+					createHitbox(ent)
+				end
+			end
+		end
 	})
 	Expand = HitBoxes:CreateSlider({
 		Name = 'Expand amount',
 		Min = 0,
 		Max = 5,
 		Decimal = 10,
+		Function = function(val)
+			if not HitBoxes.Enabled then
+				return
+			end
+			for _, data in pairs(hitboxes) do
+				if data.Part and data.Source and data.Source.Parent then
+					data.Part.Size = data.Source.Size + Vector3.new(val, val, val)
+				end
+			end
+		end,
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end
 	})
 	Visualize = HitBoxes:CreateToggle({
 		Name = 'Visualize',
-		Function = function(callback)
-			if not callback then
-				for i, v in modified do
-					i.Transparency = v.Transparency
-				end
+		Function = function()
+			for _, data in pairs(hitboxes) do
+				updateHitboxVisual(data)
 			end
 		end,
 		Tooltip = 'Shows the expanded hitboxes.'
