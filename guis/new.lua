@@ -5374,7 +5374,12 @@ end
 
 function mainapi:Load(skipgui, profile)
 	if not skipgui then
-		self.GUIColor:SetValue(nil, nil, nil, 4)
+		if self.ThreadFix then
+			setthreadidentity(8)
+		end
+		pcall(function()
+			self.GUIColor:SetValue(nil, nil, nil, 4)
+		end)
 	end
 	local guidata = {}
 	local savecheck = true
@@ -5467,7 +5472,9 @@ function mainapi:Load(skipgui, profile)
 				if skipgui then
 					if self.ToggleNotifications.Enabled then self:CreateNotification('Module Toggled', i.."<font color='#FFFFFF'> has been </font>"..(v.Enabled and "<font color='#5AFF5A'>Enabled</font>" or "<font color='#FF5A5A'>Disabled</font>").."<font color='#FFFFFF'>!</font>", 0.75) end
 				end
-				object:Toggle(true)
+				pcall(function()
+					object:Toggle(true)
+				end)
 			end
 			object:SetBind(v.Bind)
 			object.Object.Bind.Visible = #v.Bind > 0

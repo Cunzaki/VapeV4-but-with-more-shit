@@ -24,7 +24,28 @@ if not vape then
 end
 
 local entitylib = vape.Libraries.entity
-local targetinfo = vape.Libraries.targetinfo
+local targetinfo = vape.Libraries.targetinfo or {Targets = {}}
+
+local packetsHooked = false
+local actionDiscoveryBound = false
+
+local function withThread(func)
+	if vape.ThreadFix and setthreadidentity then
+		setthreadidentity(8)
+	end
+	return func()
+end
+
+local function safeSetOption(opt, ...)
+	if not opt or not opt.SetValue then
+		return
+	end
+	pcall(function()
+		withThread(function()
+			opt:SetValue(...)
+		end)
+	end)
+end
 
 -- This file is loaded directly by game.PlaceId; always run when executed.
 
@@ -177,17 +198,29 @@ local function hookPacket(name, packet, templateKey)
 end
 
 local function installPacketHooks()
+	if packetsHooked then
+		return true
+	end
 	if not initGameModules() then
 		return false
 	end
 
-	hookPacket('_x2e2c62e0acfc88ae', Packets._x2e2c62e0acfc88ae, 'melee')
-	hookPacket('_x77a8b8d28b943359', Packets._x77a8b8d28b943359, 'gun')
-	hookPacket('_xefd6d8e74acc7f88', Packets._xefd6d8e74acc7f88, 'grapple')
-	hookPacket('_xdb2548bded1dd8e3', Packets._xdb2548bded1dd8e3, 'heat')
+	pcall(function()
+		hookPacket('_x2e2c62e0acfc88ae', Packets._x2e2c62e0acfc88ae, 'melee')
+		hookPacket('_x77a8b8d28b943359', Packets._x77a8b8d28b943359, 'gun')
+		hookPacket('_xefd6d8e74acc7f88', Packets._xefd6d8e74acc7f88, 'grapple')
+		hookPacket('_xdb2548bded1dd8e3', Packets._xdb2548bded1dd8e3, 'heat')
 
-	for _, id in NO_ARG_PACKETS do
-		hookPacket(id, Packets[id])
+		for _, id in NO_ARG_PACKETS do
+			hookPacket(id, Packets[id])
+		end
+	end)
+
+	packetsHooked = true
+
+	if not actionDiscoveryBound then
+		actionDiscoveryBound = true
+		pcall(bindActionDiscovery)
 	end
 
 	return true
@@ -439,35 +472,43 @@ end
 
 local function configureSilentAim()
 	local silentAim = vape.Modules.SilentAim
-	if not silentAim then
+	if not silentAim or not silentAim.Options then
+		notif('REDLINER', 'Silent Aim module not found yet.', 5, 'alert')
 		return
 	end
 
-	for _, opt in silentAim.Options do
-		if opt.Name == 'Method' and opt.SetValue then
-			opt:SetValue('Raycast')
-		elseif opt.Name == 'Raycast Type' and opt.SetValue then
-			opt:SetValue('Include')
-		elseif opt.Name == 'Range' and opt.SetValue then
-			opt:SetValue(math.max(opt.Value or 150, 250))
-		end
+	local opts = silentAim.Options
+	safeSetOption(opts.Method, 'Raycast')
+	safeSetOption(opts['Raycast Type'], 'Include')
+	if opts.Range then
+		safeSetOption(opts.Range, math.max(opts.Range.Value or 150, 250))
 	end
 
-	notif('REDLINER', 'Silent Aim: Method=Raycast, Raycast Type=Include. Enable Wallbang for Monarch.', 8)
+	notif('REDLINER', 'Silent Aim set to Raycast + Include. Enable Wallbang for Monarch.', 8)
 end
 
-task.defer(function()
-	local start = tick()
-	repeat
-		task.wait(0.1)
-	until vape.Modules.SilentAim or tick() - start > 12
-	configureSilentAim()
-end)
-
-run(function()
-	installPacketHooks()
-	task.defer(bindActionDiscovery)
-end)
+local function startModuleLoop(module, fn, interval)
+	local token = {}
+	module:Clean(function()
+		token.dead = true
+	end)
+	task.spawn(function()
+		local warned = false
+		while module.Enabled and not token.dead do
+			if not installPacketHooks() then
+				if not warned then
+					warned = true
+					notif(module.Name, 'Waiting for REDLINER game modules...', 4)
+				end
+				task.wait(0.5)
+			else
+				warned = false
+				pcall(fn)
+				task.wait(interval or 0.03)
+			end
+		end
+	end)
+end
 
 run(function()
 	minigames:CreateModule({
@@ -491,36 +532,31 @@ run(function()
 	MeleeAura = minigames:CreateModule({
 		Name = 'Melee Aura',
 		Function = function(callback)
-			if callback then
-				if not installPacketHooks() then
-					notif('Melee Aura', 'Packet system not ready.', 5, 'alert')
-					MeleeAura:Toggle(true)
+			if not callback then
+				return
+			end
+			startModuleLoop(MeleeAura, function()
+				if not entitylib.isAlive then
 					return
 				end
+				local root = entitylib.character.RootPart
+				local hurtboxes = getEnemyHurtboxes(Range.Value, root.Position)
 
-				repeat
-					if entitylib.isAlive then
-						local root = entitylib.character.RootPart
-						local hurtboxes = getEnemyHurtboxes(Range.Value, root.Position)
+				if #hurtboxes > 0 and attackDelay < tick() then
+					attackDelay = tick() + (1 / CPS.GetRandomValue())
+					local target = hurtboxes[1]
 
-						if #hurtboxes > 0 and attackDelay < tick() then
-							attackDelay = tick() + (1 / CPS.GetRandomValue())
-							local target = hurtboxes[1]
-
-							if FaceTarget.Enabled then
-								local flat = Vector3.new(target.Part.Position.X, root.Position.Y, target.Part.Position.Z)
-								root.CFrame = CFrame.lookAt(root.Position, flat)
-							end
-
-							fireMelee(target.Part, target.Part.Position)
-							if target.Player then
-								targetinfo.Targets[target.Player] = tick() + 1
-							end
-						end
+					if FaceTarget.Enabled then
+						local flat = Vector3.new(target.Part.Position.X, root.Position.Y, target.Part.Position.Z)
+						root.CFrame = CFrame.lookAt(root.Position, flat)
 					end
-					task.wait()
-				until not MeleeAura.Enabled
-			end
+
+					fireMelee(target.Part, target.Part.Position)
+					if target.Player and targetinfo.Targets then
+						targetinfo.Targets[target.Player] = tick() + 1
+					end
+				end
+			end, 0)
 		end,
 		Tooltip = 'Packet-based sword aura for REDLINER. Slash once manually first so the script learns melee packet args.',
 	})
@@ -555,46 +591,41 @@ run(function()
 	AutoParry = minigames:CreateModule({
 		Name = 'Auto Parry',
 		Function = function(callback)
-			if callback then
-				if not installPacketHooks() then
-					notif('Auto Parry', 'Packet system not ready.', 5, 'alert')
-					AutoParry:Toggle(true)
+			if not callback then
+				return
+			end
+			startModuleLoop(AutoParry, function()
+				if not entitylib.isAlive or lastParry + Cooldown.Value >= tick() then
 					return
 				end
+				local root = entitylib.character.RootPart
+				local threatened = false
 
-				repeat
-					if entitylib.isAlive and lastParry + Cooldown.Value < tick() then
-						local root = entitylib.character.RootPart
-						local threatened = false
-
-						if GunGlint.Enabled then
-							for _, plr in playersService:GetPlayers() do
-								if plr ~= lplr and plr.Character and hasGlint(plr.Character) then
-									local enemyRoot = getRoot(plr)
-									if enemyRoot and (enemyRoot.Position - root.Position).Magnitude <= Range.Value then
-										threatened = true
-										break
-									end
-								end
+				if GunGlint.Enabled then
+					for _, plr in playersService:GetPlayers() do
+						if plr ~= lplr and plr.Character and hasGlint(plr.Character) then
+							local enemyRoot = getRoot(plr)
+							if enemyRoot and (enemyRoot.Position - root.Position).Magnitude <= Range.Value then
+								threatened = true
+								break
 							end
-						end
-
-						if not threatened and MeleeThreat.Enabled then
-							for _, plr in playersService:GetPlayers() do
-								if plr ~= lplr and plr.Character and isMeleeThreat(plr.Character, Range.Value) then
-									threatened = true
-									break
-								end
-							end
-						end
-
-						if threatened and fireParry() then
-							lastParry = tick()
 						end
 					end
-					task.wait(0.03)
-				until not AutoParry.Enabled
-			end
+				end
+
+				if not threatened and MeleeThreat.Enabled then
+					for _, plr in playersService:GetPlayers() do
+						if plr ~= lplr and plr.Character and isMeleeThreat(plr.Character, Range.Value) then
+							threatened = true
+							break
+						end
+					end
+				end
+
+				if threatened and fireParry() then
+					lastParry = tick()
+				end
+			end, 0.03)
 		end,
 		Tooltip = 'Parries gun glints and nearby melee threats. Press F once manually to learn the parry packet ID.',
 	})
@@ -608,8 +639,8 @@ run(function()
 			return val == 1 and 'stud' or 'studs'
 		end,
 	})
-	GunGlint = AutoParry:CreateToggle({Name = 'Gun glint', Default = true})
-	MeleeThreat = AutoParry:CreateToggle({Name = 'Melee threat', Default = true})
+	GunGlint = AutoParry:CreateToggle({Name = 'Gun glint'})
+	MeleeThreat = AutoParry:CreateToggle({Name = 'Melee threat'})
 	Cooldown = AutoParry:CreateSlider({
 		Name = 'Cooldown',
 		Min = 0.05,
@@ -629,18 +660,12 @@ run(function()
 	InfiniteHeat = minigames:CreateModule({
 		Name = 'Infinite Heat',
 		Function = function(callback)
-			if callback then
-				if not installPacketHooks() then
-					notif('Infinite Heat', 'Packet system not ready.', 5, 'alert')
-					InfiniteHeat:Toggle(true)
-					return
-				end
-
-				repeat
-					setHeat(HeatValue.Value)
-					task.wait(0.25)
-				until not InfiniteHeat.Enabled
+			if not callback then
+				return
 			end
+			startModuleLoop(InfiniteHeat, function()
+				setHeat(HeatValue.Value)
+			end, 0.25)
 		end,
 		Tooltip = 'Spam heat packet (_xdb2548bded1dd8e3). Bullets cost heat (H) in REDLINER.',
 	})
@@ -661,20 +686,14 @@ run(function()
 	NoDashCooldown = minigames:CreateModule({
 		Name = 'No Dash CD',
 		Function = function(callback)
-			if callback then
-				if not installPacketHooks() then
-					notif('No Dash CD', 'Packet system not ready.', 5, 'alert')
-					NoDashCooldown:Toggle(true)
-					return
-				end
-
-				repeat
-					if entitylib.isAlive then
-						fireDash()
-					end
-					task.wait(DashRate.Value)
-				until not NoDashCooldown.Enabled
+			if not callback then
+				return
 			end
+			startModuleLoop(NoDashCooldown, function()
+				if entitylib.isAlive then
+					fireDash()
+				end
+			end, DashRate.Value)
 		end,
 		Tooltip = 'Spams dash packet. Dash once manually (Shift) to learn the correct packet ID.',
 	})
@@ -699,28 +718,23 @@ run(function()
 	InfiniteGrapple = minigames:CreateModule({
 		Name = 'Infinite Grapple',
 		Function = function(callback)
-			if callback then
-				if not installPacketHooks() then
-					notif('Infinite Grapple', 'Packet system not ready.', 5, 'alert')
-					InfiniteGrapple:Toggle(true)
+			if not callback then
+				return
+			end
+			startModuleLoop(InfiniteGrapple, function()
+				if not entitylib.isAlive then
 					return
 				end
-
-				repeat
-					if entitylib.isAlive then
-						local root = entitylib.character.RootPart
-						local look = gameCamera.CFrame.LookVector
-						local params = getMapRayParams()
-						local hit = workspaceService:Raycast(root.Position, look * Range.Value, params)
-						if hit then
-							fireGrapple(hit.Position)
-						else
-							fireGrapple(root.Position + look * Range.Value)
-						end
-					end
-					task.wait(Rate.Value)
-				until not InfiniteGrapple.Enabled
-			end
+				local root = entitylib.character.RootPart
+				local look = gameCamera.CFrame.LookVector
+				local params = getMapRayParams()
+				local hit = workspaceService:Raycast(root.Position, look * Range.Value, params)
+				if hit then
+					fireGrapple(hit.Position)
+				else
+					fireGrapple(root.Position + look * Range.Value)
+				end
+			end, Rate.Value)
 		end,
 		Tooltip = 'Spams grapple packet toward camera look. Grapple once manually (E) to learn packet args.',
 	})
@@ -754,23 +768,18 @@ run(function()
 	InstantGun = minigames:CreateModule({
 		Name = 'Instant Gun',
 		Function = function(callback)
-			if callback then
-				if not installPacketHooks() then
-					notif('Instant Gun', 'Packet system not ready.', 5, 'alert')
-					InstantGun:Toggle(true)
+			if not callback then
+				return
+			end
+			startModuleLoop(InstantGun, function()
+				if not entitylib.isAlive then
 					return
 				end
-
-				repeat
-					if entitylib.isAlive then
-						local ent = getNearestEnemyEntity(Range.Value)
-						if ent and ent.RootPart then
-							fireGunAt(ent.Head and ent.Head.Position or ent.RootPart.Position)
-						end
-					end
-					task.wait(Rate.Value)
-				until not InstantGun.Enabled
-			end
+				local ent = getNearestEnemyEntity(Range.Value)
+				if ent and ent.RootPart then
+					fireGunAt(ent.Head and ent.Head.Position or ent.RootPart.Position)
+				end
+			end, Rate.Value)
 		end,
 		Tooltip = 'Fires gun packet at nearest enemy. Draw/shoot once manually (Q) to capture gun packet args. Pair with universal Silent Aim for best results.',
 	})
@@ -803,17 +812,26 @@ run(function()
 	SpeedBoost = minigames:CreateModule({
 		Name = 'Speed Boost',
 		Function = function(callback)
-			if callback then
-				repeat
-					if entitylib.isAlive then
-						local hum = entitylib.character.Humanoid
-						if hum then
-							hum.WalkSpeed = Speed.Value
-						end
-					end
-					task.wait(0.2)
-				until not SpeedBoost.Enabled
+			if not callback then
+				return
 			end
+			local token = {}
+			SpeedBoost:Clean(function()
+				token.dead = true
+			end)
+			task.spawn(function()
+				while SpeedBoost.Enabled and not token.dead do
+					pcall(function()
+						if entitylib.isAlive then
+							local hum = entitylib.character.Humanoid
+							if hum then
+								hum.WalkSpeed = Speed.Value
+							end
+						end
+					end)
+					task.wait(0.2)
+				end
+			end)
 		end,
 		Tooltip = 'Local walkspeed boost between dashes.',
 	})
@@ -843,42 +861,47 @@ run(function()
 		Name = 'Hurtbox ESP',
 		Function = function(callback)
 			if callback then
-				repeat
-					local seen = {}
-					for _, part in getHurtboxes() do
-						local owner = getCharFromHurtbox(part)
-						if owner and isEnemyModel(owner) then
-							seen[owner] = true
-							if not highlights[owner] then
-								local highlight = Instance.new('Highlight')
-								highlight.FillTransparency = 0.7
-								highlight.OutlineTransparency = 0
-								highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-								highlight.Parent = owner
-								highlights[owner] = highlight
+				local token = {}
+				HurtboxESP:Clean(function()
+					token.dead = true
+				end)
+				task.spawn(function()
+					while HurtboxESP.Enabled and not token.dead do
+						pcall(function()
+							local seen = {}
+							for _, part in getHurtboxes() do
+								local owner = getCharFromHurtbox(part)
+								if owner and isEnemyModel(owner) then
+									seen[owner] = true
+									if not highlights[owner] then
+										local highlight = Instance.new('Highlight')
+										highlight.FillTransparency = 0.7
+										highlight.OutlineTransparency = 0
+										highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+										highlight.Parent = owner
+										highlights[owner] = highlight
+									end
+								end
 							end
-						end
-					end
 
-					for model in highlights do
-						if not seen[model] or not model.Parent then
-							pcall(function()
-								highlights[model]:Destroy()
-							end)
-							highlights[model] = nil
-						end
+							for model in highlights do
+								if not seen[model] or not model.Parent then
+									pcall(function()
+										highlights[model]:Destroy()
+									end)
+									highlights[model] = nil
+								end
+							end
+						end)
+						task.wait(0.5)
 					end
-
-					task.wait(0.5)
-				until not HurtboxESP.Enabled
+				end)
 			else
 				clearHighlights()
 			end
 		end,
 		Tooltip = 'Highlights enemy Hurtbox owners (CollectionService tag "Hurtbox").',
 	})
-
-	vape:Clean(clearHighlights)
 end)
 
 run(function()
@@ -888,20 +911,20 @@ run(function()
 	PacketLogger = minigames:CreateModule({
 		Name = 'Packet Logger',
 		Function = function(callback)
-			if callback then
-				notif('Packet Logger', 'Use melee/parry/dash/grapple/gun once manually. Check output.', 6)
-				repeat
-					if #packetLog > 0 and tick() - lastNotify > 3 then
-						local entry = packetLog[1]
-						print('[REDLINER Packet]', entry.name, 'args:', entry.n)
-						for i = 1, math.min(entry.n, 8) do
-							print('  ', i, typeof(entry.args[i]), entry.args[i])
-						end
-						lastNotify = tick()
-					end
-					task.wait(0.2)
-				until not PacketLogger.Enabled
+			if not callback then
+				return
 			end
+			notif('Packet Logger', 'Use melee/parry/dash/grapple/gun once manually. Check output.', 6)
+			startModuleLoop(PacketLogger, function()
+				if #packetLog > 0 and tick() - lastNotify > 3 then
+					local entry = packetLog[1]
+					print('[REDLINER Packet]', entry.name, 'args:', entry.n)
+					for i = 1, math.min(entry.n, 8) do
+						print('  ', i, typeof(entry.args[i]), entry.args[i])
+					end
+					lastNotify = tick()
+				end
+			end, 0.2)
 		end,
 		Tooltip = 'Logs outgoing packet fires to console. Use to confirm parry/dash/melee packet IDs.',
 	})
@@ -929,14 +952,19 @@ run(function()
 end)
 
 run(function()
-	local ctx
-	pcall(function()
-		if PlaceContext or initGameModules() and PlaceContext then
-			ctx = PlaceContext.get(true)
-		end
+	task.defer(function()
+		local start = tick()
+		repeat
+			task.wait(0.25)
+		until vape.Loaded or tick() - start > 15
+		local ctx
+		pcall(function()
+			if initGameModules() and PlaceContext then
+				ctx = PlaceContext.get(true)
+			end
+		end)
+		local mode = ctx and ctx.effective_mode or 'unknown'
+		local placeType = ctx and ctx.effective_place_type or tostring(game.PlaceId)
+		notif('REDLINER', 'Loaded ' .. placeType .. ' (' .. mode .. '). Minigames modules ready.', 5)
 	end)
-
-	local mode = ctx and ctx.effective_mode or 'unknown'
-	local placeType = ctx and ctx.effective_place_type or tostring(game.PlaceId)
-	notif('REDLINER', 'Loaded ' .. placeType .. ' (' .. mode .. '). Minigames modules ready.', 5)
 end)
