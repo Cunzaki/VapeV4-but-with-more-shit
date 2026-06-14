@@ -8,10 +8,14 @@ end
 local vape
 local loadstring = function(...)
 	local res, err = loadstring(...)
-	if err and vape then
-		vape:CreateNotification('Katware', 'Failed to load : '..err, 30, 'alert')
+	if err then
+		if vape then
+			vape:CreateNotification('Katware', 'Failed to load : '..err, 30, 'alert')
+		else
+			warn('[Vape] Failed to load:', err)
+		end
 	end
-	return res
+	return res, err
 end
 local queue_on_teleport = queue_on_teleport or function() end
 local isfile = isfile or function(file)
@@ -41,9 +45,34 @@ local function downloadFile(path, func)
 	return (func or readfile)(path)
 end
 
+local function runGameScript(source, name)
+	local chunk, err = loadstring(source, name)
+	if not chunk then
+		warn('[Vape] Failed to compile '..name..': '..tostring(err))
+		return false
+	end
+	local ok, runErr = pcall(chunk)
+	if not ok then
+		warn('[Vape] Failed to run '..name..': '..tostring(runErr))
+		if vape and vape.CreateNotification then
+			vape:CreateNotification('Vape', 'Failed to run '..name..': '..tostring(runErr), 15, 'alert')
+		end
+		return false
+	end
+	return true
+end
+
 local function finishLoading()
 	vape.Init = nil
-	vape:Load()
+	local loadOk, loadErr = pcall(function()
+		vape:Load()
+	end)
+	if not loadOk then
+		warn('[Vape] Load failed:', loadErr)
+		if vape.CreateNotification then
+			vape:CreateNotification('Vape', 'Load failed: '..tostring(loadErr), 15, 'alert')
+		end
+	end
 	task.spawn(function()
 		repeat
 			vape:Save()
@@ -90,20 +119,25 @@ local gui = readfile('newvape/profiles/gui.txt')
 if not isfolder('newvape/assets/'..gui) then
 	makefolder('newvape/assets/'..gui)
 end
-vape = loadstring(downloadFile('newvape/guis/'..gui..'.lua'), 'gui')()
+local guiChunk, guiErr = loadstring(downloadFile('newvape/guis/'..gui..'.lua'), 'gui')
+if not guiChunk then
+	error('Failed to load GUI: '..tostring(guiErr))
+end
+vape = guiChunk()
 shared.vape = vape
 
 if not shared.VapeIndependent then
-	loadstring(downloadFile('newvape/games/universal.lua'), 'universal')()
-	if isfile('newvape/games/'..game.PlaceId..'.lua') then
-		loadstring(readfile('newvape/games/'..game.PlaceId..'.lua'), tostring(game.PlaceId))(...)
+	runGameScript(downloadFile('newvape/games/universal.lua'), 'universal')
+	local placeScript = 'newvape/games/'..game.PlaceId..'.lua'
+	if isfile(placeScript) then
+		runGameScript(readfile(placeScript), tostring(game.PlaceId))
 	else
 		if not shared.VapeDeveloper then
 			local suc, res = pcall(function()
 				return game:HttpGet('https://raw.githubusercontent.com/Cunzaki/VapeV4-but-with-more-shit/'..readfile('newvape/profiles/commit.txt')..'/games/'..game.PlaceId..'.lua', true)
 			end)
 			if suc and res ~= '404: Not Found' then
-				loadstring(downloadFile('newvape/games/'..game.PlaceId..'.lua'), tostring(game.PlaceId))(...)
+				runGameScript(downloadFile(placeScript), tostring(game.PlaceId))
 			end
 		end
 	end

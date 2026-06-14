@@ -518,7 +518,7 @@ run(function()
 				configureSilentAim()
 			end
 		end,
-		Tooltip = 'REDLINER guns use workspace:Raycast with FilterType.Include on Map.Main. Set Method to Raycast + Include. Slash attacks ignore raycasts — use Melee Aura. Enable Wallbang for Monarch wallbangs.',
+		Tooltip = 'REDLINER guns use workspace:Raycast with FilterType.Include on Map.Main. Set Method to Raycast + Include. Slash attacks ignore raycasts, use Melee Aura. Enable Wallbang for Monarch wallbangs.',
 	})
 end)
 
@@ -906,6 +906,7 @@ end)
 
 run(function()
 	local PacketLogger
+	local PacketTemplates
 	local lastNotify = 0
 
 	PacketLogger = minigames:CreateModule({
@@ -929,23 +930,29 @@ run(function()
 		Tooltip = 'Logs outgoing packet fires to console. Use to confirm parry/dash/melee packet IDs.',
 	})
 
-	minigames:CreateModule({
+	PacketTemplates = minigames:CreateModule({
 		Name = 'Packet Templates',
 		Function = function(callback)
-			if callback then
-				local lines = {}
-				for key, template in packetTemplates do
-					if template then
-						table.insert(lines, key .. ': ' .. (typeof(template) == 'string' and template or template.n .. ' args'))
-					end
-				end
-				if #lines == 0 then
-					notif('Packet Templates', 'No templates captured yet. Use actions manually first.', 6, 'alert')
-				else
-					notif('Packet Templates', table.concat(lines, ' | '), 10)
-					print('[REDLINER Templates]', packetTemplates)
+			if not callback then
+				return
+			end
+			local lines = {}
+			for key, template in packetTemplates do
+				if template then
+					table.insert(lines, key .. ': ' .. (typeof(template) == 'string' and template or template.n .. ' args'))
 				end
 			end
+			if #lines == 0 then
+				notif('Packet Templates', 'No templates captured yet. Use actions manually first.', 6, 'alert')
+			else
+				notif('Packet Templates', table.concat(lines, ' | '), 10)
+				print('[REDLINER Templates]', packetTemplates)
+			end
+			task.defer(function()
+				if PacketTemplates.Enabled then
+					PacketTemplates:Toggle(true)
+				end
+			end)
 		end,
 		Tooltip = 'Shows captured packet templates from manual actions (melee, parry, dash, grapple, gun).',
 	})
