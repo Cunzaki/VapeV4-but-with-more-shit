@@ -1,5 +1,0 @@
--- Decompiled from: Workspace.vxlviv.Health
--- Class: Script
--- Place: Ugc (14104248348)
-
--- Empty bytecode

@@ -1,6 +1,0 @@
--- Decompiled with Potassium's decompiler.
-
-script.Parent:GetPropertyChangedSignal("ImageTransparency"):Connect(function() --[[ Name: Update, Line 1 ]]
-    script.Parent.ImageLabel.ImageTransparency = script.Parent.ImageTransparency;
-end);
-script.Parent.ImageLabel.ImageTransparency = script.Parent.ImageTransparency;
