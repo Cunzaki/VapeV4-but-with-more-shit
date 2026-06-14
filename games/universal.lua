@@ -1054,13 +1054,18 @@ run(function()
 		stickyTarget = nil
 	end
 
-	local function isStickyTargetValid(ent)
-		if not ent or not ent.Character then return false end
+	local function isStickyTargetAlive(ent)
+		if not ent or not ent.Character or not ent.Character.Parent then
+			return false
+		end
 		local aimPart = ent[Part.Value]
-		if not aimPart or not aimPart.Parent then return false end
-		if not entitylib.targetCheck(ent) then return false end
-		if not entitylib.isVulnerable(ent, (Targets.Forcefield and Targets.Forcefield.Enabled) or false) then return false end
-		if Targets.Walls.Enabled and entitylib.Wallcheck(gameCamera.CFrame.Position, aimPart.Position, true) then
+		if not aimPart or not aimPart.Parent then
+			return false
+		end
+		if ent.Health <= 0 then
+			return false
+		end
+		if not entitylib.targetCheck(ent) then
 			return false
 		end
 		return true
@@ -1106,15 +1111,16 @@ run(function()
 		end
 		if not areModuleBindKeysHeld() then
 			clearStickyTarget()
+			return nil
 		end
-		if stickyTarget and isStickyTargetValid(stickyTarget) and areModuleBindKeysHeld() then
+		-- Keep sticky lock outside FOV until bind release, death, or team invalidation
+		if stickyTarget and isStickyTargetAlive(stickyTarget) then
 			return stickyTarget
 		end
+		stickyTarget = nil
 		local ent = acquireTarget(false)
-		if ent and areModuleBindKeysHeld() then
+		if ent then
 			stickyTarget = ent
-		elseif not ent then
-			stickyTarget = nil
 		end
 		return ent
 	end
