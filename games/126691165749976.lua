@@ -36,13 +36,13 @@ local function withThread(func)
 	return func()
 end
 
-local function safeSetOption(opt, ...)
+local function safeSetOption(opt, val)
 	if not opt or not opt.SetValue then
 		return
 	end
 	pcall(function()
 		withThread(function()
-			opt:SetValue(...)
+			opt:SetValue(val)
 		end)
 	end)
 end
