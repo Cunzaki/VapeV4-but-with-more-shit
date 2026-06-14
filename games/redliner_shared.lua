@@ -19,24 +19,16 @@ local workspaceService = cloneref(workspace)
 local gameCamera = workspaceService.CurrentCamera
 local lplr = playersService.LocalPlayer
 local vape = shared.vape
-local entitylib = vape.Libraries.entity
-local targetinfo = vape.Libraries.targetinfo
-
-local REDLINER_GAME_IDS = {
-	[7265339759] = true,
-	[115875349872417] = true,
-}
-local REDLINER_PLACES = {
-	[115875349872417] = true,
-	[126691165749976] = true,
-	[94987506187454] = true,
-}
-
-if not REDLINER_GAME_IDS[game.GameId] and not REDLINER_PLACES[game.PlaceId] then
+if not vape then
 	return
 end
 
-vape:Remove('Killaura')
+local entitylib = vape.Libraries.entity
+local targetinfo = vape.Libraries.targetinfo
+
+pcall(function()
+	vape:Remove('Killaura')
+end)
 
 if not vape.Categories.Minigames then
 	vape.Categories.Minigames = vape:CreateCategory({
