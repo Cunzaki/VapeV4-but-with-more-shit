@@ -22,13 +22,17 @@ local vape = shared.vape
 local entitylib = vape.Libraries.entity
 local targetinfo = vape.Libraries.targetinfo
 
-local REDLINER_GAME_ID = 7265339759
+local REDLINER_GAME_IDS = {
+	[7265339759] = true,
+	[115875349872417] = true,
+}
 local REDLINER_PLACES = {
 	[115875349872417] = true,
 	[126691165749976] = true,
+	[94987506187454] = true,
 }
 
-if game.GameId ~= REDLINER_GAME_ID and not REDLINER_PLACES[game.PlaceId] then
+if not REDLINER_GAME_IDS[game.GameId] and not REDLINER_PLACES[game.PlaceId] then
 	return
 end
 
