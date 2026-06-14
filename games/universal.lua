@@ -1020,6 +1020,8 @@ run(function()
 	local RightClick
 	local LeftClick
 	local Strength
+	local SpecialCases
+	local ClosestAim
 	local stickyTarget = nil
 	local moveConst = Vector2.new(1, 0.77) * math.rad(0.5)
 	
@@ -1037,8 +1039,12 @@ run(function()
 		return inputService:GetMouseLocation()
 	end
 
-	local function areModuleBindKeysHeld()
-		if #AimAssist.Bind == 0 then
+	local function hasModuleBind()
+		return #AimAssist.Bind > 0
+	end
+
+	local function isModuleBindHeld()
+		if not hasModuleBind() then
 			return true
 		end
 		local heldKeys = vape.HeldKeybinds or {}
@@ -1052,6 +1058,14 @@ run(function()
 
 	local function clearStickyTarget()
 		stickyTarget = nil
+	end
+
+	local function isSpecialCasesEnabled()
+		return SpecialCases and SpecialCases.Value == 'Enabled'
+	end
+
+	local function isClosestAimEnabled()
+		return isSpecialCasesEnabled() and ClosestAim and ClosestAim.Enabled
 	end
 
 	local function isStickyTargetAlive(ent)
@@ -1105,13 +1119,39 @@ run(function()
 		end
 	end
 
+	local function acquireClosestTarget()
+		if not entitylib.isAlive then return nil end
+		local localPos = entitylib.character.RootPart.Position
+		local sortingTable = {}
+		for _, v in entitylib.List do
+			if not Targets.Players.Enabled and v.Player then continue end
+			if not Targets.NPCs.Enabled and v.NPC then continue end
+			if not v.Targetable then continue end
+			local aimPart = v[Part.Value]
+			if not aimPart then continue end
+			if not entitylib.isVulnerable(v, (Targets.Forcefield and Targets.Forcefield.Enabled) or false) then continue end
+			table.insert(sortingTable, {
+				Entity = v,
+				Magnitude = v.Target and -1 or (aimPart.Position - localPos).Magnitude
+			})
+		end
+		table.sort(sortingTable, function(a, b)
+			return a.Magnitude < b.Magnitude
+		end)
+		for _, v in sortingTable do
+			if Targets.Walls.Enabled and entitylib.Wallcheck(localPos, v.Entity[Part.Value].Position, true) then
+				continue
+			end
+			return v.Entity
+		end
+	end
+
 	local function resolveTarget()
+		if isClosestAimEnabled() then
+			return acquireClosestTarget()
+		end
 		if not StickyAim.Enabled then
 			return acquireTarget(false)
-		end
-		if not areModuleBindKeysHeld() then
-			clearStickyTarget()
-			return nil
 		end
 		-- Keep sticky lock outside FOV until bind release, death, or team invalidation
 		if stickyTarget and isStickyTargetAlive(stickyTarget) then
@@ -1203,6 +1243,13 @@ run(function()
 					end
 				end))
 			end
+
+			AimAssist:Clean(inputService.InputEnded:Connect(function(input)
+				if input.KeyCode == Enum.KeyCode.Unknown then return end
+				if hasModuleBind() and not isModuleBindHeld() then
+					clearStickyTarget()
+				end
+			end))
 		end,
 		Tooltip = 'Smoothly aims to closest valid target'
 	})
@@ -1229,7 +1276,27 @@ run(function()
 				clearStickyTarget()
 			end
 		end,
-		Tooltip = 'Keeps your locked target outside the FOV circle until the module bind is released or the module is disabled. Without a module bind, the lock persists until the module is turned off.'
+		Tooltip = 'Keeps your locked target outside the FOV circle until the module bind is released, the target dies, or the module is disabled. Without a module bind, the lock stays active while the module is on.'
+	})
+	SpecialCases = AimAssist:CreateDropdown({
+		Name = 'Special Cases',
+		List = {'Disabled', 'Enabled'},
+		Default = 'Disabled',
+		Function = function(val)
+			ClosestAim.Object.Visible = val == 'Enabled'
+		end,
+		Tooltip = 'Enables custom targeting behavior for Aim Assist'
+	})
+	ClosestAim = AimAssist:CreateToggle({
+		Name = 'Closest Aim',
+		Darker = true,
+		Visible = false,
+		Function = function(callback)
+			if callback then
+				clearStickyTarget()
+			end
+		end,
+		Tooltip = 'Always targets the closest valid player by distance, ignoring FOV'
 	})
 	FOV = AimAssist:CreateSlider({
 		Name = 'FOV',
