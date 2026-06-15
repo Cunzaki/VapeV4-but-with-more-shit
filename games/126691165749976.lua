@@ -210,13 +210,14 @@ local hud = {
 	killAuraActive = false,
 	killAuraRangeSetting = 18,
 	killAuraExtendSetting = 10,
-	killAuraDelaySetting = 0.15,
+	killAuraDelaySetting = 0.35,
 	killAuraItemIdSetting = 'Auto',
 	killAuraBound = false,
 	lastKillAuraAt = 0,
 	killAuraAttackSerial = 0,
 	hudTickCallback = nil,
 	drawTimerOffsetSetting = 0,
+	antiParryEnabled = true,
 	threatShowMeleeSetting = true,
 	threatShowGunDrawSetting = true,
 	threatShowGunShotSetting = true,
@@ -1012,6 +1013,92 @@ tryParry = function(reason, char)
 	return true
 end
 
+-- Enemy parry animations (built from Assets.Animations catalog at load).
+local ENEMY_PARRY_ANIM_IDS = {}
+
+local function buildEnemyParryAnimCatalog()
+	table.clear(ENEMY_PARRY_ANIM_IDS)
+	local assets = replicatedStorage:FindFirstChild('Assets')
+	if not assets then
+		return 0
+	end
+	local count = 0
+	for _, inst in assets:GetDescendants() do
+		if inst:IsA('Animation') then
+			local upper = string.upper(inst.Name)
+			if string.find(upper, 'PARRY', 1, true) then
+				local normId = normalizeAnimId(inst.AnimationId)
+				if normId ~= '' and not ENEMY_PARRY_ANIM_IDS[normId] then
+					ENEMY_PARRY_ANIM_IDS[normId] = inst.Name
+					count += 1
+				end
+			end
+		end
+	end
+	return count
+end
+
+local function isEnemyParryAnim(animId, animName)
+	local normId = normalizeAnimId(animId)
+	if normId == '' then
+		return false
+	end
+	if GUN_DRAW_ANIM_IDS[normId] or GUN_SHOT_ANIM_IDS[normId] then
+		return false
+	end
+	if ENEMY_PARRY_ANIM_IDS[normId] then
+		return true
+	end
+	local upper = string.upper(animName or '')
+	return string.find(upper, 'PARRY', 1, true) ~= nil
+end
+
+local function isEnemyParrying(charOrPlr)
+	local plr, char
+	if charOrPlr and charOrPlr:IsA('Player') then
+		plr = charOrPlr
+		char = charOrPlr.Character
+	else
+		char = charOrPlr
+		plr = char and playersService:GetPlayerFromCharacter(char)
+	end
+	if not char or not char.Parent then
+		return false
+	end
+	local models = plr and getEnemyModels(plr) or {char}
+	for _, model in models do
+		if model and model.Parent then
+			for _, track in getAllPlayingTracks(model) do
+				if track.IsPlaying and track.WeightCurrent >= 0.25 then
+					local name, animId = getTrackAnimInfo(track)
+					if isEnemyParryAnim(animId, name) and track.TimePosition <= 0.85 then
+						return true
+					end
+				end
+			end
+		end
+	end
+	return false
+end
+
+local function anyEnemyInRangeParrying(attackRange)
+	for _, plr in playersService:GetPlayers() do
+		if plr ~= lplr and plr.Character then
+			if getClosestEnemyDistance(plr) <= attackRange and isEnemyParrying(plr) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+task.defer(function()
+	local count = buildEnemyParryAnimCatalog()
+	if count > 0 then
+		print('[REDLINER] enemy parry catalog | entries=', count)
+	end
+end)
+
 local startEnemyWatchers
 local refreshEnemyWatchers
 local refreshThreatWatchers
@@ -1026,6 +1113,8 @@ local unwatchAllForPlayer
 local installHitboxReachHook
 local installGunBulletVizHook
 local detectLocalMeleeItemId
+local pressAttackClick
+local getNearestEnemyInAttackRange
 
 run(function()
 -- ---------------------------------------------------------------------------
@@ -1749,8 +1838,10 @@ end
 local function augmentMeleePacket(packed)
 	local action = packed[2]
 	local beforeCount = countPackedHurtboxes(packed)
-	if not reachActive then
-		reachDebugSkip('reach_off', 'augment skipped (reach inactive)', 'action=', action)
+	local usingReach = reachActive and reachExtend > 0
+	local usingKillAura = hud.killAuraActive
+	if not usingReach and not usingKillAura then
+		reachDebugSkip('reach_off', 'augment skipped (reach/kill aura inactive)', 'action=', action)
 		return packed
 	end
 	if not isLocalAlive() then
@@ -1766,11 +1857,7 @@ local function augmentMeleePacket(packed)
 		reachDebugSkip('no_root', 'augment skipped (no HumanoidRootPart)')
 		return packed
 	end
-	if reachExtend <= 0 then
-		reachDebugSkip('extend_zero', 'augment skipped (Extend slider is 0)', 'extend=', reachExtend)
-		return packed
-	end
-	local meleeReach = getMeleeReach()
+	local meleeReach = usingReach and getMeleeReach() or (hud.killAuraRangeSetting + hud.killAuraExtendSetting)
 	local extended = getEnemyHurtboxesInRange(meleeReach, root.Position)
 	local nearestPart, nearestDist, nearestName = describeNearestEnemy(meleeReach, root.Position)
 	if #extended == 0 then
@@ -1801,6 +1888,8 @@ local function augmentMeleePacket(packed)
 		'augment applied',
 		'action=', packed[2],
 		'aimDir=', aimDir,
+		'usingReach=', usingReach,
+		'usingKillAura=', usingKillAura,
 		'extend=', reachExtend,
 		'hurtboxes before=', beforeCount,
 		'after=', countPackedHurtboxes(packed),
@@ -2274,7 +2363,7 @@ run(function()
 -- Auto attack
 -- ---------------------------------------------------------------------------
 
-local function pressAttackClick()
+pressAttackClick = function()
 	if tick() < parryBlockAttackUntil then
 		return false
 	end
@@ -2363,7 +2452,7 @@ bindParryScanLoop = function()
 	runService.RenderStepped:Connect(scanStep)
 end
 
-local function getNearestEnemyInAttackRange(attackRange)
+getNearestEnemyInAttackRange = function(attackRange)
 	local root = getLocalRoot()
 	if not root then
 		return nil
@@ -2406,6 +2495,10 @@ local function tryAutoAttack(attackDelay)
 	end
 
 	if not getNearestEnemyInAttackRange(autoAttackRangeSetting) then
+		return
+	end
+
+	if hud.antiParryEnabled and anyEnemyInRangeParrying(autoAttackRangeSetting) then
 		return
 	end
 
@@ -2544,6 +2637,8 @@ run(function()
 			hudGui.ResetOnSpawn = false
 			hudGui.IgnoreGuiInset = true
 			hudGui.DisplayOrder = 50
+			hudGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+			hudGui.Enabled = true
 			hudGui.Parent = playerGui
 		end
 		if not drawContainer or not drawContainer.Parent then
@@ -2790,6 +2885,7 @@ run(function()
 		applyDrawLayout()
 		drawContainer.Visible = true
 		local entries = collectDrawEntries()
+		local hasEntries = #entries > 0
 		for i = 1, hud.drawTimerMaxEntriesSetting do
 			local card = ensureDrawCard(i)
 			local entry = entries[i]
@@ -2819,6 +2915,29 @@ run(function()
 				end
 			else
 				card.Visible = false
+			end
+		end
+		if not hasEntries then
+			local standby = ensureDrawCard(1)
+			standby.Visible = true
+			standby.BackgroundTransparency = 1 - hud.drawTimerOpacitySetting
+			local title = standby:FindFirstChild('Title')
+			local timer = standby:FindFirstChild('Timer')
+			local barBg = standby:FindFirstChild('BarBg')
+			if title then
+				title.Text = 'DRAW TIMER'
+				title.TextColor3 = Color3.fromRGB(255, 220, 120)
+			end
+			if timer then
+				timer.Text = 'Scanning threats in range...'
+				timer.TextColor3 = Color3.fromRGB(200, 200, 200)
+			end
+			if barBg then
+				local barFill = barBg:FindFirstChild('BarFill')
+				if barFill then
+					barFill.Size = UDim2.fromScale(0.35, 1)
+					barFill.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
+				end
 			end
 		end
 	end
@@ -2933,12 +3052,32 @@ run(function()
 		ensureHudGui()
 		local threats = collectThreatEntries()
 		local primary = threats[1]
+		threatOverlay.Visible = true
 		if not primary then
-			threatOverlay.Visible = false
 			lastPrimaryKey = ''
+			if hud.threatIndicatorFullscreenSetting then
+				threatOverlay.BackgroundTransparency = 1 - hud.threatIndicatorOpacitySetting * 0.35
+				threatPanel.AnchorPoint = Vector2.new(0.5, 0.5)
+				threatPanel.Position = UDim2.fromScale(0.5, 0.5)
+				threatPanel.Size = UDim2.fromScale(0.7, 0.18)
+			else
+				threatOverlay.BackgroundTransparency = 1
+				threatPanel.AnchorPoint = Vector2.new(0.5, 1)
+				threatPanel.Position = UDim2.fromScale(0.5, math.clamp(hud.threatIndicatorPosYSetting, 0.55, 0.98))
+				threatPanel.Size = UDim2.fromScale(0.92, 0.16)
+			end
+			threatPanel.BackgroundTransparency = 1 - hud.threatIndicatorOpacitySetting
+			if threatTitle then
+				threatTitle.TextSize = math.floor(hud.threatIndicatorFontSizeSetting * 0.65)
+				threatTitle.Text = 'ALL CLEAR'
+				threatTitle.TextColor3 = Color3.fromRGB(120, 220, 140)
+			end
+			if threatSub then
+				threatSub.TextSize = math.floor(hud.threatIndicatorFontSizeSetting * 0.28)
+				threatSub.Text = 'Threat indicator active — watching for melee / gun / glint'
+			end
 			return
 		end
-		threatOverlay.Visible = true
 		if hud.threatIndicatorFullscreenSetting then
 			threatOverlay.BackgroundTransparency = 1 - hud.threatIndicatorOpacitySetting * 0.65
 			threatPanel.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -3024,43 +3163,39 @@ run(function()
 
 	hud.hudTickCallback = updateHud
 
-	local function fireKillAuraPacket()
+	local hudUpdateBound = false
+	local function bindHudUpdateLoop()
+		if hudUpdateBound then
+			return
+		end
+		hudUpdateBound = true
+		runService.RenderStepped:Connect(function()
+			if not hud.drawTimerEnabled and not hud.threatIndicatorEnabled then
+				return
+			end
+			if hud.hudTickCallback then
+				pcall(hud.hudTickCallback)
+			end
+		end)
+	end
+	bindHudUpdateLoop()
+
+	local function tryKillAura()
 		if not hud.killAuraActive or not isLocalAlive() then
 			return
 		end
-		if not initPackets() then
+		if not isGameWindowFocused() then
 			return
 		end
-		local packet = Packets[MELEE_PACKET_NAME]
-		if not packet or type(packet.Fire) ~= 'function' then
+		bindPacketListeners()
+		local range = hud.killAuraRangeSetting
+		if not getNearestEnemyInAttackRange(range) then
 			return
 		end
-		local root = getLocalRoot()
-		if not root then
+		if hud.antiParryEnabled and anyEnemyInRangeParrying(range) then
 			return
 		end
-		local totalRange = hud.killAuraRangeSetting + hud.killAuraExtendSetting
-		local hurtboxes = getEnemyHurtboxesInRange(totalRange, root.Position)
-		if #hurtboxes == 0 then
-			return
-		end
-		local maxBoxes = 8
-		if #hurtboxes > maxBoxes then
-			local trimmed = {}
-			for i = 1, maxBoxes do
-				trimmed[i] = hurtboxes[i]
-			end
-			hurtboxes = trimmed
-		end
-		hud.killAuraAttackSerial += 1
-		local aimDir = (hurtboxes[1].Position - root.Position).Unit
-		local tpl = meleeTemplate
-		local itemId = detectLocalMeleeItemId()
-		local action = (tpl and tpl[2]) or 'SWING'
-		local extra = tpl and tpl[6]
-		pcall(function()
-			packet:Fire(itemId, action, 'ka' .. hud.killAuraAttackSerial, aimDir, hurtboxes, extra)
-		end)
+		pressAttackClick()
 	end
 
 	local function bindKillAuraLoop()
@@ -3072,12 +3207,12 @@ run(function()
 			if not hud.killAuraActive or not isLocalAlive() then
 				return
 			end
-			local delay = math.max(0, hud.killAuraDelaySetting)
-			if delay > 0 and tick() - hud.lastKillAuraAt < delay then
+			local delay = math.max(0.2, hud.killAuraDelaySetting)
+			if tick() - hud.lastKillAuraAt < delay then
 				return
 			end
 			hud.lastKillAuraAt = tick()
-			task.defer(fireKillAuraPacket)
+			tryKillAura()
 		end)
 	end
 
@@ -3671,6 +3806,15 @@ run(function()
 		Tooltip = 'Left clicks when an enemy is within Attack Range. Only fires while Roblox is focused. Pauses while parrying.',
 	})
 
+	AutoAttack:CreateToggle({
+		Name = 'Anti Parry',
+		Default = true,
+		Function = function(callback)
+			hud.antiParryEnabled = callback
+		end,
+		Tooltip = 'Skips attacking when a nearby enemy is playing a parry animation (scanned from Assets.Animations).',
+	})
+
 	Reach = minigames:CreateModule({
 		Name = 'Reach',
 		Function = function(callback)
@@ -4143,6 +4287,9 @@ run(function()
 			hud.drawTimerEnabled = callback
 			if callback then
 				notif('Draw Timer', 'Animated gun draw/glint countdown HUD active.', 4)
+				if hud.hudTickCallback then
+					pcall(hud.hudTickCallback)
+				end
 			end
 		end,
 		Tooltip = 'Animated HUD countdown for enemy gun draws/glints using parry delays (Castigate/Phoenix/Siege/Monarch).',
@@ -4216,6 +4363,9 @@ run(function()
 			hud.threatIndicatorEnabled = callback
 			if callback then
 				notif('Threat Indicator', 'Primary threat banner HUD active.', 4)
+				if hud.hudTickCallback then
+					pcall(hud.hudTickCallback)
+				end
 			end
 		end,
 		Tooltip = 'Large animated banner for the most urgent melee/gun/glint threat.',
@@ -4409,10 +4559,10 @@ run(function()
 			hud.killAuraActive = callback
 			if callback then
 				bindPacketListeners()
-				notif('Kill Aura', 'Spamming melee packet on all hurtboxes in range.', 4)
+				notif('Kill Aura', 'Real LMB swings with extended reach — swing once manually if hits fail.', 5)
 			end
 		end,
-		Tooltip = 'Fires melee packet with every enemy hurtbox around you (multi-target reach).',
+		Tooltip = 'Auto-attacks through the real melee pipeline with Kill Aura reach augment (server-valid hits).',
 	})
 	KillAura:CreateSlider({
 		Name = 'Range',
@@ -4439,18 +4589,18 @@ run(function()
 		end,
 	})
 	KillAura:CreateSlider({
-		Name = 'Packet Delay',
-		Min = 0,
+		Name = 'Attack Delay',
+		Min = 0.2,
 		Max = 0.5,
 		Decimal = 100,
-		Default = 0.15,
+		Default = 0.35,
 		Function = function(val)
 			hud.killAuraDelaySetting = val
 		end,
 		Suffix = function(val)
 			return val == 1 and 'second' or 'seconds'
 		end,
-		Tooltip = 'Delay between melee packets. Default 0.15s — lower values may lag or get ignored by the server.',
+		Tooltip = 'Delay between kill aura swings. Uses real attack clicks + reach augment, not raw packets.',
 	})
 	KillAura:CreateDropdown({
 		Name = 'Item ID',
