@@ -58,7 +58,7 @@ local AUTO_PARRY_DEFAULTS = {
 	meleeEnemyDebounce = 0.08,
 	gunEnemyDebounce = 0.3,
 	meleeAimDot = 0.32,
-	gunAimDot = 0.8,
+	gunAimDot = 0.65,
 	meleeParryCooldown = 0,
 	parryCooldown = 0.05,
 	meleeSwingWindow = 0.7,
@@ -178,10 +178,14 @@ local lastWatcherRefreshAt = 0
 local PARRY_SCAN_INTERVAL = 0.02
 local WATCHER_REFRESH_INTERVAL = 0.25
 local GUN_AIM_RANGE_BONUS = 0.12
+local GUN_MUZZLE_NAMES = {'Muzzle', 'Barrel', 'FirePoint', 'Gun', 'Handle', 'Tip', 'ShootPoint', 'Ray', 'Flash', 'Emitter', 'Glint'}
+local GUN_RAY_HIT_RADIUS = 5
+local GUN_RAY_MAX_RANGE = 140
 local tryParry
 local canSafelyParry
 local hitboxReachHooked = false
 local meleePacketHooked = false
+local gunParryPacketHooked = false
 local packetMetatableHooked = false
 local attackReachHooked = false
 local reachHitboxHookSource = nil
@@ -701,23 +705,108 @@ local function getTrackOwnerModel(track)
 	return nil
 end
 
+local function getAimDot3D(origin, lookVector, targetPos)
+	local offset = targetPos - origin
+	if offset.Magnitude < 0.05 then
+		return 1
+	end
+	if lookVector.Magnitude < 0.05 then
+		return 0
+	end
+	return lookVector.Unit:Dot(offset.Unit)
+end
+
+local function rayClosestDistance(origin, dir, point, maxRange)
+	dir = dir.Unit
+	local rel = point - origin
+	local t = math.clamp(rel:Dot(dir), 0, maxRange or GUN_RAY_MAX_RANGE)
+	local closest = origin + dir * t
+	return (point - closest).Magnitude, t
+end
+
+local refreshMyHurtboxes
+
+local function isGunRayThreatening(origin, direction, maxRange, maxRadius)
+	if direction.Magnitude < 0.05 then
+		return false
+	end
+	if #myHurtboxes == 0 then
+		refreshMyHurtboxes()
+	end
+	local dir = direction.Unit
+	local range = maxRange or GUN_RAY_MAX_RANGE
+	local radius = maxRadius or GUN_RAY_HIT_RADIUS
+	for _, part in myHurtboxes do
+		if part and part.Parent then
+			local dist = select(1, rayClosestDistance(origin, dir, part.Position, range))
+			if dist <= radius then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function isGunMuzzlePart(name)
+	local lower = string.lower(name)
+	for _, mName in GUN_MUZZLE_NAMES do
+		if string.find(lower, string.lower(mName), 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+local function collectEnemyGunAimSources(char, aimModel)
+	local rays = {}
+	local dots = {}
+	local myRoot = getLocalRoot()
+	if not myRoot then
+		return rays, dots
+	end
+	local targetPos = myRoot.Position
+	local plr = playersService:GetPlayerFromCharacter(char)
+	local models = plr and getEnemyModels(plr) or {char}
+	for _, model in models do
+		if not model or not model.Parent then
+			continue
+		end
+		local hrp = model:FindFirstChild('HumanoidRootPart')
+		local head = model:FindFirstChild('Head')
+		if hrp then
+			table.insert(rays, {origin = hrp.Position, direction = hrp.CFrame.LookVector})
+			table.insert(dots, getAimDot3D(hrp.Position, hrp.CFrame.LookVector, targetPos))
+		end
+		if head then
+			table.insert(rays, {origin = head.Position, direction = head.CFrame.LookVector})
+			table.insert(dots, getAimDot3D(head.Position, head.CFrame.LookVector, targetPos))
+		end
+		for _, desc in model:GetDescendants() do
+			if desc:IsA('BasePart') and isGunMuzzlePart(desc.Name) then
+				local toMe = targetPos - desc.Position
+				if toMe.Magnitude > 0.05 then
+					table.insert(rays, {origin = desc.Position, direction = toMe.Unit})
+				end
+				table.insert(dots, getAimDot3D(desc.Position, desc.CFrame.LookVector, targetPos))
+			end
+		end
+	end
+	if aimModel and aimModel:IsA('BasePart') and string.find(string.lower(aimModel.Name), 'glint', 1, true) then
+		local toMe = targetPos - aimModel.Position
+		if toMe.Magnitude > 0.05 then
+			table.insert(rays, {origin = aimModel.Position, direction = toMe.Unit})
+		end
+	end
+	return rays, dots
+end
+
 local function getGunAimDotFromModel(model)
 	local root = getLocalRoot()
 	local enemyRoot = model and model:FindFirstChild('HumanoidRootPart')
 	if not root or not enemyRoot then
 		return 0
 	end
-	local offset = root.Position - enemyRoot.Position
-	local flatOffset = Vector3.new(offset.X, 0, offset.Z)
-	if flatOffset.Magnitude < 0.05 then
-		return 1
-	end
-	local dir = flatOffset.Unit
-	local flatLook = Vector3.new(enemyRoot.CFrame.LookVector.X, 0, enemyRoot.CFrame.LookVector.Z)
-	if flatLook.Magnitude < 0.05 then
-		return 0
-	end
-	return flatLook.Unit:Dot(dir)
+	return getAimDot3D(enemyRoot.Position, enemyRoot.CFrame.LookVector, root.Position)
 end
 
 local function getHeadAimDotFromModel(model)
@@ -726,16 +815,7 @@ local function getHeadAimDotFromModel(model)
 	if not root or not head then
 		return 0
 	end
-	local offset = root.Position - head.Position
-	local flatOffset = Vector3.new(offset.X, 0, offset.Z)
-	if flatOffset.Magnitude < 0.05 then
-		return 1
-	end
-	local flatHead = Vector3.new(head.CFrame.LookVector.X, 0, head.CFrame.LookVector.Z)
-	if flatHead.Magnitude < 0.05 then
-		return 0
-	end
-	return flatHead.Unit:Dot(flatOffset.Unit)
+	return getAimDot3D(head.Position, head.CFrame.LookVector, root.Position)
 end
 
 local function getEffectiveGunAimThreshold(dist)
@@ -758,14 +838,23 @@ local function getAimDot(char)
 end
 
 local function isEnemyAimingAtMeForGun(char, aimModel)
-	local model = aimModel or char
 	local dist = getClosestEnemyDistance(char)
-	local hrpDot = getGunAimDotFromModel(model)
 	local need = getEffectiveGunAimThreshold(dist)
-	if hrpDot < need then
-		return false, hrpDot, need
+	local rays, dotList = collectEnemyGunAimSources(char, aimModel)
+	for _, ray in rays do
+		if isGunRayThreatening(ray.origin, ray.direction, GUN_RAY_MAX_RANGE, GUN_RAY_HIT_RADIUS) then
+			return true, 1, need
+		end
 	end
-	return true, hrpDot, need
+	local maxDot = getGunAimDotFromModel(aimModel or char)
+	maxDot = math.max(maxDot, getHeadAimDotFromModel(aimModel or char))
+	for _, d in dotList do
+		maxDot = math.max(maxDot, d)
+	end
+	if maxDot < need then
+		return false, maxDot, need
+	end
+	return true, maxDot, need
 end
 
 local function isEnemyTargetingMe(char, minDot, confirmedAttack)
@@ -800,11 +889,37 @@ local function shouldParryGun(char, confirmedAttack, aimModel)
 		return false
 	end
 	local aiming, dot, need = isEnemyAimingAtMeForGun(char, aimModel)
-	if not aiming then
-		threatDebugSkip('not_aiming', char.Name, 'gun', string.format('dot=%.3f need=%.2f', dot, need))
-		return false
+	if aiming then
+		return true
 	end
-	return true
+	if confirmedAttack then
+		local myRoot = getLocalRoot()
+		if myRoot then
+			local permissiveRange = threatRangeSetting
+			local permissiveRadius = 8
+			local rays = collectEnemyGunAimSources(char, aimModel)
+			for _, ray in rays do
+				if isGunRayThreatening(ray.origin, ray.direction, permissiveRange, permissiveRadius) then
+					return true
+				end
+			end
+			local hrp = char:FindFirstChild('HumanoidRootPart')
+			if hrp then
+				local toMe = myRoot.Position - hrp.Position
+				if toMe.Magnitude > 0.05 and isGunRayThreatening(hrp.Position, toMe, permissiveRange, permissiveRadius) then
+					return true
+				end
+			end
+			if aimModel and aimModel:IsA('BasePart') and string.find(string.lower(aimModel.Name), 'glint', 1, true) then
+				local toMe = myRoot.Position - aimModel.Position
+				if toMe.Magnitude > 0.05 and isGunRayThreatening(aimModel.Position, toMe, permissiveRange, permissiveRadius) then
+					return true
+				end
+			end
+		end
+	end
+	threatDebugSkip('not_aiming', char.Name, 'gun', string.format('dot=%.3f need=%.2f', dot, need))
+	return false
 end
 
 local function isMeleeSwingTrackActive(track)
@@ -1113,6 +1228,7 @@ local handleMeleeAnimation
 local unwatchAllForPlayer
 local installHitboxReachHook
 local installGunBulletVizHook
+local installGunParryPacketHook
 local detectLocalMeleeItemId
 local pressAttackClick
 local getNearestEnemyInAttackRange
@@ -1461,7 +1577,7 @@ refreshThreatWatchers = function(force)
 	end
 end
 
-local function refreshMyHurtboxes()
+refreshMyHurtboxes = function()
 	table.clear(myHurtboxes)
 	local char = getLocalCharacter()
 	if not char then
@@ -1581,6 +1697,83 @@ startEnemyWatchers = function()
 			end)
 		end
 	end
+end
+
+installGunParryPacketHook = function()
+	if gunParryPacketHooked then
+		return true
+	end
+	if not initPackets() then
+		return false
+	end
+	local packet = Packets[GUN_PACKET_NAME]
+	if not packet or not packet.OnClientEvent or type(packet.OnClientEvent.Connect) ~= 'function' then
+		return false
+	end
+	if packet._gunParryHooked then
+		gunParryPacketHooked = true
+		return true
+	end
+	packet._gunParryHooked = true
+	gunParryPacketHooked = true
+	packet.OnClientEvent:Connect(function(arg1, _arg2, _arg3, _arg4, _arg5, aimDir, gunName, arg8, arg9)
+		if not autoParryActive or not parryGunShotEnabled or not isLocalAlive() then
+			return
+		end
+		if typeof(aimDir) ~= 'Vector3' or aimDir.Magnitude < 0.05 then
+			return
+		end
+		local char
+		if typeof(arg1) == 'string' and arg1 ~= '' then
+			local plr = playersService:FindFirstChild(arg1)
+			if plr and plr ~= lplr then
+				char = plr.Character
+			end
+		end
+		if not char then
+			local uid
+			if typeof(arg8) == 'number' and arg8 > 0 then
+				uid = arg8
+			elseif typeof(arg9) == 'number' and arg9 > 0 then
+				uid = arg9
+			elseif typeof(arg1) == 'number' and arg1 > 0 then
+				uid = arg1
+			end
+			if uid then
+				local plr = playersService:GetPlayerByUserId(uid)
+				if plr and plr ~= lplr then
+					char = plr.Character
+				end
+			end
+		end
+		if not char or not char.Parent then
+			return
+		end
+		if not isEnemyInGunThreatRange(char) then
+			return
+		end
+		local originPos
+		local hrp = char:FindFirstChild('HumanoidRootPart')
+		if hrp then
+			originPos = hrp.Position
+		end
+		for _, desc in char:GetDescendants() do
+			if desc:IsA('BasePart') and isGunMuzzlePart(desc.Name) then
+				originPos = desc.Position
+				break
+			end
+		end
+		if not originPos then
+			return
+		end
+		if not isGunRayThreatening(originPos, aimDir, GUN_RAY_MAX_RANGE, GUN_RAY_HIT_RADIUS) then
+			return
+		end
+		local label = typeof(gunName) == 'string' and gunName ~= '' and gunName or detectEquippedGun(char)
+		debugLog('trigger', 'gun_packet', label, 'dist=' .. string.format('%.1f', getClosestEnemyDistance(char)))
+		tryParry('gun_packet_' .. label, char)
+	end)
+	return true
 end
 
 end)
@@ -2354,6 +2547,9 @@ bindPacketListeners = function()
 	installMeleeReachHook()
 	if hud.hitboxVisualizerBulletEnabled then
 		installGunBulletVizHook()
+	end
+	if autoParryActive then
+		installGunParryPacketHook()
 	end
 end
 
@@ -3982,7 +4178,7 @@ run(function()
 		Function = function(val)
 			gunAimDotSetting = val
 		end,
-		Tooltip = 'HRP must face you (flat dot). Default 0.80 ≈ 37° cone; stricter at long range. 0.95 ≈ 18°.',
+		Tooltip = '3D aim dot (HRP/Head/muzzles) plus gun-ray proximity to your hurtboxes. Default 0.65; ray hits bypass dot. Stricter at long range.',
 	})
 
 	ParryCooldown = AutoParry:CreateSlider({
