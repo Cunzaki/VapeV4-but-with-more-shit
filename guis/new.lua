@@ -23,6 +23,28 @@ local mainapi = {
 	Windows = {}
 }
 
+-- Games that share one profile file across multiple place IDs.
+local SHARED_GAME_CONFIGS = {
+	REDLINER = {
+		label = 'REDLINER',
+		places = {94987506187454, 115875349872417, 126691165749976},
+		canonPlace = 115875349872417,
+	},
+}
+local PLACE_TO_SHARED = {}
+for _, data in SHARED_GAME_CONFIGS do
+	for _, placeId in data.places do
+		PLACE_TO_SHARED[placeId] = data
+	end
+end
+local PLACE_LABELS = {
+	[94987506187454] = 'REDLINER Main',
+	[115875349872417] = 'REDLINER FFA',
+	[126691165749976] = 'REDLINER Match',
+	[14104248348] = 'On Tap',
+	[14191889582] = 'On Tap Alt',
+}
+
 local cloneref = cloneref or function(obj)
 	return obj
 end
@@ -3085,6 +3107,9 @@ function mainapi:CreateGUI()
 		end)
 		button.MouseButton1Click:Connect(function()
 			settingspane.Visible = true
+			if categorysettings.OnOpen then
+				categorysettings.OnOpen()
+			end
 		end)
 		close.MouseButton1Click:Connect(function()
 			settingspane.Visible = false
@@ -3101,6 +3126,8 @@ function mainapi:CreateGUI()
 			end
 		end)
 
+		optionapi.Children = settingschildren
+		optionapi.Window = settingspane
 		return optionapi
 	end
 
@@ -4422,8 +4449,8 @@ function mainapi:CreateCategoryList(categorysettings)
 				if ind then
 					if val ~= 'default' then
 						table.remove(mainapi.Profiles, ind)
-						if isfile('newvape/profiles/'..val..mainapi.Place..'.txt') and delfile then
-							delfile('newvape/profiles/'..val..mainapi.Place..'.txt')
+						if isfile(mainapi:GetProfileConfigPath(val, mainapi.Place)) and delfile then
+							delfile(mainapi:GetProfileConfigPath(val, mainapi.Place))
 						end
 					end
 				else
@@ -5372,6 +5399,203 @@ function mainapi:CreateNotification(title, text, duration, type)
 	end)
 end
 
+function mainapi:GetConfigPlaceId(placeId)
+	placeId = placeId or self.Place
+	local shared = PLACE_TO_SHARED[placeId]
+	if shared then
+		return shared.canonPlace
+	end
+	return placeId
+end
+
+function mainapi:GetPlaceLabel(placeId)
+	local shared = PLACE_TO_SHARED[placeId]
+	if shared then
+		return shared.label..' (shared)'
+	end
+	return PLACE_LABELS[placeId] or ('Place '..tostring(placeId))
+end
+
+function mainapi:GetProfileConfigPath(profile, placeId)
+	profile = profile or self.Profile
+	placeId = self:GetConfigPlaceId(placeId or self.Place)
+	return 'newvape/profiles/'..profile..placeId..'.txt'
+end
+
+function mainapi:MigrateSharedConfig(profile, placeId)
+	profile = profile or self.Profile
+	placeId = placeId or self.Place
+	local configPlace = self:GetConfigPlaceId(placeId)
+	local canonPath = self:GetProfileConfigPath(profile, configPlace)
+	if isfile(canonPath) then
+		return
+	end
+	local shared = PLACE_TO_SHARED[placeId]
+	if not shared then
+		return
+	end
+	local tryOrder = {shared.canonPlace, placeId}
+	for _, extraPlace in shared.places do
+		if extraPlace ~= shared.canonPlace and extraPlace ~= placeId then
+			table.insert(tryOrder, extraPlace)
+		end
+	end
+	for _, tryPlace in tryOrder do
+		local legacyPath = 'newvape/profiles/'..profile..tryPlace..'.txt'
+		if isfile(legacyPath) then
+			writefile(canonPath, readfile(legacyPath))
+			return
+		end
+	end
+end
+
+function mainapi:GetGameConfigEntries(profile)
+	profile = profile or self.Profile
+	local entries = {}
+	local seen = {}
+	if not listfiles or not isfolder or not isfolder('newvape/profiles') then
+		return entries
+	end
+	for _, path in listfiles('newvape/profiles') do
+		local file = path:match('([^/\\]+)$') or path
+		if file:find('%.gui%.txt') or not file:find('%.txt$') then
+			continue
+		end
+		local stem = file:sub(1, -5)
+		local placeId = tonumber(stem:match('(%d+)$'))
+		if not placeId then
+			continue
+		end
+		local prof = stem:sub(1, #stem - #tostring(placeId))
+		if prof ~= profile then
+			continue
+		end
+		local configPlace = self:GetConfigPlaceId(placeId)
+		local key = tostring(configPlace)
+		if seen[key] then
+			continue
+		end
+		seen[key] = true
+		local configPath = self:GetProfileConfigPath(profile, configPlace)
+		if not isfile(configPath) then
+			continue
+		end
+		table.insert(entries, {
+			profile = prof,
+			configPlace = configPlace,
+			label = self:GetPlaceLabel(configPlace),
+			path = configPath,
+			isCurrent = configPlace == self:GetConfigPlaceId(self.Place),
+		})
+	end
+	table.sort(entries, function(a, b)
+		if a.isCurrent ~= b.isCurrent then
+			return a.isCurrent
+		end
+		return a.label < b.label
+	end)
+	return entries
+end
+
+function mainapi:ApplyGameConfig(configPlace)
+	self:Save()
+	local targetPath = self:GetProfileConfigPath(self.Profile, self.Place)
+	local sourcePath = self:GetProfileConfigPath(self.Profile, configPlace)
+	if not isfile(sourcePath) then
+		self:CreateNotification('Configs', 'Config file not found.', 5, 'alert')
+		return
+	end
+	if targetPath == sourcePath then
+		self:CreateNotification('Configs', 'Already using this config.', 4)
+		return
+	end
+	writefile(targetPath, readfile(sourcePath))
+	self:CreateNotification('Configs', 'Applied '..self:GetPlaceLabel(configPlace)..'. Reloading...', 5)
+	shared.vapereload = true
+	if shared.VapeDeveloper then
+		loadstring(readfile('newvape/loader.lua'), 'loader')()
+	else
+		loadstring(game:HttpGet('https://raw.githubusercontent.com/Cunzaki/VapeV4-but-with-more-shit-main/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true))()
+	end
+end
+
+function mainapi:RefreshConfigsPane()
+	local host = self.ConfigListHost
+	if not host then
+		return
+	end
+	for _, child in host:GetChildren() do
+		child:Destroy()
+	end
+	local layout = Instance.new('UIListLayout')
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Padding = UDim.new(0, 4)
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.Parent = host
+
+	local currentPlace = self:GetConfigPlaceId(self.Place)
+	local header = Instance.new('TextLabel')
+	header.Name = 'CurrentConfig'
+	header.Size = UDim2.fromOffset(200, 36)
+	header.BackgroundColor3 = color.Light(uipallet.Main, 0.04)
+	header.Text = '★ '..self:GetPlaceLabel(currentPlace)..'\nProfile: '..self.Profile
+	header.TextColor3 = Color3.fromHSV(self.GUIColor.Hue, self.GUIColor.Sat, self.GUIColor.Value)
+	header.TextSize = 12
+	header.FontFace = uipallet.Font
+	header.LayoutOrder = 0
+	header.Parent = host
+	addCorner(header)
+
+	local sub = Instance.new('TextLabel')
+	sub.Name = 'ConfigHint'
+	sub.Size = UDim2.fromOffset(200, 22)
+	sub.BackgroundTransparency = 1
+	sub.Text = 'Saved configs for this profile:'
+	sub.TextColor3 = color.Dark(uipallet.Text, 0.2)
+	sub.TextSize = 11
+	sub.FontFace = uipallet.Font
+	sub.LayoutOrder = 1
+	sub.Parent = host
+
+	local entries = self:GetGameConfigEntries()
+	if #entries == 0 then
+		local empty = Instance.new('TextLabel')
+		empty.Size = UDim2.fromOffset(200, 28)
+		empty.BackgroundTransparency = 1
+		empty.Text = 'No saved game configs yet.'
+		empty.TextColor3 = color.Dark(uipallet.Text, 0.35)
+		empty.TextSize = 11
+		empty.FontFace = uipallet.Font
+		empty.LayoutOrder = 2
+		empty.Parent = host
+		return
+	end
+
+	for i, entry in ipairs(entries) do
+		local row = Instance.new('TextButton')
+		row.Name = 'ConfigRow'..entry.configPlace
+		row.Size = UDim2.fromOffset(200, entry.isCurrent and 34 or 30)
+		row.BackgroundColor3 = entry.isCurrent and color.Light(uipallet.Main, 0.08) or color.Light(uipallet.Main, 0.02)
+		row.BorderSizePixel = 0
+		row.AutoButtonColor = false
+		row.Text = (entry.isCurrent and '★ ' or '')..entry.label..'\n'..entry.configPlace
+		row.TextColor3 = entry.isCurrent and Color3.fromHSV(self.GUIColor.Hue, self.GUIColor.Sat, self.GUIColor.Value) or uipallet.Text
+		row.TextSize = 11
+		row.FontFace = uipallet.Font
+		row.LayoutOrder = i + 1
+		row.Parent = host
+		addCorner(row)
+		if not entry.isCurrent then
+			row.MouseButton1Click:Connect(function()
+				mainapi:ApplyGameConfig(entry.configPlace)
+			end)
+			addTooltip(row, 'Load this config for the current game')
+		else
+			addTooltip(row, 'Active config for this game')
+		end
+	end
+end
+
 function mainapi:Load(skipgui, profile)
 	if not skipgui then
 		if self.ThreadFix then
@@ -5425,14 +5649,17 @@ function mainapi:Load(skipgui, profile)
 	self.Profiles = guidata.Profiles or {{
 		Name = 'default', Bind = {}
 	}}
+	self.ConfigPlace = self:GetConfigPlaceId(self.Place)
+	self:MigrateSharedConfig(self.Profile, self.Place)
 	self.Categories.Profiles:ChangeValue()
 	if self.ProfileLabel then
 		self.ProfileLabel.Text = #self.Profile > 10 and self.Profile:sub(1, 10)..'...' or self.Profile
 		self.ProfileLabel.Size = UDim2.fromOffset(getfontsize(self.ProfileLabel.Text, self.ProfileLabel.TextSize, self.ProfileLabel.Font).X + 16, 24)
 	end
 
-	if isfile('newvape/profiles/'..self.Profile..self.Place..'.txt') then
-		local savedata = loadJson('newvape/profiles/'..self.Profile..self.Place..'.txt')
+	local profilePath = self:GetProfileConfigPath(self.Profile, self.Place)
+	if isfile(profilePath) then
+		local savedata = loadJson(profilePath)
 		if not savedata then
 			savedata = {Categories = {}, Modules = {}, Legit = {}}
 			self:CreateNotification('Vape', 'Failed to load '..self.Profile..' profile.', 10, 'alert')
@@ -5614,7 +5841,7 @@ function mainapi:Save(newprofile)
 	end
 
 	writefile('newvape/profiles/'..game.GameId..'.gui.txt', httpService:JSONEncode(guidata))
-	writefile('newvape/profiles/'..self.Profile..self.Place..'.txt', httpService:JSONEncode(savedata))
+	writefile(self:GetProfileConfigPath(newprofile or self.Profile, self.Place), httpService:JSONEncode(savedata))
 end
 
 function mainapi:SaveOptions(object, savedoptions)
@@ -5913,8 +6140,8 @@ general:CreateButton({
 	Name = 'Reset current profile',
 	Function = function()
 	mainapi.Save = function() end
-		if isfile('newvape/profiles/'..mainapi.Profile..mainapi.Place..'.txt') and delfile then
-			delfile('newvape/profiles/'..mainapi.Profile..mainapi.Place..'.txt')
+		if isfile(mainapi:GetProfileConfigPath(mainapi.Profile, mainapi.Place)) and delfile then
+			delfile(mainapi:GetProfileConfigPath(mainapi.Profile, mainapi.Place))
 		end
 		shared.vapereload = true
 		if shared.VapeDeveloper then
@@ -6161,6 +6388,36 @@ mainapi.ToggleNotifications = notifpane:CreateToggle({
 	Default = true,
 	Darker = true
 })
+
+local configsPane = mainapi.Categories.Main:CreateSettingsPane({
+	Name = 'Configs',
+	OnOpen = function()
+		mainapi:RefreshConfigsPane()
+	end,
+})
+configsPane:CreateButton({
+	Name = 'Save current config',
+	Function = function()
+		mainapi:Save()
+		mainapi:CreateNotification('Configs', 'Saved '..mainapi:GetPlaceLabel(mainapi:GetConfigPlaceId(mainapi.Place))..' config.', 4)
+		mainapi:RefreshConfigsPane()
+	end,
+	Tooltip = 'Writes module settings for the current game to disk.',
+})
+configsPane:CreateButton({
+	Name = 'Refresh list',
+	Function = function()
+		mainapi:RefreshConfigsPane()
+	end,
+	Tooltip = 'Reload the list of saved game configs.',
+})
+local configHost = Instance.new('Frame')
+configHost.Name = 'ConfigListHost'
+configHost.Size = UDim2.new(1, 0, 0, 0)
+configHost.AutomaticSize = Enum.AutomaticSize.Y
+configHost.BackgroundTransparency = 1
+configHost.Parent = configsPane.Children
+mainapi.ConfigListHost = configHost
 
 mainapi.GUIColor = mainapi.Categories.Main:CreateGUISlider({
 	Name = 'GUI Theme',
