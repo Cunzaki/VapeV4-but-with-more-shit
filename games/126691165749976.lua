@@ -380,6 +380,9 @@ local function getEnemyState(char)
 	return enemyStates[char]
 end
 
+local bindUtilityLoop
+local installUtilityPacketHooks
+run(function()
 local function getMapMain()
 	if mapMain and mapMain.Parent then
 		return mapMain
@@ -594,7 +597,7 @@ local function freezeGrappleState()
 	end
 end
 
-local function installUtilityPacketHooks()
+installUtilityPacketHooks = function()
 	if utilityHooksInstalled then
 		installIncomingUtilityHooks()
 		return true
@@ -750,7 +753,7 @@ local function utilityHeartbeat()
 	end
 end
 
-local function bindUtilityLoop()
+bindUtilityLoop = function()
 	if utilityLoopBound then
 		return
 	end
@@ -780,7 +783,8 @@ local function bindUtilityLoop()
 			warn('[REDLINER] utility error:', err)
 		end
 	end)
-end
+
+end)
 
 -- ---------------------------------------------------------------------------
 -- Animation catalog (whitelist-only)
@@ -1727,10 +1731,14 @@ end
 -- Animation Logger (file dump for ID identification)
 -- ---------------------------------------------------------------------------
 
-local animLogActive = false
-local animLogLocal = false
-local animLogEnemies = true
-local animLogFilePath = ''
+local AnimLog = {
+	active = false,
+	logLocal = false,
+	logEnemies = true,
+	filePath = '',
+}
+
+run(function()
 local animLogBuffer = {}
 local animLogBufferChars = 0
 local animLogLastFlush = 0
@@ -1775,7 +1783,7 @@ local function animLogVerifyFile(path)
 end
 
 local function animLogAppendFile(text, path)
-	path = path or animLogFilePath
+	path = path or AnimLog.filePath
 	if not animLogCanWrite() or path == '' then
 		animLogLastWriteError = 'writefile unavailable'
 		return false, animLogLastWriteError
@@ -1808,7 +1816,7 @@ local function animLogAppendFile(text, path)
 end
 
 local function animLogWriteFile(text, path)
-	path = path or animLogFilePath
+	path = path or AnimLog.filePath
 	if not animLogCanWrite() or path == '' then
 		animLogLastWriteError = 'writefile unavailable'
 		return false, animLogLastWriteError
@@ -1894,12 +1902,12 @@ end
 
 local function animLogShouldLogPlayer(plr)
 	if not plr then
-		return animLogEnemies
+		return AnimLog.logEnemies
 	end
 	if plr == lplr then
-		return animLogLocal
+		return AnimLog.logLocal
 	end
-	return animLogEnemies
+	return AnimLog.logEnemies
 end
 
 local function animLogSafeNumber(value, digits)
@@ -1956,7 +1964,7 @@ local function animLogFormatTrackEvent(char, plr, track, eventName)
 end
 
 local function animLogOnTrackEvent(char, plr, track, eventName)
-	if not animLogActive then
+	if not AnimLog.active then
 		return
 	end
 	animLogEventCount += 1
@@ -1968,7 +1976,7 @@ local function animLogHookAnimator(animator, ownerChar, ownerPlr, conns)
 		animLogOnTrackEvent(ownerChar, ownerPlr, track, 'played')
 		pcall(function()
 			track.Stopped:Once(function()
-				if animLogActive then
+				if AnimLog.active then
 					animLogOnTrackEvent(ownerChar, ownerPlr, track, 'stopped')
 				end
 			end)
@@ -2040,10 +2048,10 @@ local function animLogRefreshWatchers()
 	for key in animLogWatchers do
 		animLogUnwatch(key)
 	end
-	if animLogLocal then
+	if AnimLog.logLocal then
 		animLogWatchPlayer(lplr)
 	end
-	if animLogEnemies then
+	if AnimLog.logEnemies then
 		for _, plr in playersService:GetPlayers() do
 			if plr ~= lplr then
 				animLogWatchPlayer(plr)
@@ -2069,13 +2077,13 @@ local function animLogStartWatchers()
 	table.insert(animLogGlobalConns, playersService.PlayerAdded:Connect(function(plr)
 		plr.CharacterAdded:Connect(function()
 			task.defer(function()
-				if animLogActive then
+				if AnimLog.active then
 					animLogWatchPlayer(plr)
 				end
 			end)
 		end)
 		task.defer(function()
-			if animLogActive then
+			if AnimLog.active then
 				animLogWatchPlayer(plr)
 			end
 		end)
@@ -2093,7 +2101,7 @@ local function animLogStartWatchers()
 	for _, plr in playersService:GetPlayers() do
 		plr.CharacterAdded:Connect(function()
 			task.defer(function()
-				if animLogActive then
+				if AnimLog.active then
 					animLogWatchPlayer(plr)
 				end
 			end)
@@ -2103,7 +2111,7 @@ local function animLogStartWatchers()
 	animLogFlushToken += 1
 	local token = animLogFlushToken
 	task.spawn(function()
-		while animLogActive and token == animLogFlushToken do
+		while AnimLog.active and token == animLogFlushToken do
 			animLogFlush(false)
 			task.wait(1.5)
 		end
@@ -2133,10 +2141,10 @@ local function animLogDumpCatalog()
 	end
 
 	animLogEnsureFolder()
-	if animLogFilePath == '' then
-		animLogFilePath = animLogGetFilePath()
+	if AnimLog.filePath == '' then
+		AnimLog.filePath = animLogGetFilePath()
 	end
-	local path = animLogFilePath
+	local path = AnimLog.filePath
 	local entries = {}
 	local roots = {
 		{root = replicatedStorage:FindFirstChild('Assets'), prefix = ''},
@@ -2196,7 +2204,7 @@ local function animLogBeginSession(clearFile)
 		return false, 'writefile unavailable'
 	end
 	animLogEnsureFolder()
-	animLogFilePath = animLogGetFilePath()
+	AnimLog.filePath = animLogGetFilePath()
 	animLogEventCount = 0
 	animLogMirrorConsole = false
 	local header = table.concat({
@@ -2206,18 +2214,18 @@ local function animLogBeginSession(clearFile)
 		'# place=' .. tostring(game.PlaceId),
 		'# started=' .. os.date('%Y-%m-%d %H:%M:%S'),
 		'# local=' .. lplr.Name,
-		'# log_local=' .. tostring(animLogLocal),
-		'# log_enemies=' .. tostring(animLogEnemies),
-		'# file=' .. animLogFilePath,
+		'# log_local=' .. tostring(AnimLog.logLocal),
+		'# log_enemies=' .. tostring(AnimLog.logEnemies),
+		'# file=' .. AnimLog.filePath,
 		'# executor=' .. animLogGetExecutorName(),
 		'################################################################################',
 		'',
 	}, '\n')
 	local ok, err
 	if clearFile then
-		ok, err = animLogWriteFile(header, animLogFilePath)
+		ok, err = animLogWriteFile(header, AnimLog.filePath)
 	else
-		ok, err = animLogAppendFile(header, animLogFilePath)
+		ok, err = animLogAppendFile(header, AnimLog.filePath)
 	end
 	if not ok then
 		animLogMirrorConsole = true
@@ -2230,16 +2238,27 @@ local function animLogBeginSession(clearFile)
 	if catalogErr then
 		return true, catalogErr
 	end
-	print('[REDLINER] Animation Logger | wrote test OK | executor=' .. animLogGetExecutorName() .. ' | file=' .. animLogFilePath)
+	print('[REDLINER] Animation Logger | wrote test OK | executor=' .. animLogGetExecutorName() .. ' | file=' .. AnimLog.filePath)
 	return true
 end
 
 local function animLogStop()
 	animLogWriteLine('# session ended', os.date('%Y-%m-%d %H:%M:%S'), 'events=' .. animLogEventCount)
 	animLogFlush(true)
-	animLogActive = false
+	AnimLog.active = false
 	animLogStopWatchers()
 end
+
+
+AnimLog.beginSession = animLogBeginSession
+AnimLog.stop = animLogStop
+AnimLog.startWatchers = animLogStartWatchers
+AnimLog.refreshWatchers = animLogRefreshWatchers
+AnimLog.dumpCatalog = animLogDumpCatalog
+AnimLog.flush = animLogFlush
+AnimLog.getFilePath = animLogGetFilePath
+AnimLog.getExecutorName = animLogGetExecutorName
+end)
 
 -- ---------------------------------------------------------------------------
 -- UI modules
@@ -2756,19 +2775,19 @@ run(function()
 		Name = 'Animation Logger',
 		Function = function(callback)
 			if callback then
-				local ok, err = animLogBeginSession(false)
+				local ok, err = AnimLog.beginSession(false)
 				if not ok then
 					return
 				end
-				animLogActive = true
-				animLogStartWatchers()
+				AnimLog.active = true
+				AnimLog.startWatchers()
 				if err then
 					notif('Animation Logger', 'File write failed — logging to console. ' .. err, 10, 'warning')
 				else
-					notif('Animation Logger', animLogFilePath .. ' (' .. animLogGetExecutorName() .. ' workspace)', 8)
+					notif('Animation Logger', AnimLog.filePath .. ' (' .. AnimLog.getExecutorName() .. ' workspace)', 8)
 				end
 			else
-				animLogStop()
+				AnimLog.stop()
 			end
 		end,
 		Tooltip = 'Writes played animations to a text file. File is in your executor workspace, not this repo folder.',
@@ -2778,9 +2797,9 @@ run(function()
 		Name = 'Log Local',
 		Default = false,
 		Function = function(callback)
-			animLogLocal = callback
-			if animLogActive then
-				animLogRefreshWatchers()
+			AnimLog.logLocal = callback
+			if AnimLog.active then
+				AnimLog.refreshWatchers()
 			end
 		end,
 		Tooltip = 'Include your own character animations in the log.',
@@ -2790,9 +2809,9 @@ run(function()
 		Name = 'Log Enemies',
 		Default = true,
 		Function = function(callback)
-			animLogEnemies = callback
-			if animLogActive then
-				animLogRefreshWatchers()
+			AnimLog.logEnemies = callback
+			if AnimLog.active then
+				AnimLog.refreshWatchers()
 			end
 		end,
 		Tooltip = 'Include enemy player animations in the log.',
@@ -2801,7 +2820,7 @@ run(function()
 	AnimLogger:CreateButton({
 		Name = 'Dump Catalog',
 		Function = function()
-			local path, err = animLogDumpCatalog()
+			local path, err = AnimLog.dumpCatalog()
 			if err then
 				notif('Animation Logger', 'Catalog dump failed — check console. ' .. err, 8, 'warning')
 			else
@@ -2814,17 +2833,17 @@ run(function()
 	AnimLogger:CreateButton({
 		Name = 'New Session',
 		Function = function()
-			local ok, err = animLogBeginSession(true)
+			local ok, err = AnimLog.beginSession(true)
 			if not ok then
 				return
 			end
-			if animLogActive then
-				animLogStartWatchers()
+			if AnimLog.active then
+				AnimLog.startWatchers()
 			end
 			if err then
 				notif('Animation Logger', 'New session (console mirror). ' .. err, 8, 'warning')
 			else
-				notif('Animation Logger', 'New session: ' .. animLogFilePath, 6)
+				notif('Animation Logger', 'New session: ' .. AnimLog.filePath, 6)
 			end
 		end,
 		Tooltip = 'Clears the log file and writes a fresh header + catalog.',
@@ -2833,8 +2852,8 @@ run(function()
 	AnimLogger:CreateButton({
 		Name = 'Flush Now',
 		Function = function()
-			animLogFlush(true)
-			notif('Animation Logger', 'Buffer flushed to ' .. (animLogFilePath ~= '' and animLogFilePath or animLogGetFilePath()), 4)
+			AnimLog.flush(true)
+			notif('Animation Logger', 'Buffer flushed to ' .. (AnimLog.filePath ~= '' and AnimLog.filePath or AnimLog.getFilePath()), 4)
 		end,
 		Tooltip = 'Immediately write buffered events to the log file.',
 	})
