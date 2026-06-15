@@ -1,5 +1,6 @@
 --[[
-	REDLINER shared game script (FFA + MATCH place IDs).
+	REDLINER shared game script (MAIN + FFA + MATCH place IDs).
+	Place IDs: 94987506187454 (main), 115875349872417 (FFA), 126691165749976 (match).
 	Auto Parry, Auto Attack, Reach (melee packet extension).
 ]]
 
