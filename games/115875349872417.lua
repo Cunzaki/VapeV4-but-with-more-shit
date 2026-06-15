@@ -181,6 +181,8 @@ local GUN_AIM_RANGE_BONUS = 0.12
 local GUN_MUZZLE_NAMES = {'Muzzle', 'Barrel', 'FirePoint', 'Gun', 'Handle', 'Tip', 'ShootPoint', 'Ray', 'Flash', 'Emitter', 'Glint'}
 local GUN_RAY_HIT_RADIUS = 5
 local GUN_RAY_MAX_RANGE = 140
+local PING_PARRY_MULTIPLIER = 0.9
+local PING_PARRY_MAX_OFFSET = 0.5
 local tryParry
 local canSafelyParry
 local hitboxReachHooked = false
@@ -979,6 +981,27 @@ local function getGunParryDelay(gunName)
 	return gunParryDelays[gunName] or gunParryDelays.Castigate
 end
 
+local function getPingParryOffset()
+	local ping = 0
+	pcall(function()
+		if lplr.GetNetworkPing then
+			ping = lplr:GetNetworkPing()
+		end
+	end)
+	if typeof(ping) ~= 'number' or ping ~= ping or ping < 0 then
+		return 0
+	end
+	return math.clamp(ping * PING_PARRY_MULTIPLIER, 0, PING_PARRY_MAX_OFFSET)
+end
+
+local function getEffectiveGunParryDelay(gunName)
+	return math.max(0, getGunParryDelay(gunName) - getPingParryOffset())
+end
+
+local function getAdjustedParryDelay(baseDelay, timePosition)
+	return math.max(0, (baseDelay or 0) - (timePosition or 0) - getPingParryOffset())
+end
+
 local function scheduleGunDrawParry(char, gunName, normId, timePosition, source, track, aimModel)
 	if not shouldParryGun(char, true, aimModel) then
 		debugSkip('gun_draw_aim_schedule', char.Name, gunName, normId, source)
@@ -993,9 +1016,16 @@ local function scheduleGunDrawParry(char, gunName, normId, timePosition, source,
 	state.scheduledDrawToken += 1
 	local token = state.scheduledDrawToken
 	timePosition = timePosition or 0
-	local delay = math.max(0, getGunParryDelay(gunName) - timePosition)
+	local delay = getAdjustedParryDelay(getGunParryDelay(gunName), timePosition)
 
-	debugLog('trigger', 'gun_draw_schedule_' .. gunName, 'id=' .. normId, 'delay=' .. string.format('%.2f', delay), source)
+	debugLog(
+		'trigger',
+		'gun_draw_schedule_' .. gunName,
+		'id=' .. normId,
+		'delay=' .. string.format('%.2f', delay),
+		'ping=' .. string.format('%.0fms', getPingParryOffset() * 1000),
+		source
+	)
 
 	if track then
 		track.Stopped:Once(function()
@@ -3000,8 +3030,8 @@ run(function()
 					local _, animId = getTrackAnimInfo(track)
 					local gunName = GUN_DRAW_ANIM_IDS[normalizeAnimId(animId)]
 					if gunName then
-						local delay = getGunParryDelay(gunName)
-						local remaining = math.max(0, delay - track.TimePosition)
+						local delay = getEffectiveGunParryDelay(gunName)
+						local remaining = getAdjustedParryDelay(getGunParryDelay(gunName), track.TimePosition)
 						return gunName, remaining, delay, 'DRAW'
 					end
 				end
@@ -3037,7 +3067,7 @@ run(function()
 								for _, desc in model:GetDescendants() do
 									if isGlintInstance(desc) then
 										local glintGun = detectEquippedGun(char)
-										local delay = getGunParryDelay(glintGun)
+										local delay = getEffectiveGunParryDelay(glintGun)
 										local rem = math.max(0, delay + hud.drawTimerOffsetSetting)
 										table.insert(entries, {
 											name = plr.Name,
@@ -3168,8 +3198,8 @@ run(function()
 							local aiming = isEnemyAimingAtMeForGun(char, model)
 							if aiming then
 								local gunName = GUN_DRAW_ANIM_IDS[normalizeAnimId(animId)] or detectEquippedGun(char)
-								local delay = getGunParryDelay(gunName)
-								local remaining = math.max(0, delay - track.TimePosition)
+								local delay = getEffectiveGunParryDelay(gunName)
+								local remaining = getAdjustedParryDelay(getGunParryDelay(gunName), track.TimePosition)
 								table.insert(threats, {
 									type = 'GUN DRAW',
 									name = plr.Name,
@@ -4430,7 +4460,7 @@ run(function()
 			debugEnabled = callback
 			if callback then
 				logParryAnimIds(true)
-				print('[REDLINER] debug on | alive=', isLocalAlive(), 'autoParry=', autoParryActive, 'threatRange=', threatRangeSetting, 'castigateDelay=', gunParryDelays.Castigate)
+				print('[REDLINER] debug on | alive=', isLocalAlive(), 'autoParry=', autoParryActive, 'threatRange=', threatRangeSetting, 'castigateDelay=', gunParryDelays.Castigate, 'pingOffset=', string.format('%.0fms', getPingParryOffset() * 1000))
 			else
 				table.clear(lastDebugAnimAt)
 			end
