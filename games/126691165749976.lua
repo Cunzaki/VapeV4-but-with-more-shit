@@ -87,6 +87,14 @@ local GRAPPLE_MAX_KEYS = {
 	'maxCharges',
 	'max_charges',
 }
+-- ItemDef.ModuleScript bullet_cost (heat cap per gun, in "H" units).
+local GUN_HEAT_CAPS = {
+	Castigate = 100,
+	Phoenix = 150,
+	Siege = 140,
+	Monarch = 200,
+}
+local GUN_HEAT_WEAPON_LIST = { 'Castigate', 'Phoenix', 'Siege', 'Monarch' }
 
 local AUTO_PARRY_DEFAULTS = {
 	meleeRange = 20,
@@ -198,20 +206,12 @@ local parryScanBound = false
 local tryParry
 local infiniteHeatActive = false
 local infiniteGrappleActive = false
-local heatValueSetting = 200
-local heatRateSetting = 0.25
-local grappleRangeSetting = 120
-local grappleRateSetting = 0.2
-local grappleAutoFire = false
-local grappleHoldOnly = true
-local augmentHeld = false
+local selectedHeatWeapon = 'Castigate'
+local heatRefreshRate = 0.15
 local lastHeatAt = 0
-local lastGrappleAt = 0
-local mapMain = nil
 local utilityHooksInstalled = false
 local utilityIncomingHooked = false
 local utilityLoopBound = false
-local lastUtilityReadyWarn = 0
 local utilityHookLogged = {
 	heat = false,
 	grapple = false,
@@ -220,10 +220,6 @@ local heatStateRefs = {}
 local grappleStateRefs = {}
 local lastHeatGcScan = 0
 local lastGrappleGcScan = 0
-local packetTemplates = {
-	grapple = nil,
-	gun = nil,
-}
 
 local function notif(...)
 	return vape:CreateNotification(...)
@@ -382,33 +378,16 @@ end
 
 local bindUtilityLoop
 local installUtilityPacketHooks
+local setHeat
+local freezeHeatState
+local getSelectedHeatCap
 run(function()
-local function getMapMain()
-	if mapMain and mapMain.Parent then
-		return mapMain
-	end
-	local map = workspaceService:FindFirstChild('Map')
-	mapMain = map and map:FindFirstChild('Main')
-	return mapMain
-end
-
-local function getMapRayParams()
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Include
-	params.IgnoreWater = true
-	local main = getMapMain()
-	params.FilterDescendantsInstances = main and {main} or {}
-	return params
+getSelectedHeatCap = function()
+	return GUN_HEAT_CAPS[selectedHeatWeapon] or 200
 end
 
 local function isPacketReady(packet)
 	return packet ~= nil and packet.Id ~= nil
-end
-
-local function capturePacketTemplate(packed, key)
-	if key and packed and packed.n and packed.n > 0 then
-		packetTemplates[key] = packed
-	end
 end
 
 local function logUtilityHookOnce(kind, message)
@@ -420,20 +399,23 @@ local function logUtilityHookOnce(kind, message)
 	debugLog(kind, message)
 end
 
-local function transformIncomingHeat(...)
+local function transformIncomingUtility(...)
+	local cap = getSelectedHeatCap()
 	local n = select('#', ...)
 	if n == 0 then
 		return
 	end
 	local args = table.pack(...)
-	local maxHeat = heatValueSetting
-	if args.n >= 2 and type(args[2]) == 'number' then
-		maxHeat = math.max(maxHeat, args[2])
-		args[2] = maxHeat
-	end
 	for i = 1, args.n do
-		if type(args[i]) == 'number' then
-			args[i] = maxHeat
+		local val = args[i]
+		if type(val) == 'number' then
+			if infiniteHeatActive then
+				val = math.max(val, cap)
+			end
+			if infiniteGrappleActive and val >= 0 and val <= GRAPPLE_MAX_CHARGES + 1 then
+				val = GRAPPLE_MAX_CHARGES
+			end
+			args[i] = val
 		end
 	end
 	return table.unpack(args, 1, args.n)
@@ -456,42 +438,45 @@ local function hookIncomingPacketSignal(packet, tag, transformFn, enabledFn)
 end
 
 local function installIncomingUtilityHooks()
-	if utilityIncomingHooked then
-		return true
-	end
 	if not initPackets() then
 		return false
 	end
 
 	local hooked = 0
-	if hookIncomingPacketSignal(Packets[HEAT_PACKET_NAME], 'heat', transformIncomingHeat, function()
-		return infiniteHeatActive
-	end) then
+	local enabledFn = function()
+		return infiniteHeatActive or infiniteGrappleActive
+	end
+	if hookIncomingPacketSignal(Packets[HEAT_PACKET_NAME], 'heat', transformIncomingUtility, enabledFn) then
 		hooked += 1
 	end
 
 	local unreliable = Packets.unreliablePackets
 	if unreliable then
 		for _, packetName in HEAT_UNRELIABLE_PACKETS do
-			if hookIncomingPacketSignal(unreliable[packetName], 'heat_' .. packetName, transformIncomingHeat, function()
-				return infiniteHeatActive
-			end) then
+			if hookIncomingPacketSignal(unreliable[packetName], 'heat_' .. packetName, transformIncomingUtility, enabledFn) then
 				hooked += 1
 			end
 		end
 	end
 
 	if hooked > 0 then
-		logUtilityHookOnce('heat', 'Infinite Heat: hooked ' .. hooked .. ' incoming heat sync packet(s)')
+		logUtilityHookOnce('heat', 'Infinite utility: hooked ' .. hooked .. ' incoming sync packet(s)')
 		utilityIncomingHooked = true
 	end
-	return utilityIncomingHooked
+	return hooked > 0
 end
 
 local function rememberHeatState(state)
 	if table.find(heatStateRefs, state) then
 		return
 	end
+
+	local itemId = rawget(state, 'item_id') or rawget(state, 'itemId')
+	if type(itemId) == 'string' and GUN_HEAT_CAPS[itemId] then
+		table.insert(heatStateRefs, state)
+		return
+	end
+
 	for _, key in HEAT_STATE_KEYS do
 		if type(rawget(state, key)) == 'number' then
 			table.insert(heatStateRefs, state)
@@ -526,7 +511,9 @@ local function scanClientStateTables()
 	end
 
 	local now = tick()
-	if infiniteHeatActive and now - lastHeatGcScan >= 2 then
+	local heatScanInterval = #heatStateRefs == 0 and 0.5 or 2
+	local grappleScanInterval = #grappleStateRefs == 0 and 0.5 or 2
+	if infiniteHeatActive and now - lastHeatGcScan >= heatScanInterval then
 		lastHeatGcScan = now
 		for _, obj in getgc(true) do
 			if type(obj) == 'table' then
@@ -535,7 +522,7 @@ local function scanClientStateTables()
 		end
 	end
 
-	if infiniteGrappleActive and now - lastGrappleGcScan >= 2 then
+	if infiniteGrappleActive and now - lastGrappleGcScan >= grappleScanInterval then
 		lastGrappleGcScan = now
 		local before = #grappleStateRefs
 		for _, obj in getgc(true) do
@@ -549,8 +536,8 @@ local function scanClientStateTables()
 	end
 end
 
-local function freezeHeatState()
-	local maxHeat = heatValueSetting
+freezeHeatState = function()
+	local maxHeat = getSelectedHeatCap()
 	for _, state in heatStateRefs do
 		if type(state) == 'table' then
 			for _, key in HEAT_MAX_KEYS do
@@ -598,41 +585,46 @@ local function freezeGrappleState()
 end
 
 installUtilityPacketHooks = function()
-	if utilityHooksInstalled then
-		installIncomingUtilityHooks()
-		return true
-	end
 	if not initPackets() then
 		return false
 	end
 
 	local grapplePacket = Packets[GRAPPLE_PACKET_NAME]
 	local gunPacket = Packets[GUN_PACKET_NAME]
-	if not grapplePacket and not gunPacket and not Packets[HEAT_PACKET_NAME] then
+	local heatPacket = Packets[HEAT_PACKET_NAME]
+	if not grapplePacket and not gunPacket and not heatPacket then
 		return false
 	end
 
-	if grapplePacket and not grapplePacket._utilityCaptureHooked then
+	if grapplePacket and not grapplePacket._utilityGrappleHooked then
 		local oldGrappleFire = grapplePacket.Fire
 		grapplePacket.Fire = function(self, ...)
-			local packed = table.pack(...)
-			capturePacketTemplate(packed, 'grapple')
-			return oldGrappleFire(self, ...)
+			local ok, result = pcall(oldGrappleFire, self, ...)
+			if infiniteGrappleActive then
+				freezeGrappleState()
+			end
+			if ok then
+				return result
+			end
+			error(result, 0)
 		end
-		grapplePacket._utilityCaptureHooked = true
+		grapplePacket._utilityGrappleHooked = true
 	end
 
-	if gunPacket and not gunPacket._utilityCaptureHooked then
+	if gunPacket and not gunPacket._utilityGunHooked then
 		local oldGunFire = gunPacket.Fire
 		gunPacket.Fire = function(self, ...)
-			local packed = table.pack(...)
-			capturePacketTemplate(packed, 'gun')
-			if infiniteHeatActive and packed.n >= 5 and type(packed[5]) == 'number' then
-				packed[5] = 0
+			local ok, result = pcall(oldGunFire, self, ...)
+			if infiniteHeatActive then
+				setHeat(getSelectedHeatCap())
+				freezeHeatState()
 			end
-			return oldGunFire(self, table.unpack(packed, 1, packed.n))
+			if ok then
+				return result
+			end
+			error(result, 0)
 		end
-		gunPacket._utilityCaptureHooked = true
+		gunPacket._utilityGunHooked = true
 	end
 
 	installIncomingUtilityHooks()
@@ -640,25 +632,7 @@ installUtilityPacketHooks = function()
 	return true
 end
 
-local function utilityPacketsReady()
-	if not initPackets() then
-		return false
-	end
-	if grappleAutoFire and infiniteGrappleActive and not isPacketReady(Packets[GRAPPLE_PACKET_NAME]) then
-		return false
-	end
-	return true
-end
-
-local function warnUtilityNotReady()
-	if tick() - lastUtilityReadyWarn < 8 then
-		return
-	end
-	lastUtilityReadyWarn = tick()
-	notif('REDLINER', 'Auto grapple waiting for packet IDs — grapple manually once.', 6, 'warning')
-end
-
-local function setHeat(value)
+setHeat = function(value)
 	if not initPackets() then
 		return false
 	end
@@ -667,42 +641,8 @@ local function setHeat(value)
 	if not isPacketReady(packet) then
 		return false
 	end
-	task.spawn(function()
-		pcall(function()
-			packet:Fire(value)
-		end)
-	end)
-	return true
-end
-
-local function fireGrappleTowardLook(range)
-	if not isLocalAlive() or not initPackets() then
-		return false
-	end
-	installUtilityPacketHooks()
-
-	local packet = Packets[GRAPPLE_PACKET_NAME]
-	if not isPacketReady(packet) then
-		return false
-	end
-
-	local root = getLocalRoot()
-	local camera = workspaceService.CurrentCamera
-	if not root or not camera then
-		return false
-	end
-
-	local look = camera.CFrame.LookVector
-	local hit = workspaceService:Raycast(root.Position, look * range, getMapRayParams())
-	local target = hit and hit.Position or (root.Position + look * range)
-	local template = packetTemplates.grapple
-	local itemId = template and template[1] or 'Grappler'
-	local tag = template and template[4] or ''
-
-	task.spawn(function()
-		pcall(function()
-			packet:Fire(itemId, root.Position, target, tag)
-		end)
+	pcall(function()
+		packet:Fire(value)
 	end)
 	return true
 end
@@ -717,38 +657,27 @@ local function utilityHeartbeat()
 	end
 
 	installUtilityPacketHooks()
+	if not utilityIncomingHooked then
+		installIncomingUtilityHooks()
+	end
 	scanClientStateTables()
 
 	if infiniteHeatActive then
 		freezeHeatState()
 		local now = tick()
-		if now - lastHeatAt >= heatRateSetting then
+		if now - lastHeatAt >= heatRefreshRate then
 			lastHeatAt = now
-			setHeat(heatValueSetting)
+			setHeat(getSelectedHeatCap())
 		end
 		if not utilityHookLogged.heat then
-			logUtilityHookOnce('heat', 'Infinite Heat: state freeze active (packets + client tables)')
+			logUtilityHookOnce('heat', 'Infinite Heat: ' .. selectedHeatWeapon .. ' capped at ' .. getSelectedHeatCap() .. 'H')
 		end
 	end
 
 	if infiniteGrappleActive then
 		freezeGrappleState()
 		if not utilityHookLogged.grapple then
-			logUtilityHookOnce('grapple', 'Infinite Grapple: charge freeze active at ' .. GRAPPLE_MAX_CHARGES)
-		end
-
-		if grappleAutoFire then
-			if not utilityPacketsReady() then
-				warnUtilityNotReady()
-			else
-				local now = tick()
-				if now - lastGrappleAt >= grappleRateSetting then
-					if not grappleHoldOnly or augmentHeld then
-						lastGrappleAt = now
-						fireGrappleTowardLook(grappleRangeSetting)
-					end
-				end
-			end
+			logUtilityHookOnce('grapple', 'Infinite Grapple: charges frozen at ' .. GRAPPLE_MAX_CHARGES .. ' (RMB/AUGMENT)')
 		end
 	end
 end
@@ -759,21 +688,6 @@ bindUtilityLoop = function()
 	end
 	utilityLoopBound = true
 
-	inputService.InputBegan:Connect(function(input, processed)
-		if processed then
-			return
-		end
-		if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
-			augmentHeld = true
-		end
-	end)
-
-	inputService.InputEnded:Connect(function(input)
-		if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
-			augmentHeld = false
-		end
-	end)
-
 	runService.Heartbeat:Connect(function()
 		if not infiniteHeatActive and not infiniteGrappleActive then
 			return
@@ -783,7 +697,6 @@ bindUtilityLoop = function()
 			warn('[REDLINER] utility error:', err)
 		end
 	end)
-
 end
 
 end)
@@ -2325,8 +2238,7 @@ run(function()
 	})
 
 	local InfiniteHeat
-	local HeatValue
-	local HeatRate
+	local HeatWeapon
 
 	InfiniteHeat = minigames:CreateModule({
 		Name = 'Infinite Heat',
@@ -2337,44 +2249,28 @@ run(function()
 				heatStateRefs = {}
 				bindPacketListeners()
 				bindUtilityLoop()
-				notif('Infinite Heat', 'Hooks heat sync + freezes client heat state. Check output for hook log.', 6)
+				setHeat(getSelectedHeatCap())
+				notif('Infinite Heat', selectedHeatWeapon .. ' heat locked at ' .. getSelectedHeatCap() .. 'H.', 6)
 			end
 		end,
-		Tooltip = 'Hooks incoming heat sync (_xdb2548bded1dd8e3 + unreliable NumberF16 packets) and freezes client heat tables. Gun packet heat cost zeroed. Castigate 100H, Phoenix 150H, Siege 140H, Monarch 200H.',
+		Tooltip = 'Sets/maxes heat for the selected gun. Caps from ItemDef: Castigate 100H, Phoenix 150H, Siege 140H, Monarch 200H. Syncs via _xdb2548bded1dd8e3 + unreliable NumberF16 packets.',
 	})
 
-	HeatValue = InfiniteHeat:CreateSlider({
-		Name = 'Max Heat',
-		Min = 50,
-		Max = 500,
-		Default = 200,
+	HeatWeapon = InfiniteHeat:CreateDropdown({
+		Name = 'Weapon',
+		List = GUN_HEAT_WEAPON_LIST,
+		Default = selectedHeatWeapon,
 		Function = function(val)
-			heatValueSetting = val
+			selectedHeatWeapon = val
+			if infiniteHeatActive then
+				setHeat(getSelectedHeatCap())
+				freezeHeatState()
+			end
 		end,
-		Suffix = 'H',
-		Tooltip = 'Target heat cap (200H covers Monarch). Incoming sync and client state are clamped to this.',
-	})
-
-	HeatRate = InfiniteHeat:CreateSlider({
-		Name = 'Fallback Refresh',
-		Min = 0.1,
-		Max = 1,
-		Decimal = 100,
-		Default = 0.25,
-		Function = function(val)
-			heatRateSetting = val
-		end,
-		Suffix = function(val)
-			return val == 1 and 'second' or 'seconds'
-		end,
-		Tooltip = 'Optional backup: re-sends client heat packet if sync hooks miss. Primary fix is incoming hook + state freeze.',
+		Tooltip = 'Pick the gun you are using — heat is set to that weapon\'s max bullet cost.',
 	})
 
 	local InfiniteGrapple
-	local GrappleAutoFire
-	local GrappleRange
-	local GrappleRate
-	local GrappleHoldOnly
 
 	InfiniteGrapple = minigames:CreateModule({
 		Name = 'Infinite Grapple',
@@ -2385,55 +2281,10 @@ run(function()
 				grappleStateRefs = {}
 				bindPacketListeners()
 				bindUtilityLoop()
-				notif('Infinite Grapple', 'Keeps grapple charges at 2. Enable Auto Fire for optional E spam.', 6)
+				notif('Infinite Grapple', 'Grappler charges stay at 2. Hold RMB (AUGMENT) to grapple normally.', 6)
 			end
 		end,
-		Tooltip = 'Freezes Grappler charges at 2 via getgc client state scan + heartbeat. Optional Auto Fire sends grapple packets toward look.',
-	})
-
-	GrappleAutoFire = InfiniteGrapple:CreateToggle({
-		Name = 'Auto Fire',
-		Default = false,
-		Function = function(callback)
-			grappleAutoFire = callback
-		end,
-		Tooltip = 'Off by default — use normal E grapple with infinite charges. On: auto-fires grapple packet toward camera.',
-	})
-
-	GrappleRange = InfiniteGrapple:CreateSlider({
-		Name = 'Range',
-		Min = 30,
-		Max = 250,
-		Default = 120,
-		Function = function(val)
-			grappleRangeSetting = val
-		end,
-		Suffix = function(val)
-			return val == 1 and 'stud' or 'studs'
-		end,
-	})
-
-	GrappleRate = InfiniteGrapple:CreateSlider({
-		Name = 'Rate',
-		Min = 0.05,
-		Max = 1,
-		Decimal = 100,
-		Default = 0.2,
-		Function = function(val)
-			grappleRateSetting = val
-		end,
-		Suffix = function(val)
-			return val == 1 and 'second' or 'seconds'
-		end,
-	})
-
-	GrappleHoldOnly = InfiniteGrapple:CreateToggle({
-		Name = 'Hold E Only',
-		Default = true,
-		Function = function(callback)
-			grappleHoldOnly = callback
-		end,
-		Tooltip = 'When Auto Fire is on: only fire while holding E (AUGMENT). Turn off for constant auto grapple.',
+		Tooltip = 'Keeps Grappler charges at 2 via client state freeze + post-fire restore. Uses RMB (AUGMENT), not E.',
 	})
 
 	MeleeRange = AutoParry:CreateSlider({
