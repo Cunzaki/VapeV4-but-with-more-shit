@@ -51,10 +51,11 @@ local AUTO_PARRY_DEFAULTS = {
 	meleeRange = 20,
 	threatRange = 100,
 	watcherThreatRange = 120,
-	enemyParryDebounce = 0.3,
+	meleeEnemyDebounce = 0.15,
+	gunEnemyDebounce = 0.3,
 	meleeAimDot = 0.32,
-	gunAimDot = 0.4,
-	meleeParryCooldown = 0.02,
+	gunAimDot = 0.8,
+	meleeParryCooldown = 0,
 	parryCooldown = 0.05,
 	meleeSwingWindow = 0.55,
 	gunDrawWindow = 0.45,
@@ -130,7 +131,8 @@ local threatDebugEnabled = AUTO_PARRY_DEFAULTS.threatDebug
 local meleeRangeSetting = AUTO_PARRY_DEFAULTS.meleeRange
 local threatRangeSetting = AUTO_PARRY_DEFAULTS.threatRange
 local watcherThreatRangeSetting = AUTO_PARRY_DEFAULTS.watcherThreatRange
-local enemyParryDebounceSetting = AUTO_PARRY_DEFAULTS.enemyParryDebounce
+local meleeEnemyDebounceSetting = AUTO_PARRY_DEFAULTS.meleeEnemyDebounce
+local gunEnemyDebounceSetting = AUTO_PARRY_DEFAULTS.gunEnemyDebounce
 local meleeAimDotSetting = AUTO_PARRY_DEFAULTS.meleeAimDot
 local gunAimDotSetting = AUTO_PARRY_DEFAULTS.gunAimDot
 local meleeParryCooldownSetting = AUTO_PARRY_DEFAULTS.meleeParryCooldown
@@ -168,8 +170,9 @@ local autoAttackLoopBound = false
 local localRespawnBound = false
 local lastParryScanAt = 0
 local lastWatcherRefreshAt = 0
-local PARRY_SCAN_INTERVAL = 0.12
-local WATCHER_REFRESH_INTERVAL = 0.5
+local PARRY_SCAN_INTERVAL = 0.05
+local WATCHER_REFRESH_INTERVAL = 0.25
+local GUN_AIM_RANGE_BONUS = 0.12
 local tryParry
 local canSafelyParry
 local hitboxReachHooked = false
@@ -355,13 +358,34 @@ local function isEnemyCharacter(model)
 	return plr and plr ~= lplr
 end
 
-local function getEnemyDistance(char)
+local function getClosestEnemyDistance(charOrPlr)
 	local root = getLocalRoot()
-	local enemyRoot = char and char:FindFirstChild('HumanoidRootPart')
-	if not root or not enemyRoot then
+	if not root then
 		return math.huge
 	end
-	return (enemyRoot.Position - root.Position).Magnitude
+	local models
+	if typeof(charOrPlr) == 'Instance' and charOrPlr:IsA('Player') then
+		models = getEnemyModels(charOrPlr)
+	elseif charOrPlr then
+		local plr = playersService:GetPlayerFromCharacter(charOrPlr)
+		models = plr and getEnemyModels(plr) or {charOrPlr}
+	else
+		return math.huge
+	end
+	local best = math.huge
+	for _, model in models do
+		if model and model.Parent then
+			local enemyRoot = model:FindFirstChild('HumanoidRootPart')
+			if enemyRoot then
+				best = math.min(best, (enemyRoot.Position - root.Position).Magnitude)
+			end
+		end
+	end
+	return best
+end
+
+local function getEnemyDistance(char)
+	return getClosestEnemyDistance(char)
 end
 
 local function getPlayerFromModel(model)
@@ -397,7 +421,7 @@ local function getEnemyModels(plr)
 end
 
 local function getEnemyState(char)
-	if not enemyStates[char] then
+		if not enemyStates[char] then
 		enemyStates[char] = {
 			lastSwingId = '',
 			lastShotId = '',
@@ -407,7 +431,8 @@ local function getEnemyState(char)
 			scheduledMeleeToken = 0,
 			lastAnimTriggerKey = '',
 			lastAnimTriggerAt = 0,
-			lastParryAt = 0,
+			lastMeleeParryAt = 0,
+			lastGunParryAt = 0,
 		}
 	end
 	return enemyStates[char]
@@ -439,10 +464,18 @@ local function isInstUnderEnemyModels(char, inst)
 	return false
 end
 
+local function getTriggerDebounce(triggerKey)
+	if string.find(triggerKey, ':melee:', 1, true) then
+		return meleeEnemyDebounceSetting
+	end
+	return gunEnemyDebounceSetting
+end
+
 local function canEnemyAnimTrigger(char, triggerKey)
 	local state = getEnemyState(char)
 	local now = tick()
-	if state.lastAnimTriggerKey == triggerKey and now - (state.lastAnimTriggerAt or 0) < enemyParryDebounceSetting then
+	local debounce = getTriggerDebounce(triggerKey)
+	if state.lastAnimTriggerKey == triggerKey and now - (state.lastAnimTriggerAt or 0) < debounce then
 		threatDebugSkip('cooldown', char.Name, triggerKey)
 		return false
 	end
@@ -573,9 +606,23 @@ end
 -- Aim checks
 -- ---------------------------------------------------------------------------
 
-local function getAimDot(char)
+local function getTrackOwnerModel(track)
+	if not track then
+		return nil
+	end
+	local inst = track.Parent
+	while inst do
+		if inst:IsA('Model') and inst:FindFirstChild('HumanoidRootPart') then
+			return inst
+		end
+		inst = inst.Parent
+	end
+	return nil
+end
+
+local function getGunAimDotFromModel(model)
 	local root = getLocalRoot()
-	local enemyRoot = char:FindFirstChild('HumanoidRootPart')
+	local enemyRoot = model and model:FindFirstChild('HumanoidRootPart')
 	if not root or not enemyRoot then
 		return 0
 	end
@@ -585,23 +632,63 @@ local function getAimDot(char)
 		return 1
 	end
 	local dir = flatOffset.Unit
-	local best = 0
 	local flatLook = Vector3.new(enemyRoot.CFrame.LookVector.X, 0, enemyRoot.CFrame.LookVector.Z)
-	if flatLook.Magnitude > 0.05 then
-		best = flatLook.Unit:Dot(dir)
+	if flatLook.Magnitude < 0.05 then
+		return 0
 	end
-	local head = char:FindFirstChild('Head')
-	if head then
-		local flatHead = Vector3.new(head.CFrame.LookVector.X, 0, head.CFrame.LookVector.Z)
-		if flatHead.Magnitude > 0.05 then
-			best = math.max(best, flatHead.Unit:Dot(dir))
-		end
+	return flatLook.Unit:Dot(dir)
+end
+
+local function getHeadAimDotFromModel(model)
+	local root = getLocalRoot()
+	local head = model and model:FindFirstChild('Head')
+	if not root or not head then
+		return 0
 	end
-	return best
+	local offset = root.Position - head.Position
+	local flatOffset = Vector3.new(offset.X, 0, offset.Z)
+	if flatOffset.Magnitude < 0.05 then
+		return 1
+	end
+	local flatHead = Vector3.new(head.CFrame.LookVector.X, 0, head.CFrame.LookVector.Z)
+	if flatHead.Magnitude < 0.05 then
+		return 0
+	end
+	return flatHead.Unit:Dot(flatOffset.Unit)
+end
+
+local function getEffectiveGunAimThreshold(dist)
+	local base = gunAimDotSetting
+	if threatRangeSetting <= 0 then
+		return math.min(base, 0.95)
+	end
+	local rangeFactor = math.clamp(dist / threatRangeSetting, 0, 1)
+	return math.min(base + rangeFactor * GUN_AIM_RANGE_BONUS, 0.95)
+end
+
+local function getGunAimDot(char, aimModel)
+	return getGunAimDotFromModel(aimModel or char)
+end
+
+local function getAimDot(char)
+	local hrpDot = getGunAimDotFromModel(char)
+	local headDot = getHeadAimDotFromModel(char)
+	return math.max(hrpDot, headDot)
+end
+
+local function isEnemyAimingAtMeForGun(char, aimModel)
+	local model = aimModel or char
+	local dist = getClosestEnemyDistance(char)
+	local hrpDot = getGunAimDotFromModel(model)
+	local need = getEffectiveGunAimThreshold(dist)
+	if hrpDot < need then
+		return false, hrpDot, need
+	end
+	return true, hrpDot, need
 end
 
 local function isEnemyTargetingMe(char, minDot, confirmedAttack)
-	local dist = getEnemyDistance(char)
+	local dist = getClosestEnemyDistance(char)
 	if not confirmedAttack and dist < closeRangeStudsSetting and not charHasWhitelistAttackPlaying(char) then
 		debugSkip('close_range_no_attack', char.Name, string.format('%.1f', dist))
 		return false
@@ -614,13 +701,13 @@ local function shouldParryMelee(char, _confirmedAttack)
 		return false
 	end
 	if not isEnemyInMeleeThreatRange(char) then
-		threatDebugSkip('out_of_range', char.Name, 'melee', string.format('%.1f', getEnemyDistance(char)))
+		threatDebugSkip('out_of_range', char.Name, 'melee', string.format('%.1f', getClosestEnemyDistance(char)))
 		return false
 	end
 	return true
 end
 
-local function shouldParryGun(char, confirmedAttack)
+local function shouldParryGun(char, confirmedAttack, aimModel)
 	if not parryGunDrawEnabled and not parryGunShotEnabled then
 		return false
 	end
@@ -628,11 +715,12 @@ local function shouldParryGun(char, confirmedAttack)
 		return false
 	end
 	if not isEnemyInGunThreatRange(char) then
-		threatDebugSkip('out_of_range', char.Name, 'gun', string.format('%.1f', getEnemyDistance(char)))
+		threatDebugSkip('out_of_range', char.Name, 'gun', string.format('%.1f', getClosestEnemyDistance(char)))
 		return false
 	end
-	if not isEnemyTargetingMe(char, gunAimDotSetting, confirmedAttack) then
-		threatDebugSkip('not_aiming', char.Name, 'gun', string.format('dot=%.3f need=%.2f', getAimDot(char), gunAimDotSetting))
+	local aiming, dot, need = isEnemyAimingAtMeForGun(char, aimModel)
+	if not aiming then
+		threatDebugSkip('not_aiming', char.Name, 'gun', string.format('dot=%.3f need=%.2f', dot, need))
 		return false
 	end
 	return true
@@ -695,7 +783,11 @@ local function getGunParryDelay(gunName)
 	return gunParryDelays[gunName] or gunParryDelays.Castigate
 end
 
-local function scheduleGunDrawParry(char, gunName, normId, timePosition, source, track)
+local function scheduleGunDrawParry(char, gunName, normId, timePosition, source, track, aimModel)
+	if not shouldParryGun(char, true, aimModel) then
+		debugSkip('gun_draw_aim_schedule', char.Name, gunName, normId, source)
+		return
+	end
 	local state = getEnemyState(char)
 	local drawKey = normId .. ':gun_draw'
 	if state.lastDrawId == drawKey then
@@ -738,11 +830,11 @@ local function scheduleGunDrawParry(char, gunName, normId, timePosition, source,
 			debugSkip('gun_draw_dash', char.Name, gunName, normId)
 			return
 		end
-		if not shouldParryGun(char, true) then
-			debugSkip('gun_draw_out_of_range', char.Name, gunName, string.format('%.1f', getEnemyDistance(char)))
+		if not shouldParryGun(char, true, aimModel) then
+			debugSkip('gun_draw_out_of_range', char.Name, gunName, string.format('%.1f', getClosestEnemyDistance(char)))
 			return
 		end
-		debugLog('trigger', 'gun_draw_timed_' .. gunName, normId, string.format('%.2f', getEnemyDistance(char)))
+		debugLog('trigger', 'gun_draw_timed_' .. gunName, normId, string.format('%.2f', getClosestEnemyDistance(char)))
 		tryParry('gun_draw_' .. gunName .. '_' .. normId, char)
 	end)
 end
@@ -790,7 +882,6 @@ tryParry = function(reason, char)
 			end
 			return false
 		end
-		lastMeleeParryAt = now
 	else
 		if now - lastParryAt < parryCooldownSetting then
 			if char then
@@ -801,11 +892,20 @@ tryParry = function(reason, char)
 	end
 	if char then
 		local state = getEnemyState(char)
-		if now - (state.lastParryAt or 0) < enemyParryDebounceSetting then
+		local perEnemyDebounce = isMeleeParry and meleeEnemyDebounceSetting or gunEnemyDebounceSetting
+		local lastAt = isMeleeParry and (state.lastMeleeParryAt or 0) or (state.lastGunParryAt or 0)
+		if now - lastAt < perEnemyDebounce then
 			threatDebugSkip('cooldown', char.Name, reason)
 			return false
 		end
-		state.lastParryAt = now
+		if isMeleeParry then
+			state.lastMeleeParryAt = now
+		else
+			state.lastGunParryAt = now
+		end
+	end
+	if isMeleeParry then
+		lastMeleeParryAt = now
 	end
 	lastParryAt = now
 	parryBlockAttackUntil = tick() + 0.2
@@ -818,7 +918,7 @@ end
 -- Threat handlers (edge-triggered only)
 -- ---------------------------------------------------------------------------
 
-local function handleMeleeAnimation(char, track, source)
+local function handleMeleeAnimation(char, track, source, aimModel)
 	source = source or 'edge'
 	if not isMeleeSwingTrackActive(track) then
 		debugSkip('melee_not_playing', getTrackAnimInfo(track), source)
@@ -854,11 +954,11 @@ local function handleMeleeAnimation(char, track, source)
 			state.lastSwingId = ''
 		end
 	end)
-	debugLog('trigger', 'melee_' .. normId, 'dist=' .. string.format('%.1f', getEnemyDistance(char)), source)
+	debugLog('trigger', 'melee_' .. normId, 'dist=' .. string.format('%.1f', getClosestEnemyDistance(char)), source)
 	tryParry('melee_' .. normId, char)
 end
 
-local function handleGunDrawAnimation(char, track, source)
+local function handleGunDrawAnimation(char, track, source, aimModel)
 	if not parryGunDrawEnabled then
 		return
 	end
@@ -878,7 +978,7 @@ local function handleGunDrawAnimation(char, track, source)
 		debugSkip('gun_draw_late', name, string.format('%.2f', track.TimePosition), source)
 		return
 	end
-	if not shouldParryGun(char, true) then
+	if not shouldParryGun(char, true, aimModel) then
 		return
 	end
 
@@ -887,10 +987,10 @@ local function handleGunDrawAnimation(char, track, source)
 		return
 	end
 
-	scheduleGunDrawParry(char, gunName, normId, track.TimePosition, source, track)
+	scheduleGunDrawParry(char, gunName, normId, track.TimePosition, source, track, aimModel)
 end
 
-local function handleGunShotAnimation(char, track, source)
+local function handleGunShotAnimation(char, track, source, aimModel)
 	if not parryGunShotEnabled then
 		return
 	end
@@ -910,7 +1010,7 @@ local function handleGunShotAnimation(char, track, source)
 		debugSkip('gun_shot_late', name, string.format('%.2f', track.TimePosition), source)
 		return
 	end
-	if not shouldParryGun(char, true) then
+	if not shouldParryGun(char, true, aimModel) then
 		return
 	end
 	if not charHasGunEquipped(char) then
@@ -934,7 +1034,7 @@ local function handleGunShotAnimation(char, track, source)
 		end
 	end)
 
-	debugLog('trigger', 'gun_shot_' .. gunName, normId, 'dist=' .. string.format('%.1f', getEnemyDistance(char)), source)
+	debugLog('trigger', 'gun_shot_' .. gunName, normId, 'dist=' .. string.format('%.1f', getClosestEnemyDistance(char)), source)
 	tryParry('gun_shot_' .. gunName .. '_' .. normId, char)
 end
 
@@ -950,7 +1050,7 @@ local function handleGlintSpawn(char, inst)
 		return
 	end
 	if not isEnemyInGunThreatRange(char) then
-		threatDebugSkip('out_of_range', char.Name, 'glint', string.format('%.1f', getEnemyDistance(char)))
+		threatDebugSkip('out_of_range', char.Name, 'glint', string.format('%.1f', getClosestEnemyDistance(char)))
 		return
 	end
 	if not charHasGunEquipped(char) then
@@ -961,7 +1061,14 @@ local function handleGlintSpawn(char, inst)
 		debugSkip('glint_dash', inst.Name)
 		return
 	end
-	if not shouldParryGun(char, true) then
+	local aimModel = inst
+	while aimModel and not aimModel:FindFirstChild('HumanoidRootPart') do
+		aimModel = aimModel.Parent
+	end
+	if not aimModel or not aimModel:IsA('Model') then
+		aimModel = char
+	end
+	if not shouldParryGun(char, true, aimModel) then
 		return
 	end
 	local glintKey = 'glint:' .. inst:GetFullName()
@@ -969,8 +1076,8 @@ local function handleGlintSpawn(char, inst)
 		return
 	end
 	local gunName = detectEquippedGun(char)
-	debugLog('trigger', 'gun_glint', gunName, 'dist=' .. string.format('%.1f', getEnemyDistance(char)))
-	scheduleGunDrawParry(char, gunName, 'glint:' .. gunName, 0, 'glint')
+	debugLog('trigger', 'gun_glint', gunName, 'dist=' .. string.format('%.1f', getClosestEnemyDistance(char)))
+	scheduleGunDrawParry(char, gunName, 'glint:' .. gunName, 0, 'glint', nil, aimModel)
 end
 
 local function onEnemyAnimationPlayed(char, track)
@@ -980,6 +1087,7 @@ local function onEnemyAnimationPlayed(char, track)
 	local name, animId = getTrackAnimInfo(track)
 	local normId = normalizeAnimId(animId)
 	local kind = getParryAnimKind(animId)
+	local aimModel = getTrackOwnerModel(track) or char
 	if debugEnabled then
 		if BLOCKED_ANIM_IDS[normId] then
 			debugAnimLog('blocked', normId, BLOCKED_ANIM_IDS[normId], 'w=' .. string.format('%.2f', track.WeightCurrent))
@@ -988,23 +1096,23 @@ local function onEnemyAnimationPlayed(char, track)
 		end
 	end
 	if kind == 'melee' and parryMeleeEnabled then
-		if not isEnemyInMeleeThreatRange(char) then
-			threatDebugSkip('out_of_range', char.Name, 'melee_edge', string.format('%.1f', getEnemyDistance(char)))
+		if getClosestEnemyDistance(char) > meleeRangeSetting then
+			threatDebugSkip('out_of_range', char.Name, 'melee_edge', string.format('%.1f', getClosestEnemyDistance(char)))
 			return
 		end
-		handleMeleeAnimation(char, track, 'edge')
+		handleMeleeAnimation(char, track, 'edge', aimModel)
 	elseif kind == 'gun_draw' and parryGunDrawEnabled then
-		if not isEnemyInGunThreatRange(char) then
-			threatDebugSkip('out_of_range', char.Name, 'gun_draw_edge', string.format('%.1f', getEnemyDistance(char)))
+		if getClosestEnemyDistance(char) > threatRangeSetting then
+			threatDebugSkip('out_of_range', char.Name, 'gun_draw_edge', string.format('%.1f', getClosestEnemyDistance(char)))
 			return
 		end
-		handleGunDrawAnimation(char, track, 'edge')
+		handleGunDrawAnimation(char, track, 'edge', aimModel)
 	elseif kind == 'gun_shot' and parryGunShotEnabled then
-		if not isEnemyInGunThreatRange(char) then
-			threatDebugSkip('out_of_range', char.Name, 'gun_shot_edge', string.format('%.1f', getEnemyDistance(char)))
+		if getClosestEnemyDistance(char) > threatRangeSetting then
+			threatDebugSkip('out_of_range', char.Name, 'gun_shot_edge', string.format('%.1f', getClosestEnemyDistance(char)))
 			return
 		end
-		handleGunShotAnimation(char, track, 'edge')
+		handleGunShotAnimation(char, track, 'edge', aimModel)
 	end
 end
 
@@ -1112,8 +1220,8 @@ local function watchEnemyPlayer(plr)
 	if plr == lplr then
 		return
 	end
-	local char = plr.Character
-	if char and getEnemyDistance(char) > getEffectiveWatcherRange() then
+	local plrDist = getClosestEnemyDistance(plr)
+	if plrDist > getEffectiveWatcherRange() then
 		unwatchAllForPlayer(plr)
 		return
 	end
@@ -1139,8 +1247,7 @@ local function refreshThreatWatchers(force)
 	purgeOrphanWatchers()
 	for _, plr in playersService:GetPlayers() do
 		if plr ~= lplr then
-			local enemyChar = plr.Character
-			if enemyChar and getEnemyDistance(enemyChar) <= getEffectiveWatcherRange() then
+			if getClosestEnemyDistance(plr) <= getEffectiveWatcherRange() then
 				watchEnemyPlayer(plr)
 			else
 				unwatchAllForPlayer(plr)
@@ -1974,29 +2081,41 @@ local function pressAttackClick()
 	return true
 end
 
-local function scanWhitelistRealtime()
-	local scanRange = math.max(meleeRangeSetting, threatRangeSetting)
+local function scanMeleeWhitelistRealtime()
+	local root = getLocalRoot()
+	if not root then
+		return
+	end
 	for _, plr in playersService:GetPlayers() do
-		if plr ~= lplr and plr.Character then
-			local ownerChar = plr.Character
-			local dist = getEnemyDistance(ownerChar)
-			if dist > scanRange then
+		if plr == lplr then
+			continue
+		end
+		local ownerChar = plr.Character
+		if not ownerChar then
+			continue
+		end
+		if getClosestEnemyDistance(plr) > meleeRangeSetting then
+			continue
+		end
+		for _, model in getEnemyModels(plr) do
+			if not model or not model.Parent then
 				continue
 			end
-			for _, model in getEnemyModels(plr) do
-				for _, track in getAllPlayingTracks(model) do
-					if not track.IsPlaying then
-						continue
-					end
-					local _, animId = getTrackAnimInfo(track)
-					local kind = getParryAnimKind(animId)
-					if kind == 'melee' and dist <= meleeRangeSetting and track.TimePosition <= meleeSwingWindowSetting then
-						handleMeleeAnimation(ownerChar, track, 'scan')
-					elseif kind == 'gun_draw' and dist <= threatRangeSetting and track.TimePosition <= gunDrawWindowSetting then
-						handleGunDrawAnimation(ownerChar, track, 'scan')
-					elseif kind == 'gun_shot' and dist <= threatRangeSetting and track.TimePosition <= gunShotWindowSetting then
-						handleGunShotAnimation(ownerChar, track, 'scan')
-					end
+			local enemyRoot = model:FindFirstChild('HumanoidRootPart')
+			if not enemyRoot then
+				continue
+			end
+			local dist = (enemyRoot.Position - root.Position).Magnitude
+			if dist > meleeRangeSetting then
+				continue
+			end
+			for _, track in getAllPlayingTracks(model) do
+				if not track.IsPlaying then
+					continue
+				end
+				local _, animId = getTrackAnimInfo(track)
+				if getParryAnimKind(animId) == 'melee' and track.TimePosition <= meleeSwingWindowSetting then
+					handleMeleeAnimation(ownerChar, track, 'scan', model)
 				end
 			end
 		end
@@ -2017,7 +2136,7 @@ local function bindParryScanLoop()
 			return
 		end
 		lastParryScanAt = now
-		scanWhitelistRealtime()
+		scanMeleeWhitelistRealtime()
 	end)
 end
 
@@ -2142,7 +2261,7 @@ local function combatHeartbeat(meleeRange)
 					if charWatchers[plr.Character] then
 						watchedCount += 1
 					end
-					if getEnemyDistance(plr.Character) <= getEffectiveWatcherRange() then
+					if getClosestEnemyDistance(plr) <= getEffectiveWatcherRange() then
 						threatCount += 1
 					end
 				end
@@ -2379,7 +2498,10 @@ local function animLogFormatTrackEvent(char, plr, track, eventName)
 		'looped=' .. tostring(track.Looped),
 	}
 	if plr ~= lplr then
-		lines[#lines + 1] = 'dist=' .. animLogSafeNumber(getEnemyDistance(char), 2)
+		lines[#lines + 1] = 'dist=' .. animLogSafeNumber(getClosestEnemyDistance(char), 2)
+		local hrpDot = getGunAimDotFromModel(char)
+		local need = getEffectiveGunAimThreshold(getClosestEnemyDistance(char))
+		lines[#lines + 1] = 'gun_hrp_dot=' .. animLogSafeNumber(hrpDot, 3) .. ' need=' .. animLogSafeNumber(need, 2)
 		lines[#lines + 1] = 'aim_dot=' .. animLogSafeNumber(getAimDot(char), 3)
 	end
 	lines[#lines + 1] = 'horiz_vel=' .. animLogSafeNumber(horizVel, 2)
@@ -2773,7 +2895,8 @@ run(function()
 
 	local ThreatRange
 	local WatcherThreatRange
-	local EnemyParryDebounce
+	local MeleeEnemyDebounce
+	local GunEnemyDebounce
 	local ThreatDebug
 
 	ThreatRange = AutoParry:CreateSlider({
@@ -2804,19 +2927,34 @@ run(function()
 		Tooltip = 'Anim/glint watcher attach radius. Effective range is max of this, Threat Range, and Melee Range.',
 	})
 
-	EnemyParryDebounce = AutoParry:CreateSlider({
-		Name = 'Enemy Debounce',
-		Min = 0.1,
+	MeleeEnemyDebounce = AutoParry:CreateSlider({
+		Name = 'Melee Enemy Debounce',
+		Min = 0.05,
 		Max = 0.6,
 		Decimal = 100,
-		Default = AUTO_PARRY_DEFAULTS.enemyParryDebounce,
+		Default = AUTO_PARRY_DEFAULTS.meleeEnemyDebounce,
 		Function = function(val)
-			enemyParryDebounceSetting = val
+			meleeEnemyDebounceSetting = val
 		end,
 		Suffix = function(val)
 			return val == 1 and 'second' or 'seconds'
 		end,
-		Tooltip = 'Per-enemy cooldown between parry triggers (blocks duplicate anim edges).',
+		Tooltip = 'Per-enemy cooldown between melee parry triggers. Lower = faster re-parry in crowded fights.',
+	})
+
+	GunEnemyDebounce = AutoParry:CreateSlider({
+		Name = 'Gun Enemy Debounce',
+		Min = 0.1,
+		Max = 0.6,
+		Decimal = 100,
+		Default = AUTO_PARRY_DEFAULTS.gunEnemyDebounce,
+		Function = function(val)
+			gunEnemyDebounceSetting = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end,
+		Tooltip = 'Per-enemy cooldown between gun parry triggers (blocks duplicate anim/glint edges).',
 	})
 
 	local ParryMelee
@@ -2882,14 +3020,14 @@ run(function()
 
 	GunAimDot = AutoParry:CreateSlider({
 		Name = 'Gun Aim Dot',
-		Min = 0.1,
-		Max = 0.9,
+		Min = 0.5,
+		Max = 0.95,
 		Decimal = 100,
 		Default = AUTO_PARRY_DEFAULTS.gunAimDot,
 		Function = function(val)
 			gunAimDotSetting = val
 		end,
-		Tooltip = 'How directly enemies must face you for gun draw/shot/glint parry.',
+		Tooltip = 'HRP must face you (flat dot). Default 0.80 ≈ 37° cone; stricter at long range. 0.95 ≈ 18°.',
 	})
 
 	ParryCooldown = AutoParry:CreateSlider({
@@ -3031,7 +3169,8 @@ run(function()
 		meleeRangeSetting = d.meleeRange
 		threatRangeSetting = d.threatRange
 		watcherThreatRangeSetting = d.watcherThreatRange
-		enemyParryDebounceSetting = d.enemyParryDebounce
+		meleeEnemyDebounceSetting = d.meleeEnemyDebounce
+		gunEnemyDebounceSetting = d.gunEnemyDebounce
 		threatDebugEnabled = d.threatDebug
 		meleeAimDotSetting = d.meleeAimDot
 		gunAimDotSetting = d.gunAimDot
@@ -3053,7 +3192,8 @@ run(function()
 		MeleeRange:SetValue(d.meleeRange)
 		ThreatRange:SetValue(d.threatRange)
 		WatcherThreatRange:SetValue(d.watcherThreatRange)
-		EnemyParryDebounce:SetValue(d.enemyParryDebounce)
+		MeleeEnemyDebounce:SetValue(d.meleeEnemyDebounce)
+		GunEnemyDebounce:SetValue(d.gunEnemyDebounce)
 		MeleeAimDot:SetValue(d.meleeAimDot)
 		GunAimDot:SetValue(d.gunAimDot)
 		ParryCooldown:SetValue(d.parryCooldown)
@@ -3152,7 +3292,7 @@ run(function()
 		Function = function(callback)
 			threatDebugEnabled = callback
 			if callback then
-				print('[REDLINER] threat debug on | meleeRange=', meleeRangeSetting, 'threatRange=', threatRangeSetting, 'watcherRange=', watcherThreatRangeSetting, 'effectiveWatcher=', getEffectiveWatcherRange(), 'gunAimDot=', gunAimDotSetting)
+				print('[REDLINER] threat debug on | meleeRange=', meleeRangeSetting, 'threatRange=', threatRangeSetting, 'watcherRange=', watcherThreatRangeSetting, 'effectiveWatcher=', getEffectiveWatcherRange(), 'gunAimDot=', gunAimDotSetting, 'meleeDebounce=', meleeEnemyDebounceSetting, 'gunDebounce=', gunEnemyDebounceSetting)
 			else
 				table.clear(lastDebugSkipAt)
 			end
