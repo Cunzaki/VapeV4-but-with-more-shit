@@ -47,13 +47,15 @@ local CLOSE_RANGE_STUDS = 3
 local MELEE_SWING_MIN_TIME = 0
 local MELEE_SWING_MAX_TIME = 0.55
 local MELEE_PARRY_DELAY = 0.2
-local GUN_DRAW_EDGE_MAX_TIME = 0.12
+local DASH_VELOCITY_MIN = 20
 
--- Only these runtime-confirmed attack animation IDs may trigger parry.
--- gun_shot id 110389010823335 was removed: it also plays on dash/movement.
+-- Melee swing only. Gun anim IDs 115078691506529 / 110389010823335 are dash/movement, not attacks.
 local PARRY_ANIM_IDS = {
 	['105441036119013'] = 'melee',
-	['115078691506529'] = 'gun_draw',
+}
+local BLOCKED_ANIM_IDS = {
+	['115078691506529'] = 'dash',
+	['110389010823335'] = 'dash',
 }
 
 local GUN_DRAW_TIMES = {
@@ -266,27 +268,19 @@ local function getTrackAnimInfo(track)
 end
 
 local function getParryAnimKind(animId)
-	return PARRY_ANIM_IDS[normalizeAnimId(animId)]
+	local normId = normalizeAnimId(animId)
+	if BLOCKED_ANIM_IDS[normId] then
+		return nil
+	end
+	return PARRY_ANIM_IDS[normId]
 end
 
-local function isParryAnimId(animId, kind)
-	return getParryAnimKind(animId) == kind
+local function isParryMeleeAnim(animId)
+	return getParryAnimKind(animId) == 'melee'
 end
 
 local function logParryAnimIds()
-	print('[REDLINER] parry ids | melee=105441036119013 gun_draw=115078691506529')
-end
-
-local function charHasGunEquipped(char)
-	for _, desc in char:GetDescendants() do
-		local lower = string.lower(desc.Name)
-		for _, entry in GUN_ITEM_PATTERNS do
-			if string.find(lower, entry.pattern, 1, true) then
-				return true
-			end
-		end
-	end
-	return false
+	print('[REDLINER] parry ids | melee=105441036119013 | gun=glint+timed | blocked dash=115078691506529,110389010823335')
 end
 
 local function getAllPlayingTracks(char)
@@ -411,58 +405,59 @@ local function detectEquippedGun(char)
 	return bestGun
 end
 
-local function getGunParryDelay(gunName, elapsed)
-	if gunName == 'Castigate' then
-		return math.max(0.02, castigateParryDelay - elapsed)
+local function charHasGunEquipped(char)
+	for _, desc in char:GetDescendants() do
+		local lower = string.lower(desc.Name)
+		for _, entry in GUN_ITEM_PATTERNS do
+			if string.find(lower, entry.pattern, 1, true) then
+				return true
+			end
+		end
 	end
-	local base = (GUN_DRAW_TIMES[gunName] or castigateParryDelay) - 0.14
-	return math.max(0.02, base - elapsed)
+	return false
 end
 
-local function scheduleDrawParry(char, gunName, track, source)
-	local _, animId = getTrackAnimInfo(track)
-	if not track or not isParryAnimId(animId, 'gun_draw') then
-		return
+local function isEnemyDashing(char)
+	local root = char:FindFirstChild('HumanoidRootPart')
+	if root then
+		local vel = root.AssemblyLinearVelocity
+		local horizontal = Vector3.new(vel.X, 0, vel.Z)
+		if horizontal.Magnitude >= DASH_VELOCITY_MIN then
+			return true
+		end
 	end
-	if track.TimePosition > GUN_DRAW_EDGE_MAX_TIME then
-		debugSkip('draw_late_detect', normalizeAnimId(animId), string.format('%.2f', track.TimePosition), source)
-		return
-	end
-	if track.WeightCurrent < 0.25 then
-		debugSkip('draw_low_weight', normalizeAnimId(animId), string.format('%.2f', track.WeightCurrent), source)
-		return
-	end
-	if not shouldParryGun(char, true) then
-		debugSkip('draw_aim', normalizeAnimId(animId), string.format('%.2f', getAimDot(char)), source)
-		return
-	end
-	if not charHasGunEquipped(char) then
-		debugSkip('draw_no_gun', normalizeAnimId(animId), source)
-		return
-	end
+	return false
+end
 
-	source = source or 'draw'
+local function isGlintInstance(inst)
+	return string.find(string.lower(inst.Name), 'glint', 1, true) ~= nil
+end
+
+local function getGunParryDelay(gunName)
+	if gunName == 'Castigate' then
+		return castigateParryDelay
+	end
+	return math.max(0.02, (GUN_DRAW_TIMES[gunName] or castigateParryDelay) - 0.14)
+end
+
+local function scheduleGlintParry(char, gunName)
 	local state = getEnemyState(char)
-	local normId = normalizeAnimId(animId)
-	local drawKey = normId .. ':' .. gunName .. ':draw'
+	local drawKey = 'glint:' .. gunName
 	if state.lastDrawId == drawKey then
 		return
 	end
 	state.lastDrawId = drawKey
 	state.scheduledDrawToken += 1
 	local token = state.scheduledDrawToken
+	local delay = getGunParryDelay(gunName)
 
-	local elapsed = track.TimePosition
-	local delay = getGunParryDelay(gunName, elapsed)
+	debugLog('trigger', 'gun_schedule_' .. gunName, 'delay=' .. string.format('%.2f', delay), 'source=glint')
 
-	track.Stopped:Once(function()
-		state.scheduledDrawToken += 1
+	task.delay(2, function()
 		if state.lastDrawId == drawKey then
 			state.lastDrawId = ''
 		end
 	end)
-
-	debugLog('trigger', 'gun_schedule_' .. gunName, 'delay=' .. string.format('%.2f', delay), 'elapsed=' .. string.format('%.2f', elapsed), source)
 
 	task.delay(delay, function()
 		if not autoParryActive or token ~= state.scheduledDrawToken then
@@ -471,8 +466,12 @@ local function scheduleDrawParry(char, gunName, track, source)
 		if not char.Parent or not isLocalAlive() then
 			return
 		end
+		if not charHasGunEquipped(char) or isEnemyDashing(char) then
+			debugSkip('glint_cancelled', char.Name, gunName)
+			return
+		end
 		if not shouldParryGun(char, true) then
-			debugSkip('timed_draw_aim_lost', char.Name, gunName)
+			debugSkip('glint_aim_lost', char.Name, gunName)
 			return
 		end
 		debugLog('trigger', 'gun_timed_' .. gunName, string.format('%.2f', getAimDot(char)))
@@ -569,7 +568,7 @@ local function handleMeleeAnimation(char, track, source)
 
 	local name, animId = getTrackAnimInfo(track)
 	local normId = normalizeAnimId(animId)
-	if not isParryAnimId(animId, 'melee') then
+	if not isParryMeleeAnim(animId) then
 		debugSkip('not_whitelisted', name, normId, source)
 		return
 	end
@@ -596,28 +595,25 @@ local function handleMeleeAnimation(char, track, source)
 	end
 end
 
-local function handleGunDraw(char, track, source)
-	source = source or 'edge'
-	if not track.IsPlaying or track.WeightCurrent < 0.05 then
-		return
-	end
-	local name, animId = getTrackAnimInfo(track)
-	if not isParryAnimId(animId, 'gun_draw') then
-		return
-	end
-	if source ~= 'edge' then
+local function handleGlintSpawn(char, inst)
+	if not isGlintInstance(inst) then
 		return
 	end
 	if not charHasGunEquipped(char) then
-		debugSkip('draw_no_gun', normalizeAnimId(animId), source)
+		debugSkip('glint_no_gun', inst.Name)
+		return
+	end
+	if isEnemyDashing(char) then
+		debugSkip('glint_dash', inst.Name)
 		return
 	end
 	if not shouldParryGun(char, true) then
-		debugSkip('gun_aim', name, string.format('%.2f', getAimDot(char)), source)
+		debugSkip('glint_aim', inst.Name, string.format('%.2f', getAimDot(char)))
 		return
 	end
 	local gunName = detectEquippedGun(char)
-	scheduleDrawParry(char, gunName, track, source)
+	debugLog('trigger', 'gun_glint', gunName, 'aim=' .. string.format('%.2f', getAimDot(char)))
+	scheduleGlintParry(char, gunName)
 end
 
 local function onEnemyAnimationPlayed(char, track)
@@ -625,17 +621,17 @@ local function onEnemyAnimationPlayed(char, track)
 		return
 	end
 	local name, animId = getTrackAnimInfo(track)
+	local normId = normalizeAnimId(animId)
 	local kind = getParryAnimKind(animId)
 	if debugEnabled then
-		debugLog('anim_played', name, 'id=' .. normalizeAnimId(animId), kind or '-', 'w=' .. string.format('%.2f', track.WeightCurrent))
-	end
-	if not kind then
-		return
+		if BLOCKED_ANIM_IDS[normId] then
+			debugSkip('blocked_anim', normId, BLOCKED_ANIM_IDS[normId], 'w=' .. string.format('%.2f', track.WeightCurrent))
+		else
+			debugLog('anim_played', name, 'id=' .. normId, kind or '-', 'w=' .. string.format('%.2f', track.WeightCurrent))
+		end
 	end
 	if kind == 'melee' then
 		handleMeleeAnimation(char, track, 'edge')
-	elseif kind == 'gun_draw' then
-		handleGunDraw(char, track, 'edge')
 	end
 end
 
@@ -650,15 +646,21 @@ local function hookModel(model, ownerChar, conns)
 				onEnemyAnimationPlayed(ownerChar, track)
 			end))
 		end
+		if isGlintInstance(desc) then
+			handleGlintSpawn(ownerChar, desc)
+		end
 	end
 
-	model.DescendantAdded:Connect(function(inst)
+	table.insert(conns, model.DescendantAdded:Connect(function(inst)
 		if inst:IsA('Animator') then
 			table.insert(conns, inst.AnimationPlayed:Connect(function(track)
 				onEnemyAnimationPlayed(ownerChar, track)
 			end))
 		end
-	end)
+		if isGlintInstance(inst) then
+			handleGlintSpawn(ownerChar, inst)
+		end
+	end))
 end
 
 local function unwatchCharacter(char)
@@ -921,8 +923,7 @@ local function scanWhitelistRealtime()
 						continue
 					end
 					local _, animId = getTrackAnimInfo(track)
-					local kind = getParryAnimKind(animId)
-					if kind == 'melee' and meleeDist <= meleeRangeSetting and track.TimePosition <= MELEE_SWING_MAX_TIME then
+					if getParryAnimKind(animId) == 'melee' and meleeDist <= meleeRangeSetting and track.TimePosition <= MELEE_SWING_MAX_TIME then
 						handleMeleeAnimation(ownerChar, track, 'scan')
 					end
 				end
@@ -949,11 +950,7 @@ local function enemyThreatensMe(char, meleeRange)
 	for _, track in getAllPlayingTracksForChar(char) do
 		if track.IsPlaying and track.WeightCurrent >= 0.08 then
 			local _, animId = getTrackAnimInfo(track)
-			local kind = getParryAnimKind(animId)
-			if kind == 'melee' and getEnemyDistance(char) <= meleeRange and shouldParryMelee(char, true) then
-				return true
-			end
-			if kind == 'gun_draw' and charHasGunEquipped(char) and shouldParryGun(char, true) then
+			if getParryAnimKind(animId) == 'melee' and getEnemyDistance(char) <= meleeRange and shouldParryMelee(char, true) then
 				return true
 			end
 		end
