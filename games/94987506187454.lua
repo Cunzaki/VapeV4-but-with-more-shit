@@ -42,19 +42,19 @@ local PARRY_VK = 0x46
 local MELEE_PACKET_NAME = '_x2e2c62e0acfc88ae'
 local GUN_VFX_PACKET = '_x47fd55153a58f398'
 
-local MELEE_AIM_DOT = 0.28
+local MELEE_AIM_DOT = 0.32
 local GUN_AIM_DOT = 0.32
 local CLOSE_RANGE_STUDS = 3
-local MELEE_PARRY_DELAY = 0.12
-local MELEE_SWING_DETECT_TIME = 0.18
-local GUN_SHOT_DETECT_TIME = 0.08
-local GUN_TIMING_EARLY = 0.1
+local MELEE_SWING_MIN_TIME = 0
+local MELEE_SWING_MAX_TIME = 0.55
+local MELEE_PARRY_DELAY = 0.2
+local GUN_SHOT_MAX_TIME = 0.15
+local GUN_DRAW_EARLY = 0.1
 
--- Confirmed runtime animation IDs (generic "Animation" instance names)
-local KNOWN_MELEE_IDS = {
+local KNOWN_MELEE_ANIM_IDS = {
 	['105441036119013'] = true,
 }
-local KNOWN_GUN_SHOT_IDS = {
+local KNOWN_GUN_SHOT_ANIM_IDS = {
 	['110389010823335'] = true,
 }
 
@@ -98,9 +98,9 @@ local MELEE_SWING_SOUND_PATTERNS = {
 }
 local GUN_DRAW_TIMES = {
 	Castigate = 0.55,
-	Phoenix = 0.58,
-	Siege = 0.88,
-	Monarch = 1.62,
+	Phoenix = 0.60,
+	Siege = 0.90,
+	Monarch = 1.65,
 }
 local GUN_ITEM_PATTERNS = {
 	{pattern = 'castigate', gun = 'Castigate'},
@@ -119,7 +119,7 @@ local autoAttackActive = false
 local reachActive = false
 local reachExtend = 0
 local debugEnabled = false
-local meleeRangeSetting = 12
+local meleeRangeSetting = 20
 local myHurtboxes = {}
 local enemyStates = {}
 local charWatchers = {}
@@ -141,6 +141,8 @@ local parryBlockAttackUntil = 0
 local packetListenersBound = false
 local attackPressToken = 0
 local lastDebugHeartbeat = 0
+local lastDebugSkipAt = {}
+local parryScanBound = false
 local tryParry
 
 local function notif(...)
@@ -162,6 +164,12 @@ end
 
 local function debugSkip(...)
 	if debugEnabled then
+		local key = table.concat({...}, '|')
+		local now = tick()
+		if now - (lastDebugSkipAt[key] or 0) < 0.2 then
+			return
+		end
+		lastDebugSkipAt[key] = now
 		print('[REDLINER] skip:', ...)
 	end
 end
@@ -380,10 +388,10 @@ local function buildAnimCatalog(force)
 	for _, pat in GUN_SHOT_NAME_PATTERNS do
 		animCatalog.gunShotNames[pat] = true
 	end
-	for id in pairs(KNOWN_MELEE_IDS) do
+	for id, _ in KNOWN_MELEE_ANIM_IDS do
 		animCatalog.meleeIds[id] = true
 	end
-	for id in pairs(KNOWN_GUN_SHOT_IDS) do
+	for id, _ in KNOWN_GUN_SHOT_ANIM_IDS do
 		animCatalog.gunShotIds[id] = true
 	end
 
@@ -414,12 +422,20 @@ local function getTrackAnimInfo(track)
 	return anim.Name or '', anim.AnimationId or ''
 end
 
+local function isKnownMeleeId(animId)
+	return KNOWN_MELEE_ANIM_IDS[normalizeAnimId(animId)] == true
+end
+
+local function isKnownGunShotId(animId)
+	return KNOWN_GUN_SHOT_ANIM_IDS[normalizeAnimId(animId)] == true
+end
+
 local function getAnimKind(name, animId)
 	local normId = normalizeAnimId(animId)
-	if KNOWN_MELEE_IDS[normId] or catalogHasId(animCatalog.meleeIds, animId) then
+	if isKnownMeleeId(animId) or catalogHasId(animCatalog.meleeIds, animId) then
 		return 'melee'
 	end
-	if KNOWN_GUN_SHOT_IDS[normId] or catalogHasId(animCatalog.gunShotIds, animId) then
+	if isKnownGunShotId(animId) or catalogHasId(animCatalog.gunShotIds, animId) then
 		return 'gun_shot'
 	end
 	if catalogHasId(animCatalog.gunDrawIds, animId) then
@@ -502,43 +518,23 @@ local function getAimDot(char)
 		return 0
 	end
 	local offset = root.Position - enemyRoot.Position
-	if offset.Magnitude < 0.05 then
+	local flatOffset = Vector3.new(offset.X, 0, offset.Z)
+	if flatOffset.Magnitude < 0.05 then
 		return 1
 	end
-	local dir = offset.Unit
-	local planarDir = Vector3.new(dir.X, 0, dir.Z)
-	if planarDir.Magnitude > 0.05 then
-		planarDir = planarDir.Unit
-	else
-		planarDir = dir
+	local dir = flatOffset.Unit
+	local best = 0
+	local flatLook = Vector3.new(enemyRoot.CFrame.LookVector.X, 0, enemyRoot.CFrame.LookVector.Z)
+	if flatLook.Magnitude > 0.05 then
+		best = flatLook.Unit:Dot(dir)
 	end
-
-	local function lookDot(part)
-		if not part then
-			return -1
-		end
-		local look = part.CFrame.LookVector
-		local planarLook = Vector3.new(look.X, 0, look.Z)
-		if planarLook.Magnitude < 0.05 then
-			return look:Dot(dir)
-		end
-		return planarLook.Unit:Dot(planarDir)
-	end
-
-	local best = lookDot(enemyRoot)
-	best = math.max(best, lookDot(char:FindFirstChild('Head')))
-	best = math.max(best, lookDot(char:FindFirstChild('UpperTorso')))
-	best = math.max(best, lookDot(char:FindFirstChild('Torso')))
-
-	local weapon = char:FindFirstChild('Weapon') or char:FindFirstChild('Equipped')
-	if weapon then
-		for _, part in weapon:GetDescendants() do
-			if part:IsA('BasePart') and part.Name:lower():find('barrel', 1, true) then
-				best = math.max(best, lookDot(part))
-			end
+	local head = char:FindFirstChild('Head')
+	if head then
+		local flatHead = Vector3.new(head.CFrame.LookVector.X, 0, head.CFrame.LookVector.Z)
+		if flatHead.Magnitude > 0.05 then
+			best = math.max(best, flatHead.Unit:Dot(dir))
 		end
 	end
-
 	return best
 end
 
@@ -562,10 +558,7 @@ local function shouldParryMelee(char, confirmedAttack)
 end
 
 local function shouldParryGun(char, confirmedAttack)
-	if not isEnemyTargetingMe(char, GUN_AIM_DOT, confirmedAttack) then
-		return false
-	end
-	return true
+	return isEnemyTargetingMe(char, GUN_AIM_DOT, confirmedAttack)
 end
 
 -- ---------------------------------------------------------------------------
@@ -601,47 +594,11 @@ local function isMeleeSwingSoundName(name)
 	return nameMatchesPatterns(name, MELEE_SWING_SOUND_PATTERNS)
 end
 
-local function scheduleMeleeParry(char, animId, track, source)
-	local state = getEnemyState(char)
-	local normId = normalizeAnimId(animId)
-	local key = normId .. ':sched'
-	if state.lastSwingId == key then
-		return
-	end
-	state.lastSwingId = key
-	state.scheduledMeleeToken += 1
-	local token = state.scheduledMeleeToken
-	local delay = math.max(0.02, MELEE_PARRY_DELAY - track.TimePosition)
-
-	debugLog('schedule', 'melee_' .. normId, string.format('%.2f', delay), 's', source)
-	task.delay(delay, function()
-		if not autoParryActive or token ~= state.scheduledMeleeToken then
-			return
-		end
-		if not char.Parent or not isLocalAlive() then
-			return
-		end
-		if not shouldParryMelee(char, true) then
-			debugSkip('melee_timed_aim', normId, string.format('%.2f', getAimDot(char)))
-			return
-		end
-		debugLog('trigger', 'melee_timed_' .. normId, 'aim=' .. string.format('%.2f', getAimDot(char)), source)
-		tryParry('melee_timed_' .. normId)
-	end)
-
-	track.Stopped:Once(function()
-		state.scheduledMeleeToken += 1
-		if state.lastSwingId == key then
-			state.lastSwingId = ''
-		end
-	end)
-end
-
 local function scheduleDrawParry(char, gunName)
 	local state = getEnemyState(char)
 	state.scheduledDrawToken += 1
 	local token = state.scheduledDrawToken
-	local delay = math.max(0.02, (GUN_DRAW_TIMES[gunName] or GUN_DRAW_TIMES.Castigate) - GUN_TIMING_EARLY)
+	local delay = math.max(0.05, (GUN_DRAW_TIMES[gunName] or GUN_DRAW_TIMES.Castigate) - GUN_DRAW_EARLY)
 
 	task.delay(delay, function()
 		if not autoParryActive or token ~= state.scheduledDrawToken then
@@ -650,7 +607,7 @@ local function scheduleDrawParry(char, gunName)
 		if not char.Parent or not isLocalAlive() then
 			return
 		end
-		if not shouldParryGun(char) then
+		if not shouldParryGun(char, true) then
 			debugSkip('timed_draw_aim_lost', char.Name, gunName)
 			return
 		end
@@ -690,23 +647,54 @@ tryParry = function(reason)
 	if not autoParryActive or not isLocalAlive() then
 		return false
 	end
-	if tick() - lastParryAt < 0.08 then
+	if tick() - lastParryAt < 0.05 then
 		return false
 	end
 	lastParryAt = tick()
 	parryBlockAttackUntil = tick() + 0.2
 	debugLog('parry trigger', reason)
-	task.defer(pressParryKey)
+	pressParryKey()
 	return true
+end
+
+local function scheduleMeleeParry(char, animId, track, source)
+	local state = getEnemyState(char)
+	local normId = normalizeAnimId(animId)
+	local swingKey = normId .. ':melee:swing'
+	if state.lastSwingId == swingKey then
+		return
+	end
+	state.lastSwingId = swingKey
+	state.scheduledMeleeToken = (state.scheduledMeleeToken or 0) + 1
+	local token = state.scheduledMeleeToken
+
+	track.Stopped:Once(function()
+		if state.lastSwingId == swingKey then
+			state.lastSwingId = ''
+		end
+	end)
+
+	local delay = math.max(0, MELEE_PARRY_DELAY - track.TimePosition)
+	debugLog('trigger', 'melee_schedule_' .. normId, 'delay=' .. string.format('%.2f', delay), 'aim=' .. string.format('%.2f', getAimDot(char)), source)
+
+	task.delay(delay, function()
+		if not autoParryActive or token ~= state.scheduledMeleeToken then
+			return
+		end
+		if not char.Parent or not isLocalAlive() then
+			return
+		end
+		if not shouldParryMelee(char, true) then
+			debugSkip('melee_timed_aim', normId, string.format('%.2f', getAimDot(char)))
+			return
+		end
+		tryParry('melee_' .. normId)
+	end)
 end
 
 -- ---------------------------------------------------------------------------
 -- Threat handlers (edge-triggered only)
 -- ---------------------------------------------------------------------------
-
-local function isKnownMeleeId(animId)
-	return KNOWN_MELEE_IDS[normalizeAnimId(animId)] == true
-end
 
 local function handleMeleeAnimation(char, track, source)
 	source = source or 'edge'
@@ -716,16 +704,18 @@ local function handleMeleeAnimation(char, track, source)
 	end
 
 	local name, animId = getTrackAnimInfo(track)
+	local normId = normalizeAnimId(animId)
 	local kind = getAnimKind(name, animId)
-	if kind ~= 'melee' then
-		debugSkip('not_whitelisted', name, normalizeAnimId(animId), source)
+	local knownMelee = isKnownMeleeId(animId)
+	if kind ~= 'melee' and not knownMelee then
+		debugSkip('not_whitelisted', name, normId, source)
 		return
 	end
-	if not isKnownMeleeId(animId) and not isMeleePriority(track, kind) then
+	if not knownMelee and not isMeleePriority(track, kind) then
 		debugSkip('wrong_priority', name, track.Priority, source)
 		return
 	end
-	if track.TimePosition > MELEE_SWING_DETECT_TIME then
+	if track.TimePosition > MELEE_SWING_MAX_TIME then
 		debugSkip('melee_late_window', name, string.format('%.2f', track.TimePosition), source)
 		return
 	end
@@ -734,7 +724,18 @@ local function handleMeleeAnimation(char, track, source)
 		return
 	end
 
-	scheduleMeleeParry(char, animId, track, source)
+	if track.TimePosition <= 0.35 then
+		scheduleMeleeParry(char, animId, track, source)
+	else
+		local state = getEnemyState(char)
+		local swingKey = normId .. ':melee:swing'
+		if state.lastSwingId == swingKey then
+			return
+		end
+		state.lastSwingId = swingKey
+		debugLog('trigger', 'melee_immediate_' .. normId, 'aim=' .. string.format('%.2f', getAimDot(char)), source)
+		tryParry('melee_immediate_' .. normId)
+	end
 end
 
 local function handleGunAnimation(char, track, source)
@@ -744,40 +745,32 @@ local function handleGunAnimation(char, track, source)
 	end
 
 	local name, animId = getTrackAnimInfo(track)
+	local normId = normalizeAnimId(animId)
 	local kind = getAnimKind(name, animId)
 	if kind ~= 'gun_shot' and kind ~= 'gun_draw' then
+		debugSkip('gun_not_whitelisted', name, normId, source)
 		return
 	end
+	if not shouldParryGun(char, true) then
+		debugSkip('gun_aim', name, string.format('%.2f', getAimDot(char)), source)
+		return
+	end
+
 	if kind == 'gun_draw' then
-		if source == 'scan' then
-			return
-		end
-		if not shouldParryGun(char, true) then
-			debugSkip('gun_draw_aim', name, string.format('%.2f', getAimDot(char)), source)
-			return
-		end
 		local gunName = detectEquippedGun(char)
 		debugLog('trigger', 'gun_draw_' .. name, gunName, source)
 		scheduleDrawParry(char, gunName)
 		return
 	end
 
-	if not shouldParryGun(char, true) then
-		if source ~= 'scan' then
-			debugSkip('gun_aim', name, string.format('%.2f', getAimDot(char)), source)
-		end
-		return
-	end
-	if track.TimePosition > GUN_SHOT_DETECT_TIME then
-		if source ~= 'scan' then
-			debugSkip('gun_shot_late', name, string.format('%.2f', track.TimePosition), source)
-		end
+	if track.TimePosition > GUN_SHOT_MAX_TIME then
+		debugSkip('gun_shot_late', name, string.format('%.2f', track.TimePosition), source)
 		return
 	end
 
 	local state = getEnemyState(char)
-	local key = normalizeAnimId(animId) .. ':gun:' .. tostring(math.floor(track.TimePosition * 100))
-	if key == state.lastShotId then
+	local key = normId .. ':gun:swing'
+	if state.lastShotId == key then
 		return
 	end
 	state.lastShotId = key
@@ -787,8 +780,8 @@ local function handleGunAnimation(char, track, source)
 		end
 	end)
 
-	debugLog('trigger', 'gun_shot_' .. name, 'id=' .. normalizeAnimId(animId), 'aim=' .. string.format('%.2f', getAimDot(char)), source)
-	tryParry('gun_shot_' .. name)
+	debugLog('trigger', 'gun_shot_' .. name, 'id=' .. normId, 'aim=' .. string.format('%.2f', getAimDot(char)), source)
+	tryParry('gun_shot_' .. normId)
 end
 
 local function onEnemyAnimationPlayed(char, track)
@@ -803,24 +796,11 @@ local function onEnemyAnimationPlayed(char, track)
 	if not kind then
 		return
 	end
-	if kind == 'gun_shot' then
-		handleGunAnimation(char, track, 'edge')
-		return
-	end
-	if kind == 'gun_draw' then
-		task.defer(function()
-			if track.IsPlaying then
-				handleGunAnimation(char, track, 'edge')
-			end
-		end)
-		return
-	end
-	task.defer(function()
-		if not track.IsPlaying then
-			return
-		end
+	if kind == 'melee' then
 		handleMeleeAnimation(char, track, 'edge')
-	end)
+	elseif kind == 'gun_shot' or kind == 'gun_draw' then
+		handleGunAnimation(char, track, 'edge')
+	end
 end
 
 local function handleGlintSpawn(char, inst)
@@ -1149,7 +1129,7 @@ local function onGunVfxPacket(itemId, position)
 			if shotDir.Magnitude < 0.05 or toUs.Magnitude < 0.1 then
 				continue
 			end
-			if shotDir.Unit:Dot(toUs.Unit) >= 0.45 then
+			if shotDir.Unit:Dot(toUs.Unit) >= 0.75 then
 				debugLog('trigger', 'gun_vfx_' .. tostring(itemId), 'aim=' .. string.format('%.2f', getAimDot(char)))
 				tryParry('gun_vfx_' .. tostring(itemId))
 				return
@@ -1220,13 +1200,11 @@ local function pressAttackClick()
 	return true
 end
 
-local function scanWhitelistHeartbeat()
+local function scanWhitelistRealtime()
 	for _, plr in playersService:GetPlayers() do
 		if plr ~= lplr and plr.Character then
 			local ownerChar = plr.Character
-			if getEnemyDistance(ownerChar) > meleeRangeSetting + 4 then
-				continue
-			end
+			local meleeDist = getEnemyDistance(ownerChar)
 			for _, model in getEnemyModels(plr) do
 				for _, track in getAllPlayingTracks(model) do
 					if not track.IsPlaying or track.WeightCurrent < 0.05 then
@@ -1234,9 +1212,11 @@ local function scanWhitelistHeartbeat()
 					end
 					local name, animId = getTrackAnimInfo(track)
 					local kind = getAnimKind(name, animId)
-					if kind == 'melee' and track.TimePosition <= MELEE_SWING_DETECT_TIME then
+					if kind == 'melee' and meleeDist <= meleeRangeSetting and track.TimePosition <= MELEE_SWING_MAX_TIME then
 						handleMeleeAnimation(ownerChar, track, 'scan')
-					elseif kind == 'gun_shot' and track.TimePosition <= GUN_SHOT_DETECT_TIME then
+					elseif kind == 'gun_shot' and track.TimePosition <= GUN_SHOT_MAX_TIME then
+						handleGunAnimation(ownerChar, track, 'scan')
+					elseif kind == 'gun_draw' then
 						handleGunAnimation(ownerChar, track, 'scan')
 					end
 				end
@@ -1245,15 +1225,26 @@ local function scanWhitelistHeartbeat()
 	end
 end
 
-local function enemyThreatensMe(char, meleeRange)
-	if getEnemyDistance(char) > meleeRange + 4 then
-		return false
+local function bindParryScanLoop()
+	if parryScanBound then
+		return
 	end
+	parryScanBound = true
+	runService.PreRender:Connect(function()
+		if not autoParryActive or not isLocalAlive() then
+			return
+		end
+		startEnemyWatchers()
+		scanWhitelistRealtime()
+	end)
+end
+
+local function enemyThreatensMe(char, meleeRange)
 	for _, track in getAllPlayingTracks(char) do
-		if track.IsPlaying and track.WeightCurrent >= 0.2 then
+		if track.IsPlaying and track.WeightCurrent >= 0.1 then
 			local name, animId = getTrackAnimInfo(track)
 			local kind = getAnimKind(name, animId)
-			if kind == 'melee' and shouldParryMelee(char, true) then
+			if kind == 'melee' and getEnemyDistance(char) <= meleeRange and shouldParryMelee(char, true) then
 				return true
 			end
 			if (kind == 'gun_shot' or kind == 'gun_draw') and shouldParryGun(char, true) then
@@ -1328,8 +1319,7 @@ local function combatHeartbeat(meleeRange, attackCooldown)
 	bindPacketListeners()
 
 	if autoParryActive then
-		startEnemyWatchers()
-		scanWhitelistHeartbeat()
+		bindParryScanLoop()
 
 		if debugEnabled and tick() - lastDebugHeartbeat > 3 then
 			lastDebugHeartbeat = tick()
@@ -1382,11 +1372,12 @@ run(function()
 			if callback then
 				buildAnimCatalog(true)
 				startEnemyWatchers()
+				bindParryScanLoop()
 				bindPacketListeners()
-				notif('Auto Parry', 'Whitelist parry — melee swings + gun glint/timed shots.', 5)
+				notif('Auto Parry', 'Timed melee + gun parry when enemies aim at you.', 5)
 			end
 		end,
-		Tooltip = 'Parries sword swings (timed) and gun shots at any range when enemies face you.',
+		Tooltip = 'Parries whitelisted melee swings and gun shots when enemies aim at you.',
 	})
 
 	AutoAttack = minigames:CreateModule({
@@ -1417,12 +1408,11 @@ run(function()
 	MeleeRange = AutoParry:CreateSlider({
 		Name = 'Melee Range',
 		Min = 4,
-		Max = 20,
-		Default = 12,
+		Max = 30,
+		Default = 20,
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
-		Tooltip = 'Max distance to parry sword swings. Guns work at any range.',
 	})
 
 	ExtendReach = Reach:CreateSlider({
