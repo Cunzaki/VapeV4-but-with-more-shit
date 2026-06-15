@@ -358,36 +358,6 @@ local function isEnemyCharacter(model)
 	return plr and plr ~= lplr
 end
 
-local function getClosestEnemyDistance(charOrPlr)
-	local root = getLocalRoot()
-	if not root then
-		return math.huge
-	end
-	local models
-	if typeof(charOrPlr) == 'Instance' and charOrPlr:IsA('Player') then
-		models = getEnemyModels(charOrPlr)
-	elseif charOrPlr then
-		local plr = playersService:GetPlayerFromCharacter(charOrPlr)
-		models = plr and getEnemyModels(plr) or {charOrPlr}
-	else
-		return math.huge
-	end
-	local best = math.huge
-	for _, model in models do
-		if model and model.Parent then
-			local enemyRoot = model:FindFirstChild('HumanoidRootPart')
-			if enemyRoot then
-				best = math.min(best, (enemyRoot.Position - root.Position).Magnitude)
-			end
-		end
-	end
-	return best
-end
-
-local function getEnemyDistance(char)
-	return getClosestEnemyDistance(char)
-end
-
 local function getPlayerFromModel(model)
 	if not model then
 		return nil
@@ -418,6 +388,36 @@ local function getEnemyModels(plr)
 		end
 	end
 	return models
+end
+
+local function getClosestEnemyDistance(charOrPlr)
+	local root = getLocalRoot()
+	if not root then
+		return math.huge
+	end
+	local models
+	if typeof(charOrPlr) == 'Instance' and charOrPlr:IsA('Player') then
+		models = getEnemyModels(charOrPlr)
+	elseif charOrPlr then
+		local plr = playersService:GetPlayerFromCharacter(charOrPlr)
+		models = plr and getEnemyModels(plr) or {charOrPlr}
+	else
+		return math.huge
+	end
+	local best = math.huge
+	for _, model in models do
+		if model and model.Parent then
+			local enemyRoot = model:FindFirstChild('HumanoidRootPart')
+			if enemyRoot then
+				best = math.min(best, (enemyRoot.Position - root.Position).Magnitude)
+			end
+		end
+	end
+	return best
+end
+
+local function getEnemyDistance(char)
+	return getClosestEnemyDistance(char)
 end
 
 local function getEnemyState(char)
