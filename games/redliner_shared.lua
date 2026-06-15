@@ -49,13 +49,16 @@ local MELEE_SWING_MIN_TIME = 0
 local MELEE_SWING_MAX_TIME = 0.55
 local MELEE_PARRY_DELAY = 0.2
 local GUN_SHOT_MAX_TIME = 0.15
-local GUN_DRAW_EARLY = 0.1
+local GUN_DRAW_EARLY = 0.14
 
 local KNOWN_MELEE_ANIM_IDS = {
 	['105441036119013'] = true,
 }
 local KNOWN_GUN_SHOT_ANIM_IDS = {
 	['110389010823335'] = true,
+}
+local KNOWN_GUN_DRAW_ANIM_IDS = {
+	['115078691506529'] = true,
 }
 
 local MELEE_NAME_PATTERNS = {
@@ -97,10 +100,10 @@ local MELEE_SWING_SOUND_PATTERNS = {
 	'dark_slash', 'swing_heavy', 'swing', 'toolslash', 'slash', 'wideslash', 'hit2', 'inherit_hit',
 }
 local GUN_DRAW_TIMES = {
-	Castigate = 0.55,
-	Phoenix = 0.60,
-	Siege = 0.90,
-	Monarch = 1.65,
+	Castigate = 0.50,
+	Phoenix = 0.56,
+	Siege = 0.86,
+	Monarch = 1.60,
 }
 local GUN_ITEM_PATTERNS = {
 	{pattern = 'castigate', gun = 'Castigate'},
@@ -282,6 +285,7 @@ local function getEnemyState(char)
 		enemyStates[char] = {
 			lastSwingId = '',
 			lastShotId = '',
+			lastDrawId = '',
 			glintToken = 0,
 			scheduledDrawToken = 0,
 			scheduledMeleeToken = 0,
@@ -394,6 +398,9 @@ local function buildAnimCatalog(force)
 	for id, _ in KNOWN_GUN_SHOT_ANIM_IDS do
 		animCatalog.gunShotIds[id] = true
 	end
+	for id, _ in KNOWN_GUN_DRAW_ANIM_IDS do
+		animCatalog.gunDrawIds[id] = true
+	end
 
 	local meleeCount, drawCount, shotCount, idCount = 0, 0, 0, 0
 	for _ in animCatalog.meleeNames do meleeCount += 1 end
@@ -430,6 +437,10 @@ local function isKnownGunShotId(animId)
 	return KNOWN_GUN_SHOT_ANIM_IDS[normalizeAnimId(animId)] == true
 end
 
+local function isKnownGunDrawId(animId)
+	return KNOWN_GUN_DRAW_ANIM_IDS[normalizeAnimId(animId)] == true
+end
+
 local function getAnimKind(name, animId)
 	local normId = normalizeAnimId(animId)
 	if isKnownMeleeId(animId) or catalogHasId(animCatalog.meleeIds, animId) then
@@ -438,7 +449,7 @@ local function getAnimKind(name, animId)
 	if isKnownGunShotId(animId) or catalogHasId(animCatalog.gunShotIds, animId) then
 		return 'gun_shot'
 	end
-	if catalogHasId(animCatalog.gunDrawIds, animId) then
+	if isKnownGunDrawId(animId) or catalogHasId(animCatalog.gunDrawIds, animId) then
 		return 'gun_draw'
 	end
 	if isDeniedAnimName(name) then
@@ -594,11 +605,40 @@ local function isMeleeSwingSoundName(name)
 	return nameMatchesPatterns(name, MELEE_SWING_SOUND_PATTERNS)
 end
 
-local function scheduleDrawParry(char, gunName)
+local function scheduleDrawParry(char, gunName, track, source)
+	source = source or 'draw'
 	local state = getEnemyState(char)
+	local _, animId = track and getTrackAnimInfo(track) or '', ''
+	local normId = track and normalizeAnimId(animId) or gunName
+	local drawKey = tostring(normId) .. ':' .. gunName .. ':draw'
+	if state.lastDrawId == drawKey then
+		return
+	end
+	state.lastDrawId = drawKey
 	state.scheduledDrawToken += 1
 	local token = state.scheduledDrawToken
-	local delay = math.max(0.05, (GUN_DRAW_TIMES[gunName] or GUN_DRAW_TIMES.Castigate) - GUN_DRAW_EARLY)
+
+	local baseDelay = (GUN_DRAW_TIMES[gunName] or GUN_DRAW_TIMES.Castigate) - GUN_DRAW_EARLY
+	local elapsed = track and track.TimePosition or 0
+	local delay = math.max(0.03, baseDelay - elapsed)
+
+	if track then
+		track.Stopped:Once(function()
+			task.delay(0.4, function()
+				if state.lastDrawId == drawKey then
+					state.lastDrawId = ''
+				end
+			end)
+		end)
+	else
+		task.delay(2, function()
+			if state.lastDrawId == drawKey then
+				state.lastDrawId = ''
+			end
+		end)
+	end
+
+	debugLog('trigger', 'gun_schedule_' .. gunName, 'delay=' .. string.format('%.2f', delay), 'elapsed=' .. string.format('%.2f', elapsed), source)
 
 	task.delay(delay, function()
 		if not autoParryActive or token ~= state.scheduledDrawToken then
@@ -758,8 +798,7 @@ local function handleGunAnimation(char, track, source)
 
 	if kind == 'gun_draw' then
 		local gunName = detectEquippedGun(char)
-		debugLog('trigger', 'gun_draw_' .. name, gunName, source)
-		scheduleDrawParry(char, gunName)
+		scheduleDrawParry(char, gunName, track, source)
 		return
 	end
 
@@ -815,7 +854,7 @@ local function handleGlintSpawn(char, inst)
 	local gunName = detectEquippedGun(char)
 
 	debugLog('trigger', 'gun_glint', gunName, 'timed', GUN_DRAW_TIMES[gunName] or GUN_DRAW_TIMES.Castigate, 'aim=' .. string.format('%.2f', getAimDot(char)))
-	scheduleDrawParry(char, gunName)
+	scheduleDrawParry(char, gunName, nil, 'glint')
 
 	task.delay(1.5, function()
 		if state.glintToken == token then
