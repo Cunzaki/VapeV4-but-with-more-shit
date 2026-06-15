@@ -60,15 +60,32 @@ local GUN_SHOT_NAME_PATTERNS = {
 	'shot', 'fire', 'castigate', 'phoenix', 'siege', 'monarch', 'bullet', 'shoot',
 	'destroy_shot', 'awp_shot', 'destroyer', 'goldrose', 'afterburn', 'zealot',
 }
-local DENY_ANIM_PATTERNS = {
-	'animation', 'idle', 'walk', 'run', 'jump', 'fall', 'land', 'sit', 'climb',
-	'toolnone', 'toollunge', 'wave', 'point', 'dance', 'emote', 'equip', 'crouch',
+local DENY_ANIM_EXACT = {
+	animation = true,
+	idle = true,
+	walk = true,
+	run = true,
+	jump = true,
+	fall = true,
+	land = true,
+	sit = true,
+	climb = true,
+	toolnone = true,
+	toollunge = true,
+	wave = true,
+	point = true,
+	dance = true,
+	emote = true,
+	equip = true,
 }
 local GLINT_NAME_PATTERNS = {
 	'glint', 'flash', 'sparkle', 'shine', 'telegraph', 'warn',
 }
 local GUN_SHOT_SOUND_PATTERNS = {
 	'destroy_shot', 'awp_shot', 'shot', 'fire', 'castigate', 'phoenix', 'siege', 'monarch',
+}
+local MELEE_SWING_SOUND_PATTERNS = {
+	'dark_slash', 'swing_heavy', 'swing', 'toolslash', 'slash', 'wideslash', 'hit2', 'inherit_hit',
 }
 local GUN_DRAW_TIMES = {
 	Castigate = 0.65,
@@ -270,18 +287,32 @@ local function nameMatchesPatterns(name, patterns)
 	return false
 end
 
-local function isDeniedAnimName(name)
-	return nameMatchesPatterns(name, DENY_ANIM_PATTERNS)
+local function normalizeAnimId(animId)
+	if typeof(animId) ~= 'string' or animId == '' then
+		return ''
+	end
+	local numeric = string.match(animId, '(%d+)')
+	return numeric or string.lower(animId)
 end
 
-local function addCatalogEntry(set, name, animId)
+local function isDeniedAnimName(name)
+	local lower = string.lower(name or '')
+	return DENY_ANIM_EXACT[lower] == true
+end
+
+local function addCatalogEntry(nameSet, idSet, name, animId)
 	if not name or name == '' then
 		return
 	end
 	local lower = string.lower(name)
-	set[lower] = true
-	if animId and animId ~= '' then
-		set[animId] = true
+	nameSet[lower] = true
+	local normId = normalizeAnimId(animId)
+	if normId ~= '' then
+		idSet[normId] = true
+		if animId and animId ~= '' then
+			idSet[animId] = true
+			idSet[string.lower(animId)] = true
+		end
 	end
 end
 
@@ -296,24 +327,33 @@ local function scanAnimationsIn(root)
 				continue
 			end
 			if nameMatchesPatterns(name, MELEE_NAME_PATTERNS) or string.find(string.lower(name), 'dark', 1, true) then
-				addCatalogEntry(animCatalog.meleeNames, name, inst.AnimationId)
-				addCatalogEntry(animCatalog.meleeIds, name, inst.AnimationId)
+				addCatalogEntry(animCatalog.meleeNames, animCatalog.meleeIds, name, inst.AnimationId)
 			elseif nameMatchesPatterns(name, GUN_SHOT_NAME_PATTERNS) then
-				addCatalogEntry(animCatalog.gunShotNames, name, inst.AnimationId)
-				addCatalogEntry(animCatalog.gunShotIds, name, inst.AnimationId)
+				addCatalogEntry(animCatalog.gunShotNames, animCatalog.gunShotIds, name, inst.AnimationId)
 			elseif nameMatchesPatterns(name, GUN_DRAW_NAME_PATTERNS) then
-				addCatalogEntry(animCatalog.gunDrawNames, name, inst.AnimationId)
-				addCatalogEntry(animCatalog.gunDrawIds, name, inst.AnimationId)
+				addCatalogEntry(animCatalog.gunDrawNames, animCatalog.gunDrawIds, name, inst.AnimationId)
 			end
 		end
 	end
 end
 
-local function buildAnimCatalog()
-	if animCatalogBuilt then
-		return
+local function buildAnimCatalog(force)
+	if animCatalogBuilt and not force then
+		local idCount = 0
+		for _ in animCatalog.meleeIds do
+			idCount += 1
+		end
+		if idCount > 0 then
+			return
+		end
 	end
 	animCatalogBuilt = true
+	table.clear(animCatalog.meleeNames)
+	table.clear(animCatalog.gunDrawNames)
+	table.clear(animCatalog.gunShotNames)
+	table.clear(animCatalog.meleeIds)
+	table.clear(animCatalog.gunDrawIds)
+	table.clear(animCatalog.gunShotIds)
 
 	local assets = replicatedStorage:FindFirstChild('Assets')
 	if assets then
@@ -332,11 +372,23 @@ local function buildAnimCatalog()
 		animCatalog.gunShotNames[pat] = true
 	end
 
-	local meleeCount, drawCount, shotCount = 0, 0, 0
+	local meleeCount, drawCount, shotCount, idCount = 0, 0, 0, 0
 	for _ in animCatalog.meleeNames do meleeCount += 1 end
 	for _ in animCatalog.gunDrawNames do drawCount += 1 end
 	for _ in animCatalog.gunShotNames do shotCount += 1 end
-	print('[REDLINER] anim catalog | melee=', meleeCount, 'draw=', drawCount, 'shot=', shotCount)
+	for _ in animCatalog.meleeIds do idCount += 1 end
+	print('[REDLINER] anim catalog | melee=', meleeCount, 'draw=', drawCount, 'shot=', shotCount, 'ids=', idCount)
+end
+
+local function catalogHasId(idSet, animId)
+	local normId = normalizeAnimId(animId)
+	if normId ~= '' and idSet[normId] then
+		return true
+	end
+	if animId ~= '' and idSet[animId] then
+		return true
+	end
+	return false
 end
 
 local function getTrackAnimInfo(track)
@@ -348,6 +400,16 @@ local function getTrackAnimInfo(track)
 end
 
 local function getAnimKind(name, animId)
+	local normId = normalizeAnimId(animId)
+	if catalogHasId(animCatalog.meleeIds, animId) then
+		return 'melee'
+	end
+	if catalogHasId(animCatalog.gunShotIds, animId) then
+		return 'gun_shot'
+	end
+	if catalogHasId(animCatalog.gunDrawIds, animId) then
+		return 'gun_draw'
+	end
 	if isDeniedAnimName(name) then
 		return nil
 	end
@@ -355,16 +417,16 @@ local function getAnimKind(name, animId)
 	if string.find(lower, 'parry', 1, true) then
 		return nil
 	end
-	if animCatalog.meleeNames[lower] or animCatalog.meleeIds[animId] then
+	if animCatalog.meleeNames[lower] then
 		return 'melee'
 	end
-	if animCatalog.gunShotNames[lower] or animCatalog.gunShotIds[animId] then
+	if animCatalog.gunShotNames[lower] then
 		return 'gun_shot'
 	end
-	if animCatalog.gunDrawNames[lower] or animCatalog.gunDrawIds[animId] then
+	if animCatalog.gunDrawNames[lower] then
 		return 'gun_draw'
 	end
-	if nameMatchesPatterns(name, MELEE_NAME_PATTERNS) or string.find(lower, 'dark', 1, true) then
+	if nameMatchesPatterns(name, MELEE_NAME_PATTERNS) or string.find(lower, 'dark', 1, true) or string.find(lower, 'wideslash', 1, true) then
 		return 'melee'
 	end
 	if nameMatchesPatterns(name, GUN_SHOT_NAME_PATTERNS) then
@@ -376,8 +438,11 @@ local function getAnimKind(name, animId)
 	return nil
 end
 
-local function isActionPriority(track)
-	return track.Priority.Value >= Enum.AnimationPriority.Action.Value
+local function isMeleePriority(track, kind)
+	if kind ~= 'melee' then
+		return track.Priority.Value >= Enum.AnimationPriority.Action.Value
+	end
+	return track.Priority.Value >= Enum.AnimationPriority.Core.Value
 end
 
 local function getAllPlayingTracks(char)
@@ -400,9 +465,10 @@ end
 
 local function charHasWhitelistAttackPlaying(char)
 	for _, track in getAllPlayingTracks(char) do
-		if track.IsPlaying and track.WeightCurrent >= 0.2 and isActionPriority(track) then
+		if track.IsPlaying and track.WeightCurrent >= 0.1 then
 			local name, animId = getTrackAnimInfo(track)
-			if getAnimKind(name, animId) then
+			local kind = getAnimKind(name, animId)
+			if kind and isMeleePriority(track, kind) then
 				return true
 			end
 		end
@@ -433,30 +499,30 @@ local function getAimDot(char)
 	return best
 end
 
-local function isEnemyTargetingMe(char, minDot)
+local function isEnemyTargetingMe(char, minDot, confirmedAttack)
 	local dist = getEnemyDistance(char)
-	if dist < CLOSE_RANGE_STUDS and not charHasWhitelistAttackPlaying(char) then
+	if not confirmedAttack and dist < CLOSE_RANGE_STUDS and not charHasWhitelistAttackPlaying(char) then
 		debugSkip('close_range_no_attack', char.Name, string.format('%.1f', dist))
 		return false
 	end
 	return getAimDot(char) >= minDot
 end
 
-local function shouldParryMelee(char)
+local function shouldParryMelee(char, confirmedAttack)
 	if getEnemyDistance(char) > meleeRangeSetting then
 		return false
 	end
-	if not isEnemyTargetingMe(char, MELEE_AIM_DOT) then
+	if not isEnemyTargetingMe(char, MELEE_AIM_DOT, confirmedAttack) then
 		return false
 	end
 	return true
 end
 
-local function shouldParryGun(char)
+local function shouldParryGun(char, confirmedAttack)
 	if getEnemyDistance(char) > gunRangeSetting then
 		return false
 	end
-	if not isEnemyTargetingMe(char, GUN_AIM_DOT) then
+	if not isEnemyTargetingMe(char, GUN_AIM_DOT, confirmedAttack) then
 		return false
 	end
 	return true
@@ -489,6 +555,10 @@ end
 
 local function isShotSoundName(name)
 	return nameMatchesPatterns(name, GUN_SHOT_SOUND_PATTERNS)
+end
+
+local function isMeleeSwingSoundName(name)
+	return nameMatchesPatterns(name, MELEE_SWING_SOUND_PATTERNS)
 end
 
 local function scheduleDrawParry(char, gunName)
@@ -558,33 +628,34 @@ end
 -- Threat handlers (edge-triggered only)
 -- ---------------------------------------------------------------------------
 
-local function handleMeleeAnimation(char, track)
-	if not track.IsPlaying or track.WeightCurrent < 0.2 then
-		debugSkip('melee_low_weight', getTrackAnimInfo(track))
-		return
-	end
-	if not isActionPriority(track) then
-		debugSkip('wrong_priority', getTrackAnimInfo(track), track.Priority)
+local function handleMeleeAnimation(char, track, source)
+	source = source or 'edge'
+	if not track.IsPlaying or track.WeightCurrent < 0.08 then
+		debugSkip('melee_low_weight', getTrackAnimInfo(track), source)
 		return
 	end
 
 	local name, animId = getTrackAnimInfo(track)
 	local kind = getAnimKind(name, animId)
 	if kind ~= 'melee' then
-		debugSkip('not_whitelisted', name)
+		debugSkip('not_whitelisted', name, normalizeAnimId(animId), source)
+		return
+	end
+	if not isMeleePriority(track, kind) then
+		debugSkip('wrong_priority', name, track.Priority, source)
 		return
 	end
 	if track.TimePosition > MELEE_SWING_MAX_TIME then
-		debugSkip('melee_late_window', name, string.format('%.2f', track.TimePosition))
+		debugSkip('melee_late_window', name, string.format('%.2f', track.TimePosition), source)
 		return
 	end
-	if not shouldParryMelee(char) then
-		debugSkip('melee_aim', name, string.format('%.2f', getAimDot(char)))
+	if not shouldParryMelee(char, true) then
+		debugSkip('melee_aim', name, string.format('%.2f', getAimDot(char)), source)
 		return
 	end
 
 	local state = getEnemyState(char)
-	local key = animId .. ':melee'
+	local key = normalizeAnimId(animId) .. ':melee:' .. tostring(math.floor(track.TimePosition * 10))
 	if key == state.lastSwingId then
 		return
 	end
@@ -595,40 +666,41 @@ local function handleMeleeAnimation(char, track)
 		end
 	end)
 
-	debugLog('trigger', 'melee_' .. name, 'aim=' .. string.format('%.2f', getAimDot(char)))
+	debugLog('trigger', 'melee_' .. name, 'id=' .. normalizeAnimId(animId), 'aim=' .. string.format('%.2f', getAimDot(char)), source)
 	tryParry('melee_' .. name)
 end
 
-local function handleGunAnimation(char, track)
-	if not track.IsPlaying or track.WeightCurrent < 0.15 then
+local function handleGunAnimation(char, track, source)
+	source = source or 'edge'
+	if not track.IsPlaying or track.WeightCurrent < 0.08 then
 		return
 	end
 
 	local name, animId = getTrackAnimInfo(track)
 	local kind = getAnimKind(name, animId)
 	if kind ~= 'gun_shot' and kind ~= 'gun_draw' then
-		debugSkip('gun_not_whitelisted', name)
+		debugSkip('gun_not_whitelisted', name, normalizeAnimId(animId), source)
 		return
 	end
-	if not shouldParryGun(char) then
-		debugSkip('gun_aim', name, string.format('%.2f', getAimDot(char)))
+	if not shouldParryGun(char, true) then
+		debugSkip('gun_aim', name, string.format('%.2f', getAimDot(char)), source)
 		return
 	end
 
 	if kind == 'gun_draw' then
 		local gunName = detectEquippedGun(char)
-		debugLog('trigger', 'gun_draw_' .. name, gunName)
+		debugLog('trigger', 'gun_draw_' .. name, gunName, source)
 		scheduleDrawParry(char, gunName)
 		return
 	end
 
 	if track.TimePosition > GUN_SHOT_MAX_TIME then
-		debugSkip('gun_shot_late', name, string.format('%.2f', track.TimePosition))
+		debugSkip('gun_shot_late', name, string.format('%.2f', track.TimePosition), source)
 		return
 	end
 
 	local state = getEnemyState(char)
-	local key = animId .. ':gun'
+	local key = normalizeAnimId(animId) .. ':gun:' .. tostring(math.floor(track.TimePosition * 10))
 	if key == state.lastShotId then
 		return
 	end
@@ -639,7 +711,7 @@ local function handleGunAnimation(char, track)
 		end
 	end)
 
-	debugLog('trigger', 'gun_shot_' .. name, 'aim=' .. string.format('%.2f', getAimDot(char)))
+	debugLog('trigger', 'gun_shot_' .. name, 'id=' .. normalizeAnimId(animId), 'aim=' .. string.format('%.2f', getAimDot(char)), source)
 	tryParry('gun_shot_' .. name)
 end
 
@@ -649,18 +721,26 @@ local function onEnemyAnimationPlayed(char, track)
 	end
 	local name, animId = getTrackAnimInfo(track)
 	local kind = getAnimKind(name, animId)
+	if debugEnabled then
+		debugLog('anim_played', name, 'id=' .. normalizeAnimId(animId), kind or '-', 'w=' .. string.format('%.2f', track.WeightCurrent))
+	end
 	if not kind then
 		return
 	end
-	if kind == 'melee' then
-		handleMeleeAnimation(char, track)
-	elseif kind == 'gun_shot' or kind == 'gun_draw' then
-		handleGunAnimation(char, track)
-	end
+	task.defer(function()
+		if not track.IsPlaying then
+			return
+		end
+		if kind == 'melee' then
+			handleMeleeAnimation(char, track, 'edge')
+		elseif kind == 'gun_shot' or kind == 'gun_draw' then
+			handleGunAnimation(char, track, 'edge')
+		end
+	end)
 end
 
 local function handleGlintSpawn(char, inst)
-	if not shouldParryGun(char) then
+	if not shouldParryGun(char, false) then
 		debugSkip('glint_aim', inst.Name, string.format('%.2f', getAimDot(char)))
 		return
 	end
@@ -680,6 +760,32 @@ local function handleGlintSpawn(char, inst)
 	end)
 end
 
+local function handleMeleeSound(char, sound)
+	if not sound.IsPlaying then
+		return
+	end
+	if not isMeleeSwingSoundName(sound.Name) then
+		return
+	end
+	if not shouldParryMelee(char, true) then
+		debugSkip('melee_sound_aim', sound.Name, string.format('%.2f', getAimDot(char)))
+		return
+	end
+	local state = getEnemyState(char)
+	local key = 'sound:' .. sound.Name
+	if state.lastSwingId == key then
+		return
+	end
+	state.lastSwingId = key
+	task.delay(0.5, function()
+		if state.lastSwingId == key then
+			state.lastSwingId = ''
+		end
+	end)
+	debugLog('trigger', 'melee_sound_' .. sound.Name, 'aim=' .. string.format('%.2f', getAimDot(char)))
+	tryParry('melee_sound_' .. sound.Name)
+end
+
 local function handleShotSound(char, sound)
 	if not sound.IsPlaying then
 		return
@@ -687,7 +793,7 @@ local function handleShotSound(char, sound)
 	if not isShotSoundName(sound.Name) then
 		return
 	end
-	if not shouldParryGun(char) then
+	if not shouldParryGun(char, true) then
 		debugSkip('sound_aim', sound.Name, string.format('%.2f', getAimDot(char)))
 		return
 	end
@@ -699,42 +805,44 @@ end
 -- Enemy watchers
 -- ---------------------------------------------------------------------------
 
-local function hookModel(model, ownerChar)
+local function hookModel(model, ownerChar, conns)
 	for _, desc in model:GetDescendants() do
 		if desc:IsA('Animator') then
-			desc.AnimationPlayed:Connect(function(track)
+			table.insert(conns, desc.AnimationPlayed:Connect(function(track)
 				onEnemyAnimationPlayed(ownerChar, track)
-			end)
+			end))
 		end
 		if desc:IsA('Sound') then
-			desc:GetPropertyChangedSignal('IsPlaying'):Connect(function()
+			table.insert(conns, desc:GetPropertyChangedSignal('IsPlaying'):Connect(function()
 				if desc.IsPlaying then
+					handleMeleeSound(ownerChar, desc)
 					handleShotSound(ownerChar, desc)
 				end
-			end)
+			end))
 		end
 		if isGlintName(desc.Name) then
 			handleGlintSpawn(ownerChar, desc)
 		end
 	end
 
-	model.DescendantAdded:Connect(function(inst)
+	table.insert(conns, model.DescendantAdded:Connect(function(inst)
 		if inst:IsA('Animator') then
-			inst.AnimationPlayed:Connect(function(track)
+			table.insert(conns, inst.AnimationPlayed:Connect(function(track)
 				onEnemyAnimationPlayed(ownerChar, track)
-			end)
+			end))
 		end
 		if inst:IsA('Sound') then
-			inst:GetPropertyChangedSignal('IsPlaying'):Connect(function()
+			table.insert(conns, inst:GetPropertyChangedSignal('IsPlaying'):Connect(function()
 				if inst.IsPlaying then
+					handleMeleeSound(ownerChar, inst)
 					handleShotSound(ownerChar, inst)
 				end
-			end)
+			end))
 		end
 		if isGlintName(inst.Name) then
 			handleGlintSpawn(ownerChar, inst)
 		end
-	end)
+	end))
 end
 
 local function unwatchCharacter(char)
@@ -760,15 +868,15 @@ local function watchEnemyCharacter(char, ownerPlr)
 		plr = playersService:GetPlayerFromCharacter(char)
 	end
 
-	local conns = {true}
+	local conns = {}
 	charWatchers[char] = conns
 	local ownerChar = (plr and plr.Character) or char
 
-	hookModel(char, ownerChar)
+	hookModel(char, ownerChar, conns)
 	if plr then
 		for _, extraModel in getEnemyModels(plr) do
 			if extraModel ~= char then
-				hookModel(extraModel, ownerChar)
+				hookModel(extraModel, ownerChar, conns)
 			end
 		end
 	end
@@ -945,7 +1053,7 @@ local function onGunVfxPacket(itemId, position)
 	for _, plr in playersService:GetPlayers() do
 		if plr ~= lplr and plr.Character then
 			local char = plr.Character
-			if not shouldParryGun(char) then
+			if not shouldParryGun(char, true) then
 				continue
 			end
 			local enemyRoot = char:FindFirstChild('HumanoidRootPart')
@@ -1028,6 +1136,32 @@ local function pressAttackClick()
 	return true
 end
 
+local function scanWhitelistHeartbeat()
+	for _, plr in playersService:GetPlayers() do
+		if plr ~= lplr and plr.Character then
+			local ownerChar = plr.Character
+			local maxRange = math.max(meleeRangeSetting, gunRangeSetting) + 4
+			if getEnemyDistance(ownerChar) > maxRange then
+				continue
+			end
+			for _, model in getEnemyModels(plr) do
+				for _, track in getAllPlayingTracks(model) do
+					if not track.IsPlaying or track.WeightCurrent < 0.08 then
+						continue
+					end
+					local name, animId = getTrackAnimInfo(track)
+					local kind = getAnimKind(name, animId)
+					if kind == 'melee' and track.TimePosition <= MELEE_SWING_MAX_TIME then
+						handleMeleeAnimation(ownerChar, track, 'scan')
+					elseif kind == 'gun_shot' and track.TimePosition <= GUN_SHOT_MAX_TIME then
+						handleGunAnimation(ownerChar, track, 'scan')
+					end
+				end
+			end
+		end
+	end
+end
+
 local function enemyThreatensMe(char, meleeRange, gunRange)
 	if getEnemyDistance(char) > math.max(meleeRange, gunRange) + 4 then
 		return false
@@ -1036,16 +1170,16 @@ local function enemyThreatensMe(char, meleeRange, gunRange)
 		if track.IsPlaying and track.WeightCurrent >= 0.2 then
 			local name, animId = getTrackAnimInfo(track)
 			local kind = getAnimKind(name, animId)
-			if kind == 'melee' and shouldParryMelee(char) then
+			if kind == 'melee' and shouldParryMelee(char, true) then
 				return true
 			end
-			if (kind == 'gun_shot' or kind == 'gun_draw') and shouldParryGun(char) then
+			if (kind == 'gun_shot' or kind == 'gun_draw') and shouldParryGun(char, true) then
 				return true
 			end
 		end
 	end
 	for _, inst in char:GetDescendants() do
-		if isGlintName(inst.Name) and shouldParryGun(char) then
+		if isGlintName(inst.Name) and shouldParryGun(char, false) then
 			return true
 		end
 	end
@@ -1113,6 +1247,7 @@ local function combatHeartbeat(meleeRange, gunRange, attackCooldown)
 
 	if autoParryActive then
 		startEnemyWatchers()
+		scanWhitelistHeartbeat()
 
 		if debugEnabled and tick() - lastDebugHeartbeat > 3 then
 			lastDebugHeartbeat = tick()
@@ -1164,7 +1299,7 @@ run(function()
 		Function = function(callback)
 			autoParryActive = callback
 			if callback then
-				buildAnimCatalog()
+				buildAnimCatalog(true)
 				startEnemyWatchers()
 				bindPacketListeners()
 				notif('Auto Parry', 'Whitelist parry — melee swings + gun glint/timed shots.', 5)
