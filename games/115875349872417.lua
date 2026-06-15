@@ -1042,6 +1042,435 @@ local function cleanupEnemyState(model)
 end
 
 -- ---------------------------------------------------------------------------
+-- Animation Logger (file dump for ID identification)
+-- ---------------------------------------------------------------------------
+
+local animLogActive = false
+local animLogLocal = false
+local animLogEnemies = true
+local animLogFilePath = ''
+local animLogBuffer = {}
+local animLogBufferChars = 0
+local animLogLastFlush = 0
+local animLogWatchers = {}
+local animLogGlobalConns = {}
+local animLogEventCount = 0
+local animLogFlushToken = 0
+
+local function animLogCanWrite()
+	return writefile ~= nil and (appendfile ~= nil or readfile ~= nil)
+end
+
+local function animLogEnsureFolder()
+	if not makefolder or not isfolder then
+		return
+	end
+	pcall(function()
+		if not isfolder('newvape') then
+			makefolder('newvape')
+		end
+		if not isfolder('newvape/redliner') then
+			makefolder('newvape/redliner')
+		end
+	end)
+end
+
+local function animLogAppendFile(text)
+	if not animLogCanWrite() or animLogFilePath == '' then
+		return false
+	end
+	if appendfile then
+		local ok = pcall(appendfile, animLogFilePath, text)
+		return ok
+	end
+	local existing = ''
+	if isfile and isfile(animLogFilePath) then
+		pcall(function()
+			existing = readfile(animLogFilePath)
+		end)
+	end
+	return pcall(writefile, animLogFilePath, existing .. text)
+end
+
+local function animLogFlush(force)
+	if animLogBufferChars == 0 then
+		return
+	end
+	if not force and tick() - animLogLastFlush < 1.5 then
+		return
+	end
+	local chunk = table.concat(animLogBuffer)
+	table.clear(animLogBuffer)
+	animLogBufferChars = 0
+	animLogLastFlush = tick()
+	animLogAppendFile(chunk)
+end
+
+local function animLogQueue(text)
+	table.insert(animLogBuffer, text)
+	animLogBufferChars += #text
+	if animLogBufferChars >= 12000 then
+		animLogFlush(true)
+	end
+end
+
+local function animLogWriteLine(...)
+	local parts = {}
+	for i = 1, select('#', ...) do
+		table.insert(parts, tostring(select(i, ...)))
+	end
+	animLogQueue(table.concat(parts, ' ') .. '\n')
+end
+
+local function animLogWriteBlock(lines)
+	for _, line in lines do
+		animLogQueue(line .. '\n')
+	end
+	animLogQueue('\n')
+end
+
+local function animLogGetFilePath()
+	return 'newvape/redliner/' .. tostring(game.PlaceId) .. '_anim_log.txt'
+end
+
+local function animLogKnownLabel(normId)
+	if PARRY_ANIM_IDS[normId] then
+		return 'parry:' .. PARRY_ANIM_IDS[normId]
+	end
+	if BLOCKED_ANIM_IDS[normId] then
+		return 'blocked:' .. BLOCKED_ANIM_IDS[normId]
+	end
+	return ''
+end
+
+local function animLogShouldLogPlayer(plr)
+	if not plr then
+		return animLogEnemies
+	end
+	if plr == lplr then
+		return animLogLocal
+	end
+	return animLogEnemies
+end
+
+local function animLogSafeNumber(value, digits)
+	if typeof(value) ~= 'number' then
+		return 'n/a'
+	end
+	if digits then
+		return string.format('%.' .. digits .. 'f', value)
+	end
+	return tostring(value)
+end
+
+local function animLogFormatTrackEvent(char, plr, track, eventName)
+	local name, animId = getTrackAnimInfo(track)
+	local normId = normalizeAnimId(animId)
+	local root = char:FindFirstChild('HumanoidRootPart')
+	local horizVel = 0
+	if root then
+		local vel = root.AssemblyLinearVelocity
+		horizVel = Vector3.new(vel.X, 0, vel.Z).Magnitude
+	end
+	local known = animLogKnownLabel(normId)
+	local lines = {
+		'=== ' .. string.upper(eventName) .. ' #' .. animLogEventCount .. ' ===',
+		'time=' .. string.format('%.3f', tick()),
+		'event=' .. eventName,
+		'player=' .. (plr and plr.Name or 'npc') .. (plr == lplr and ' (local)' or (plr and ' (enemy)' or '')),
+		'character=' .. char.Name,
+		'anim_name=' .. name,
+		'anim_id=' .. (animId ~= '' and animId or 'n/a'),
+		'norm_id=' .. (normId ~= '' and normId or 'n/a'),
+		'known=' .. (known ~= '' and known or '-'),
+		'priority=' .. tostring(track.Priority),
+		'weight=' .. animLogSafeNumber(track.WeightCurrent, 3),
+		'weight_target=' .. animLogSafeNumber(track.WeightTarget, 3),
+		'time_pos=' .. animLogSafeNumber(track.TimePosition, 3),
+		'length=' .. animLogSafeNumber(track.Length, 3),
+		'speed=' .. animLogSafeNumber(track.Speed, 3),
+		'is_playing=' .. tostring(track.IsPlaying),
+		'looped=' .. tostring(track.Looped),
+	}
+	if plr ~= lplr then
+		lines[#lines + 1] = 'dist=' .. animLogSafeNumber(getEnemyDistance(char), 2)
+		lines[#lines + 1] = 'aim_dot=' .. animLogSafeNumber(getAimDot(char), 3)
+	end
+	lines[#lines + 1] = 'horiz_vel=' .. animLogSafeNumber(horizVel, 2)
+	lines[#lines + 1] = 'gun_equipped=' .. tostring(charHasGunEquipped(char))
+	lines[#lines + 1] = 'gun=' .. detectEquippedGun(char)
+	local anim = track.Animation
+	if anim then
+		lines[#lines + 1] = 'animation_parent=' .. anim.Parent:GetFullName()
+	end
+	return lines
+end
+
+local function animLogOnTrackEvent(char, plr, track, eventName)
+	if not animLogActive then
+		return
+	end
+	animLogEventCount += 1
+	animLogWriteBlock(animLogFormatTrackEvent(char, plr, track, eventName))
+end
+
+local function animLogHookAnimator(animator, ownerChar, ownerPlr, conns)
+	table.insert(conns, animator.AnimationPlayed:Connect(function(track)
+		animLogOnTrackEvent(ownerChar, ownerPlr, track, 'played')
+		pcall(function()
+			track.Stopped:Once(function()
+				if animLogActive then
+					animLogOnTrackEvent(ownerChar, ownerPlr, track, 'stopped')
+				end
+			end)
+		end)
+	end))
+end
+
+local function animLogHookModel(model, ownerChar, ownerPlr, conns)
+	for _, desc in model:GetDescendants() do
+		if desc:IsA('Animator') then
+			animLogHookAnimator(desc, ownerChar, ownerPlr, conns)
+		end
+	end
+	table.insert(conns, model.DescendantAdded:Connect(function(inst)
+		if inst:IsA('Animator') then
+			animLogHookAnimator(inst, ownerChar, ownerPlr, conns)
+		end
+	end))
+end
+
+local function animLogUnwatch(key)
+	local conns = animLogWatchers[key]
+	if conns then
+		for _, conn in conns do
+			conn:Disconnect()
+		end
+	end
+	animLogWatchers[key] = nil
+end
+
+local function animLogWatchCharacter(char, ownerPlr)
+	if not char or not animLogShouldLogPlayer(ownerPlr) then
+		return
+	end
+	local key = char
+	if animLogWatchers[key] then
+		return
+	end
+	local conns = {}
+	animLogWatchers[key] = conns
+	local ownerChar = (ownerPlr and ownerPlr.Character) or char
+	animLogHookModel(char, ownerChar, ownerPlr, conns)
+	if ownerPlr then
+		for _, extraModel in getEnemyModels(ownerPlr) do
+			if extraModel ~= char then
+				animLogHookModel(extraModel, ownerChar, ownerPlr, conns)
+			end
+		end
+	end
+end
+
+local function animLogWatchPlayer(plr)
+	if not animLogShouldLogPlayer(plr) then
+		return
+	end
+	if plr.Character then
+		animLogWatchCharacter(plr.Character, plr)
+	end
+	if plr ~= lplr then
+		for _, model in getEnemyModels(plr) do
+			if model ~= plr.Character then
+				animLogWatchCharacter(model, plr)
+			end
+		end
+	end
+end
+
+local function animLogRefreshWatchers()
+	for key in animLogWatchers do
+		animLogUnwatch(key)
+	end
+	if animLogLocal then
+		animLogWatchPlayer(lplr)
+	end
+	if animLogEnemies then
+		for _, plr in playersService:GetPlayers() do
+			if plr ~= lplr then
+				animLogWatchPlayer(plr)
+			end
+		end
+	end
+end
+
+local function animLogStopWatchers()
+	for key in animLogWatchers do
+		animLogUnwatch(key)
+	end
+	for _, conn in animLogGlobalConns do
+		conn:Disconnect()
+	end
+	table.clear(animLogGlobalConns)
+end
+
+local function animLogStartWatchers()
+	animLogStopWatchers()
+	animLogRefreshWatchers()
+
+	table.insert(animLogGlobalConns, playersService.PlayerAdded:Connect(function(plr)
+		plr.CharacterAdded:Connect(function()
+			task.defer(function()
+				if animLogActive then
+					animLogWatchPlayer(plr)
+				end
+			end)
+		end)
+		task.defer(function()
+			if animLogActive then
+				animLogWatchPlayer(plr)
+			end
+		end)
+	end))
+
+	table.insert(animLogGlobalConns, playersService.PlayerRemoving:Connect(function(plr)
+		if plr.Character then
+			animLogUnwatch(plr.Character)
+		end
+		for _, model in getEnemyModels(plr) do
+			animLogUnwatch(model)
+		end
+	end))
+
+	for _, plr in playersService:GetPlayers() do
+		plr.CharacterAdded:Connect(function()
+			task.defer(function()
+				if animLogActive then
+					animLogWatchPlayer(plr)
+				end
+			end)
+		end)
+	end
+
+	animLogFlushToken += 1
+	local token = animLogFlushToken
+	task.spawn(function()
+		while animLogActive and token == animLogFlushToken do
+			animLogFlush(false)
+			task.wait(1.5)
+		end
+	end)
+end
+
+local function animLogScanAnimations(root, pathPrefix, out)
+	for _, inst in root:GetDescendants() do
+		if inst:IsA('Animation') then
+			local normId = normalizeAnimId(inst.AnimationId)
+			local fullPath = pathPrefix .. inst:GetFullName()
+			table.insert(out, {
+				path = fullPath,
+				name = inst.Name,
+				animId = inst.AnimationId,
+				normId = normId,
+				known = animLogKnownLabel(normId),
+			})
+		end
+	end
+end
+
+local function animLogDumpCatalog()
+	if not animLogCanWrite() then
+		notif('Animation Logger', 'writefile/appendfile not available in this executor.', 6, 'warning')
+		return ''
+	end
+
+	animLogEnsureFolder()
+	local path = animLogFilePath ~= '' and animLogFilePath or animLogGetFilePath()
+	local entries = {}
+	local roots = {
+		{root = replicatedStorage:FindFirstChild('Assets'), prefix = ''},
+		{root = replicatedStorage, prefix = ''},
+		{root = workspace:FindFirstChild('Chrono_EntityStorage'), prefix = ''},
+	}
+	for _, entry in roots do
+		if entry.root then
+			animLogScanAnimations(entry.root, entry.prefix, entries)
+		end
+	end
+
+	table.sort(entries, function(a, b)
+		return a.normId < b.normId or (a.normId == b.normId and a.path < b.path)
+	end)
+
+	local lines = {
+		'################################################################################',
+		'# ANIMATION CATALOG DUMP',
+		'# place=' .. tostring(game.PlaceId),
+		'# time=' .. os.date('%Y-%m-%d %H:%M:%S'),
+		'# total=' .. #entries,
+		'################################################################################',
+	}
+	local seenIds = {}
+	for _, entry in entries do
+		local idKey = entry.normId .. '|' .. entry.name
+		if not seenIds[idKey] then
+			seenIds[idKey] = true
+			lines[#lines + 1] = string.format(
+				'[CATALOG] path=%s | name=%s | id=%s | norm_id=%s | known=%s',
+				entry.path,
+				entry.name,
+				entry.animId ~= '' and entry.animId or 'n/a',
+				entry.normId ~= '' and entry.normId or 'n/a',
+				entry.known ~= '' and entry.known or '-'
+			)
+		end
+	end
+	lines[#lines + 1] = ''
+	lines[#lines + 1] = '# End catalog'
+	lines[#lines + 1] = ''
+
+	local text = table.concat(lines, '\n')
+	animLogAppendFile(text)
+	return path
+end
+
+local function animLogBeginSession(clearFile)
+	if not animLogCanWrite() then
+		notif('Animation Logger', 'writefile/appendfile not available in this executor.', 6, 'warning')
+		return false
+	end
+	animLogEnsureFolder()
+	animLogFilePath = animLogGetFilePath()
+	animLogEventCount = 0
+	local header = table.concat({
+		'',
+		'################################################################################',
+		'# REDLINER Animation Log',
+		'# place=' .. tostring(game.PlaceId),
+		'# started=' .. os.date('%Y-%m-%d %H:%M:%S'),
+		'# local=' .. lplr.Name,
+		'# log_local=' .. tostring(animLogLocal),
+		'# log_enemies=' .. tostring(animLogEnemies),
+		'# file=' .. animLogFilePath,
+		'################################################################################',
+		'',
+	}, '\n')
+	if clearFile then
+		pcall(writefile, animLogFilePath, header)
+	else
+		animLogAppendFile(header)
+	end
+	animLogDumpCatalog()
+	return true
+end
+
+local function animLogStop()
+	animLogWriteLine('# session ended', os.date('%Y-%m-%d %H:%M:%S'), 'events=' .. animLogEventCount)
+	animLogFlush(true)
+	animLogActive = false
+	animLogStopWatchers()
+end
+
+-- ---------------------------------------------------------------------------
 -- UI modules
 -- ---------------------------------------------------------------------------
 
@@ -1179,6 +1608,86 @@ run(function()
 		Tooltip = 'Sends one F key press. Use to verify parry works.',
 	})
 
+	local AnimLogger
+	AnimLogger = minigames:CreateModule({
+		Name = 'Animation Logger',
+		Function = function(callback)
+			if callback then
+				if not animLogBeginSession(false) then
+					return
+				end
+				animLogActive = true
+				animLogStartWatchers()
+				notif('Animation Logger', 'Logging to ' .. animLogFilePath, 8)
+				print('[REDLINER] Animation Logger | file=' .. animLogFilePath)
+			else
+				animLogStop()
+			end
+		end,
+		Tooltip = 'Writes all played animations + game catalog to a text file for ID identification.',
+	})
+
+	AnimLogger:CreateToggle({
+		Name = 'Log Local',
+		Default = false,
+		Function = function(callback)
+			animLogLocal = callback
+			if animLogActive then
+				animLogRefreshWatchers()
+			end
+		end,
+		Tooltip = 'Include your own character animations in the log.',
+	})
+
+	AnimLogger:CreateToggle({
+		Name = 'Log Enemies',
+		Default = true,
+		Function = function(callback)
+			animLogEnemies = callback
+			if animLogActive then
+				animLogRefreshWatchers()
+			end
+		end,
+		Tooltip = 'Include enemy player animations in the log.',
+	})
+
+	AnimLogger:CreateButton({
+		Name = 'Dump Catalog',
+		Function = function()
+			animLogEnsureFolder()
+			if animLogFilePath == '' then
+				animLogFilePath = animLogGetFilePath()
+			end
+			local path = animLogDumpCatalog()
+			notif('Animation Logger', 'Catalog appended to ' .. path, 6)
+			print('[REDLINER] catalog dumped | file=' .. path)
+		end,
+		Tooltip = 'Scan ReplicatedStorage/workspace for Animation instances and append to log.',
+	})
+
+	AnimLogger:CreateButton({
+		Name = 'New Session',
+		Function = function()
+			if not animLogBeginSession(true) then
+				return
+			end
+			if animLogActive then
+				animLogStartWatchers()
+			end
+			notif('Animation Logger', 'New log file started: ' .. animLogFilePath, 6)
+		end,
+		Tooltip = 'Clears the log file and writes a fresh header + catalog.',
+	})
+
+	AnimLogger:CreateButton({
+		Name = 'Flush Now',
+		Function = function()
+			animLogFlush(true)
+			notif('Animation Logger', 'Buffer flushed to ' .. (animLogFilePath ~= '' and animLogFilePath or animLogGetFilePath()), 4)
+		end,
+		Tooltip = 'Immediately write buffered events to the log file.',
+	})
+
 	local combatBound = false
 	local function bindCombatLoop()
 		if combatBound then
@@ -1216,6 +1725,6 @@ run(function()
 		repeat
 			task.wait(0.25)
 		until vape.Loaded or tick() - start > 20
-		notif('REDLINER', 'Minigames: Auto Parry, Auto Attack, Reach ready.', 5)
+		notif('REDLINER', 'Minigames: Auto Parry, Auto Attack, Reach, Animation Logger ready.', 5)
 	end)
 end)
