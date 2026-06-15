@@ -94,6 +94,8 @@ local parryBlockAttackUntil = 0
 local attackPressToken = 0
 local lastDebugHeartbeat = 0
 local lastDebugSkipAt = {}
+local lastDebugAnimAt = {}
+local parryIdsLogged = false
 local parryScanBound = false
 local tryParry
 
@@ -279,7 +281,24 @@ local function isParryMeleeAnim(animId)
 	return getParryAnimKind(animId) == 'melee'
 end
 
-local function logParryAnimIds()
+local function debugAnimLog(...)
+	if not debugEnabled then
+		return
+	end
+	local key = table.concat({...}, '|')
+	local now = tick()
+	if now - (lastDebugAnimAt[key] or 0) < 0.5 then
+		return
+	end
+	lastDebugAnimAt[key] = now
+	print('[REDLINER] anim:', ...)
+end
+
+local function logParryAnimIds(force)
+	if parryIdsLogged and not force then
+		return
+	end
+	parryIdsLogged = true
 	print('[REDLINER] parry ids | melee=105441036119013 | gun=glint+timed | blocked dash=115078691506529,110389010823335')
 end
 
@@ -625,9 +644,9 @@ local function onEnemyAnimationPlayed(char, track)
 	local kind = getParryAnimKind(animId)
 	if debugEnabled then
 		if BLOCKED_ANIM_IDS[normId] then
-			debugSkip('blocked_anim', normId, BLOCKED_ANIM_IDS[normId], 'w=' .. string.format('%.2f', track.WeightCurrent))
-		else
-			debugLog('anim_played', name, 'id=' .. normId, kind or '-', 'w=' .. string.format('%.2f', track.WeightCurrent))
+			debugAnimLog('blocked', normId, BLOCKED_ANIM_IDS[normId], 'w=' .. string.format('%.2f', track.WeightCurrent))
+		elseif PARRY_ANIM_IDS[normId] or track.WeightCurrent >= 0.35 then
+			debugAnimLog('played', name, 'id=' .. normId, kind or '-', 'w=' .. string.format('%.2f', track.WeightCurrent))
 		end
 	end
 	if kind == 'melee' then
@@ -716,7 +735,6 @@ local function watchEnemyPlayer(plr)
 end
 
 local function startEnemyWatchers()
-	logParryAnimIds()
 	for _, plr in playersService:GetPlayers() do
 		if plr ~= lplr then
 			watchEnemyPlayer(plr)
@@ -1056,16 +1074,28 @@ local animLogWatchers = {}
 local animLogGlobalConns = {}
 local animLogEventCount = 0
 local animLogFlushToken = 0
+local animLogMirrorConsole = false
+local animLogLastWriteError = ''
+
+local function animLogGetExecutorName()
+	if identifyexecutor then
+		local ok, name = pcall(identifyexecutor)
+		if ok and name then
+			return tostring(name)
+		end
+	end
+	return 'executor'
+end
 
 local function animLogCanWrite()
-	return writefile ~= nil and (appendfile ~= nil or readfile ~= nil)
+	return type(writefile) == 'function'
 end
 
 local function animLogEnsureFolder()
-	if not makefolder or not isfolder then
-		return
+	if type(makefolder) ~= 'function' or type(isfolder) ~= 'function' then
+		return true
 	end
-	pcall(function()
+	local ok = pcall(function()
 		if not isfolder('newvape') then
 			makefolder('newvape')
 		end
@@ -1073,23 +1103,64 @@ local function animLogEnsureFolder()
 			makefolder('newvape/redliner')
 		end
 	end)
+	return ok
 end
 
-local function animLogAppendFile(text)
-	if not animLogCanWrite() or animLogFilePath == '' then
-		return false
+local function animLogVerifyFile(path)
+	return type(isfile) == 'function' and isfile(path)
+end
+
+local function animLogAppendFile(text, path)
+	path = path or animLogFilePath
+	if not animLogCanWrite() or path == '' then
+		animLogLastWriteError = 'writefile unavailable'
+		return false, animLogLastWriteError
 	end
-	if appendfile then
-		local ok = pcall(appendfile, animLogFilePath, text)
-		return ok
+	animLogEnsureFolder()
+
+	local ok, err
+	if type(appendfile) == 'function' then
+		ok, err = pcall(appendfile, path, text)
+	else
+		local existing = ''
+		if type(readfile) == 'function' and animLogVerifyFile(path) then
+			pcall(function()
+				existing = readfile(path)
+			end)
+		end
+		ok, err = pcall(writefile, path, existing .. text)
 	end
-	local existing = ''
-	if isfile and isfile(animLogFilePath) then
-		pcall(function()
-			existing = readfile(animLogFilePath)
-		end)
+
+	if not ok then
+		animLogLastWriteError = tostring(err)
+		return false, animLogLastWriteError
 	end
-	return pcall(writefile, animLogFilePath, existing .. text)
+	if not animLogVerifyFile(path) then
+		animLogLastWriteError = 'write returned ok but isfile=false (check ' .. animLogGetExecutorName() .. ' workspace, not this repo folder)'
+		return false, animLogLastWriteError
+	end
+	animLogLastWriteError = ''
+	return true
+end
+
+local function animLogWriteFile(text, path)
+	path = path or animLogFilePath
+	if not animLogCanWrite() or path == '' then
+		animLogLastWriteError = 'writefile unavailable'
+		return false, animLogLastWriteError
+	end
+	animLogEnsureFolder()
+	local ok, err = pcall(writefile, path, text)
+	if not ok then
+		animLogLastWriteError = tostring(err)
+		return false, animLogLastWriteError
+	end
+	if not animLogVerifyFile(path) then
+		animLogLastWriteError = 'write returned ok but isfile=false (check ' .. animLogGetExecutorName() .. ' workspace, not this repo folder)'
+		return false, animLogLastWriteError
+	end
+	animLogLastWriteError = ''
+	return true
 end
 
 local function animLogFlush(force)
@@ -1103,10 +1174,18 @@ local function animLogFlush(force)
 	table.clear(animLogBuffer)
 	animLogBufferChars = 0
 	animLogLastFlush = tick()
-	animLogAppendFile(chunk)
+	local ok, err = animLogAppendFile(chunk)
+	if not ok then
+		animLogMirrorConsole = true
+		warn('[REDLINER] anim log flush failed:', err)
+		print(chunk)
+	end
 end
 
 local function animLogQueue(text)
+	if animLogMirrorConsole then
+		print(text)
+	end
 	table.insert(animLogBuffer, text)
 	animLogBufferChars += #text
 	if animLogBufferChars >= 12000 then
@@ -1379,12 +1458,15 @@ end
 
 local function animLogDumpCatalog()
 	if not animLogCanWrite() then
-		notif('Animation Logger', 'writefile/appendfile not available in this executor.', 6, 'warning')
-		return ''
+		notif('Animation Logger', 'writefile not available in this executor.', 6, 'warning')
+		return '', 'writefile unavailable'
 	end
 
 	animLogEnsureFolder()
-	local path = animLogFilePath ~= '' and animLogFilePath or animLogGetFilePath()
+	if animLogFilePath == '' then
+		animLogFilePath = animLogGetFilePath()
+	end
+	local path = animLogFilePath
 	local entries = {}
 	local roots = {
 		{root = replicatedStorage:FindFirstChild('Assets'), prefix = ''},
@@ -1429,18 +1511,24 @@ local function animLogDumpCatalog()
 	lines[#lines + 1] = ''
 
 	local text = table.concat(lines, '\n')
-	animLogAppendFile(text)
+	local ok, err = animLogAppendFile(text, path)
+	if not ok then
+		warn('[REDLINER] catalog dump failed:', err)
+		print(text)
+		return path, err
+	end
 	return path
 end
 
 local function animLogBeginSession(clearFile)
 	if not animLogCanWrite() then
-		notif('Animation Logger', 'writefile/appendfile not available in this executor.', 6, 'warning')
-		return false
+		notif('Animation Logger', 'writefile not available in this executor.', 6, 'warning')
+		return false, 'writefile unavailable'
 	end
 	animLogEnsureFolder()
 	animLogFilePath = animLogGetFilePath()
 	animLogEventCount = 0
+	animLogMirrorConsole = false
 	local header = table.concat({
 		'',
 		'################################################################################',
@@ -1451,15 +1539,28 @@ local function animLogBeginSession(clearFile)
 		'# log_local=' .. tostring(animLogLocal),
 		'# log_enemies=' .. tostring(animLogEnemies),
 		'# file=' .. animLogFilePath,
+		'# executor=' .. animLogGetExecutorName(),
 		'################################################################################',
 		'',
 	}, '\n')
+	local ok, err
 	if clearFile then
-		pcall(writefile, animLogFilePath, header)
+		ok, err = animLogWriteFile(header, animLogFilePath)
 	else
-		animLogAppendFile(header)
+		ok, err = animLogAppendFile(header, animLogFilePath)
 	end
-	animLogDumpCatalog()
+	if not ok then
+		animLogMirrorConsole = true
+		warn('[REDLINER] anim log file write failed:', err)
+		notif('Animation Logger', 'File write failed — mirroring to console. ' .. err, 10, 'warning')
+		print(header)
+		return true, err
+	end
+	local catalogPath, catalogErr = animLogDumpCatalog()
+	if catalogErr then
+		return true, catalogErr
+	end
+	print('[REDLINER] Animation Logger | wrote test OK | executor=' .. animLogGetExecutorName() .. ' | file=' .. animLogFilePath)
 	return true
 end
 
@@ -1587,8 +1688,10 @@ run(function()
 		Function = function(callback)
 			debugEnabled = callback
 			if callback then
-				logParryAnimIds()
+				logParryAnimIds(true)
 				print('[REDLINER] debug on | alive=', isLocalAlive(), 'autoParry=', autoParryActive, 'castigateDelay=', castigateParryDelay)
+			else
+				table.clear(lastDebugAnimAt)
 			end
 		end,
 	})
@@ -1613,18 +1716,22 @@ run(function()
 		Name = 'Animation Logger',
 		Function = function(callback)
 			if callback then
-				if not animLogBeginSession(false) then
+				local ok, err = animLogBeginSession(false)
+				if not ok then
 					return
 				end
 				animLogActive = true
 				animLogStartWatchers()
-				notif('Animation Logger', 'Logging to ' .. animLogFilePath, 8)
-				print('[REDLINER] Animation Logger | file=' .. animLogFilePath)
+				if err then
+					notif('Animation Logger', 'File write failed — logging to console. ' .. err, 10, 'warning')
+				else
+					notif('Animation Logger', animLogFilePath .. ' (' .. animLogGetExecutorName() .. ' workspace)', 8)
+				end
 			else
 				animLogStop()
 			end
 		end,
-		Tooltip = 'Writes all played animations + game catalog to a text file for ID identification.',
+		Tooltip = 'Writes played animations to a text file. File is in your executor workspace, not this repo folder.',
 	})
 
 	AnimLogger:CreateToggle({
@@ -1654,13 +1761,12 @@ run(function()
 	AnimLogger:CreateButton({
 		Name = 'Dump Catalog',
 		Function = function()
-			animLogEnsureFolder()
-			if animLogFilePath == '' then
-				animLogFilePath = animLogGetFilePath()
+			local path, err = animLogDumpCatalog()
+			if err then
+				notif('Animation Logger', 'Catalog dump failed — check console. ' .. err, 8, 'warning')
+			else
+				notif('Animation Logger', 'Catalog written to ' .. path, 6)
 			end
-			local path = animLogDumpCatalog()
-			notif('Animation Logger', 'Catalog appended to ' .. path, 6)
-			print('[REDLINER] catalog dumped | file=' .. path)
 		end,
 		Tooltip = 'Scan ReplicatedStorage/workspace for Animation instances and append to log.',
 	})
@@ -1668,13 +1774,18 @@ run(function()
 	AnimLogger:CreateButton({
 		Name = 'New Session',
 		Function = function()
-			if not animLogBeginSession(true) then
+			local ok, err = animLogBeginSession(true)
+			if not ok then
 				return
 			end
 			if animLogActive then
 				animLogStartWatchers()
 			end
-			notif('Animation Logger', 'New log file started: ' .. animLogFilePath, 6)
+			if err then
+				notif('Animation Logger', 'New session (console mirror). ' .. err, 8, 'warning')
+			else
+				notif('Animation Logger', 'New session: ' .. animLogFilePath, 6)
+			end
 		end,
 		Tooltip = 'Clears the log file and writes a fresh header + catalog.',
 	})
