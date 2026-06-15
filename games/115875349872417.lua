@@ -161,6 +161,7 @@ local lastParryAt = 0
 local lastMeleeParryAt = 0
 local lastAttackAt = 0
 local parryBlockAttackUntil = 0
+local PARRY_ATTACK_BLOCK_SEC = 0.08
 local lastDebugHeartbeat = 0
 local lastDebugSkipAt = {}
 local lastDebugAnimAt = {}
@@ -292,11 +293,11 @@ end
 
 local function getLocalCharacter()
 	local char = lplr.Character
+	if char and char.Parent then
+		return char
+	end
 	if entitylib.isAlive and entitylib.character.Character then
 		local elibChar = entitylib.character.Character
-		if char and elibChar == char then
-			return elibChar
-		end
 		if elibChar and elibChar.Parent then
 			return elibChar
 		end
@@ -309,25 +310,23 @@ local function getLocalRoot()
 	if not char then
 		return nil
 	end
-	if entitylib.isAlive and entitylib.character.RootPart then
-		local root = entitylib.character.RootPart
-		if root:IsDescendantOf(char) then
-			return root
+	local root = char:FindFirstChild('HumanoidRootPart')
+	if root then
+		return root
+	end
+	if entitylib.isAlive and entitylib.character.Character == char and entitylib.character.RootPart then
+		local elibRoot = entitylib.character.RootPart
+		if elibRoot.Parent and elibRoot:IsDescendantOf(char) then
+			return elibRoot
 		end
 	end
-	return char:FindFirstChild('HumanoidRootPart')
+	return nil
 end
 
 local function isLocalAlive()
 	local char = getLocalCharacter()
 	if not char or not char.Parent then
 		return false
-	end
-	if entitylib.isAlive and entitylib.character.Character == char and entitylib.character.RootPart then
-		local root = entitylib.character.RootPart
-		if root:IsDescendantOf(char) then
-			return true
-		end
 	end
 	local hum = char:FindFirstChildWhichIsA('Humanoid')
 	if not hum or hum.Health <= 0 then
@@ -847,7 +846,7 @@ local function pressParryKey()
 	if not canSafelyParry() then
 		return false
 	end
-	parryBlockAttackUntil = tick() + 0.2
+	parryBlockAttackUntil = tick() + PARRY_ATTACK_BLOCK_SEC
 	task.spawn(function()
 		withThread(function()
 			pcall(function()
@@ -908,7 +907,6 @@ tryParry = function(reason, char)
 		lastMeleeParryAt = now
 	end
 	lastParryAt = now
-	parryBlockAttackUntil = tick() + 0.2
 	debugLog('parry trigger', reason, char and char.Name or '-')
 	pressParryKey()
 	return true
@@ -1293,6 +1291,13 @@ local function onEnemyCharacterSpawned(plr)
 	end)
 end
 
+local function resetLocalParryState()
+	lastParryAt = 0
+	lastMeleeParryAt = 0
+	parryBlockAttackUntil = 0
+	cancelPendingParries()
+end
+
 local function blockLocalParry()
 	cancelPendingParries()
 end
@@ -1316,18 +1321,26 @@ local function bindLocalRespawnHandler()
 		end
 	end
 
+	local function onLocalRespawn(char)
+		resetLocalParryState()
+		task.defer(function()
+			if not char or not char.Parent then
+				return
+			end
+			refreshMyHurtboxes()
+			if autoParryActive then
+				purgeOrphanWatchers()
+				refreshEnemyWatchers()
+			end
+			hookCharacter(char)
+		end)
+	end
+
 	lplr.CharacterRemoving:Connect(function()
 		blockLocalParry()
 	end)
 
-	lplr.CharacterAdded:Connect(function(char)
-		blockLocalParry()
-		task.defer(function()
-			refreshMyHurtboxes()
-			refreshEnemyWatchers()
-			hookCharacter(char)
-		end)
-	end)
+	lplr.CharacterAdded:Connect(onLocalRespawn)
 
 	if lplr.Character then
 		hookCharacter(lplr.Character)
@@ -2052,9 +2065,6 @@ local function pressAttackClick()
 	if tick() < parryBlockAttackUntil then
 		return false
 	end
-	if tick() - lastParryAt < 0.15 then
-		return false
-	end
 	if not isGameWindowFocused() then
 		return false
 	end
@@ -2062,7 +2072,6 @@ local function pressAttackClick()
 	if mouse1click then
 		pcall(mouse1click)
 		lastAttackAt = tick()
-		debugLog('attack', 'lmb')
 		return true
 	end
 
@@ -2077,7 +2086,6 @@ local function pressAttackClick()
 	end)
 
 	lastAttackAt = tick()
-	debugLog('attack', 'lmb')
 	return true
 end
 
@@ -2174,9 +2182,6 @@ local function tryAutoAttack(attackDelay)
 		return
 	end
 	if tick() < parryBlockAttackUntil then
-		return
-	end
-	if tick() - lastParryAt < 0.15 then
 		return
 	end
 
