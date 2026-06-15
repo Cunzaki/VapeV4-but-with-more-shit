@@ -2,7 +2,7 @@
 	REDLINER shared game script (MAIN + FFA + MATCH place IDs).
 	Place IDs: 94987506187454 (main), 115875349872417 (FFA), 126691165749976 (match).
 	Auto Parry, Auto Attack, Reach (melee packet extension).
-	Infinite Heat, Infinite Grapple.
+	Inf Ammo, Infinite Grapple.
 ]]
 
 local run = function(func)
@@ -87,14 +87,40 @@ local GRAPPLE_MAX_KEYS = {
 	'maxCharges',
 	'max_charges',
 }
--- ItemDef.ModuleScript bullet_cost (heat cap per gun, in "H" units).
+local GRAPPLE_COOLDOWN_KEYS = {
+	'cooldown',
+	'Cooldown',
+	'cooldownEnd',
+	'cooldown_end',
+	'nextUse',
+	'next_use',
+	'recharge',
+	'Recharge',
+	'rechargeTime',
+	'recharge_time',
+	'lastUse',
+	'last_use',
+	'readyAt',
+	'ready_at',
+	'regenAt',
+	'regen_at',
+	'nextFire',
+	'next_fire',
+}
+local INF_BULLETS_FLAG_KEYS = {
+	'has_inf_bullets',
+	'hasInfBullets',
+	'inf_bullets',
+	'infBullets',
+}
+-- ItemDef bullet_cost caps (H units). Monarch 200H covers all guns.
+local INF_AMMO_MAX_HEAT = 200
 local GUN_HEAT_CAPS = {
 	Castigate = 100,
 	Phoenix = 150,
 	Siege = 140,
 	Monarch = 200,
 }
-local GUN_HEAT_WEAPON_LIST = { 'Castigate', 'Phoenix', 'Siege', 'Monarch' }
 
 local AUTO_PARRY_DEFAULTS = {
 	meleeRange = 20,
@@ -203,22 +229,26 @@ local lastDebugSkipAt = {}
 local lastDebugAnimAt = {}
 local parryIdsLogged = false
 local parryScanBound = false
+local localRespawnBound = false
+local lastParryScanAt = 0
+local PARRY_SCAN_INTERVAL = 0.12
 local tryParry
-local infiniteHeatActive = false
+local canSafelyParry
+local infiniteAmmoActive = false
 local infiniteGrappleActive = false
-local selectedHeatWeapon = 'Castigate'
-local heatRefreshRate = 0.15
-local lastHeatAt = 0
+local ammoRefreshRate = 0.15
+local lastAmmoAt = 0
 local utilityHooksInstalled = false
 local utilityIncomingHooked = false
 local utilityLoopBound = false
 local utilityHookLogged = {
-	heat = false,
+	ammo = false,
 	grapple = false,
 }
-local heatStateRefs = {}
+local ammoStateRefs = {}
+local infBulletsRefs = {}
 local grappleStateRefs = {}
-local lastHeatGcScan = 0
+local lastAmmoGcScan = 0
 local lastGrappleGcScan = 0
 
 local function notif(...)
@@ -289,28 +319,64 @@ end
 -- Character helpers (must be above utility/grapple — forward refs break)
 -- ---------------------------------------------------------------------------
 
-local function isLocalAlive()
-	if entitylib.isAlive and entitylib.character.RootPart then
-		return true
-	end
+local function getLocalCharacter()
 	local char = lplr.Character
-	local hum = char and char:FindFirstChildWhichIsA('Humanoid')
-	return hum ~= nil and hum.Health > 0
+	if entitylib.isAlive and entitylib.character.Character then
+		local elibChar = entitylib.character.Character
+		if char and elibChar == char then
+			return elibChar
+		end
+		if elibChar and elibChar.Parent then
+			return elibChar
+		end
+	end
+	return char
 end
 
 local function getLocalRoot()
-	if entitylib.isAlive and entitylib.character.RootPart then
-		return entitylib.character.RootPart
+	local char = getLocalCharacter()
+	if not char then
+		return nil
 	end
-	local char = lplr.Character
-	return char and char:FindFirstChild('HumanoidRootPart')
+	if entitylib.isAlive and entitylib.character.RootPart then
+		local root = entitylib.character.RootPart
+		if root:IsDescendantOf(char) then
+			return root
+		end
+	end
+	return char:FindFirstChild('HumanoidRootPart')
 end
 
-local function getLocalCharacter()
-	if entitylib.isAlive and entitylib.character.Character then
-		return entitylib.character.Character
+local function isLocalAlive()
+	local char = getLocalCharacter()
+	if not char or not char.Parent then
+		return false
 	end
-	return lplr.Character
+	if entitylib.isAlive and entitylib.character.Character == char and entitylib.character.RootPart then
+		local root = entitylib.character.RootPart
+		if root:IsDescendantOf(char) then
+			return true
+		end
+	end
+	local hum = char:FindFirstChildWhichIsA('Humanoid')
+	if not hum or hum.Health <= 0 then
+		return false
+	end
+	if hum:GetState() == Enum.HumanoidStateType.Dead then
+		return false
+	end
+	return true
+end
+
+canSafelyParry = function()
+	if not autoParryActive then
+		return false
+	end
+	if not isLocalAlive() then
+		return false
+	end
+	local root = getLocalRoot()
+	return root ~= nil and root.Parent ~= nil
 end
 
 local function isEnemyCharacter(model)
@@ -378,12 +444,23 @@ end
 
 local bindUtilityLoop
 local installUtilityPacketHooks
-local setHeat
-local freezeHeatState
-local getSelectedHeatCap
+local setAmmoHeat
+local applyInfiniteAmmo
+local getMaxAmmoHeat
 run(function()
-getSelectedHeatCap = function()
-	return GUN_HEAT_CAPS[selectedHeatWeapon] or 200
+getMaxAmmoHeat = function()
+	local maxHeat = INF_AMMO_MAX_HEAT
+	for _, state in ammoStateRefs do
+		if type(state) == 'table' then
+			for _, key in HEAT_MAX_KEYS do
+				local cap = rawget(state, key)
+				if type(cap) == 'number' and cap > maxHeat then
+					maxHeat = cap
+				end
+			end
+		end
+	end
+	return maxHeat
 end
 
 local function isPacketReady(packet)
@@ -399,8 +476,22 @@ local function logUtilityHookOnce(kind, message)
 	debugLog(kind, message)
 end
 
-local function transformIncomingUtility(...)
-	local cap = getSelectedHeatCap()
+local function clampIncomingHeat(...)
+	local cap = getMaxAmmoHeat()
+	local n = select('#', ...)
+	if n == 0 then
+		return
+	end
+	local args = table.pack(...)
+	for i = 1, args.n do
+		if type(args[i]) == 'number' then
+			args[i] = math.max(args[i], cap)
+		end
+	end
+	return table.unpack(args, 1, args.n)
+end
+
+local function clampIncomingGrapple(...)
 	local n = select('#', ...)
 	if n == 0 then
 		return
@@ -408,14 +499,8 @@ local function transformIncomingUtility(...)
 	local args = table.pack(...)
 	for i = 1, args.n do
 		local val = args[i]
-		if type(val) == 'number' then
-			if infiniteHeatActive then
-				val = math.max(val, cap)
-			end
-			if infiniteGrappleActive and val >= 0 and val <= GRAPPLE_MAX_CHARGES + 1 then
-				val = GRAPPLE_MAX_CHARGES
-			end
-			args[i] = val
+		if type(val) == 'number' and val >= 0 and val <= GRAPPLE_MAX_CHARGES + 1 then
+			args[i] = GRAPPLE_MAX_CHARGES
 		end
 	end
 	return table.unpack(args, 1, args.n)
@@ -443,43 +528,73 @@ local function installIncomingUtilityHooks()
 	end
 
 	local hooked = 0
-	local enabledFn = function()
-		return infiniteHeatActive or infiniteGrappleActive
-	end
-	if hookIncomingPacketSignal(Packets[HEAT_PACKET_NAME], 'heat', transformIncomingUtility, enabledFn) then
+	if hookIncomingPacketSignal(Packets[HEAT_PACKET_NAME], 'heat', clampIncomingHeat, function()
+		return infiniteAmmoActive
+	end) then
 		hooked += 1
 	end
 
 	local unreliable = Packets.unreliablePackets
 	if unreliable then
 		for _, packetName in HEAT_UNRELIABLE_PACKETS do
-			if hookIncomingPacketSignal(unreliable[packetName], 'heat_' .. packetName, transformIncomingUtility, enabledFn) then
+			if hookIncomingPacketSignal(unreliable[packetName], 'heat_' .. packetName, clampIncomingHeat, function()
+				return infiniteAmmoActive
+			end) then
 				hooked += 1
 			end
 		end
 	end
 
 	if hooked > 0 then
-		logUtilityHookOnce('heat', 'Infinite utility: hooked ' .. hooked .. ' incoming sync packet(s)')
+		logUtilityHookOnce('ammo', 'Inf Ammo: hooked ' .. hooked .. ' incoming heat sync packet(s)')
 		utilityIncomingHooked = true
 	end
 	return hooked > 0
 end
 
-local function rememberHeatState(state)
-	if table.find(heatStateRefs, state) then
+local function rememberAmmoState(state)
+	if table.find(ammoStateRefs, state) then
 		return
 	end
 
 	local itemId = rawget(state, 'item_id') or rawget(state, 'itemId')
-	if type(itemId) == 'string' and GUN_HEAT_CAPS[itemId] then
-		table.insert(heatStateRefs, state)
+	if type(itemId) == 'string' and (GUN_HEAT_CAPS[itemId] or itemId == 'Redliner') then
+		table.insert(ammoStateRefs, state)
 		return
 	end
 
 	for _, key in HEAT_STATE_KEYS do
 		if type(rawget(state, key)) == 'number' then
-			table.insert(heatStateRefs, state)
+			table.insert(ammoStateRefs, state)
+			return
+		end
+	end
+
+	local hasHeatField, hasMaxField = false, false
+	for _, key in HEAT_STATE_KEYS do
+		local val = rawget(state, key)
+		if type(val) == 'number' and val >= 0 and val <= INF_AMMO_MAX_HEAT + 50 then
+			hasHeatField = true
+		end
+	end
+	for _, key in HEAT_MAX_KEYS do
+		local val = rawget(state, key)
+		if type(val) == 'number' and val >= 80 and val <= INF_AMMO_MAX_HEAT + 50 then
+			hasMaxField = true
+		end
+	end
+	if hasHeatField and hasMaxField then
+		table.insert(ammoStateRefs, state)
+	end
+end
+
+local function rememberInfBulletsState(state)
+	if table.find(infBulletsRefs, state) then
+		return
+	end
+	for _, key in INF_BULLETS_FLAG_KEYS do
+		if rawget(state, key) ~= nil then
+			table.insert(infBulletsRefs, state)
 			return
 		end
 	end
@@ -496,6 +611,12 @@ local function rememberGrappleState(state)
 		return
 	end
 
+	local itemType = rawget(state, 'item_type') or rawget(state, 'itemType')
+	if itemType == 'augment' then
+		table.insert(grappleStateRefs, state)
+		return
+	end
+
 	for _, key in GRAPPLE_STATE_KEYS do
 		local uses = rawget(state, key)
 		if type(uses) == 'number' and uses >= 0 and uses <= GRAPPLE_MAX_CHARGES + 1 then
@@ -505,20 +626,31 @@ local function rememberGrappleState(state)
 	end
 end
 
+local function scanGcTable(obj)
+	if type(obj) ~= 'table' then
+		return
+	end
+	if infiniteAmmoActive then
+		rememberInfBulletsState(obj)
+		rememberAmmoState(obj)
+	end
+	if infiniteGrappleActive then
+		rememberGrappleState(obj)
+	end
+end
+
 local function scanClientStateTables()
 	if not getgc then
 		return
 	end
 
 	local now = tick()
-	local heatScanInterval = #heatStateRefs == 0 and 0.5 or 2
+	local ammoScanInterval = (#ammoStateRefs == 0 and #infBulletsRefs == 0) and 0.5 or 2
 	local grappleScanInterval = #grappleStateRefs == 0 and 0.5 or 2
-	if infiniteHeatActive and now - lastHeatGcScan >= heatScanInterval then
-		lastHeatGcScan = now
+	if infiniteAmmoActive and now - lastAmmoGcScan >= ammoScanInterval then
+		lastAmmoGcScan = now
 		for _, obj in getgc(true) do
-			if type(obj) == 'table' then
-				rememberHeatState(obj)
-			end
+			scanGcTable(obj)
 		end
 	end
 
@@ -526,9 +658,7 @@ local function scanClientStateTables()
 		lastGrappleGcScan = now
 		local before = #grappleStateRefs
 		for _, obj in getgc(true) do
-			if type(obj) == 'table' then
-				rememberGrappleState(obj)
-			end
+			scanGcTable(obj)
 		end
 		if #grappleStateRefs > before then
 			logUtilityHookOnce('grapple', 'Infinite Grapple: found ' .. #grappleStateRefs .. ' client charge state table(s)')
@@ -536,20 +666,20 @@ local function scanClientStateTables()
 	end
 end
 
-freezeHeatState = function()
-	local maxHeat = getSelectedHeatCap()
-	for _, state in heatStateRefs do
+applyInfiniteAmmo = function()
+	local maxHeat = getMaxAmmoHeat()
+
+	for _, state in infBulletsRefs do
 		if type(state) == 'table' then
-			for _, key in HEAT_MAX_KEYS do
-				local cap = rawget(state, key)
-				if type(cap) == 'number' and cap > maxHeat then
-					maxHeat = cap
+			for _, key in INF_BULLETS_FLAG_KEYS do
+				if rawget(state, key) ~= nil then
+					rawset(state, key, true)
 				end
 			end
 		end
 	end
 
-	for _, state in heatStateRefs do
+	for _, state in ammoStateRefs do
 		if type(state) == 'table' then
 			for _, key in HEAT_STATE_KEYS do
 				local val = rawget(state, key)
@@ -561,6 +691,11 @@ freezeHeatState = function()
 				local val = rawget(state, key)
 				if type(val) == 'number' and val < maxHeat then
 					rawset(state, key, maxHeat)
+				end
+			end
+			for _, key in INF_BULLETS_FLAG_KEYS do
+				if rawget(state, key) ~= nil then
+					rawset(state, key, true)
 				end
 			end
 		end
@@ -578,6 +713,16 @@ local function freezeGrappleState()
 			for _, key in GRAPPLE_MAX_KEYS do
 				if rawget(state, key) ~= nil then
 					rawset(state, key, GRAPPLE_MAX_CHARGES)
+				end
+			end
+			for _, key in GRAPPLE_COOLDOWN_KEYS do
+				local val = rawget(state, key)
+				if type(val) == 'number' then
+					if val > 0 and val <= 120 then
+						rawset(state, key, 0)
+					elseif val > tick() - 5 then
+						rawset(state, key, 0)
+					end
 				end
 			end
 		end
@@ -599,6 +744,9 @@ installUtilityPacketHooks = function()
 	if grapplePacket and not grapplePacket._utilityGrappleHooked then
 		local oldGrappleFire = grapplePacket.Fire
 		grapplePacket.Fire = function(self, ...)
+			if infiniteGrappleActive then
+				freezeGrappleState()
+			end
 			local ok, result = pcall(oldGrappleFire, self, ...)
 			if infiniteGrappleActive then
 				freezeGrappleState()
@@ -614,10 +762,14 @@ installUtilityPacketHooks = function()
 	if gunPacket and not gunPacket._utilityGunHooked then
 		local oldGunFire = gunPacket.Fire
 		gunPacket.Fire = function(self, ...)
-			local ok, result = pcall(oldGunFire, self, ...)
-			if infiniteHeatActive then
-				setHeat(getSelectedHeatCap())
-				freezeHeatState()
+			local packed = table.pack(...)
+			if infiniteAmmoActive and packed.n >= 5 and type(packed[5]) == 'number' then
+				packed[5] = 0
+			end
+			local ok, result = pcall(oldGunFire, self, table.unpack(packed, 1, packed.n))
+			if infiniteAmmoActive then
+				applyInfiniteAmmo()
+				setAmmoHeat(getMaxAmmoHeat())
 			end
 			if ok then
 				return result
@@ -632,7 +784,7 @@ installUtilityPacketHooks = function()
 	return true
 end
 
-setHeat = function(value)
+setAmmoHeat = function(value)
 	if not initPackets() then
 		return false
 	end
@@ -641,8 +793,10 @@ setHeat = function(value)
 	if not isPacketReady(packet) then
 		return false
 	end
-	pcall(function()
-		packet:Fire(value)
+	task.spawn(function()
+		pcall(function()
+			packet:Fire(value)
+		end)
 	end)
 	return true
 end
@@ -652,25 +806,25 @@ local function utilityHeartbeat()
 		return
 	end
 
-	if not infiniteHeatActive and not infiniteGrappleActive then
+	if not infiniteAmmoActive and not infiniteGrappleActive then
 		return
 	end
 
 	installUtilityPacketHooks()
-	if not utilityIncomingHooked then
+	if infiniteAmmoActive and not utilityIncomingHooked then
 		installIncomingUtilityHooks()
 	end
 	scanClientStateTables()
 
-	if infiniteHeatActive then
-		freezeHeatState()
+	if infiniteAmmoActive then
+		applyInfiniteAmmo()
 		local now = tick()
-		if now - lastHeatAt >= heatRefreshRate then
-			lastHeatAt = now
-			setHeat(getSelectedHeatCap())
+		if now - lastAmmoAt >= ammoRefreshRate then
+			lastAmmoAt = now
+			setAmmoHeat(getMaxAmmoHeat())
 		end
-		if not utilityHookLogged.heat then
-			logUtilityHookOnce('heat', 'Infinite Heat: ' .. selectedHeatWeapon .. ' capped at ' .. getSelectedHeatCap() .. 'H')
+		if not utilityHookLogged.ammo then
+			logUtilityHookOnce('ammo', 'Inf Ammo: heat locked at ' .. getMaxAmmoHeat() .. 'H + has_inf_bullets')
 		end
 	end
 
@@ -689,7 +843,7 @@ bindUtilityLoop = function()
 	utilityLoopBound = true
 
 	runService.Heartbeat:Connect(function()
-		if not infiniteHeatActive and not infiniteGrappleActive then
+		if not infiniteAmmoActive and not infiniteGrappleActive then
 			return
 		end
 		local ok, err = pcall(utilityHeartbeat)
@@ -859,24 +1013,18 @@ local function isEnemyTargetingMe(char, minDot, confirmedAttack)
 	return getAimDot(char) >= minDot
 end
 
-local function shouldParryMelee(char, confirmedAttack)
+local function shouldParryMelee(char, _confirmedAttack)
 	if not parryMeleeEnabled then
 		return false
 	end
-	if getEnemyDistance(char) > meleeRangeSetting then
-		return false
-	end
-	if not isEnemyTargetingMe(char, meleeAimDotSetting, confirmedAttack) then
-		return false
-	end
-	return true
+	return getEnemyDistance(char) <= meleeRangeSetting
 end
 
-local function shouldParryGun(char, confirmedAttack)
+local function shouldParryGun(_char, _confirmedAttack)
 	if not parryGunDrawEnabled and not parryGunShotEnabled then
 		return false
 	end
-	return isEnemyTargetingMe(char, gunAimDotSetting, confirmedAttack)
+	return true
 end
 
 local function isMeleeSwingTrackActive(track)
@@ -965,10 +1113,10 @@ local function scheduleGunDrawParry(char, gunName, normId, timePosition, source,
 	end)
 
 	task.delay(delay, function()
-		if not autoParryActive or token ~= state.scheduledDrawToken then
+		if not canSafelyParry() or token ~= state.scheduledDrawToken then
 			return
 		end
-		if not char.Parent or not isLocalAlive() then
+		if not char.Parent then
 			return
 		end
 		if not charHasGunEquipped(char) then
@@ -993,6 +1141,9 @@ end
 -- ---------------------------------------------------------------------------
 
 local function pressParryKey()
+	if not canSafelyParry() then
+		return false
+	end
 	parryBlockAttackUntil = tick() + 0.2
 	task.spawn(function()
 		withThread(function()
@@ -1016,7 +1167,7 @@ local function pressParryKey()
 end
 
 tryParry = function(reason)
-	if not autoParryActive or not isLocalAlive() then
+	if not canSafelyParry() then
 		return false
 	end
 	if tick() - lastParryAt < parryCooldownSetting then
@@ -1050,10 +1201,10 @@ local function scheduleMeleeParry(char, animId, track, source)
 	debugLog('trigger', 'melee_schedule_' .. normId, 'delay=' .. string.format('%.2f', delay), 'aim=' .. string.format('%.2f', getAimDot(char)), source)
 
 	task.delay(delay, function()
-		if not autoParryActive or token ~= state.scheduledMeleeToken then
+		if not canSafelyParry() or token ~= state.scheduledMeleeToken then
 			return
 		end
-		if not char.Parent or not isLocalAlive() then
+		if not char.Parent then
 			return
 		end
 		if not shouldParryMelee(char, true) then
@@ -1263,6 +1414,103 @@ local function unwatchCharacter(char)
 	enemyStates[char] = nil
 end
 
+local function cancelPendingParries()
+	for _, state in enemyStates do
+		state.scheduledDrawToken += 1
+		state.scheduledMeleeToken += 1
+		state.lastSwingId = ''
+		state.lastShotId = ''
+		state.lastDrawId = ''
+	end
+end
+
+local function unwatchAllForPlayer(plr)
+	local toRemove = {}
+	for char in charWatchers do
+		if getPlayerFromModel(char) == plr then
+			table.insert(toRemove, char)
+		end
+	end
+	for _, char in toRemove do
+		unwatchCharacter(char)
+	end
+end
+
+local function purgeOrphanWatchers()
+	local toRemove = {}
+	for char in charWatchers do
+		if not char.Parent then
+			table.insert(toRemove, char)
+		end
+	end
+	for _, char in toRemove do
+		unwatchCharacter(char)
+	end
+end
+
+local function refreshEnemyWatchers()
+	if not autoParryActive then
+		return
+	end
+	purgeOrphanWatchers()
+	for _, plr in playersService:GetPlayers() do
+		if plr ~= lplr then
+			watchEnemyPlayer(plr)
+		end
+	end
+end
+
+local function onEnemyCharacterSpawned(plr)
+	task.defer(function()
+		if not plr.Parent then
+			return
+		end
+		unwatchAllForPlayer(plr)
+		watchEnemyPlayer(plr)
+	end)
+end
+
+local function blockLocalParry()
+	cancelPendingParries()
+end
+
+local function bindLocalRespawnHandler()
+	if localRespawnBound then
+		return
+	end
+	localRespawnBound = true
+
+	local function hookCharacter(char)
+		if not char then
+			return
+		end
+		refreshMyHurtboxes()
+		local hum = char:FindFirstChildWhichIsA('Humanoid') or char:WaitForChild('Humanoid', 8)
+		if hum then
+			hum.Died:Connect(function()
+				blockLocalParry()
+			end)
+		end
+	end
+
+	lplr.CharacterRemoving:Connect(function()
+		blockLocalParry()
+	end)
+
+	lplr.CharacterAdded:Connect(function(char)
+		blockLocalParry()
+		task.defer(function()
+			refreshMyHurtboxes()
+			refreshEnemyWatchers()
+			hookCharacter(char)
+		end)
+	end)
+
+	if lplr.Character then
+		hookCharacter(lplr.Character)
+	end
+end
+
 local function watchEnemyCharacter(char, ownerPlr)
 	if not char or char == getLocalCharacter() or charWatchers[char] then
 		return
@@ -1305,11 +1553,7 @@ local function watchEnemyPlayer(plr)
 end
 
 local function startEnemyWatchers()
-	for _, plr in playersService:GetPlayers() do
-		if plr ~= lplr then
-			watchEnemyPlayer(plr)
-		end
-	end
+	refreshEnemyWatchers()
 	if watchersStarted then
 		return
 	end
@@ -1317,30 +1561,21 @@ local function startEnemyWatchers()
 
 	playersService.PlayerAdded:Connect(function(plr)
 		plr.CharacterAdded:Connect(function()
-			task.defer(function()
-				watchEnemyPlayer(plr)
-			end)
+			onEnemyCharacterSpawned(plr)
 		end)
 		task.defer(function()
-			watchEnemyPlayer(plr)
+			onEnemyCharacterSpawned(plr)
 		end)
 	end)
 
 	playersService.PlayerRemoving:Connect(function(plr)
-		if plr.Character then
-			unwatchCharacter(plr.Character)
-		end
-		for _, model in getEnemyModels(plr) do
-			unwatchCharacter(model)
-		end
+		unwatchAllForPlayer(plr)
 	end)
 
 	for _, plr in playersService:GetPlayers() do
 		if plr ~= lplr then
 			plr.CharacterAdded:Connect(function()
-				task.defer(function()
-					watchEnemyPlayer(plr)
-				end)
+				onEnemyCharacterSpawned(plr)
 			end)
 		end
 	end
@@ -1444,7 +1679,14 @@ local function installMeleeReachHook()
 				end
 			end
 		end
-		return oldFire(self, table.unpack(packed, 1, packed.n))
+		local ok, result = pcall(oldFire, self, table.unpack(packed, 1, packed.n))
+		if infiniteAmmoActive then
+			applyInfiniteAmmo()
+		end
+		if ok then
+			return result
+		end
+		error(result, 0)
 	end
 end
 
@@ -1535,7 +1777,11 @@ local function bindParryScanLoop()
 		if not autoParryActive or not isLocalAlive() then
 			return
 		end
-		startEnemyWatchers()
+		local now = tick()
+		if now - lastParryScanAt < PARRY_SCAN_INTERVAL then
+			return
+		end
+		lastParryScanAt = now
 		scanWhitelistRealtime()
 	end)
 end
@@ -1639,7 +1885,7 @@ local function combatHeartbeat(meleeRange, attackCooldown)
 end
 
 local function cleanupEnemyState(model)
-	unwatchCharacter(model)
+	unwatchAllForPlayer(getPlayerFromModel(model) or playersService:GetPlayerFromCharacter(model))
 end
 
 -- ---------------------------------------------------------------------------
@@ -2203,13 +2449,14 @@ run(function()
 			autoParryActive = callback
 			if callback then
 				logParryAnimIds()
+				bindLocalRespawnHandler()
 				startEnemyWatchers()
 				bindParryScanLoop()
 				bindPacketListeners()
-				notif('Auto Parry', 'Melee + gun draw/shot parry when enemies aim at you.', 5)
+				notif('Auto Parry', '360° melee + gun draw/shot parry (edge-triggered).', 5)
 			end
 		end,
-		Tooltip = 'Parries melee swings and gun draw/shot animations when enemies aim at you.',
+		Tooltip = 'Parries melee swings and gun draw/shot animations within melee range (360°, no aim required).',
 	})
 
 	AutoAttack = minigames:CreateModule({
@@ -2237,37 +2484,24 @@ run(function()
 		Tooltip = 'Hooks REDLINER melee packet to hit hurtboxes farther away (base ' .. BASE_SWORD_REACH .. ' studs).',
 	})
 
-	local InfiniteHeat
-	local HeatWeapon
+	local InfAmmo
 
-	InfiniteHeat = minigames:CreateModule({
-		Name = 'Infinite Heat',
+	InfAmmo = minigames:CreateModule({
+		Name = 'Inf Ammo',
 		Function = function(callback)
-			infiniteHeatActive = callback
+			infiniteAmmoActive = callback
 			if callback then
-				utilityHookLogged.heat = false
-				heatStateRefs = {}
+				utilityHookLogged.ammo = false
+				ammoStateRefs = {}
+				infBulletsRefs = {}
 				bindPacketListeners()
 				bindUtilityLoop()
-				setHeat(getSelectedHeatCap())
-				notif('Infinite Heat', selectedHeatWeapon .. ' heat locked at ' .. getSelectedHeatCap() .. 'H.', 6)
+				applyInfiniteAmmo()
+				setAmmoHeat(getMaxAmmoHeat())
+				notif('Inf Ammo', 'Heat locked at ' .. getMaxAmmoHeat() .. 'H for all weapons (guns + melee bullets).', 6)
 			end
 		end,
-		Tooltip = 'Sets/maxes heat for the selected gun. Caps from ItemDef: Castigate 100H, Phoenix 150H, Siege 140H, Monarch 200H. Syncs via _xdb2548bded1dd8e3 + unreliable NumberF16 packets.',
-	})
-
-	HeatWeapon = InfiniteHeat:CreateDropdown({
-		Name = 'Weapon',
-		List = GUN_HEAT_WEAPON_LIST,
-		Default = selectedHeatWeapon,
-		Function = function(val)
-			selectedHeatWeapon = val
-			if infiniteHeatActive then
-				setHeat(getSelectedHeatCap())
-				freezeHeatState()
-			end
-		end,
-		Tooltip = 'Pick the gun you are using — heat is set to that weapon\'s max bullet cost.',
+		Tooltip = 'Maxes heat/ammo pool (200H covers all guns). Sets has_inf_bullets, hooks gun packet heat cost + heat sync packets _xdb2548bded1dd8e3.',
 	})
 
 	local InfiniteGrapple
@@ -2281,10 +2515,10 @@ run(function()
 				grappleStateRefs = {}
 				bindPacketListeners()
 				bindUtilityLoop()
-				notif('Infinite Grapple', 'Grappler charges stay at 2. Hold RMB (AUGMENT) to grapple normally.', 6)
+				notif('Infinite Grapple', 'Grappler charges stay at 2 with zero cooldown. Hold RMB (AUGMENT) to grapple.', 6)
 			end
 		end,
-		Tooltip = 'Keeps Grappler charges at 2 via client state freeze + post-fire restore. Uses RMB (AUGMENT), not E.',
+		Tooltip = 'Keeps Grappler charges at 2 via client state freeze + cooldown zeroing. Uses RMB (AUGMENT), not E.',
 	})
 
 	MeleeRange = AutoParry:CreateSlider({
@@ -2603,7 +2837,9 @@ run(function()
 		Name = 'Test Parry',
 		Function = function(callback)
 			if callback then
-				task.defer(pressParryKey)
+				if canSafelyParry() then
+					task.defer(pressParryKey)
+				end
 				task.defer(function()
 					if TestParry.Enabled then
 						TestParry:Toggle(true)
@@ -2611,7 +2847,7 @@ run(function()
 				end)
 			end
 		end,
-		Tooltip = 'Sends one F key press. Use to verify parry works.',
+		Tooltip = 'Sends one F key press when alive. Use to verify parry works.',
 	})
 
 	AutoParry:CreateButton({
@@ -2717,6 +2953,7 @@ run(function()
 			return
 		end
 		combatBound = true
+		bindLocalRespawnHandler()
 
 		runService.Heartbeat:Connect(function()
 			if not AutoParry.Enabled and not AutoAttack.Enabled and not Reach.Enabled then
@@ -2726,9 +2963,7 @@ run(function()
 		end)
 
 		playersService.PlayerRemoving:Connect(function(plr)
-			if plr.Character then
-				cleanupEnemyState(plr.Character)
-			end
+			unwatchAllForPlayer(plr)
 		end)
 	end
 
@@ -2749,6 +2984,6 @@ run(function()
 		repeat
 			task.wait(0.25)
 		until vape.Loaded or tick() - start > 20
-		notif('REDLINER', 'Minigames: Auto Parry, Auto Attack, Reach, Infinite Heat, Infinite Grapple ready.', 5)
+		notif('REDLINER', 'Minigames: Auto Parry, Auto Attack, Reach, Inf Ammo, Infinite Grapple ready.', 5)
 	end)
 end)
