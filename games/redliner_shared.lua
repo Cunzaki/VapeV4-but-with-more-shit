@@ -2,6 +2,7 @@
 	REDLINER shared game script (MAIN + FFA + MATCH place IDs).
 	Place IDs: 94987506187454 (main), 115875349872417 (FFA), 126691165749976 (match).
 	Auto Parry, Auto Attack, Reach (melee packet extension).
+	Infinite Heat, Infinite Grapple.
 ]]
 
 local run = function(func)
@@ -21,6 +22,7 @@ local collectionService = cloneref(game:GetService('CollectionService'))
 local runService = cloneref(game:GetService('RunService'))
 local virtualInputManager = cloneref(game:GetService('VirtualInputManager'))
 local inputService = cloneref(game:GetService('UserInputService'))
+local workspaceService = cloneref(workspace)
 
 local lplr = playersService.LocalPlayer
 local vape = shared.vape
@@ -40,6 +42,9 @@ local PARRY_KEY = Enum.KeyCode.F
 local PARRY_VK = 0x46
 
 local MELEE_PACKET_NAME = '_x2e2c62e0acfc88ae'
+local HEAT_PACKET_NAME = '_xdb2548bded1dd8e3'
+local GRAPPLE_PACKET_NAME = '_xefd6d8e74acc7f88'
+local GUN_PACKET_NAME = '_x77a8b8d28b943359'
 
 local MELEE_AIM_DOT = 0.32
 local GUN_AIM_DOT = 0.32
@@ -128,6 +133,23 @@ local lastDebugAnimAt = {}
 local parryIdsLogged = false
 local parryScanBound = false
 local tryParry
+local infiniteHeatActive = false
+local infiniteGrappleActive = false
+local heatValueSetting = 200
+local heatRateSetting = 0.25
+local grappleRangeSetting = 120
+local grappleRateSetting = 0.2
+local grappleHoldOnly = true
+local augmentHeld = false
+local lastHeatAt = 0
+local lastGrappleAt = 0
+local mapMain = nil
+local utilityHooksInstalled = false
+local utilityLoopBound = false
+local packetTemplates = {
+	grapple = nil,
+	gun = nil,
+}
 
 local function notif(...)
 	return vape:CreateNotification(...)
@@ -182,6 +204,166 @@ end
 
 local function getMeleeReach()
 	return BASE_SWORD_REACH + (reachActive and reachExtend or 0)
+end
+
+local function getMapMain()
+	if mapMain and mapMain.Parent then
+		return mapMain
+	end
+	local map = workspaceService:FindFirstChild('Map')
+	mapMain = map and map:FindFirstChild('Main')
+	return mapMain
+end
+
+local function getMapRayParams()
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.IgnoreWater = true
+	local main = getMapMain()
+	params.FilterDescendantsInstances = main and {main} or {}
+	return params
+end
+
+local function isPacketReady(packet)
+	return packet ~= nil and packet.Id ~= nil
+end
+
+local function capturePacketTemplate(packed, key)
+	if key and packed and packed.n and packed.n > 0 then
+		packetTemplates[key] = packed
+	end
+end
+
+local function installUtilityPacketHooks()
+	if utilityHooksInstalled or not initPackets() then
+		return
+	end
+	utilityHooksInstalled = true
+
+	local grapplePacket = Packets[GRAPPLE_PACKET_NAME]
+	if grapplePacket and not grapplePacket._utilityCaptureHooked then
+		local oldGrappleFire = grapplePacket.Fire
+		grapplePacket.Fire = function(self, ...)
+			local packed = table.pack(...)
+			capturePacketTemplate(packed, 'grapple')
+			return oldGrappleFire(self, ...)
+		end
+		grapplePacket._utilityCaptureHooked = true
+	end
+
+	local gunPacket = Packets[GUN_PACKET_NAME]
+	if gunPacket and not gunPacket._utilityCaptureHooked then
+		local oldGunFire = gunPacket.Fire
+		gunPacket.Fire = function(self, ...)
+			local packed = table.pack(...)
+			capturePacketTemplate(packed, 'gun')
+			if infiniteHeatActive and packed.n >= 5 then
+				packed[5] = heatValueSetting
+			end
+			return oldGunFire(self, table.unpack(packed, 1, packed.n))
+		end
+		gunPacket._utilityCaptureHooked = true
+	end
+end
+
+local function setHeat(value)
+	if not initPackets() then
+		return false
+	end
+	installUtilityPacketHooks()
+	local packet = Packets[HEAT_PACKET_NAME]
+	if not isPacketReady(packet) then
+		return false
+	end
+	task.spawn(function()
+		pcall(function()
+			packet:Fire(value)
+		end)
+	end)
+	return true
+end
+
+local function fireGrappleTowardLook(range)
+	if not isLocalAlive() or not initPackets() then
+		return false
+	end
+	installUtilityPacketHooks()
+
+	local packet = Packets[GRAPPLE_PACKET_NAME]
+	if not isPacketReady(packet) then
+		return false
+	end
+
+	local root = getLocalRoot()
+	local camera = workspaceService.CurrentCamera
+	if not root or not camera then
+		return false
+	end
+
+	local look = camera.CFrame.LookVector
+	local hit = workspaceService:Raycast(root.Position, look * range, getMapRayParams())
+	local target = hit and hit.Position or (root.Position + look * range)
+	local template = packetTemplates.grapple
+	local itemId = template and template[1] or 'Grappler'
+	local tag = template and template[4] or ''
+
+	task.spawn(function()
+		pcall(function()
+			packet:Fire(itemId, root.Position, target, tag)
+		end)
+	end)
+	return true
+end
+
+local function utilityHeartbeat()
+	if not isLocalAlive() then
+		return
+	end
+
+	initPackets()
+	installUtilityPacketHooks()
+	local now = tick()
+
+	if infiniteHeatActive and now - lastHeatAt >= heatRateSetting then
+		lastHeatAt = now
+		setHeat(heatValueSetting)
+	end
+
+	if infiniteGrappleActive and now - lastGrappleAt >= grappleRateSetting then
+		if not grappleHoldOnly or augmentHeld then
+			lastGrappleAt = now
+			fireGrappleTowardLook(grappleRangeSetting)
+		end
+	end
+end
+
+local function bindUtilityLoop()
+	if utilityLoopBound then
+		return
+	end
+	utilityLoopBound = true
+
+	inputService.InputBegan:Connect(function(input, processed)
+		if processed then
+			return
+		end
+		if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
+			augmentHeld = true
+		end
+	end)
+
+	inputService.InputEnded:Connect(function(input)
+		if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
+			augmentHeld = false
+		end
+	end)
+
+	runService.Heartbeat:Connect(function()
+		if not infiniteHeatActive and not infiniteGrappleActive then
+			return
+		end
+		utilityHeartbeat()
+	end)
 end
 
 -- ---------------------------------------------------------------------------
@@ -1006,6 +1188,7 @@ local function bindPacketListeners()
 	if not initPackets() then
 		return
 	end
+	installUtilityPacketHooks()
 	installMeleeReachHook()
 end
 
@@ -1772,6 +1955,103 @@ run(function()
 		Tooltip = 'Hooks REDLINER melee packet to hit hurtboxes farther away (base ' .. BASE_SWORD_REACH .. ' studs).',
 	})
 
+	local InfiniteHeat
+	local HeatValue
+	local HeatRate
+
+	InfiniteHeat = minigames:CreateModule({
+		Name = 'Infinite Heat',
+		Function = function(callback)
+			infiniteHeatActive = callback
+			if callback then
+				bindPacketListeners()
+				bindUtilityLoop()
+				notif('Infinite Heat', 'Keeps heat topped up for gun draws. Swing once if draws fail.', 5)
+			end
+		end,
+		Tooltip = 'Spams heat packet (_xdb2548bded1dd8e3). Guns spend heat (H) as ammo.',
+	})
+
+	HeatValue = InfiniteHeat:CreateSlider({
+		Name = 'Heat',
+		Min = 50,
+		Max = 500,
+		Default = 200,
+		Function = function(val)
+			heatValueSetting = val
+		end,
+		Suffix = 'H',
+		Tooltip = '200H covers Monarch (200H). Castigate costs 100H.',
+	})
+
+	HeatRate = InfiniteHeat:CreateSlider({
+		Name = 'Refresh Rate',
+		Min = 0.1,
+		Max = 1,
+		Decimal = 100,
+		Default = 0.25,
+		Function = function(val)
+			heatRateSetting = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end,
+	})
+
+	local InfiniteGrapple
+	local GrappleRange
+	local GrappleRate
+	local GrappleHoldOnly
+
+	InfiniteGrapple = minigames:CreateModule({
+		Name = 'Infinite Grapple',
+		Function = function(callback)
+			infiniteGrappleActive = callback
+			if callback then
+				bindPacketListeners()
+				bindUtilityLoop()
+				notif('Infinite Grapple', 'Hold E to grapple. Grapple once manually first if needed.', 6)
+			end
+		end,
+		Tooltip = 'Fires grapple packet toward camera look. Grapple once (E) to capture args.',
+	})
+
+	GrappleRange = InfiniteGrapple:CreateSlider({
+		Name = 'Range',
+		Min = 30,
+		Max = 250,
+		Default = 120,
+		Function = function(val)
+			grappleRangeSetting = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end,
+	})
+
+	GrappleRate = InfiniteGrapple:CreateSlider({
+		Name = 'Rate',
+		Min = 0.05,
+		Max = 1,
+		Decimal = 100,
+		Default = 0.2,
+		Function = function(val)
+			grappleRateSetting = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end,
+	})
+
+	GrappleHoldOnly = InfiniteGrapple:CreateToggle({
+		Name = 'Hold E Only',
+		Default = true,
+		Function = function(callback)
+			grappleHoldOnly = callback
+		end,
+		Tooltip = 'Only spam grapple while holding E (AUGMENT). Turn off for constant grapple.',
+	})
+
 	MeleeRange = AutoParry:CreateSlider({
 		Name = 'Melee Range',
 		Min = 4,
@@ -1960,6 +2240,7 @@ run(function()
 	end
 
 	task.defer(bindCombatLoop)
+	task.defer(bindUtilityLoop)
 	task.defer(function()
 		local start = tick()
 		repeat
@@ -1975,6 +2256,6 @@ run(function()
 		repeat
 			task.wait(0.25)
 		until vape.Loaded or tick() - start > 20
-		notif('REDLINER', 'Minigames: Auto Parry, Auto Attack, Reach, Animation Logger ready.', 5)
+		notif('REDLINER', 'Minigames: Auto Parry, Auto Attack, Reach, Infinite Heat, Infinite Grapple ready.', 5)
 	end)
 end)
