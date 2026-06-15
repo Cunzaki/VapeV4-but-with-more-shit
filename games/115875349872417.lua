@@ -49,12 +49,12 @@ local AUTO_ATTACK_MIN_DELAY = 1 / 60
 
 local AUTO_PARRY_DEFAULTS = {
 	meleeRange = 20,
-	threatRange = 25,
-	watcherThreatRange = 35,
+	threatRange = 100,
+	watcherThreatRange = 120,
 	enemyParryDebounce = 0.3,
-	meleeParryDelay = 0.2,
 	meleeAimDot = 0.32,
-	gunAimDot = 0.32,
+	gunAimDot = 0.4,
+	meleeParryCooldown = 0.02,
 	parryCooldown = 0.05,
 	meleeSwingWindow = 0.55,
 	gunDrawWindow = 0.45,
@@ -131,9 +131,9 @@ local meleeRangeSetting = AUTO_PARRY_DEFAULTS.meleeRange
 local threatRangeSetting = AUTO_PARRY_DEFAULTS.threatRange
 local watcherThreatRangeSetting = AUTO_PARRY_DEFAULTS.watcherThreatRange
 local enemyParryDebounceSetting = AUTO_PARRY_DEFAULTS.enemyParryDebounce
-local meleeParryDelaySetting = AUTO_PARRY_DEFAULTS.meleeParryDelay
 local meleeAimDotSetting = AUTO_PARRY_DEFAULTS.meleeAimDot
 local gunAimDotSetting = AUTO_PARRY_DEFAULTS.gunAimDot
+local meleeParryCooldownSetting = AUTO_PARRY_DEFAULTS.meleeParryCooldown
 local parryCooldownSetting = AUTO_PARRY_DEFAULTS.parryCooldown
 local meleeSwingWindowSetting = AUTO_PARRY_DEFAULTS.meleeSwingWindow
 local gunDrawWindowSetting = AUTO_PARRY_DEFAULTS.gunDrawWindow
@@ -156,6 +156,7 @@ local watchersStarted = false
 local meleeTemplate = nil
 local meleeHooked = false
 local lastParryAt = 0
+local lastMeleeParryAt = 0
 local lastAttackAt = 0
 local parryBlockAttackUntil = 0
 local lastDebugHeartbeat = 0
@@ -420,6 +421,10 @@ local function isEnemyInGunThreatRange(char)
 	return getEnemyDistance(char) <= threatRangeSetting
 end
 
+local function getEffectiveWatcherRange()
+	return math.max(watcherThreatRangeSetting, threatRangeSetting, meleeRangeSetting)
+end
+
 local function isInstUnderEnemyModels(char, inst)
 	if not inst or not char then
 		return false
@@ -615,7 +620,7 @@ local function shouldParryMelee(char, _confirmedAttack)
 	return true
 end
 
-local function shouldParryGun(char, _confirmedAttack)
+local function shouldParryGun(char, confirmedAttack)
 	if not parryGunDrawEnabled and not parryGunShotEnabled then
 		return false
 	end
@@ -624,6 +629,10 @@ local function shouldParryGun(char, _confirmedAttack)
 	end
 	if not isEnemyInGunThreatRange(char) then
 		threatDebugSkip('out_of_range', char.Name, 'gun', string.format('%.1f', getEnemyDistance(char)))
+		return false
+	end
+	if not isEnemyTargetingMe(char, gunAimDotSetting, confirmedAttack) then
+		threatDebugSkip('not_aiming', char.Name, 'gun', string.format('dot=%.3f need=%.2f', getAimDot(char), gunAimDotSetting))
 		return false
 	end
 	return true
@@ -773,11 +782,22 @@ tryParry = function(reason, char)
 		return false
 	end
 	local now = tick()
-	if now - lastParryAt < parryCooldownSetting then
-		if char then
-			threatDebugSkip('cooldown', 'global', char.Name, reason)
+	local isMeleeParry = reason and string.sub(reason, 1, 6) == 'melee_'
+	if isMeleeParry then
+		if now - lastMeleeParryAt < meleeParryCooldownSetting then
+			if char then
+				threatDebugSkip('cooldown', 'melee', char.Name, reason)
+			end
+			return false
 		end
-		return false
+		lastMeleeParryAt = now
+	else
+		if now - lastParryAt < parryCooldownSetting then
+			if char then
+				threatDebugSkip('cooldown', 'global', char.Name, reason)
+			end
+			return false
+		end
 	end
 	if char then
 		local state = getEnemyState(char)
@@ -792,41 +812,6 @@ tryParry = function(reason, char)
 	debugLog('parry trigger', reason, char and char.Name or '-')
 	pressParryKey()
 	return true
-end
-
-local function scheduleMeleeParry(char, animId, track, source)
-	local state = getEnemyState(char)
-	local normId = normalizeAnimId(animId)
-	local swingKey = normId .. ':melee:swing'
-	if state.lastSwingId == swingKey then
-		return
-	end
-	state.lastSwingId = swingKey
-	state.scheduledMeleeToken = (state.scheduledMeleeToken or 0) + 1
-	local token = state.scheduledMeleeToken
-
-	track.Stopped:Once(function()
-		if state.lastSwingId == swingKey then
-			state.lastSwingId = ''
-		end
-	end)
-
-	local delay = math.max(0, meleeParryDelaySetting - track.TimePosition)
-	debugLog('trigger', 'melee_schedule_' .. normId, 'delay=' .. string.format('%.2f', delay), 'dist=' .. string.format('%.1f', getEnemyDistance(char)), source)
-
-	task.delay(delay, function()
-		if not canSafelyParry() or token ~= state.scheduledMeleeToken then
-			return
-		end
-		if not char.Parent then
-			return
-		end
-		if not shouldParryMelee(char, true) then
-			debugSkip('melee_timed_range', normId, string.format('%.1f', getEnemyDistance(char)))
-			return
-		end
-		tryParry('melee_' .. normId, char)
-	end)
 end
 
 -- ---------------------------------------------------------------------------
@@ -859,18 +844,18 @@ local function handleMeleeAnimation(char, track, source)
 		return
 	end
 
-	if track.TimePosition <= 0.35 then
-		scheduleMeleeParry(char, animId, track, source)
-	else
-		local state = getEnemyState(char)
-		local swingKey = normId .. ':melee:swing'
-		if state.lastSwingId == swingKey then
-			return
-		end
-		state.lastSwingId = swingKey
-		debugLog('trigger', 'melee_immediate_' .. normId, 'dist=' .. string.format('%.1f', getEnemyDistance(char)), source)
-		tryParry('melee_immediate_' .. normId, char)
+	local state = getEnemyState(char)
+	if state.lastSwingId == swingKey then
+		return
 	end
+	state.lastSwingId = swingKey
+	track.Stopped:Once(function()
+		if state.lastSwingId == swingKey then
+			state.lastSwingId = ''
+		end
+	end)
+	debugLog('trigger', 'melee_' .. normId, 'dist=' .. string.format('%.1f', getEnemyDistance(char)), source)
+	tryParry('melee_' .. normId, char)
 end
 
 local function handleGunDrawAnimation(char, track, source)
@@ -1128,7 +1113,7 @@ local function watchEnemyPlayer(plr)
 		return
 	end
 	local char = plr.Character
-	if char and getEnemyDistance(char) > watcherThreatRangeSetting then
+	if char and getEnemyDistance(char) > getEffectiveWatcherRange() then
 		unwatchAllForPlayer(plr)
 		return
 	end
@@ -1155,7 +1140,7 @@ local function refreshThreatWatchers(force)
 	for _, plr in playersService:GetPlayers() do
 		if plr ~= lplr then
 			local enemyChar = plr.Character
-			if enemyChar and getEnemyDistance(enemyChar) <= watcherThreatRangeSetting then
+			if enemyChar and getEnemyDistance(enemyChar) <= getEffectiveWatcherRange() then
 				watchEnemyPlayer(plr)
 			else
 				unwatchAllForPlayer(plr)
@@ -2157,7 +2142,7 @@ local function combatHeartbeat(meleeRange)
 					if charWatchers[plr.Character] then
 						watchedCount += 1
 					end
-					if getEnemyDistance(plr.Character) <= watcherThreatRangeSetting then
+					if getEnemyDistance(plr.Character) <= getEffectiveWatcherRange() then
 						threatCount += 1
 					end
 				end
@@ -2794,7 +2779,7 @@ run(function()
 	ThreatRange = AutoParry:CreateSlider({
 		Name = 'Threat Range',
 		Min = 12,
-		Max = 40,
+		Max = 200,
 		Default = AUTO_PARRY_DEFAULTS.threatRange,
 		Function = function(val)
 			threatRangeSetting = val
@@ -2802,13 +2787,13 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
-		Tooltip = '360° gun draw/shot/glint parry radius. Ignores distant enemies.',
+		Tooltip = 'Gun draw/shot/glint parry radius. Enemy must be aiming at you (Gun Aim Dot). Default 100 studs.',
 	})
 
 	WatcherThreatRange = AutoParry:CreateSlider({
 		Name = 'Watcher Range',
 		Min = 20,
-		Max = 60,
+		Max = 200,
 		Default = AUTO_PARRY_DEFAULTS.watcherThreatRange,
 		Function = function(val)
 			watcherThreatRangeSetting = val
@@ -2816,7 +2801,7 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
-		Tooltip = 'Only attach anim/glint watchers to enemies within this range (performance).',
+		Tooltip = 'Anim/glint watcher attach radius. Effective range is max of this, Threat Range, and Melee Range.',
 	})
 
 	EnemyParryDebounce = AutoParry:CreateSlider({
@@ -2838,7 +2823,6 @@ run(function()
 	local ParryGunDraw
 	local ParryGunShot
 	local ParryGlint
-	local MeleeParryDelay
 	local MeleeAimDot
 	local GunAimDot
 	local ParryCooldown
@@ -2884,20 +2868,6 @@ run(function()
 		Tooltip = 'Fallback draw parry when glint VFX spawns.',
 	})
 
-	MeleeParryDelay = AutoParry:CreateSlider({
-		Name = 'Melee Parry Delay',
-		Min = 0,
-		Max = 0.5,
-		Decimal = 100,
-		Default = AUTO_PARRY_DEFAULTS.meleeParryDelay,
-		Function = function(val)
-			meleeParryDelaySetting = val
-		end,
-		Suffix = function(val)
-			return val == 1 and 'second' or 'seconds'
-		end,
-	})
-
 	MeleeAimDot = AutoParry:CreateSlider({
 		Name = 'Melee Aim Dot',
 		Min = 0.1,
@@ -2919,7 +2889,7 @@ run(function()
 		Function = function(val)
 			gunAimDotSetting = val
 		end,
-		Tooltip = 'How directly enemies must face you for gun parry.',
+		Tooltip = 'How directly enemies must face you for gun draw/shot/glint parry.',
 	})
 
 	ParryCooldown = AutoParry:CreateSlider({
@@ -3063,9 +3033,9 @@ run(function()
 		watcherThreatRangeSetting = d.watcherThreatRange
 		enemyParryDebounceSetting = d.enemyParryDebounce
 		threatDebugEnabled = d.threatDebug
-		meleeParryDelaySetting = d.meleeParryDelay
 		meleeAimDotSetting = d.meleeAimDot
 		gunAimDotSetting = d.gunAimDot
+		meleeParryCooldownSetting = d.meleeParryCooldown
 		parryCooldownSetting = d.parryCooldown
 		meleeSwingWindowSetting = d.meleeSwingWindow
 		gunDrawWindowSetting = d.gunDrawWindow
@@ -3084,7 +3054,6 @@ run(function()
 		ThreatRange:SetValue(d.threatRange)
 		WatcherThreatRange:SetValue(d.watcherThreatRange)
 		EnemyParryDebounce:SetValue(d.enemyParryDebounce)
-		MeleeParryDelay:SetValue(d.meleeParryDelay)
 		MeleeAimDot:SetValue(d.meleeAimDot)
 		GunAimDot:SetValue(d.gunAimDot)
 		ParryCooldown:SetValue(d.parryCooldown)
@@ -3183,12 +3152,12 @@ run(function()
 		Function = function(callback)
 			threatDebugEnabled = callback
 			if callback then
-				print('[REDLINER] threat debug on | meleeRange=', meleeRangeSetting, 'threatRange=', threatRangeSetting, 'watcherRange=', watcherThreatRangeSetting)
+				print('[REDLINER] threat debug on | meleeRange=', meleeRangeSetting, 'threatRange=', threatRangeSetting, 'watcherRange=', watcherThreatRangeSetting, 'effectiveWatcher=', getEffectiveWatcherRange(), 'gunAimDot=', gunAimDotSetting)
 			else
 				table.clear(lastDebugSkipAt)
 			end
 		end,
-		Tooltip = 'Log skip reasons: out_of_range, wrong_enemy, cooldown.',
+		Tooltip = 'Log skip reasons: out_of_range, not_aiming, wrong_enemy, cooldown.',
 	})
 
 	TestParry = AutoParry:CreateToggle({
