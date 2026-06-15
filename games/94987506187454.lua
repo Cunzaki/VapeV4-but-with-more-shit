@@ -41,6 +41,8 @@ local PARRY_KEY = Enum.KeyCode.F
 local PARRY_VK = 0x46
 
 local MELEE_PACKET_NAME = '_x2e2c62e0acfc88ae'
+local MELEE_PACKET_REMOTE = '_xe6cbd0bf2a4cf278'
+local MELEE_ACTION_HINTS = { 'SWING', 'SLASH', 'HIT', 'ATTACK', 'WIDE', 'STAB', 'CUT' }
 local DASH_VELOCITY_MIN = 20
 local AUTO_ATTACK_RANGE_DEFAULT = 14
 
@@ -159,7 +161,10 @@ local tryParry
 local canSafelyParry
 local hitboxReachHooked = false
 local meleePacketHooked = false
+local packetMetatableHooked = false
+local attackReachHooked = false
 local reachHitboxHookSource = nil
+local reachAttackHookSource = nil
 local reachDebugEnabled = false
 local lastReachDebugHeartbeat = 0
 local lastReachDebugSkipAt = {}
@@ -972,6 +977,70 @@ local function purgeOrphanWatchers()
 	end
 end
 
+local function watchEnemyCharacter(char, ownerPlr)
+	if not char or char == getLocalCharacter() or charWatchers[char] then
+		return
+	end
+	local plr = ownerPlr or playersService:GetPlayerFromCharacter(char)
+	if not plr or plr == lplr then
+		if not isEnemyCharacter(char) then
+			return
+		end
+		plr = playersService:GetPlayerFromCharacter(char)
+	end
+
+	local conns = {}
+	charWatchers[char] = conns
+	local ownerChar = (plr and plr.Character) or char
+
+	hookModel(char, ownerChar, conns)
+	if plr then
+		for _, extraModel in getEnemyModels(plr) do
+			if extraModel ~= char then
+				hookModel(extraModel, ownerChar, conns)
+			end
+		end
+	end
+	debugLog('watching', ownerChar.Name)
+end
+
+local function watchEnemyPlayer(plr)
+	if plr == lplr then
+		return
+	end
+	if plr.Character then
+		watchEnemyCharacter(plr.Character)
+	end
+	for _, model in getEnemyModels(plr) do
+		if model ~= plr.Character then
+			watchEnemyCharacter(model, plr)
+		end
+	end
+end
+
+local function refreshMyHurtboxes()
+	table.clear(myHurtboxes)
+	local char = getLocalCharacter()
+	if not char then
+		return
+	end
+	for _, part in collectionService:GetTagged('Hurtbox') do
+		if part.Parent and part:IsDescendantOf(char) then
+			table.insert(myHurtboxes, part)
+		end
+	end
+	if #myHurtboxes == 0 then
+		local root = char:FindFirstChild('HumanoidRootPart')
+		local head = char:FindFirstChild('Head')
+		if root then
+			table.insert(myHurtboxes, root)
+		end
+		if head then
+			table.insert(myHurtboxes, head)
+		end
+	end
+end
+
 local function refreshEnemyWatchers()
 	if not autoParryActive then
 		return
@@ -1035,47 +1104,6 @@ local function bindLocalRespawnHandler()
 	end
 end
 
-local function watchEnemyCharacter(char, ownerPlr)
-	if not char or char == getLocalCharacter() or charWatchers[char] then
-		return
-	end
-	local plr = ownerPlr or playersService:GetPlayerFromCharacter(char)
-	if not plr or plr == lplr then
-		if not isEnemyCharacter(char) then
-			return
-		end
-		plr = playersService:GetPlayerFromCharacter(char)
-	end
-
-	local conns = {}
-	charWatchers[char] = conns
-	local ownerChar = (plr and plr.Character) or char
-
-	hookModel(char, ownerChar, conns)
-	if plr then
-		for _, extraModel in getEnemyModels(plr) do
-			if extraModel ~= char then
-				hookModel(extraModel, ownerChar, conns)
-			end
-		end
-	end
-	debugLog('watching', ownerChar.Name)
-end
-
-local function watchEnemyPlayer(plr)
-	if plr == lplr then
-		return
-	end
-	if plr.Character then
-		watchEnemyCharacter(plr.Character)
-	end
-	for _, model in getEnemyModels(plr) do
-		if model ~= plr.Character then
-			watchEnemyCharacter(model, plr)
-		end
-	end
-end
-
 local function startEnemyWatchers()
 	refreshEnemyWatchers()
 	if watchersStarted then
@@ -1129,7 +1157,20 @@ local function isMeleeSwingAction(action)
 		return false
 	end
 	action = string.upper(action)
-	return string.find(action, 'SWING', 1, true) ~= nil or string.find(action, 'SLASH', 1, true) ~= nil
+	for _, hint in MELEE_ACTION_HINTS do
+		if string.find(action, hint, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+local function isMeleeHurtboxFire(packed)
+	return type(packed) == 'table' and packed.n >= 4 and typeof(packed[4]) == 'Vector3'
+end
+
+local function isMeleePacketObject(packet)
+	return packet and (packet.Name == MELEE_PACKET_REMOTE or packet.Name == MELEE_PACKET_NAME)
 end
 
 local function mergeHurtboxLists(...)
@@ -1147,29 +1188,6 @@ local function mergeHurtboxLists(...)
 		end
 	end
 	return merged
-end
-
-local function refreshMyHurtboxes()
-	table.clear(myHurtboxes)
-	local char = getLocalCharacter()
-	if not char then
-		return
-	end
-	for _, part in collectionService:GetTagged('Hurtbox') do
-		if part.Parent and part:IsDescendantOf(char) then
-			table.insert(myHurtboxes, part)
-		end
-	end
-	if #myHurtboxes == 0 then
-		local root = char:FindFirstChild('HumanoidRootPart')
-		local head = char:FindFirstChild('Head')
-		if root then
-			table.insert(myHurtboxes, root)
-		end
-		if head then
-			table.insert(myHurtboxes, head)
-		end
-	end
 end
 
 local function getEnemyHurtboxesInRange(range, origin)
@@ -1201,10 +1219,10 @@ local function getEnemyHurtboxesInRange(range, origin)
 end
 
 local function captureMeleeTemplate(packed)
-	if packed.n < 2 or typeof(packed[2]) ~= 'string' then
+	if type(packed) ~= 'table' or packed.n < 2 or typeof(packed[2]) ~= 'string' then
 		return
 	end
-	if isMeleeSwingAction(packed[2]) then
+	if isMeleeHurtboxFire(packed) or isMeleeSwingAction(packed[2]) then
 		meleeTemplate = packed
 	end
 end
@@ -1340,8 +1358,8 @@ local function augmentMeleePacket(packed)
 		reachDebugSkip('not_alive', 'augment skipped (local dead)', 'action=', action)
 		return packed
 	end
-	if not isMeleeSwingAction(action) then
-		reachDebugSkip('not_swing', 'augment skipped (not swing action)', 'action=', action)
+	if not isMeleeHurtboxFire(packed) then
+		reachDebugSkip('not_melee_shape', 'augment skipped (not melee hurtbox packet)', 'action=', action, 'n=', packed.n)
 		return packed
 	end
 	local root = getLocalRoot()
@@ -1350,7 +1368,7 @@ local function augmentMeleePacket(packed)
 		return packed
 	end
 	if reachExtend <= 0 then
-		reachDebugSkip('extend_zero', 'augment skipped (Extend slider is 0)')
+		reachDebugSkip('extend_zero', 'augment skipped (Extend slider is 0)', 'extend=', reachExtend)
 		return packed
 	end
 	local meleeReach = getMeleeReach()
@@ -1359,7 +1377,9 @@ local function augmentMeleePacket(packed)
 	if #extended == 0 then
 		reachDebugLog(
 			'augment: no enemy hurtboxes in range',
+			'action=', action,
 			'reach=', meleeReach,
+			'extend=', reachExtend,
 			'nearest=', nearestName or 'none',
 			'nearestDist=', nearestDist and string.format('%.2f', nearestDist) or 'n/a',
 			'taggedHurtboxes=', #collectionService:GetTagged('Hurtbox')
@@ -1371,7 +1391,10 @@ local function augmentMeleePacket(packed)
 	packed[1] = packed[1] or (template and template[1]) or 'Redliner'
 	packed[2] = packed[2] or (template and template[2]) or 'SWING'
 	packed[3] = packed[3] or (template and template[3]) or ''
-	packed[4] = aimDir
+	packed[4] = packed[4] or aimDir
+	if typeof(packed[4]) == 'Vector3' and packed[4].Magnitude > 0 then
+		aimDir = packed[4].Unit
+	end
 	packed[5] = mergeHurtboxLists(packed[5], extended)
 	packed[6] = packed[6] or (template and template[6])
 	packed.n = math.max(packed.n, 5)
@@ -1379,6 +1402,7 @@ local function augmentMeleePacket(packed)
 		'augment applied',
 		'action=', packed[2],
 		'aimDir=', aimDir,
+		'extend=', reachExtend,
 		'hurtboxes before=', beforeCount,
 		'after=', countPackedHurtboxes(packed),
 		'added=', #extended,
@@ -1389,27 +1413,159 @@ local function augmentMeleePacket(packed)
 	return packed
 end
 
-local function installHitboxReachHook()
-	if hitboxReachHooked then
-		reachDebugSkip('hitbox_already', 'Hitbox.cast hook already installed at', reachHitboxHookSource or '?')
+local function applyMeleeFireAugment(...)
+	local packed = table.pack(...)
+	captureMeleeTemplate(packed)
+	local okAugment, augmented = pcall(augmentMeleePacket, packed)
+	if okAugment then
+		packed = augmented
+	end
+	return table.unpack(packed, 1, packed.n)
+end
+
+local function logMeleePacketFire(context, packet, ...)
+	local n = select('#', ...)
+	local action = select(2, ...)
+	local packed = table.pack(...)
+	reachDebugLog(
+		context,
+		'packet=', packet and packet.Name or '?',
+		'action=', action,
+		'n=', n,
+		'hurtboxesIn=', countPackedHurtboxes(packed),
+		'extend=', reachExtend,
+		'totalReach=', getMeleeReach(),
+		'reachActive=', reachActive
+	)
+end
+
+local function wrapReachCallable(label, fn, wrapperFactory)
+	if type(fn) ~= 'function' then
+		return nil, label .. ': not a function'
+	end
+	local wrapper = wrapperFactory(fn)
+	if hookfunction then
+		local ok, original = pcall(hookfunction, fn, wrapper)
+		if ok and type(original) == 'function' then
+			return original, label .. ': hookfunction'
+		end
+	end
+	return fn, label .. ': assign'
+end
+
+local function extendAttackHurtboxes(attack)
+	if not reachActive or reachExtend <= 0 or type(attack) ~= 'table' then
+		return 0
+	end
+	if type(attack.hit_hurtboxes) ~= 'table' then
+		return 0
+	end
+	local root = getLocalRoot()
+	if not root then
+		return 0
+	end
+	local before = #attack.hit_hurtboxes
+	local extended = getEnemyHurtboxesInRange(getMeleeReach(), root.Position)
+	for _, part in extended do
+		if not table.find(attack.hit_hurtboxes, part) then
+			table.insert(attack.hit_hurtboxes, part)
+		end
+	end
+	return #attack.hit_hurtboxes - before
+end
+
+local function looksLikeAttackModule(mod)
+	return type(mod) == 'table'
+		and type(mod.new) == 'function'
+		and type(mod.castOnce) == 'function'
+		and type(mod.addHitbox) == 'function'
+end
+
+local function discoverAttackModule()
+	local assets = replicatedStorage:FindFirstChild('Assets')
+	local modules = assets and assets:FindFirstChild('ModuleScripts')
+	local attackModule = modules and modules:FindFirstChild('Attack')
+	if attackModule then
+		local ok, mod = pcall(require, attackModule)
+		if ok and looksLikeAttackModule(mod) then
+			return mod, 'Attack: ' .. attackModule:GetFullName()
+		end
+	end
+	if getgc then
+		local gcOk, gc = pcall(getgc, true)
+		if gcOk and type(gc) == 'table' then
+			for _, value in gc do
+				if looksLikeAttackModule(value) then
+					return value, 'getgc Attack-like table'
+				end
+			end
+		end
+	end
+	return nil, nil
+end
+
+local function installAttackReachHook()
+	if attackReachHooked then
+		reachDebugSkip('attack_already', 'Attack.castOnce hook already installed at', reachAttackHookSource or '?')
 		return true
 	end
-	local Hitbox, source, attempts = discoverHitboxModule()
-	if not Hitbox then
-		reachDebugWarn('Hitbox hook FAILED — no module found')
-		for _, line in attempts do
-			reachDebugWarn('  try:', line)
-		end
+	local Attack, source = discoverAttackModule()
+	if not Attack then
+		reachDebugWarn('Attack hook FAILED — module not found')
 		return false
 	end
-	local oldCast = Hitbox.cast
-	Hitbox.cast = function(self)
+	local function wrapCast(methodName)
+		local oldMethod = Attack[methodName]
+		if type(oldMethod) ~= 'function' then
+			return
+		end
+		local function makeWrapper(oldFn)
+			return function(attack, ...)
+				local results = oldFn(attack, ...)
+				local added = extendAttackHurtboxes(attack)
+				if reachDebugEnabled or (reachActive and reachExtend > 0) then
+					reachDebugLog(
+						methodName,
+						'extend=', reachExtend,
+						'totalReach=', getMeleeReach(),
+						'added=', added,
+						'hurtboxes=', type(attack.hit_hurtboxes) == 'table' and #attack.hit_hurtboxes or 0
+					)
+				end
+				return results
+			end
+		end
+		local wrapper = makeWrapper(oldMethod)
+		local _, detail = wrapReachCallable('Attack.' .. methodName, oldMethod, makeWrapper)
+		Attack[methodName] = wrapper
+		reachDebugLog('Attack.' .. methodName, 'hook OK —', detail)
+	end
+	wrapCast('castOnce')
+	wrapCast('castMore')
+	wrapCast('castContinuous')
+	attackReachHooked = true
+	reachAttackHookSource = source
+	reachDebugLog('Attack hook OK —', source)
+	return true
+end
+
+local function buildHitboxCastWrapper(oldCast)
+	return function(self)
 		local shape = self.shape
 		local origSize = self.size
 		local origOffset = self.offset
 		local taggedHurtboxes = #collectionService:GetTagged('Hurtbox')
 		local extended = false
 		local result
+		if reachDebugEnabled then
+			reachDebugLog(
+				'Hitbox.cast called',
+				'shape=', shape,
+				'extend=', reachExtend,
+				'totalReach=', getMeleeReach(),
+				'reachActive=', reachActive
+			)
+		end
 		if reachActive and reachExtend > 0 then
 			local extra = reachExtend
 			if shape == 'Box' and typeof(self.size) == 'Vector3' then
@@ -1453,7 +1609,7 @@ local function installHitboxReachHook()
 				'reachActive=', reachActive,
 				'reachExtend=', reachExtend
 			)
-		else
+		elseif reachDebugEnabled then
 			reachDebugSkip('cast_no_extend', 'cast without extension', 'shape=', shape, 'reachActive=', reachActive, 'extend=', reachExtend)
 		end
 		result = oldCast(self)
@@ -1462,21 +1618,110 @@ local function installHitboxReachHook()
 		end
 		return result
 	end
+end
+
+local function installHitboxReachHook()
+	if hitboxReachHooked then
+		reachDebugSkip('hitbox_already', 'Hitbox.cast hook already installed at', reachHitboxHookSource or '?')
+		return true
+	end
+	local Hitbox, source, attempts = discoverHitboxModule()
+	if not Hitbox then
+		reachDebugWarn('Hitbox hook FAILED — no module found')
+		for _, line in attempts do
+			reachDebugWarn('  try:', line)
+		end
+		return false
+	end
+	local oldCast = Hitbox.cast
+	local wrapper = buildHitboxCastWrapper(oldCast)
+	local _, detail = wrapReachCallable('Hitbox.cast', oldCast, function(oldFn)
+		return buildHitboxCastWrapper(oldFn)
+	end)
+	Hitbox.cast = wrapper
 	hitboxReachHooked = true
-	reachHitboxHookSource = source
-	reachDebugLog('Hitbox.cast hook OK —', source)
+	reachHitboxHookSource = source .. ' (' .. detail .. ')'
+	reachDebugLog('Hitbox.cast hook OK —', reachHitboxHookSource)
+	if getgc then
+		local gcOk, gc = pcall(getgc, true)
+		if gcOk and type(gc) == 'table' then
+			local extraHits = 0
+			for _, value in gc do
+				if value ~= Hitbox and looksLikeHitboxModule(value) and value.cast == oldCast then
+					value.cast = wrapper
+					extraHits += 1
+				end
+			end
+			if extraHits > 0 then
+				reachDebugLog('Hitbox.cast mirrored to', extraHits, 'getgc tables')
+			end
+		end
+	end
 	return true
 end
 
-local function installMeleeReachHook()
-	installHitboxReachHook()
+local function installPacketMetatableHook()
+	if packetMetatableHooked then
+		reachDebugSkip('meta_already', 'Packet metatable Fire hook already installed')
+		return true
+	end
+	if not initPackets() then
+		return false
+	end
+	local packet = Packets[MELEE_PACKET_NAME]
+	if not packet then
+		return false
+	end
+	local mt = getmetatable(packet)
+	if not mt or type(mt.Fire) ~= 'function' then
+		reachDebugWarn('Packet metatable Fire hook FAILED — metatable missing Fire')
+		return false
+	end
+	if mt._reachFireHooked then
+		packetMetatableHooked = true
+		return true
+	end
+	local oldFire = mt.Fire
+	local function wrappedFire(firePacket, ...)
+		if isMeleePacketObject(firePacket) then
+			logMeleePacketFire('packet Fire (meta)', firePacket, ...)
+			local before = countPackedHurtboxes(table.pack(...))
+			local augmented = table.pack(applyMeleeFireAugment(...))
+			local ok, result = pcall(oldFire, firePacket, table.unpack(augmented, 1, augmented.n))
+			if reachDebugEnabled then
+				reachDebugLog(
+					'packet Fire post-augment (meta)',
+					'action=', augmented[2],
+					'before=', before,
+					'after=', countPackedHurtboxes(augmented)
+				)
+			end
+			if ok then
+				return result
+			end
+			reachDebugWarn('packet Fire (meta) pcall failed:', result)
+			error(result, 0)
+		end
+		return oldFire(firePacket, ...)
+	end
+	local _, detail = wrapReachCallable('Packet.Fire', oldFire, function()
+		return wrappedFire
+	end)
+	mt.Fire = wrappedFire
+	mt._reachFireHooked = true
+	packetMetatableHooked = true
+	reachDebugLog('Packet metatable Fire hook OK —', detail, 'remote=', MELEE_PACKET_REMOTE)
+	return true
+end
+
+local function installMeleePacketHook()
 	if meleeHooked then
 		reachDebugSkip('packet_already', 'melee packet hook already installed')
-		return
+		return true
 	end
 	if not initPackets() then
 		reachDebugWarn('packet hook FAILED — initPackets() returned false (Assets/ModuleScripts/Packets?)')
-		return
+		return false
 	end
 	local packet = Packets[MELEE_PACKET_NAME]
 	if not packet then
@@ -1491,56 +1736,54 @@ local function installMeleeReachHook()
 			'packet hook FAILED — Packets[' .. MELEE_PACKET_NAME .. '] missing',
 			'obfuscatedKeys=', table.concat(keys, ', ')
 		)
-		return
+		return false
 	end
 	if packet._reachHooked then
 		meleeHooked = true
 		meleePacketHooked = true
 		reachDebugSkip('packet_flag', 'packet already marked _reachHooked')
-		return
+		return true
 	end
 	packet._reachHooked = true
 	meleeHooked = true
 	meleePacketHooked = true
 	local oldFire = packet.Fire
-	packet.Fire = function(self, ...)
-		local packed = table.pack(...)
-		local action = packed[2]
-		local isSwing = isMeleeSwingAction(action)
-		if reachDebugEnabled and isSwing then
+	if type(oldFire) ~= 'function' then
+		reachDebugWarn('packet hook FAILED — packet.Fire is not a function')
+		return false
+	end
+	local function wrappedFire(self, ...)
+		logMeleePacketFire('packet Fire (inst)', self, ...)
+		local before = countPackedHurtboxes(table.pack(...))
+		local augmented = table.pack(applyMeleeFireAugment(...))
+		local ok, result = pcall(oldFire, self, table.unpack(augmented, 1, augmented.n))
+		if reachDebugEnabled then
 			reachDebugLog(
-				'packet Fire (swing)',
-				'action=', action,
-				'n=', packed.n,
-				'hurtboxesIn=', countPackedHurtboxes(packed),
-				'hitboxHook=', hitboxReachHooked,
-				'packetHook=', meleePacketHooked
+				'packet Fire post-augment (inst)',
+				'action=', augmented[2],
+				'before=', before,
+				'after=', countPackedHurtboxes(augmented)
 			)
 		end
-		captureMeleeTemplate(packed)
-		local beforeCount = countPackedHurtboxes(packed)
-		local okAugment, augmented = pcall(augmentMeleePacket, packed)
-		if okAugment then
-			packed = augmented
-		else
-			reachDebugWarn('augmentMeleePacket error:', augmented)
-		end
-		if reachDebugEnabled and isSwing then
-			reachDebugLog(
-				'packet Fire post-augment',
-				'hurtboxes before=', beforeCount,
-				'after=', countPackedHurtboxes(packed),
-				'aimDir=', packed[4]
-			)
-		end
-		local ok, result = pcall(oldFire, self, table.unpack(packed, 1, packed.n))
 		if ok then
 			return result
 		end
-		reachDebugWarn('packet Fire pcall failed:', result)
+		reachDebugWarn('packet Fire (inst) pcall failed:', result)
 		error(result, 0)
 	end
-	reachDebugLog('packet hook OK —', MELEE_PACKET_NAME)
+	local _, detail = wrapReachCallable('meleePacket.Fire', oldFire, function()
+		return wrappedFire
+	end)
+	packet.Fire = wrappedFire
+	reachDebugLog('packet instance hook OK —', MELEE_PACKET_NAME, detail)
+	return true
+end
+
+local function installMeleeReachHook()
+	installHitboxReachHook()
+	installAttackReachHook()
+	installPacketMetatableHook()
+	installMeleePacketHook()
 end
 
 local function logReachHookStatus(context)
@@ -1554,9 +1797,13 @@ local function logReachHookStatus(context)
 		'totalReach=', getMeleeReach(),
 		'hitboxHook=', hitboxReachHooked,
 		'hitboxSource=', reachHitboxHookSource or 'none',
+		'attackHook=', attackReachHooked,
+		'attackSource=', reachAttackHookSource or 'none',
 		'packetHook=', meleePacketHooked,
+		'packetMetaHook=', packetMetatableHooked,
 		'meleeTemplate=', meleeTemplate ~= nil,
-		'packetsLoaded=', Packets ~= nil
+		'packetsLoaded=', Packets ~= nil,
+		'hookfunction=', hookfunction ~= nil
 	)
 end
 
@@ -1740,8 +1987,11 @@ local function combatHeartbeat(meleeRange, attackCooldown)
 			'extend=', reachExtend,
 			'totalReach=', meleeReach,
 			'hitboxHook=', hitboxReachHooked,
+			'attackHook=', attackReachHooked,
 			'packetHook=', meleePacketHooked,
+			'packetMetaHook=', packetMetatableHooked,
 			'hitboxSource=', reachHitboxHookSource or 'none',
+			'attackSource=', reachAttackHookSource or 'none',
 			'alive=', isLocalAlive(),
 			'rootPos=', root and tostring(root.Position) or 'nil',
 			'nearbyEnemyHurtboxes=', nearbyCount,
@@ -1749,7 +1999,7 @@ local function combatHeartbeat(meleeRange, attackCooldown)
 			'nearestDist=', nearestDist and string.format('%.2f', nearestDist) or 'n/a',
 			'taggedHurtboxes=', #collectionService:GetTagged('Hurtbox')
 		)
-		if (reachActive or reachDebugEnabled) and (not hitboxReachHooked or not meleePacketHooked) then
+		if (reachActive or reachDebugEnabled) and (not hitboxReachHooked or not meleePacketHooked or not packetMetatableHooked or not attackReachHooked) then
 			bindPacketListeners()
 			logReachHookStatus('heartbeat retry')
 		end
@@ -2381,7 +2631,7 @@ run(function()
 				logReachHookStatus('disabled')
 			end
 		end,
-		Tooltip = 'Hooks Attack.Hitbox.cast and melee packet _x2e2c62e0acfc88ae (base ' .. BASE_SWORD_REACH .. ' studs + Extend slider).',
+		Tooltip = 'Hooks Attack.Hitbox.cast, Attack.castOnce, and melee packet ' .. MELEE_PACKET_NAME .. ' / ' .. MELEE_PACKET_REMOTE .. ' (base ' .. BASE_SWORD_REACH .. ' studs + Extend slider).',
 	})
 
 	MeleeRange = AutoParry:CreateSlider({
