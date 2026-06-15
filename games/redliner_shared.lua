@@ -435,13 +435,36 @@ local function isKnownGunDrawId(animId)
 	return KNOWN_GUN_DRAW_ANIM_IDS[normalizeAnimId(animId)] == true
 end
 
+local function getAllPlayingTracks(char)
+	if not char then
+		return {}
+	end
+	local tracks = {}
+	local hum = char:FindFirstChildWhichIsA('Humanoid')
+	if hum then
+		for _, track in hum:GetPlayingAnimationTracks() do
+			table.insert(tracks, track)
+		end
+	end
+	for _, desc in char:GetDescendants() do
+		if desc:IsA('Animator') then
+			for _, track in desc:GetPlayingAnimationTracks() do
+				table.insert(tracks, track)
+			end
+		end
+	end
+	return tracks
+end
+
 local function getAllPlayingTracksForChar(char)
 	local plr = playersService:GetPlayerFromCharacter(char)
 	local models = plr and getEnemyModels(plr) or {char}
 	local tracks = {}
 	for _, model in models do
-		for _, track in getAllPlayingTracks(model) do
-			table.insert(tracks, track)
+		if model and model.Parent then
+			for _, track in getAllPlayingTracks(model) do
+				table.insert(tracks, track)
+			end
 		end
 	end
 	return tracks
@@ -497,24 +520,6 @@ local function charHasKnownMeleeAttack(char)
 		end
 	end
 	return false
-end
-
-local function getAllPlayingTracks(char)
-	local tracks = {}
-	local hum = char:FindFirstChildWhichIsA('Humanoid')
-	if hum then
-		for _, track in hum:GetPlayingAnimationTracks() do
-			table.insert(tracks, track)
-		end
-	end
-	for _, desc in char:GetDescendants() do
-		if desc:IsA('Animator') then
-			for _, track in desc:GetPlayingAnimationTracks() do
-				table.insert(tracks, track)
-			end
-		end
-	end
-	return tracks
 end
 
 local function charHasWhitelistAttackPlaying(char)
