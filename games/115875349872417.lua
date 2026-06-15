@@ -1,8 +1,8 @@
 --[[
 	REDLINER shared game script (MAIN + FFA + MATCH place IDs).
 	Place IDs: 94987506187454 (main), 115875349872417 (FFA), 126691165749976 (match).
-	Auto Parry, Auto Attack, Reach, Kill Aura, Draw Timer, Threat Indicator,
-	Hitbox Visualizer, Parry Trainer Overlay, Animation Logger.
+	Auto Parry, Auto Attack, Reach, Kill Aura, Draw Timer HUD, Threat Indicator,
+	Hitbox Visualizer (swing/cone/bullet/enemy), Animation Logger.
 ]]
 
 local run = function(func)
@@ -22,6 +22,7 @@ local collectionService = cloneref(game:GetService('CollectionService'))
 local runService = cloneref(game:GetService('RunService'))
 local virtualInputManager = cloneref(game:GetService('VirtualInputManager'))
 local inputService = cloneref(game:GetService('UserInputService'))
+local debrisService = cloneref(game:GetService('Debris'))
 local workspaceService = cloneref(workspace)
 
 local lplr = playersService.LocalPlayer
@@ -43,6 +44,7 @@ local PARRY_VK = 0x46
 
 local MELEE_PACKET_NAME = '_x2e2c62e0acfc88ae'
 local MELEE_PACKET_REMOTE = '_xe6cbd0bf2a4cf278'
+local GUN_PACKET_NAME = '_x77a8b8d28b943359'
 local MELEE_ACTION_HINTS = { 'SWING', 'SLASH', 'HIT', 'ATTACK', 'WIDE', 'STAB', 'CUT' }
 local DASH_VELOCITY_MIN = 20
 local AUTO_ATTACK_RANGE_DEFAULT = 14
@@ -188,24 +190,27 @@ local lastReachDebugHeartbeat = 0
 local lastReachDebugSkipAt = {}
 local hitboxVisualizerSwingEnabled = false
 local hitboxVisualizerEnemyEnabled = false
+local hitboxVisualizerBulletEnabled = false
+local gunBulletVizHooked = false
 local hitboxVisualizerDurationSetting = 0.6
 local hitboxVisualizerRangeSetting = 22
 local drawTimerEnabled = false
 local drawTimerMaxEntriesSetting = 4
-local drawTimerFontSizeSetting = 14
-local drawTimerPosXSetting = 12
-local drawTimerPosYSetting = 120
-local parryTrainerEnabled = false
-local parryTrainerDifficultySetting = 'STANDARD'
+local drawTimerFontSizeSetting = 22
+local drawTimerPositionPresetSetting = 'Center-Top'
+local drawTimerScaleSetting = 1
+local drawTimerOpacitySetting = 0.88
 local threatIndicatorEnabled = false
-local threatIndicatorMaxLinesSetting = 6
-local threatIndicatorPosXSetting = 12
-local threatIndicatorPosYSetting = 280
+local threatIndicatorFontSizeSetting = 42
+local threatIndicatorOpacitySetting = 0.55
+local threatIndicatorPosYSetting = 0.82
+local threatIndicatorAnimSpeedSetting = 0.25
+local threatIndicatorFullscreenSetting = false
 local killAuraActive = false
 local killAuraRangeSetting = 18
 local killAuraExtendSetting = 10
-local killAuraDelaySetting = 0.06
-local killAuraItemIdSetting = 'Redliner'
+local killAuraDelaySetting = 0.15
+local killAuraItemIdSetting = 'Auto'
 local killAuraBound = false
 local lastKillAuraAt = 0
 local killAuraAttackSerial = 0
@@ -220,9 +225,47 @@ local threatColorGunDrawSetting = Color3.fromRGB(255, 210, 90)
 local threatColorGunShotSetting = Color3.fromRGB(255, 90, 90)
 local threatColorGlintSetting = Color3.fromRGB(180, 130, 255)
 local hitboxVisualizerColorSetting = Color3.fromRGB(255, 60, 60)
-local parryTrainerPosXSetting = 12
-local parryTrainerPosYSetting = 440
 local lastEnemyHurtboxVizAt = 0
+
+local GUN_DRAW_COLORS = {
+	Castigate = Color3.fromRGB(255, 140, 50),
+	Phoenix = Color3.fromRGB(255, 70, 70),
+	Siege = Color3.fromRGB(255, 220, 60),
+	Monarch = Color3.fromRGB(180, 100, 255),
+}
+
+local function spawnBulletVizRay(origin, direction, color)
+	if not hitboxVisualizerBulletEnabled then
+		return
+	end
+	if typeof(origin) ~= 'Vector3' or typeof(direction) ~= 'Vector3' then
+		return
+	end
+	local dir = direction.Magnitude > 0.01 and direction.Unit or Vector3.new(0, 0, -1)
+	local length = 120
+	local part = Instance.new('Part')
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CastShadow = false
+	part.Material = Enum.Material.Neon
+	part.Color = color or hitboxVisualizerColorSetting
+	part.Transparency = 0.35
+	part.Size = Vector3.new(0.15, 0.15, length)
+	part.CFrame = CFrame.lookAt(origin, origin + dir) * CFrame.new(0, 0, -length / 2)
+	part.Parent = workspaceService
+	debrisService:AddItem(part, hitboxVisualizerDurationSetting)
+end
+
+local function isGameWindowFocused()
+	if isrbxactive then
+		return isrbxactive()
+	end
+	if iswindowactive then
+		return iswindowactive()
+	end
+	return true
+end
 
 local function reachDebugLog(...)
 	if reachDebugEnabled then
@@ -985,6 +1028,9 @@ local combatHeartbeat
 local getEnemyHurtboxesInRange
 local handleMeleeAnimation
 local unwatchAllForPlayer
+local installHitboxReachHook
+local installGunBulletVizHook
+local detectLocalMeleeItemId
 
 run(function()
 -- ---------------------------------------------------------------------------
@@ -1100,6 +1146,15 @@ local function handleGunShotAnimation(char, track, source, aimModel)
 	end)
 
 	debugLog('trigger', 'gun_shot_' .. gunName, normId, 'dist=' .. string.format('%.1f', getClosestEnemyDistance(char)), source)
+	if hitboxVisualizerBulletEnabled then
+		task.defer(function()
+			local aimRoot = aimModel and aimModel:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('HumanoidRootPart')
+			local myRoot = getLocalRoot()
+			if aimRoot and myRoot then
+				spawnBulletVizRay(aimRoot.Position, myRoot.Position - aimRoot.Position, threatColorGunShotSetting)
+			end
+		end)
+	end
 	tryParry('gun_shot_' .. gunName .. '_' .. normId, char)
 end
 
@@ -1450,15 +1505,10 @@ run(function()
 -- Packet hooks (melee reach)
 -- ---------------------------------------------------------------------------
 
-local function isGameWindowFocused()
-	if isrbxactive then
-		return isrbxactive()
-	end
-	if iswindowactive then
-		return iswindowactive()
-	end
-	return true
-end
+local MELEE_ITEM_PATTERNS = {
+	{pattern = 'redliner', id = 'Redliner'},
+	{pattern = 'nothing', id = 'Nothing'},
+}
 
 local function isEnemyOwner(model)
 	local plr = getPlayerFromModel(model)
@@ -1529,6 +1579,47 @@ getEnemyHurtboxesInRange = function(range, origin)
 		table.insert(results, entry.Part)
 	end
 	return results
+end
+
+detectLocalMeleeItemId = function()
+	local char = getLocalCharacter()
+	if char then
+		for _, desc in char:GetDescendants() do
+			local lower = string.lower(desc.Name)
+			for _, entry in MELEE_ITEM_PATTERNS do
+				if string.find(lower, entry.pattern, 1, true) then
+					return entry.id
+				end
+			end
+		end
+	end
+	if type(meleeTemplate) == 'table' and typeof(meleeTemplate[1]) == 'string' and meleeTemplate[1] ~= '' then
+		return meleeTemplate[1]
+	end
+	if killAuraItemIdSetting ~= 'Auto' then
+		return killAuraItemIdSetting
+	end
+	return 'Redliner'
+end
+
+local function spawnConeHitboxViz(hitbox, radius, length)
+	if not hitboxVisualizerSwingEnabled or typeof(length) ~= 'number' or length <= 0 then
+		return
+	end
+	local cf = hitbox.origin * hitbox.offset
+	local part = Instance.new('Part')
+	part.Shape = Enum.PartType.Cylinder
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CastShadow = false
+	part.Material = Enum.Material.ForceField
+	part.Color = hitboxVisualizerColorSetting
+	part.Transparency = 0.45
+	part.Size = Vector3.new(length, radius * 2, radius * 2)
+	part.CFrame = cf * CFrame.Angles(0, math.rad(90), 0) * CFrame.new(0, 0, -length / 2)
+	part.Parent = workspaceService
+	debrisService:AddItem(part, hitboxVisualizerDurationSetting)
 end
 
 local function captureMeleeTemplate(packed)
@@ -1936,6 +2027,10 @@ local function buildHitboxCastWrapper(oldCast)
 			reachDebugSkip('cast_no_extend', 'cast without extension', 'shape=', shape, 'reachActive=', reachActive, 'extend=', reachExtend)
 		end
 		result = oldCast(self)
+		if hitboxVisualizerSwingEnabled and shape == 'Cone' and typeof(origSize) == 'number' then
+			local halfAngle = math.rad((self.angle or 45) / 2)
+			spawnConeHitboxViz(self, origSize * math.tan(halfAngle), origSize)
+		end
 		if hitboxVisualizerSwingEnabled then
 			self.visible = origVisible
 		end
@@ -1946,7 +2041,7 @@ local function buildHitboxCastWrapper(oldCast)
 	end
 end
 
-local function installHitboxReachHook()
+installHitboxReachHook = function()
 	if hitboxReachHooked then
 		reachDebugSkip('hitbox_already', 'Hitbox.cast hook already installed at', reachHitboxHookSource or '?')
 		return true
@@ -1982,6 +2077,40 @@ local function installHitboxReachHook()
 				reachDebugLog('Hitbox.cast mirrored to', extraHits, 'getgc tables')
 			end
 		end
+	end
+	return true
+end
+
+installGunBulletVizHook = function()
+	if gunBulletVizHooked or not hitboxVisualizerBulletEnabled then
+		return true
+	end
+	if not initPackets() then
+		return false
+	end
+	local packet = Packets[GUN_PACKET_NAME]
+	if not packet or type(packet.Fire) ~= 'function' then
+		return false
+	end
+	if packet._bulletVizHooked then
+		gunBulletVizHooked = true
+		return true
+	end
+	local oldFire = packet.Fire
+	packet._bulletVizHooked = true
+	gunBulletVizHooked = true
+	packet.Fire = function(firePacket, ...)
+		local packed = table.pack(...)
+		local aimDir = packed[6]
+		if typeof(aimDir) == 'Vector3' then
+			task.defer(function()
+				local root = getLocalRoot()
+				if root then
+					spawnBulletVizRay(root.Position, aimDir, hitboxVisualizerColorSetting)
+				end
+			end)
+		end
+		return oldFire(firePacket, ...)
 	end
 	return true
 end
@@ -2138,6 +2267,9 @@ bindPacketListeners = function()
 		return
 	end
 	installMeleeReachHook()
+	if hitboxVisualizerBulletEnabled then
+		installGunBulletVizHook()
+	end
 end
 
 end)
@@ -2300,8 +2432,12 @@ end
 
 combatHeartbeat = function(meleeRange)
 	meleeRangeSetting = meleeRange
-	if reachActive or reachDebugEnabled or autoParryActive or killAuraActive then
+	if reachActive or reachDebugEnabled or autoParryActive or killAuraActive
+		or hitboxVisualizerSwingEnabled or hitboxVisualizerBulletEnabled then
 		bindPacketListeners()
+	end
+	if hitboxVisualizerSwingEnabled and not hitboxReachHooked then
+		installHitboxReachHook()
 	end
 
 	if reachDebugEnabled and tick() - lastReachDebugHeartbeat > 2 then
@@ -2378,32 +2514,31 @@ end
 -- HUD overlays + Kill Aura
 -- ---------------------------------------------------------------------------
 
-local PARRY_TRAINER_CONFIGS = {
-	STANDARD = { spawn_angle = 125, start_shot_delay = 1, end_shot_delay = 0.6 },
-	HARD = { spawn_angle = 360, start_shot_delay = 0.6, end_shot_delay = 0.4 },
-	FLATLINE = { spawn_angle = 360, start_shot_delay = 0.3, end_shot_delay = 0 },
-}
-
-local GUN_ITEMDEF_DRAW = {
-	Castigate = 0.75,
-	Phoenix = 0.8,
-	Siege = 1.1,
-	Monarch = 1.85,
+local DRAW_PRESET_ANCHORS = {
+	['Center-Top'] = {0.5, 0, 0.5, 0},
+	Center = {0.5, 0.5, 0.5, 0.5},
+	Bottom = {0.5, 1, 0.5, 1},
 }
 
 run(function()
-	local debris = cloneref(game:GetService('Debris'))
+	local tweenService = cloneref(game:GetService('TweenService'))
 	local hudGui
-	local drawListLabel
-	local threatListLabel
-	local trainerLabel
-	local lastEnemyVizAt = 0
+	local drawContainer
+	local drawCards = {}
+	local threatOverlay
+	local threatPanel
+	local threatTitle
+	local threatSub
+	local threatFlash
+	local lastPrimaryKey = ''
+	local enemyAdornPool = {}
 
 	local function ensureHudGui()
 		if hudGui and hudGui.Parent then
 			return hudGui
 		end
-		local existing = lplr:FindFirstChild('PlayerGui') and lplr.PlayerGui:FindFirstChild('RedlinerHUD')
+		local playerGui = lplr:FindFirstChild('PlayerGui') or lplr:WaitForChild('PlayerGui')
+		local existing = playerGui:FindFirstChild('RedlinerHUD')
 		if existing then
 			hudGui = existing
 		else
@@ -2411,66 +2546,162 @@ run(function()
 			hudGui.Name = 'RedlinerHUD'
 			hudGui.ResetOnSpawn = false
 			hudGui.IgnoreGuiInset = true
-			hudGui.Parent = lplr:FindFirstChild('PlayerGui') or lplr:WaitForChild('PlayerGui')
+			hudGui.DisplayOrder = 50
+			hudGui.Parent = playerGui
 		end
-		if not drawListLabel or not drawListLabel.Parent then
-			drawListLabel = Instance.new('TextLabel')
-			drawListLabel.Name = 'DrawTimers'
-			drawListLabel.BackgroundTransparency = 0.35
-			drawListLabel.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
-			drawListLabel.TextColor3 = Color3.fromRGB(255, 220, 120)
-			drawListLabel.TextXAlignment = Enum.TextXAlignment.Left
-			drawListLabel.TextYAlignment = Enum.TextYAlignment.Top
-			drawListLabel.Font = Enum.Font.GothamMedium
-			drawListLabel.TextSize = drawTimerFontSizeSetting
-			drawListLabel.BorderSizePixel = 0
-			drawListLabel.AutomaticSize = Enum.AutomaticSize.Y
-			drawListLabel.Size = UDim2.fromOffset(280, 0)
-			drawListLabel.Parent = hudGui
+		if not drawContainer or not drawContainer.Parent then
+			drawContainer = Instance.new('Frame')
+			drawContainer.Name = 'DrawTimerRoot'
+			drawContainer.BackgroundTransparency = 1
+			drawContainer.BorderSizePixel = 0
+			drawContainer.Parent = hudGui
+			local drawLayout = Instance.new('UIListLayout')
+			drawLayout.FillDirection = Enum.FillDirection.Vertical
+			drawLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			drawLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			drawLayout.Padding = UDim.new(0, 8)
+			drawLayout.Parent = drawContainer
 		end
-		if not threatListLabel or not threatListLabel.Parent then
-			threatListLabel = Instance.new('TextLabel')
-			threatListLabel.Name = 'Threats'
-			threatListLabel.BackgroundTransparency = 0.35
-			threatListLabel.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
-			threatListLabel.TextColor3 = Color3.fromRGB(255, 140, 140)
-			threatListLabel.TextXAlignment = Enum.TextXAlignment.Left
-			threatListLabel.TextYAlignment = Enum.TextYAlignment.Top
-			threatListLabel.Font = Enum.Font.GothamMedium
-			threatListLabel.TextSize = 13
-			threatListLabel.BorderSizePixel = 0
-			threatListLabel.AutomaticSize = Enum.AutomaticSize.Y
-			threatListLabel.Size = UDim2.fromOffset(320, 0)
-			threatListLabel.Parent = hudGui
-		end
-		if not trainerLabel or not trainerLabel.Parent then
-			trainerLabel = Instance.new('TextLabel')
-			trainerLabel.Name = 'ParryTrainer'
-			trainerLabel.BackgroundTransparency = 0.35
-			trainerLabel.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
-			trainerLabel.TextColor3 = Color3.fromRGB(140, 200, 255)
-			trainerLabel.TextXAlignment = Enum.TextXAlignment.Left
-			trainerLabel.TextYAlignment = Enum.TextYAlignment.Top
-			trainerLabel.Font = Enum.Font.GothamMedium
-			trainerLabel.TextSize = 12
-			trainerLabel.BorderSizePixel = 0
-			trainerLabel.AutomaticSize = Enum.AutomaticSize.Y
-			trainerLabel.Size = UDim2.fromOffset(300, 0)
-			trainerLabel.Parent = hudGui
+		if not threatOverlay or not threatOverlay.Parent then
+			threatOverlay = Instance.new('Frame')
+			threatOverlay.Name = 'ThreatOverlay'
+			threatOverlay.BackgroundColor3 = Color3.new(0, 0, 0)
+			threatOverlay.BackgroundTransparency = 1
+			threatOverlay.BorderSizePixel = 0
+			threatOverlay.Size = UDim2.fromScale(1, 1)
+			threatOverlay.Visible = false
+			threatOverlay.Parent = hudGui
+
+			threatFlash = Instance.new('Frame')
+			threatFlash.Name = 'ThreatFlash'
+			threatFlash.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
+			threatFlash.BackgroundTransparency = 1
+			threatFlash.BorderSizePixel = 0
+			threatFlash.Size = UDim2.fromScale(1, 1)
+			threatFlash.ZIndex = 2
+			threatFlash.Parent = threatOverlay
+
+			threatPanel = Instance.new('Frame')
+			threatPanel.Name = 'ThreatPanel'
+			threatPanel.BackgroundColor3 = Color3.fromRGB(12, 8, 8)
+			threatPanel.BackgroundTransparency = 0.35
+			threatPanel.BorderSizePixel = 0
+			threatPanel.AnchorPoint = Vector2.new(0.5, 1)
+			threatPanel.Size = UDim2.fromScale(0.92, 0.22)
+			threatPanel.Position = UDim2.fromScale(0.5, 0.92)
+			threatPanel.ZIndex = 3
+			threatPanel.Parent = threatOverlay
+			local panelCorner = Instance.new('UICorner')
+			panelCorner.CornerRadius = UDim.new(0, 12)
+			panelCorner.Parent = threatPanel
+
+			threatTitle = Instance.new('TextLabel')
+			threatTitle.Name = 'ThreatTitle'
+			threatTitle.BackgroundTransparency = 1
+			threatTitle.Size = UDim2.fromScale(1, 0.62)
+			threatTitle.Font = Enum.Font.GothamBlack
+			threatTitle.TextColor3 = Color3.fromRGB(255, 90, 90)
+			threatTitle.TextScaled = true
+			threatTitle.Text = ''
+			threatTitle.Parent = threatPanel
+
+			threatSub = Instance.new('TextLabel')
+			threatSub.Name = 'ThreatSub'
+			threatSub.BackgroundTransparency = 1
+			threatSub.Position = UDim2.fromScale(0, 0.58)
+			threatSub.Size = UDim2.fromScale(1, 0.38)
+			threatSub.Font = Enum.Font.GothamMedium
+			threatSub.TextColor3 = Color3.fromRGB(230, 230, 230)
+			threatSub.TextScaled = true
+			threatSub.Text = ''
+			threatSub.Parent = threatPanel
 		end
 		return hudGui
 	end
 
-	local function hideHudLabels()
-		if drawListLabel then
-			drawListLabel.Visible = false
+	local function applyDrawLayout()
+		if not drawContainer then
+			return
 		end
-		if threatListLabel then
-			threatListLabel.Visible = false
+		local preset = DRAW_PRESET_ANCHORS[drawTimerPositionPresetSetting] or DRAW_PRESET_ANCHORS['Center-Top']
+		local scale = math.clamp(drawTimerScaleSetting, 0.5, 2)
+		drawContainer.AnchorPoint = Vector2.new(preset[1], preset[2])
+		drawContainer.Position = UDim2.fromScale(preset[3], preset[4])
+		drawContainer.Size = UDim2.fromOffset(math.floor(420 * scale), 0)
+		drawContainer.AutomaticSize = Enum.AutomaticSize.Y
+	end
+
+	local function ensureDrawCard(index)
+		local card = drawCards[index]
+		if card and card.Parent then
+			return card
 		end
-		if trainerLabel then
-			trainerLabel.Visible = false
-		end
+		card = Instance.new('Frame')
+		card.Name = 'DrawCard' .. index
+		card.BackgroundColor3 = Color3.fromRGB(14, 14, 18)
+		card.BackgroundTransparency = 1 - drawTimerOpacitySetting
+		card.BorderSizePixel = 0
+		card.Size = UDim2.new(1, 0, 0, 0)
+		card.AutomaticSize = Enum.AutomaticSize.Y
+		card.LayoutOrder = index
+		card.Visible = false
+		card.Parent = drawContainer
+		local corner = Instance.new('UICorner')
+		corner.CornerRadius = UDim.new(0, 10)
+		corner.Parent = card
+		local pad = Instance.new('UIPadding')
+		pad.PaddingTop = UDim.new(0, 10)
+		pad.PaddingBottom = UDim.new(0, 10)
+		pad.PaddingLeft = UDim.new(0, 14)
+		pad.PaddingRight = UDim.new(0, 14)
+		pad.Parent = card
+
+		local title = Instance.new('TextLabel')
+		title.Name = 'Title'
+		title.BackgroundTransparency = 1
+		title.Size = UDim2.new(1, 0, 0, math.floor(drawTimerFontSizeSetting * 1.35))
+		title.Font = Enum.Font.GothamBold
+		title.TextXAlignment = Enum.TextXAlignment.Left
+		title.TextSize = drawTimerFontSizeSetting
+		title.TextColor3 = Color3.fromRGB(255, 255, 255)
+		title.Text = ''
+		title.Parent = card
+
+		local timer = Instance.new('TextLabel')
+		timer.Name = 'Timer'
+		timer.BackgroundTransparency = 1
+		timer.Position = UDim2.fromOffset(0, math.floor(drawTimerFontSizeSetting * 1.2))
+		timer.Size = UDim2.new(1, 0, 0, math.floor(drawTimerFontSizeSetting * 1.1))
+		timer.Font = Enum.Font.GothamBlack
+		timer.TextXAlignment = Enum.TextXAlignment.Left
+		timer.TextSize = math.floor(drawTimerFontSizeSetting * 1.15)
+		timer.TextColor3 = Color3.fromRGB(255, 220, 120)
+		timer.Text = ''
+		timer.Parent = card
+
+		local barBg = Instance.new('Frame')
+		barBg.Name = 'BarBg'
+		barBg.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+		barBg.BorderSizePixel = 0
+		barBg.Position = UDim2.fromOffset(0, math.floor(drawTimerFontSizeSetting * 2.5))
+		barBg.Size = UDim2.new(1, 0, 0, 8)
+		barBg.Parent = card
+		local barBgCorner = Instance.new('UICorner')
+		barBgCorner.CornerRadius = UDim.new(1, 0)
+		barBgCorner.Parent = barBg
+
+		local barFill = Instance.new('Frame')
+		barFill.Name = 'BarFill'
+		barFill.BackgroundColor3 = Color3.fromRGB(255, 140, 50)
+		barFill.BorderSizePixel = 0
+		barFill.Size = UDim2.fromScale(1, 1)
+		barFill.Parent = barBg
+		local barFillCorner = Instance.new('UICorner')
+		barFillCorner.CornerRadius = UDim.new(1, 0)
+		barFillCorner.Parent = barFill
+
+		drawCards[index] = card
+		return card
 	end
 
 	local function getActiveGunDrawInfo(char)
@@ -2482,7 +2713,7 @@ run(function()
 					if gunName then
 						local delay = getGunParryDelay(gunName)
 						local remaining = math.max(0, delay - track.TimePosition)
-						return gunName, remaining, delay, track.TimePosition
+						return gunName, remaining, delay, 'DRAW'
 					end
 				end
 			end
@@ -2490,28 +2721,24 @@ run(function()
 		return nil
 	end
 
-	local function collectDrawTimerLines()
-		local lines = {}
+	local function collectDrawEntries()
+		local entries = {}
 		local seen = {}
 		for _, plr in playersService:GetPlayers() do
 			if plr ~= lplr and plr.Character then
 				local char = plr.Character
 				local dist = getClosestEnemyDistance(plr)
 				if dist <= threatRangeSetting then
-					local gunName, remaining, _ = getActiveGunDrawInfo(char)
+					local gunName, remaining, delay, kind = getActiveGunDrawInfo(char)
 					if gunName then
 						remaining = math.max(0, remaining + drawTimerOffsetSetting)
-						local itemDef = GUN_ITEMDEF_DRAW[gunName] or getGunParryDelay(gunName)
-						table.insert(lines, {
-							text = string.format(
-								'%s | %s %.2fs (def %.2fs, %.1f studs)',
-								plr.Name,
-								gunName,
-								remaining,
-								itemDef,
-								dist
-							),
+						table.insert(entries, {
+							name = plr.Name,
+							gun = gunName,
 							remaining = remaining,
+							delay = delay,
+							kind = kind,
+							dist = dist,
 						})
 						seen[plr] = true
 					end
@@ -2523,17 +2750,13 @@ run(function()
 										local glintGun = detectEquippedGun(char)
 										local delay = getGunParryDelay(glintGun)
 										local rem = math.max(0, delay + drawTimerOffsetSetting)
-										local itemDef = GUN_ITEMDEF_DRAW[glintGun] or delay
-										table.insert(lines, {
-											text = string.format(
-												'%s | %s GLINT %.2fs (def %.2fs, %.1f studs)',
-												plr.Name,
-												glintGun,
-												rem,
-												itemDef,
-												dist
-											),
+										table.insert(entries, {
+											name = plr.Name,
+											gun = glintGun,
 											remaining = rem,
+											delay = delay,
+											kind = 'GLINT',
+											dist = dist,
 										})
 										seen[plr] = true
 										break
@@ -2545,37 +2768,66 @@ run(function()
 							end
 						end
 					end
-					if not seen[plr] and charHasGunEquipped(char) then
-						local idleGun = detectEquippedGun(char)
-						local itemDef = GUN_ITEMDEF_DRAW[idleGun]
-						if itemDef then
-							table.insert(lines, {
-								text = string.format(
-									'%s | %s ~%.2fs ItemDef (%.1f studs)',
-									plr.Name,
-									idleGun,
-									itemDef + drawTimerOffsetSetting,
-									dist
-								),
-								remaining = itemDef,
-							})
-						end
-					end
 				end
 			end
 		end
-		table.sort(lines, function(a, b)
+		table.sort(entries, function(a, b)
 			return a.remaining < b.remaining
 		end)
 		local out = {}
-		for i = 1, math.min(#lines, drawTimerMaxEntriesSetting) do
-			table.insert(out, lines[i].text)
+		for i = 1, math.min(#entries, drawTimerMaxEntriesSetting) do
+			out[i] = entries[i]
 		end
 		return out
 	end
 
-	local function collectThreatLines()
-		local lines = {}
+	local function updateDrawHud()
+		if not drawContainer then
+			return
+		end
+		if not drawTimerEnabled then
+			drawContainer.Visible = false
+			return
+		end
+		ensureHudGui()
+		applyDrawLayout()
+		drawContainer.Visible = true
+		local entries = collectDrawEntries()
+		for i = 1, drawTimerMaxEntriesSetting do
+			local card = ensureDrawCard(i)
+			local entry = entries[i]
+			if entry then
+				local gunColor = GUN_DRAW_COLORS[entry.gun] or GUN_DRAW_COLORS.Castigate
+				card.Visible = true
+				card.BackgroundTransparency = 1 - drawTimerOpacitySetting
+				local title = card:FindFirstChild('Title')
+				local timer = card:FindFirstChild('Timer')
+				local barBg = card:FindFirstChild('BarBg')
+				local barFill = barBg and barBg:FindFirstChild('BarFill')
+				if title then
+					title.TextSize = drawTimerFontSizeSetting
+					title.Text = string.format('%s  •  %s', entry.name, entry.gun)
+					title.TextColor3 = gunColor
+				end
+				if timer then
+					timer.TextSize = math.floor(drawTimerFontSizeSetting * 1.15)
+					timer.Text = string.format('%s  %.2fs', entry.kind, entry.remaining)
+					timer.TextColor3 = gunColor
+				end
+				if barFill and entry.delay > 0 then
+					local ratio = math.clamp(entry.remaining / entry.delay, 0, 1)
+					barFill.Size = UDim2.fromScale(ratio, 1)
+					local urgent = entry.remaining < 0.25
+					barFill.BackgroundColor3 = urgent and (tick() % 0.2 < 0.1 and Color3.fromRGB(255, 40, 40) or gunColor) or gunColor
+				end
+			else
+				card.Visible = false
+			end
+		end
+	end
+
+	local function collectThreatEntries()
+		local threats = {}
 		for _, plr in playersService:GetPlayers() do
 			if plr ~= lplr and plr.Character then
 				local char = plr.Character
@@ -2591,25 +2843,56 @@ run(function()
 						local _, animId = getTrackAnimInfo(track)
 						local kind = getParryAnimKind(animId)
 						if kind == 'melee' and threatShowMeleeSetting and dist <= meleeRangeSetting then
-							table.insert(lines, { dist = dist, text = string.format('MELEE | %s | %.1f studs', plr.Name, dist) })
+							table.insert(threats, {
+								type = 'MELEE',
+								name = plr.Name,
+								dist = dist,
+								color = threatColorMeleeSetting,
+								remaining = 0,
+								score = 7000 - dist * 20,
+							})
 						elseif kind == 'gun_draw' and threatShowGunDrawSetting and dist <= threatRangeSetting then
-							local aiming, dot = isEnemyAimingAtMeForGun(char, model)
+							local aiming = isEnemyAimingAtMeForGun(char, model)
 							if aiming then
-								table.insert(lines, { dist = dist, text = string.format('GUN DRAW | %s | %.1f studs | dot=%.2f', plr.Name, dist, dot) })
+								local gunName = GUN_DRAW_ANIM_IDS[normalizeAnimId(animId)] or detectEquippedGun(char)
+								local delay = getGunParryDelay(gunName)
+								local remaining = math.max(0, delay - track.TimePosition)
+								table.insert(threats, {
+									type = 'GUN DRAW',
+									name = plr.Name,
+									dist = dist,
+									color = threatColorGunDrawSetting,
+									remaining = remaining,
+									score = 8000 - dist * 5 - remaining * 200,
+								})
 							end
 						elseif kind == 'gun_shot' and threatShowGunShotSetting and dist <= threatRangeSetting then
-							local aiming, dot = isEnemyAimingAtMeForGun(char, model)
+							local aiming = isEnemyAimingAtMeForGun(char, model)
 							if aiming then
-								table.insert(lines, { dist = dist, text = string.format('GUN SHOT | %s | %.1f studs | dot=%.2f', plr.Name, dist, dot) })
+								table.insert(threats, {
+									type = 'GUN SHOT',
+									name = plr.Name,
+									dist = dist,
+									color = threatColorGunShotSetting,
+									remaining = 0,
+									score = 10000 - dist * 10,
+								})
 							end
 						end
 					end
 					if threatShowGlintSetting and dist <= threatRangeSetting then
 						for _, desc in model:GetDescendants() do
 							if isGlintInstance(desc) then
-								local aiming, dot = isEnemyAimingAtMeForGun(char, model)
+								local aiming = isEnemyAimingAtMeForGun(char, model)
 								if aiming then
-									table.insert(lines, { dist = dist, text = string.format('GLINT | %s | %.1f studs | dot=%.2f', plr.Name, dist, dot) })
+									table.insert(threats, {
+										type = 'GLINT',
+										name = plr.Name,
+										dist = dist,
+										color = threatColorGlintSetting,
+										remaining = 0,
+										score = 9000 - dist * 10,
+									})
 								end
 								break
 							end
@@ -2618,93 +2901,128 @@ run(function()
 				end
 			end
 		end
-		table.sort(lines, function(a, b)
-			return a.dist < b.dist
+		table.sort(threats, function(a, b)
+			return a.score > b.score
 		end)
-		local out = {}
-		for i = 1, math.min(#lines, threatIndicatorMaxLinesSetting) do
-			table.insert(out, lines[i].text)
-		end
-		return out
+		return threats
 	end
 
-	local function updateHud()
-		if not (drawTimerEnabled or threatIndicatorEnabled or parryTrainerEnabled) then
-			hideHudLabels()
+	local function animateThreatChange(threat, flashRed)
+		if not threatPanel then
+			return
+		end
+		local speed = math.clamp(threatIndicatorAnimSpeedSetting, 0.05, 1)
+		threatPanel.Size = UDim2.fromScale(0.85, 0.18)
+		tweenService:Create(threatPanel, TweenInfo.new(speed, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+			Size = threatIndicatorFullscreenSetting and UDim2.fromScale(1, 1) or UDim2.fromScale(0.92, 0.22),
+		}):Play()
+		if flashRed and threatFlash then
+			threatFlash.BackgroundTransparency = 0.55
+			tweenService:Create(threatFlash, TweenInfo.new(speed * 1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				BackgroundTransparency = 1,
+			}):Play()
+		end
+	end
+
+	local function updateThreatHud()
+		if not threatOverlay then
+			return
+		end
+		if not threatIndicatorEnabled then
+			threatOverlay.Visible = false
+			lastPrimaryKey = ''
 			return
 		end
 		ensureHudGui()
-		drawListLabel.TextSize = drawTimerFontSizeSetting
-		drawListLabel.Position = UDim2.fromOffset(drawTimerPosXSetting, drawTimerPosYSetting)
-		threatListLabel.Position = UDim2.fromOffset(threatIndicatorPosXSetting, threatIndicatorPosYSetting)
-		trainerLabel.Position = UDim2.fromOffset(parryTrainerPosXSetting, parryTrainerPosYSetting)
-
-		if drawTimerEnabled then
-			local lines = collectDrawTimerLines()
-			drawListLabel.Visible = true
-			drawListLabel.Text = #lines > 0 and ('DRAW TIMER\n' .. table.concat(lines, '\n')) or 'DRAW TIMER\n(none)'
-		else
-			drawListLabel.Visible = false
+		local threats = collectThreatEntries()
+		local primary = threats[1]
+		if not primary then
+			threatOverlay.Visible = false
+			lastPrimaryKey = ''
+			return
 		end
-
-		if threatIndicatorEnabled then
-			local lines = collectThreatLines()
-			threatListLabel.Visible = true
-			threatListLabel.Text = #lines > 0 and ('THREATS\n' .. table.concat(lines, '\n')) or 'THREATS\n(none)'
+		threatOverlay.Visible = true
+		if threatIndicatorFullscreenSetting then
+			threatOverlay.BackgroundTransparency = 1 - threatIndicatorOpacitySetting * 0.65
+			threatPanel.AnchorPoint = Vector2.new(0.5, 0.5)
+			threatPanel.Position = UDim2.fromScale(0.5, 0.5)
+			threatPanel.Size = UDim2.fromScale(0.96, 0.38)
 		else
-			threatListLabel.Visible = false
+			threatOverlay.BackgroundTransparency = 1
+			threatPanel.AnchorPoint = Vector2.new(0.5, 1)
+			threatPanel.Position = UDim2.fromScale(0.5, math.clamp(threatIndicatorPosYSetting, 0.55, 0.98))
+			threatPanel.Size = UDim2.fromScale(0.92, 0.22)
 		end
-
-		if parryTrainerEnabled then
-			local cfg = PARRY_TRAINER_CONFIGS[parryTrainerDifficultySetting] or PARRY_TRAINER_CONFIGS.STANDARD
-			local nearestGun, nearestRem, nearestDist = nil, 999, 9999
-			for _, plr in playersService:GetPlayers() do
-				if plr ~= lplr and plr.Character then
-					local gunName, remaining, _ = getActiveGunDrawInfo(plr.Character)
-					local dist = getClosestEnemyDistance(plr)
-					if gunName and dist <= threatRangeSetting and remaining < nearestRem then
-						nearestGun, nearestRem, nearestDist = gunName, remaining, dist
-					end
-				end
-			end
-			trainerLabel.Visible = true
-			trainerLabel.Text = string.format(
-				'PARRY TRAINER [%s]\nangle=%d start=%.2fs end=%.2fs\nnearest=%s rem=%.2fs dist=%.1f',
-				parryTrainerDifficultySetting,
-				cfg.spawn_angle,
-				cfg.start_shot_delay,
-				cfg.end_shot_delay,
-				nearestGun or 'none',
-				nearestRem < 999 and nearestRem or 0,
-				nearestDist < 9999 and nearestDist or 0
-			)
-		else
-			trainerLabel.Visible = false
+		threatPanel.BackgroundTransparency = 1 - threatIndicatorOpacitySetting
+		local key = primary.type .. ':' .. primary.name
+		local flash = primary.type == 'GUN SHOT' or primary.type == 'GLINT'
+		if key ~= lastPrimaryKey then
+			lastPrimaryKey = key
+			animateThreatChange(primary, flash)
 		end
-
-		if hitboxVisualizerEnemyEnabled and isLocalAlive() then
-			local now = tick()
-			if now - lastEnemyVizAt >= 0.15 then
-				lastEnemyVizAt = now
-				local root = getLocalRoot()
-				if root then
-					for _, part in getEnemyHurtboxesInRange(hitboxVisualizerRangeSetting, root.Position) do
-						local marker = Instance.new('Part')
-						marker.Anchored = true
-						marker.CanCollide = false
-						marker.CanQuery = false
-						marker.CastShadow = false
-						marker.Material = Enum.Material.Neon
-						marker.Color = hitboxVisualizerColorSetting
-						marker.Transparency = 0.55
-						marker.Size = part.Size
-						marker.CFrame = part.CFrame
-						marker.Parent = workspaceService
-						debris:AddItem(marker, hitboxVisualizerDurationSetting)
-					end
-				end
+		if threatTitle then
+			threatTitle.TextSize = threatIndicatorFontSizeSetting
+			threatTitle.Text = primary.type
+			threatTitle.TextColor3 = primary.color
+		end
+		if threatSub then
+			local subSize = math.floor(threatIndicatorFontSizeSetting * 0.45)
+			threatSub.TextSize = subSize
+			if primary.type == 'GUN DRAW' and primary.remaining > 0 then
+				threatSub.Text = string.format('%s  •  %.1f studs  •  %.2fs', primary.name, primary.dist, primary.remaining)
+			else
+				threatSub.Text = string.format('%s  •  %.1f studs', primary.name, primary.dist)
 			end
 		end
+	end
+
+	local function updateEnemyHurtboxViz()
+		if not hitboxVisualizerEnemyEnabled or not isLocalAlive() then
+			for part, adorn in enemyAdornPool do
+				if adorn then
+					adorn.Visible = false
+				end
+			end
+			return
+		end
+		local now = tick()
+		if now - lastEnemyHurtboxVizAt < 0.5 then
+			return
+		end
+		lastEnemyHurtboxVizAt = now
+		local root = getLocalRoot()
+		if not root then
+			return
+		end
+		local active = {}
+		for _, part in getEnemyHurtboxesInRange(hitboxVisualizerRangeSetting, root.Position) do
+			active[part] = true
+			local adorn = enemyAdornPool[part]
+			if not adorn then
+				adorn = Instance.new('BoxHandleAdornment')
+				adorn.Name = 'RedlinerHurtboxViz'
+				adorn.AlwaysOnTop = true
+				adorn.ZIndex = 5
+				adorn.Adornee = part
+				adorn.Parent = workspaceService
+				enemyAdornPool[part] = adorn
+			end
+			adorn.Color3 = hitboxVisualizerColorSetting
+			adorn.Transparency = 0.45
+			adorn.Size = part.Size
+			adorn.Visible = true
+		end
+		for part, adorn in enemyAdornPool do
+			if not active[part] then
+				adorn.Visible = false
+			end
+		end
+	end
+
+	local function updateHud()
+		updateDrawHud()
+		updateThreatHud()
+		updateEnemyHurtboxViz()
 	end
 
 	hudTickCallback = updateHud
@@ -2729,10 +3047,18 @@ run(function()
 		if #hurtboxes == 0 then
 			return
 		end
+		local maxBoxes = 8
+		if #hurtboxes > maxBoxes then
+			local trimmed = {}
+			for i = 1, maxBoxes do
+				trimmed[i] = hurtboxes[i]
+			end
+			hurtboxes = trimmed
+		end
 		killAuraAttackSerial += 1
 		local aimDir = (hurtboxes[1].Position - root.Position).Unit
 		local tpl = meleeTemplate
-		local itemId = killAuraItemIdSetting
+		local itemId = detectLocalMeleeItemId()
 		local action = (tpl and tpl[2]) or 'SWING'
 		local extra = tpl and tpl[6]
 		pcall(function()
@@ -2749,13 +3075,12 @@ run(function()
 			if not killAuraActive or not isLocalAlive() then
 				return
 			end
-			bindPacketListeners()
 			local delay = math.max(0, killAuraDelaySetting)
 			if delay > 0 and tick() - lastKillAuraAt < delay then
 				return
 			end
 			lastKillAuraAt = tick()
-			fireKillAuraPacket()
+			task.defer(fireKillAuraPacket)
 		end)
 	end
 
@@ -3819,10 +4144,18 @@ run(function()
 		Function = function(callback)
 			drawTimerEnabled = callback
 			if callback then
-				notif('Draw Timer', 'Gun draw/glint countdown HUD active.', 4)
+				notif('Draw Timer', 'Animated gun draw/glint countdown HUD active.', 4)
 			end
 		end,
-		Tooltip = 'HUD countdown for enemy gun draws/glints using parry delays + ItemDef fallback.',
+		Tooltip = 'Animated HUD countdown for enemy gun draws/glints using parry delays (Castigate/Phoenix/Siege/Monarch).',
+	})
+	DrawTimer:CreateDropdown({
+		Name = 'Position Preset',
+		List = { 'Center-Top', 'Center', 'Bottom' },
+		Default = 'Center-Top',
+		Function = function(val)
+			drawTimerPositionPresetSetting = val
+		end,
 	})
 	DrawTimer:CreateSlider({
 		Name = 'Max Entries',
@@ -3835,12 +4168,33 @@ run(function()
 	})
 	DrawTimer:CreateSlider({
 		Name = 'Font Size',
-		Min = 10,
-		Max = 22,
-		Default = 14,
+		Min = 14,
+		Max = 36,
+		Default = 22,
 		Function = function(val)
 			drawTimerFontSizeSetting = val
 		end,
+		Suffix = 'px',
+	})
+	DrawTimer:CreateSlider({
+		Name = 'Scale',
+		Min = 50,
+		Max = 200,
+		Default = 100,
+		Function = function(val)
+			drawTimerScaleSetting = val / 100
+		end,
+		Suffix = '%',
+	})
+	DrawTimer:CreateSlider({
+		Name = 'Opacity',
+		Min = 20,
+		Max = 100,
+		Default = 88,
+		Function = function(val)
+			drawTimerOpacitySetting = val / 100
+		end,
+		Suffix = '%',
 	})
 	DrawTimer:CreateSlider({
 		Name = 'Timer Offset',
@@ -3856,64 +4210,6 @@ run(function()
 		end,
 		Tooltip = 'Offset added to displayed draw countdown.',
 	})
-	DrawTimer:CreateSlider({
-		Name = 'HUD X',
-		Min = 0,
-		Max = 400,
-		Default = 12,
-		Function = function(val)
-			drawTimerPosXSetting = val
-		end,
-	})
-	DrawTimer:CreateSlider({
-		Name = 'HUD Y',
-		Min = 0,
-		Max = 500,
-		Default = 120,
-		Function = function(val)
-			drawTimerPosYSetting = val
-		end,
-	})
-
-	local ParryTrainer
-	ParryTrainer = minigames:CreateModule({
-		Name = 'Parry Trainer Overlay',
-		Function = function(callback)
-			parryTrainerEnabled = callback
-			if callback then
-				notif('Parry Trainer', 'Reference timing + nearest gun parry window.', 4)
-			end
-		end,
-		Tooltip = 'Shows ParryTrainDef reference timings and nearest active draw threat.',
-	})
-	ParryTrainer:CreateDropdown({
-		Name = 'Difficulty',
-		List = { 'STANDARD', 'HARD', 'FLATLINE' },
-		Default = 'STANDARD',
-		Function = function(val)
-			parryTrainerDifficultySetting = val
-		end,
-	})
-	ParryTrainer:CreateSlider({
-		Name = 'HUD X',
-		Min = 0,
-		Max = 400,
-		Default = 12,
-		Function = function(val)
-			parryTrainerPosXSetting = val
-		end,
-		Suffix = 'px',
-	})
-	ParryTrainer:CreateSlider({
-		Name = 'HUD Y',
-		Min = 0,
-		Max = 600,
-		Default = 440,
-		Function = function(val)
-			parryTrainerPosYSetting = val
-		end,
-		Suffix = 'px',
-	})
 
 	local ThreatIndicator
 	ThreatIndicator = minigames:CreateModule({
@@ -3921,10 +4217,18 @@ run(function()
 		Function = function(callback)
 			threatIndicatorEnabled = callback
 			if callback then
-				notif('Threat Indicator', 'Live melee/gun/glint threat list.', 4)
+				notif('Threat Indicator', 'Primary threat banner HUD active.', 4)
 			end
 		end,
-		Tooltip = 'Live HUD list of melee/gun/glint threats in range (guns require aim-at-you).',
+		Tooltip = 'Large animated banner for the most urgent melee/gun/glint threat.',
+	})
+	ThreatIndicator:CreateToggle({
+		Name = 'Fullscreen Mode',
+		Default = false,
+		Function = function(callback)
+			threatIndicatorFullscreenSetting = callback
+		end,
+		Tooltip = 'Use full-screen semi-transparent overlay instead of bottom panel.',
 	})
 	ThreatIndicator:CreateToggle({
 		Name = 'Show Melee',
@@ -3955,32 +4259,76 @@ run(function()
 		end,
 	})
 	ThreatIndicator:CreateSlider({
-		Name = 'Max Lines',
-		Min = 1,
-		Max = 12,
-		Default = 6,
+		Name = 'Font Size',
+		Min = 24,
+		Max = 72,
+		Default = 42,
 		Function = function(val)
-			threatIndicatorMaxLinesSetting = val
+			threatIndicatorFontSizeSetting = val
 		end,
+		Suffix = 'px',
 	})
 	ThreatIndicator:CreateSlider({
-		Name = 'HUD X',
-		Min = 0,
-		Max = 400,
-		Default = 12,
+		Name = 'Overlay Opacity',
+		Min = 10,
+		Max = 90,
+		Default = 55,
 		Function = function(val)
-			threatIndicatorPosXSetting = val
+			threatIndicatorOpacitySetting = val / 100
 		end,
+		Suffix = '%',
 	})
 	ThreatIndicator:CreateSlider({
-		Name = 'HUD Y',
-		Min = 0,
-		Max = 500,
-		Default = 280,
+		Name = 'Position Y',
+		Min = 55,
+		Max = 98,
+		Default = 82,
 		Function = function(val)
-			threatIndicatorPosYSetting = val
+			threatIndicatorPosYSetting = val / 100
 		end,
+		Suffix = '%',
+		Tooltip = 'Vertical anchor for panel mode (ignored in fullscreen).',
 	})
+	ThreatIndicator:CreateSlider({
+		Name = 'Animation Speed',
+		Min = 5,
+		Max = 100,
+		Default = 25,
+		Function = function(val)
+			threatIndicatorAnimSpeedSetting = val / 100
+		end,
+		Suffix = 's',
+	})
+	if ThreatIndicator.CreateColorSlider then
+		ThreatIndicator:CreateColorSlider({
+			Name = 'Melee Color',
+			Default = Color3.fromRGB(255, 130, 90),
+			Function = function(val)
+				threatColorMeleeSetting = val
+			end,
+		})
+		ThreatIndicator:CreateColorSlider({
+			Name = 'Gun Draw Color',
+			Default = Color3.fromRGB(255, 210, 90),
+			Function = function(val)
+				threatColorGunDrawSetting = val
+			end,
+		})
+		ThreatIndicator:CreateColorSlider({
+			Name = 'Gun Shot Color',
+			Default = Color3.fromRGB(255, 90, 90),
+			Function = function(val)
+				threatColorGunShotSetting = val
+			end,
+		})
+		ThreatIndicator:CreateColorSlider({
+			Name = 'Glint Color',
+			Default = Color3.fromRGB(180, 130, 255),
+			Function = function(val)
+				threatColorGlintSetting = val
+			end,
+		})
+	end
 
 	local HitboxVisualizer
 	HitboxVisualizer = minigames:CreateModule({
@@ -4008,6 +4356,18 @@ run(function()
 		Function = function(callback)
 			hitboxVisualizerEnemyEnabled = callback
 		end,
+	})
+	HitboxVisualizer:CreateToggle({
+		Name = 'Show Bullet Rays',
+		Default = false,
+		Function = function(callback)
+			hitboxVisualizerBulletEnabled = callback
+			if callback then
+				bindPacketListeners()
+				installGunBulletVizHook()
+			end
+		end,
+		Tooltip = 'Draw aim rays on local gun fire and enemy gun shots.',
 	})
 	HitboxVisualizer:CreateSlider({
 		Name = 'Enemy Range',
@@ -4085,20 +4445,23 @@ run(function()
 		Min = 0,
 		Max = 0.5,
 		Decimal = 100,
-		Default = 0.06,
+		Default = 0.15,
 		Function = function(val)
 			killAuraDelaySetting = val
 		end,
 		Suffix = function(val)
 			return val == 1 and 'second' or 'seconds'
 		end,
+		Tooltip = 'Delay between melee packets. Default 0.15s — lower values may lag or get ignored by the server.',
 	})
 	KillAura:CreateDropdown({
 		Name = 'Item ID',
-		List = { 'Redliner', 'Nothing' },
+		List = { 'Auto', 'Redliner', 'Nothing' },
+		Default = 'Auto',
 		Function = function(val)
 			killAuraItemIdSetting = val
 		end,
+		Tooltip = 'Auto detects equipped melee from character; falls back to captured swing template.',
 	})
 
 	local AnimLogger
@@ -4201,8 +4564,8 @@ run(function()
 		runService.Heartbeat:Connect(function()
 			if not AutoParry.Enabled and not AutoAttack.Enabled and not Reach.Enabled
 				and not KillAura.Enabled and not drawTimerEnabled and not threatIndicatorEnabled
-				and not parryTrainerEnabled and not hitboxVisualizerEnemyEnabled
-				and not hitboxVisualizerSwingEnabled and not reachDebugEnabled then
+				and not hitboxVisualizerEnemyEnabled and not hitboxVisualizerSwingEnabled
+				and not hitboxVisualizerBulletEnabled and not reachDebugEnabled then
 				return
 			end
 			combatHeartbeat(MeleeRange.Value)
@@ -4229,6 +4592,6 @@ run(function()
 		repeat
 			task.wait(0.25)
 		until vape.Loaded or tick() - start > 20
-		notif('REDLINER', 'Minigames: Auto Parry, Auto Attack, Reach, Kill Aura, Draw Timer, Threat HUD, Hitbox Viz, Parry Trainer ready.', 6)
+		notif('REDLINER', 'Minigames: Auto Parry, Auto Attack, Reach, Kill Aura, Draw Timer, Threat HUD, Hitbox Viz ready.', 6)
 	end)
 end)
