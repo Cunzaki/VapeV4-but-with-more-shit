@@ -47,14 +47,12 @@ local CLOSE_RANGE_STUDS = 3
 local MELEE_SWING_MIN_TIME = 0
 local MELEE_SWING_MAX_TIME = 0.55
 local MELEE_PARRY_DELAY = 0.2
-local GUN_SHOT_MAX_TIME = 0.12
 local GUN_DRAW_EDGE_MAX_TIME = 0.12
 
 -- Only these runtime-confirmed attack animation IDs may trigger parry.
--- Decompiled scripts have no rbxassetid values; IDs come from in-game observation.
+-- gun_shot id 110389010823335 was removed: it also plays on dash/movement.
 local PARRY_ANIM_IDS = {
 	['105441036119013'] = 'melee',
-	['110389010823335'] = 'gun_shot',
 	['115078691506529'] = 'gun_draw',
 }
 
@@ -276,7 +274,19 @@ local function isParryAnimId(animId, kind)
 end
 
 local function logParryAnimIds()
-	print('[REDLINER] parry ids | melee=105441036119013 draw=115078691506529 shot=110389010823335')
+	print('[REDLINER] parry ids | melee=105441036119013 gun_draw=115078691506529')
+end
+
+local function charHasGunEquipped(char)
+	for _, desc in char:GetDescendants() do
+		local lower = string.lower(desc.Name)
+		for _, entry in GUN_ITEM_PATTERNS do
+			if string.find(lower, entry.pattern, 1, true) then
+				return true
+			end
+		end
+	end
+	return false
 end
 
 local function getAllPlayingTracks(char)
@@ -424,6 +434,10 @@ local function scheduleDrawParry(char, gunName, track, source)
 	end
 	if not shouldParryGun(char, true) then
 		debugSkip('draw_aim', normalizeAnimId(animId), string.format('%.2f', getAimDot(char)), source)
+		return
+	end
+	if not charHasGunEquipped(char) then
+		debugSkip('draw_no_gun', normalizeAnimId(animId), source)
 		return
 	end
 
@@ -582,51 +596,28 @@ local function handleMeleeAnimation(char, track, source)
 	end
 end
 
-local function handleGunAnimation(char, track, source)
+local function handleGunDraw(char, track, source)
 	source = source or 'edge'
 	if not track.IsPlaying or track.WeightCurrent < 0.05 then
 		return
 	end
-
 	local name, animId = getTrackAnimInfo(track)
-	local normId = normalizeAnimId(animId)
-	local kind = getParryAnimKind(animId)
-	if not kind then
+	if not isParryAnimId(animId, 'gun_draw') then
+		return
+	end
+	if source ~= 'edge' then
+		return
+	end
+	if not charHasGunEquipped(char) then
+		debugSkip('draw_no_gun', normalizeAnimId(animId), source)
 		return
 	end
 	if not shouldParryGun(char, true) then
 		debugSkip('gun_aim', name, string.format('%.2f', getAimDot(char)), source)
 		return
 	end
-
-	if kind == 'gun_draw' then
-		if source ~= 'edge' then
-			return
-		end
-		local gunName = detectEquippedGun(char)
-		scheduleDrawParry(char, gunName, track, source)
-		return
-	end
-
-	if track.TimePosition > GUN_SHOT_MAX_TIME then
-		debugSkip('gun_shot_late', name, string.format('%.2f', track.TimePosition), source)
-		return
-	end
-
-	local state = getEnemyState(char)
-	local key = normId .. ':gun:swing'
-	if state.lastShotId == key then
-		return
-	end
-	state.lastShotId = key
-	track.Stopped:Once(function()
-		if state.lastShotId == key then
-			state.lastShotId = ''
-		end
-	end)
-
-	debugLog('trigger', 'gun_shot_' .. name, 'id=' .. normId, 'aim=' .. string.format('%.2f', getAimDot(char)), source)
-	tryParry('gun_shot_' .. normId)
+	local gunName = detectEquippedGun(char)
+	scheduleDrawParry(char, gunName, track, source)
 end
 
 local function onEnemyAnimationPlayed(char, track)
@@ -643,8 +634,8 @@ local function onEnemyAnimationPlayed(char, track)
 	end
 	if kind == 'melee' then
 		handleMeleeAnimation(char, track, 'edge')
-	elseif kind == 'gun_shot' or kind == 'gun_draw' then
-		handleGunAnimation(char, track, 'edge')
+	elseif kind == 'gun_draw' then
+		handleGunDraw(char, track, 'edge')
 	end
 end
 
@@ -933,8 +924,6 @@ local function scanWhitelistRealtime()
 					local kind = getParryAnimKind(animId)
 					if kind == 'melee' and meleeDist <= meleeRangeSetting and track.TimePosition <= MELEE_SWING_MAX_TIME then
 						handleMeleeAnimation(ownerChar, track, 'scan')
-					elseif kind == 'gun_shot' and track.TimePosition <= GUN_SHOT_MAX_TIME then
-						handleGunAnimation(ownerChar, track, 'scan')
 					end
 				end
 			end
@@ -964,7 +953,7 @@ local function enemyThreatensMe(char, meleeRange)
 			if kind == 'melee' and getEnemyDistance(char) <= meleeRange and shouldParryMelee(char, true) then
 				return true
 			end
-			if kind == 'gun_shot' and shouldParryGun(char, true) then
+			if kind == 'gun_draw' and charHasGunEquipped(char) and shouldParryGun(char, true) then
 				return true
 			end
 		end
