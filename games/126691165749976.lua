@@ -1,6 +1,8 @@
 --[[
 	REDLINER shared game script (FFA + MATCH place IDs).
-	Auto Parry presses F (parry bind) via VirtualInputManager / keypress.
+	Auto Parry (F) + Auto Attack (LMB). Parry always wins over attack.
+	Sword reach default 10 studs — derived from Attack/Hitbox default size (3)
+	plus wideslash forward extent (Redliner tag: CROUCHED WIDESLASH, cone ~45°).
 ]]
 
 local run = function(func)
@@ -19,6 +21,7 @@ local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
 local collectionService = cloneref(game:GetService('CollectionService'))
 local runService = cloneref(game:GetService('RunService'))
 local virtualInputManager = cloneref(game:GetService('VirtualInputManager'))
+local inputService = cloneref(game:GetService('UserInputService'))
 
 local lplr = playersService.LocalPlayer
 local vape = shared.vape
@@ -28,6 +31,9 @@ end
 
 local entitylib = vape.Libraries.entity
 
+-- Decompiled Attack/Hitbox.ModuleScript.lua: default box size Vector3.new(3, 3, 3), cone angle 45
+local DEFAULT_SWORD_REACH = 10
+
 local PARRY_KEY = Enum.KeyCode.F
 local PARRY_VK = 0x46
 
@@ -35,15 +41,26 @@ local PARRY_PACKET_NAME = '_x01d1e6369b1ddabb'
 local MELEE_PACKET_NAME = '_x2e2c62e0acfc88ae'
 local GUN_PACKET_NAME = '_x77a8b8d28b943359'
 
+local MELEE_ANIM_PATTERNS = {
+	'swing', 'slash', 'dark_slash', 'darkslash', 'wideslash', 'toolslash', 'hit2', 'melee',
+}
+local GUN_SHOT_PATTERNS = {
+	'shot', 'fire', 'castigate', 'monarch', 'siege', 'phoenix', 'bullet', 'shoot',
+}
+
 local Packets
 local packetsReady = false
 local autoParryActive = false
+local autoAttackActive = false
 local debugEnabled = false
 local myHurtboxes = {}
+local enemyStates = {}
 local lastParryAt = 0
-local enemyGlintState = {}
+local lastAttackAt = 0
+local parryBlockAttackUntil = 0
 local packetListenersBound = false
 local parryPressToken = 0
+local attackPressToken = 0
 
 local function notif(...)
 	return vape:CreateNotification(...)
@@ -51,7 +68,7 @@ end
 
 local function debugLog(...)
 	if debugEnabled then
-		print('[REDLINER AutoParry]', ...)
+		print('[REDLINER]', ...)
 	end
 end
 
@@ -59,27 +76,16 @@ local function initPackets()
 	if Packets then
 		return true
 	end
-
 	local assets = replicatedStorage:FindFirstChild('Assets')
-	if not assets then
-		return false
-	end
-
-	local modules = assets:FindFirstChild('ModuleScripts')
-	if not modules then
-		return false
-	end
-
-	local packetsModule = modules:FindFirstChild('Packets')
+	local modules = assets and assets:FindFirstChild('ModuleScripts')
+	local packetsModule = modules and modules:FindFirstChild('Packets')
 	if not packetsModule then
 		return false
 	end
-
 	local ok, loaded = pcall(require, packetsModule)
 	if not ok then
 		return false
 	end
-
 	Packets = loaded
 	return true
 end
@@ -130,13 +136,14 @@ local function isEnemyCharacter(model)
 	return plr and plr ~= lplr
 end
 
-local function flatDot(fromPos, toPos, direction)
-	local offset = toPos - fromPos
-	local dist = offset.Magnitude
-	if dist < 0.05 or direction.Magnitude < 0.05 then
-		return 0, dist
+local function getEnemyState(char)
+	if not enemyStates[char] then
+		enemyStates[char] = {
+			swinging = false,
+			shooting = false,
+		}
 	end
-	return direction.Unit:Dot(offset.Unit), dist
+	return enemyStates[char]
 end
 
 local function isFacingTarget(fromRoot, toPos, minDot)
@@ -147,22 +154,85 @@ local function isFacingTarget(fromRoot, toPos, minDot)
 	return fromRoot.CFrame.LookVector:Dot(toTarget.Unit) > minDot
 end
 
+local function flatDot(fromPos, toPos, direction)
+	local offset = toPos - fromPos
+	local dist = offset.Magnitude
+	if dist < 0.05 or direction.Magnitude < 0.05 then
+		return 0, dist
+	end
+	return direction.Unit:Dot(offset.Unit), dist
+end
+
+local function animNameMatches(name, patterns)
+	local lower = string.lower(name or '')
+	for _, pat in patterns do
+		if string.find(lower, pat, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+local function getMatchingTrack(char, patterns, minPriority)
+	local hum = char:FindFirstChildWhichIsA('Humanoid')
+	if not hum then
+		return nil
+	end
+	for _, track in hum:GetPlayingAnimationTracks() do
+		if track.IsPlaying and track.WeightCurrent >= 0.35 then
+			local animName = track.Animation and track.Animation.Name or ''
+			if animNameMatches(animName, patterns) then
+				if not minPriority or track.Priority.Value >= minPriority.Value then
+					return track
+				end
+			end
+		end
+	end
+	return nil
+end
+
+local function isEnemySwingingAtMe(char, range)
+	local root = getLocalRoot()
+	local enemyRoot = char:FindFirstChild('HumanoidRootPart')
+	if not root or not enemyRoot then
+		return false
+	end
+	local dist = (enemyRoot.Position - root.Position).Magnitude
+	if dist > range then
+		return false
+	end
+	if not isFacingTarget(enemyRoot, root.Position, 0.4) then
+		return false
+	end
+	return getMatchingTrack(char, MELEE_ANIM_PATTERNS, Enum.AnimationPriority.Action) ~= nil
+end
+
+local function isEnemyShootingAtMe(char, range)
+	local root = getLocalRoot()
+	local enemyRoot = char:FindFirstChild('HumanoidRootPart')
+	if not root or not enemyRoot then
+		return false
+	end
+	local dist = (enemyRoot.Position - root.Position).Magnitude
+	if dist > range then
+		return false
+	end
+	if not isFacingTarget(enemyRoot, root.Position, 0.5) then
+		return false
+	end
+	return getMatchingTrack(char, GUN_SHOT_PATTERNS, Enum.AnimationPriority.Action) ~= nil
+end
+
 local function pressParryKey()
 	parryPressToken += 1
 	local token = parryPressToken
-
-	local sent = false
+	parryBlockAttackUntil = tick() + 0.22
 
 	pcall(function()
 		virtualInputManager:SendKeyEvent(true, PARRY_KEY, false, game)
-		sent = true
 	end)
-
 	if keypress then
-		pcall(function()
-			keypress(PARRY_VK)
-			sent = true
-		end)
+		pcall(keypress, PARRY_VK)
 	end
 
 	task.delay(0.04, function()
@@ -188,26 +258,64 @@ local function pressParryKey()
 		end
 	end
 
-	return sent
+	return true
 end
 
 local function tryParry(reason)
-	if not autoParryActive then
+	if not autoParryActive or not entitylib.isAlive then
 		return false
 	end
-	if tick() - lastParryAt < 0.05 then
+	if tick() - lastParryAt < 0.08 then
 		return false
 	end
-	if not entitylib.isAlive then
+	debugLog('parry', reason)
+	lastParryAt = tick()
+	parryBlockAttackUntil = tick() + 0.22
+	pressParryKey()
+	return true
+end
+
+local function pressAttackClick()
+	if tick() < parryBlockAttackUntil then
+		return false
+	end
+	if tick() - lastParryAt < 0.15 then
 		return false
 	end
 
-	debugLog('parry', reason or 'unknown')
-	if pressParryKey() then
-		lastParryAt = tick()
-		return true
+	attackPressToken += 1
+	local token = attackPressToken
+
+	local clicked = false
+	if mouse1click then
+		local windowActive = true
+		if isrbxactive then
+			windowActive = isrbxactive()
+		elseif iswindowactive then
+			windowActive = iswindowactive()
+		end
+		if windowActive then
+			pcall(mouse1click)
+			clicked = true
+		end
 	end
-	return false
+
+	local mousePos = inputService:GetMouseLocation()
+	pcall(function()
+		virtualInputManager:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, true, game, 1)
+	end)
+	task.delay(0.03, function()
+		if token ~= attackPressToken then
+			return
+		end
+		pcall(function()
+			virtualInputManager:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, false, game, 1)
+		end)
+	end)
+
+	lastAttackAt = tick()
+	debugLog('attack', 'lmb')
+	return clicked or true
 end
 
 local function listIncludesMyHurtbox(list)
@@ -223,68 +331,56 @@ local function listIncludesMyHurtbox(list)
 	return false
 end
 
-local function directionThreatensMe(direction, maxRange)
-	local root = getLocalRoot()
-	if not root or typeof(direction) ~= 'Vector3' then
-		return false
+local function isSwingPacketAction(action)
+	return typeof(action) == 'string' and animNameMatches(action, {'swing', 'slash', 'hit'})
+end
+
+local function onMeleePacket(_, action, _, direction, hurtboxes)
+	if not autoParryActive then
+		return
 	end
-	for _, plr in playersService:GetPlayers() do
-		if plr ~= lplr and plr.Character then
-			local enemyRoot = plr.Character:FindFirstChild('HumanoidRootPart')
-			if enemyRoot then
-				local dot, dist = flatDot(enemyRoot.Position, root.Position, direction)
-				if dist <= maxRange and dot > 0.2 then
-					return true
+	if not isSwingPacketAction(action) then
+		return
+	end
+	if listIncludesMyHurtbox(hurtboxes) then
+		tryParry('packet_melee_hurtbox')
+		return
+	end
+	local root = getLocalRoot()
+	if root and typeof(direction) == 'Vector3' then
+		for _, plr in playersService:GetPlayers() do
+			if plr ~= lplr and plr.Character then
+				local enemyRoot = plr.Character:FindFirstChild('HumanoidRootPart')
+				if enemyRoot then
+					local dot, dist = flatDot(enemyRoot.Position, root.Position, direction)
+					if dist <= 18 and dot > 0.55 then
+						tryParry('packet_melee_aim')
+						return
+					end
 				end
 			end
 		end
 	end
-	return false
-end
-
-local function isSwingAction(action)
-	if typeof(action) ~= 'string' then
-		return false
-	end
-	local lower = string.lower(action)
-	return string.find(lower, 'swing', 1, true)
-		or string.find(lower, 'slash', 1, true)
-		or string.find(lower, 'hit', 1, true)
-		or string.find(lower, 'attack', 1, true)
-end
-
-local function onMeleePacket(_, action, _, direction, hurtboxes)
-	if listIncludesMyHurtbox(hurtboxes) then
-		tryParry('melee_packet_hurtbox')
-		return
-	end
-	if isSwingAction(action) and directionThreatensMe(direction, 20) then
-		tryParry('melee_packet_direction')
-	end
 end
 
 local function onGunPacket(_, _, _, _, _, direction)
-	if typeof(direction) ~= 'Vector3' then
+	if not autoParryActive or typeof(direction) ~= 'Vector3' then
 		return
 	end
-
 	local root = getLocalRoot()
 	if not root then
 		return
 	end
-
 	for _, plr in playersService:GetPlayers() do
 		if plr ~= lplr and plr.Character then
+			local enemyHead = plr.Character:FindFirstChild('Head')
 			local enemyRoot = plr.Character:FindFirstChild('HumanoidRootPart')
-			local enemyHead = plr.Character:FindFirstChild('Head') or enemyRoot
-			if enemyRoot and enemyHead then
-				local dist = (enemyRoot.Position - root.Position).Magnitude
-				if dist <= 150 then
-					local dot, shotDist = flatDot(enemyHead.Position, root.Position, direction)
-					if shotDist <= 150 and dot > 0.65 then
-						tryParry('gun_packet')
-						return
-					end
+			local aimFrom = enemyHead and enemyHead.Position or (enemyRoot and enemyRoot.Position)
+			if aimFrom then
+				local dot, dist = flatDot(aimFrom, root.Position, direction)
+				if dist <= 160 and dot > 0.78 then
+					tryParry('packet_gun_shot')
+					return
 				end
 			end
 		end
@@ -299,10 +395,8 @@ local function bindPacketListeners()
 		return
 	end
 	packetListenersBound = true
-
 	local meleePacket = Packets[MELEE_PACKET_NAME]
 	local gunPacket = Packets[GUN_PACKET_NAME]
-
 	if meleePacket and meleePacket.OnClientEvent then
 		meleePacket.OnClientEvent:Connect(onMeleePacket)
 	end
@@ -311,226 +405,99 @@ local function bindPacketListeners()
 	end
 end
 
-local function isCombatAnimation(track)
-	if not track.IsPlaying or track.WeightCurrent < 0.1 then
-		return false
+local function updateParryFromVisuals(char, meleeRange, gunRange)
+	if not autoParryActive then
+		return
 	end
-	local animName = track.Animation and string.lower(track.Animation.Name) or ''
-	if string.find(animName, 'idle', 1, true)
-		or string.find(animName, 'walk', 1, true)
-		or string.find(animName, 'run', 1, true)
-		or string.find(animName, 'jump', 1, true)
-		or string.find(animName, 'fall', 1, true)
-		or string.find(animName, 'land', 1, true) then
-		return false
+
+	local state = getEnemyState(char)
+	local swinging = isEnemySwingingAtMe(char, meleeRange)
+	local shooting = isEnemyShootingAtMe(char, gunRange)
+
+	if swinging and not state.swinging then
+		tryParry('visual_melee_swing')
 	end
-	return track.Priority.Value >= Enum.AnimationPriority.Action.Value
-		or string.find(animName, 'swing', 1, true)
-		or string.find(animName, 'slash', 1, true)
-		or string.find(animName, 'shot', 1, true)
-		or string.find(animName, 'fire', 1, true)
-		or string.find(animName, 'draw', 1, true)
-		or string.find(animName, 'attack', 1, true)
+	if shooting and not state.shooting then
+		tryParry('visual_gun_shot')
+	end
+
+	state.swinging = swinging
+	state.shooting = shooting
 end
 
-local function isEnemyAttacking(char)
-	local hum = char:FindFirstChildWhichIsA('Humanoid')
-	if not hum then
-		return false
-	end
-	for _, track in hum:GetPlayingAnimationTracks() do
-		if isCombatAnimation(track) then
-			return true
-		end
-	end
-	return false
+local function enemyThreatensMe(char, meleeRange, gunRange)
+	return isEnemySwingingAtMe(char, meleeRange + 2)
+		or isEnemyShootingAtMe(char, gunRange)
 end
 
-local function instanceShowsGlint(inst)
-	if inst:IsA('ParticleEmitter') and inst.Enabled and inst.Rate > 0 then
-		return true
-	end
-	if inst:IsA('BillboardGui') and inst.Enabled then
-		for _, child in inst:GetDescendants() do
-			if child:IsA('ImageLabel') and child.ImageTransparency < 0.95 then
-				return true
-			end
-		end
-	end
-	if inst:IsA('Highlight') and inst.Enabled then
-		return true
-	end
-	if inst:IsA('Beam') and inst.Enabled then
-		return true
-	end
-	return false
-end
-
-local function modelHasGlint(model)
-	for _, attr in {'Glint', 'GunDrawn', 'Drawing', 'Drawn', 'Aiming', 'Draw'} do
-		local val = model:GetAttribute(attr)
-		if val == true or val == 1 then
-			return true
-		end
-	end
-
-	for _, inst in model:GetDescendants() do
-		local name = string.lower(inst.Name)
-		if string.find(name, 'glint', 1, true)
-			or string.find(name, 'draw', 1, true)
-			or string.find(name, 'aim', 1, true)
-			or string.find(name, 'scope', 1, true)
-			or string.find(name, 'flash', 1, true) then
-			if instanceShowsGlint(inst) then
-				return true
-			end
-		end
-	end
-
-	return false
-end
-
-local function swingZoneHitsMe(enemyRoot, range)
-	refreshMyHurtboxes()
-	if #myHurtboxes == 0 then
-		return false
-	end
-
-	local params = OverlapParams.new()
-	params.FilterType = Enum.RaycastFilterType.Include
-	params.FilterDescendantsInstances = myHurtboxes
-
-	local swingCF = enemyRoot.CFrame * CFrame.new(0, 0, -range * 0.35)
-	local swingSize = Vector3.new(range * 1.2, 7, range * 1.1)
-	local hits = workspace:GetPartBoundsInBox(swingCF, swingSize, params)
-	if #hits > 0 then
-		return true
-	end
-
-	local radiusHits = workspace:GetPartBoundsInRadius(enemyRoot.Position, range * 0.75, params)
-	return #radiusHits > 0
-end
-
-local function isMeleeThreat(char, range)
+local function getNearestEnemyInReach(reach)
 	local root = getLocalRoot()
-	local enemyRoot = char:FindFirstChild('HumanoidRootPart')
-	if not root or not enemyRoot then
-		return false
+	if not root then
+		return nil
 	end
-
-	local dist = (enemyRoot.Position - root.Position).Magnitude
-	if dist > range then
-		return false
-	end
-
-	if not isFacingTarget(enemyRoot, root.Position, 0.05) then
-		return false
-	end
-
-	local toMe = (root.Position - enemyRoot.Position).Unit
-	local approach = enemyRoot.AssemblyLinearVelocity:Dot(toMe)
-
-	if dist <= 7 then
-		return isEnemyAttacking(char) or approach > 4 or swingZoneHitsMe(enemyRoot, range)
-	end
-
-	if isEnemyAttacking(char) and (approach > 2 or dist <= range * 0.85) then
-		return true
-	end
-
-	if swingZoneHitsMe(enemyRoot, range) then
-		return true
-	end
-
-	return approach > 10 and dist <= range * 0.7
-end
-
-local function isGunThreat(char, range)
-	local root = getLocalRoot()
-	local enemyRoot = char:FindFirstChild('HumanoidRootPart')
-	if not root or not enemyRoot then
-		return false
-	end
-
-	local dist = (enemyRoot.Position - root.Position).Magnitude
-	if dist > range then
-		return false
-	end
-
-	if modelHasGlint(char) then
-		return isFacingTarget(enemyRoot, root.Position, 0.05)
-	end
-
-	if isEnemyAttacking(char) and isFacingTarget(enemyRoot, root.Position, 0.15) then
-		local hum = char:FindFirstChildWhichIsA('Humanoid')
-		if hum then
-			for _, track in hum:GetPlayingAnimationTracks() do
-				local animName = track.Animation and string.lower(track.Animation.Name) or ''
-				if track.IsPlaying and (
-					string.find(animName, 'shot', 1, true)
-					or string.find(animName, 'fire', 1, true)
-					or string.find(animName, 'draw', 1, true)
-					or string.find(animName, 'aim', 1, true)
-				) then
-					return true
+	local nearest, nearestDist = nil, reach
+	for _, plr in playersService:GetPlayers() do
+		if plr ~= lplr and plr.Character then
+			local enemyRoot = plr.Character:FindFirstChild('HumanoidRootPart')
+			if enemyRoot then
+				local dist = (enemyRoot.Position - root.Position).Magnitude
+				if dist <= reach and dist < nearestDist then
+					nearest = plr.Character
+					nearestDist = dist
 				end
 			end
 		end
 	end
-
-	return false
+	return nearest
 end
 
-local function trackEnemyGlint(model)
-	if not isEnemyCharacter(model) or enemyGlintState[model] then
+local function tryAutoAttack(swordReach, attackCooldown)
+	if not autoAttackActive or not entitylib.isAlive then
 		return
 	end
-	enemyGlintState[model] = true
+	if tick() < parryBlockAttackUntil then
+		return
+	end
+	if tick() - lastParryAt < 0.18 then
+		return
+	end
+	if tick() - lastAttackAt < attackCooldown then
+		return
+	end
 
-	local function onDescendant()
-		if not autoParryActive or not entitylib.isAlive then
+	local target = getNearestEnemyInReach(swordReach)
+	if not target then
+		return
+	end
+
+	for _, plr in playersService:GetPlayers() do
+		if plr ~= lplr and plr.Character and enemyThreatensMe(plr.Character, swordReach + 4, 140) then
 			return
-		end
-		if modelHasGlint(model) then
-			local root = getLocalRoot()
-			local enemyRoot = model:FindFirstChild('HumanoidRootPart')
-			if root and enemyRoot and (enemyRoot.Position - root.Position).Magnitude <= 120 then
-				tryParry('glint_spawn')
-			end
 		end
 	end
 
-	model.DescendantAdded:Connect(onDescendant)
+	pressAttackClick()
 end
 
-local function scanThreats(meleeRange, gunRange)
+local function combatHeartbeat(meleeRange, gunRange, swordReach, attackCooldown)
 	if not entitylib.isAlive then
 		return
 	end
 
-	refreshMyHurtboxes()
+	refreshPacketsReady()
+	bindPacketListeners()
 
 	for _, plr in playersService:GetPlayers() do
-		if plr == lplr then
-			continue
-		end
-		local char = plr.Character
-		if not char then
-			continue
-		end
-
-		trackEnemyGlint(char)
-
-		if isGunThreat(char, gunRange) then
-			tryParry('gun_visual')
-		elseif isMeleeThreat(char, meleeRange) then
-			tryParry('melee_visual')
+		if plr ~= lplr and plr.Character then
+			updateParryFromVisuals(plr.Character, meleeRange, gunRange)
 		end
 	end
+
+	tryAutoAttack(swordReach, attackCooldown)
 end
 
 local function cleanupEnemyState(model)
-	enemyGlintState[model] = nil
+	enemyStates[model] = nil
 end
 
 run(function()
@@ -543,8 +510,11 @@ run(function()
 
 	local minigames = vape.Categories.Minigames
 	local AutoParry
+	local AutoAttack
 	local MeleeRange
 	local GunRange
+	local SwordReach
+	local AttackCooldown
 	local Debug
 	local TestParry
 
@@ -552,51 +522,29 @@ run(function()
 		Name = 'Auto Parry',
 		Function = function(callback)
 			autoParryActive = callback
-			if not callback then
-				return
+			if callback then
+				notif('Auto Parry', 'Active — parries real swings and shots only.', 4)
 			end
-
-			refreshPacketsReady()
-			bindPacketListeners()
-			notif('Auto Parry', 'Active. Parries with F key.', 4)
-
-			for _, plr in playersService:GetPlayers() do
-				if plr ~= lplr and plr.Character then
-					trackEnemyGlint(plr.Character)
-				end
-			end
-
-			AutoParry:Clean(playersService.PlayerAdded:Connect(function(plr)
-				if plr == lplr then
-					return
-				end
-				AutoParry:Clean(plr.CharacterAdded:Connect(function(char)
-					trackEnemyGlint(char)
-				end))
-				if plr.Character then
-					trackEnemyGlint(plr.Character)
-				end
-			end))
-
-			AutoParry:Clean(playersService.PlayerRemoving:Connect(function(plr)
-				if plr.Character then
-					cleanupEnemyState(plr.Character)
-				end
-			end))
-
-			AutoParry:Clean(runService.Heartbeat:Connect(function()
-				refreshPacketsReady()
-				scanThreats(MeleeRange.Value, GunRange.Value)
-			end))
 		end,
-		Tooltip = 'Presses F to parry incoming melee swings and gun shots.',
+		Tooltip = 'Presses F when an enemy in range actually swings or shoots at you.',
+	})
+
+	AutoAttack = minigames:CreateModule({
+		Name = 'Auto Attack',
+		Function = function(callback)
+			autoAttackActive = callback
+			if callback then
+				notif('Auto Attack', 'Active — LMB swings when enemies are in sword reach. Yields to parry.', 4)
+			end
+		end,
+		Tooltip = 'Left clicks when an enemy is within sword reach. Pauses while Auto Parry is reacting.',
 	})
 
 	MeleeRange = AutoParry:CreateSlider({
 		Name = 'Melee Range',
 		Min = 4,
-		Max = 24,
-		Default = 16,
+		Max = 20,
+		Default = 12,
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
@@ -612,14 +560,32 @@ run(function()
 		end,
 	})
 
+	SwordReach = AutoAttack:CreateSlider({
+		Name = 'Sword Reach',
+		Min = 4,
+		Max = 16,
+		Default = DEFAULT_SWORD_REACH,
+		Tooltip = 'Default 10 studs from decompiled hitbox size (3) + wideslash reach.',
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end,
+	})
+
+	AttackCooldown = AutoAttack:CreateSlider({
+		Name = 'Attack Cooldown',
+		Min = 0.15,
+		Max = 1,
+		Decimal = 100,
+		Default = 0.38,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end,
+	})
+
 	Debug = AutoParry:CreateToggle({
 		Name = 'Debug',
 		Function = function(callback)
 			debugEnabled = callback
-			if callback then
-				refreshPacketsReady()
-				print('[REDLINER AutoParry] debug on | packetsReady=', packetsReady, 'parryId=', Packets and Packets[PARRY_PACKET_NAME] and Packets[PARRY_PACKET_NAME].Id)
-			end
 		end,
 	})
 
@@ -628,7 +594,6 @@ run(function()
 		Function = function(callback)
 			if callback then
 				pressParryKey()
-				notif('Auto Parry', 'Sent F key press. Toggle off Test Parry.', 3)
 				task.defer(function()
 					if TestParry.Enabled then
 						TestParry:Toggle(true)
@@ -636,8 +601,36 @@ run(function()
 				end)
 			end
 		end,
-		Tooltip = 'Sends one F key press so you can verify parry input works.',
 	})
+
+	local combatBound = false
+	task.defer(function()
+		repeat
+			task.wait(0.25)
+		until vape.Loaded
+		if combatBound then
+			return
+		end
+		combatBound = true
+
+		runService.Heartbeat:Connect(function()
+			if not AutoParry.Enabled and not AutoAttack.Enabled then
+				return
+			end
+			combatHeartbeat(
+				MeleeRange.Value,
+				GunRange.Value,
+				SwordReach.Value,
+				AttackCooldown.Value
+			)
+		end)
+
+		playersService.PlayerRemoving:Connect(function(plr)
+			if plr.Character then
+				cleanupEnemyState(plr.Character)
+			end
+		end)
+	end)
 end)
 
 run(function()
@@ -646,6 +639,6 @@ run(function()
 		repeat
 			task.wait(0.25)
 		until vape.Loaded or tick() - start > 20
-		notif('REDLINER', 'Enable Auto Parry in Minigames. Use Test Parry to verify F input.', 6)
+		notif('REDLINER', 'Enable Auto Parry / Auto Attack in Minigames.', 5)
 	end)
 end)
