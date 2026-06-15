@@ -974,11 +974,24 @@ tryParry = function(reason, char)
 	return true
 end
 
+local startEnemyWatchers
+local refreshEnemyWatchers
+local refreshThreatWatchers
+local bindLocalRespawnHandler
+local bindPacketListeners
+local bindParryScanLoop
+local bindAutoAttackLoop
+local combatHeartbeat
+local getEnemyHurtboxesInRange
+local handleMeleeAnimation
+local unwatchAllForPlayer
+
+run(function()
 -- ---------------------------------------------------------------------------
 -- Threat handlers (edge-triggered only)
 -- ---------------------------------------------------------------------------
 
-local function handleMeleeAnimation(char, track, source, aimModel)
+handleMeleeAnimation = function(char, track, source, aimModel)
 	source = source or 'edge'
 	if not isMeleeSwingTrackActive(track) then
 		debugSkip('melee_not_playing', getTrackAnimInfo(track), source)
@@ -1217,7 +1230,7 @@ local function cancelPendingParries()
 	end
 end
 
-local function unwatchAllForPlayer(plr)
+unwatchAllForPlayer = function(plr)
 	local toRemove = {}
 	for char in charWatchers do
 		if getPlayerFromModel(char) == plr then
@@ -1287,7 +1300,7 @@ local function watchEnemyPlayer(plr)
 	end
 end
 
-local function refreshThreatWatchers(force)
+refreshThreatWatchers = function(force)
 	if not autoParryActive then
 		return
 	end
@@ -1331,7 +1344,7 @@ local function refreshMyHurtboxes()
 	end
 end
 
-local function refreshEnemyWatchers()
+refreshEnemyWatchers = function()
 	refreshThreatWatchers(true)
 end
 
@@ -1356,7 +1369,7 @@ local function blockLocalParry()
 	cancelPendingParries()
 end
 
-local function bindLocalRespawnHandler()
+bindLocalRespawnHandler = function()
 	if localRespawnBound then
 		return
 	end
@@ -1401,7 +1414,7 @@ local function bindLocalRespawnHandler()
 	end
 end
 
-local function startEnemyWatchers()
+startEnemyWatchers = function()
 	refreshEnemyWatchers()
 	if watchersStarted then
 		return
@@ -1430,6 +1443,9 @@ local function startEnemyWatchers()
 	end
 end
 
+end)
+
+run(function()
 -- ---------------------------------------------------------------------------
 -- Packet hooks (melee reach)
 -- ---------------------------------------------------------------------------
@@ -1487,7 +1503,7 @@ local function mergeHurtboxLists(...)
 	return merged
 end
 
-local function getEnemyHurtboxesInRange(range, origin)
+getEnemyHurtboxesInRange = function(range, origin)
 	local root = getLocalRoot()
 	origin = origin or (root and root.Position)
 	if not origin then
@@ -2117,13 +2133,16 @@ local function logReachHookStatus(context)
 	)
 end
 
-local function bindPacketListeners()
+bindPacketListeners = function()
 	if not initPackets() then
 		return
 	end
 	installMeleeReachHook()
 end
 
+end)
+
+run(function()
 -- ---------------------------------------------------------------------------
 -- Auto attack
 -- ---------------------------------------------------------------------------
@@ -2197,7 +2216,7 @@ local function scanMeleeWhitelistRealtime()
 	end
 end
 
-local function bindParryScanLoop()
+bindParryScanLoop = function()
 	if parryScanBound then
 		return
 	end
@@ -2266,7 +2285,7 @@ local function tryAutoAttack(attackDelay)
 	pressAttackClick()
 end
 
-local function bindAutoAttackLoop()
+bindAutoAttackLoop = function()
 	if autoAttackLoopBound then
 		return
 	end
@@ -2279,7 +2298,7 @@ local function bindAutoAttackLoop()
 	end)
 end
 
-local function combatHeartbeat(meleeRange)
+combatHeartbeat = function(meleeRange)
 	meleeRangeSetting = meleeRange
 	if reachActive or reachDebugEnabled or autoParryActive or killAuraActive then
 		bindPacketListeners()
@@ -2348,6 +2367,8 @@ local function combatHeartbeat(meleeRange)
 		pcall(hudTickCallback)
 	end
 end
+
+end)
 
 local function cleanupEnemyState(model)
 	unwatchAllForPlayer(getPlayerFromModel(model) or playersService:GetPlayerFromCharacter(model))
