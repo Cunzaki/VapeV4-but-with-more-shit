@@ -47,21 +47,51 @@ local CLOSE_RANGE_STUDS = 3
 local MELEE_SWING_MIN_TIME = 0
 local MELEE_SWING_MAX_TIME = 0.55
 local MELEE_PARRY_DELAY = 0.2
+local GUN_SHOT_MAX_TIME = 0.15
+local GUN_DRAW_EDGE_MAX_TIME = 0.45
 local DASH_VELOCITY_MIN = 20
 
--- Melee swing only. Gun anim IDs 115078691506529 / 110389010823335 are dash/movement, not attacks.
+-- Melee + gun animations from ReplicatedStorage.Assets.Animations catalog.
 local PARRY_ANIM_IDS = {
 	['105441036119013'] = 'melee',
 }
+
+-- Movement false-positives (NOT gun attacks).
 local BLOCKED_ANIM_IDS = {
-	['115078691506529'] = 'dash',
-	['110389010823335'] = 'dash',
+	['115078691506529'] = 'walk', -- Redliner.3P_Walk
+}
+
+-- Gun draw: 3P_Gundraw + first-person Draw per weapon.
+local GUN_DRAW_ANIM_IDS = {
+	['124492122976293'] = 'Castigate', -- Castigate.3P_Gundraw
+	['95978217334708'] = 'Castigate', -- Castigate.Draw
+	['108324409673822'] = 'Phoenix', -- Phoenix.3P_Gundraw
+	['128865035304346'] = 'Phoenix', -- Phoenix.Draw
+	['134702782811301'] = 'Siege', -- Siege.3P_Gundraw
+	['76542766199369'] = 'Siege', -- Siege.Draw
+	['125490982378115'] = 'Monarch', -- Monarch.3P_Gundraw
+	['133803127890988'] = 'Monarch', -- Monarch.Draw
+}
+
+-- Gun shot: 3P_Gunshot + Fire (+ Siege bonus shots).
+local GUN_SHOT_ANIM_IDS = {
+	['110389010823335'] = 'Castigate', -- Castigate.3P_Gunshot
+	['131479610656562'] = 'Castigate', -- Castigate.Fire
+	['115498395958050'] = 'Phoenix', -- Phoenix.3P_Gunshot
+	['102568803482882'] = 'Phoenix', -- Phoenix.Fire
+	['82893125154254'] = 'Siege', -- Siege.3P_Gunshot
+	['117470706732508'] = 'Siege', -- Siege.Fire
+	['106013608253968'] = 'Siege', -- Siege.3P_Bonusshot
+	['125194834753017'] = 'Siege', -- Siege.BonusFire
+	['96091952971711'] = 'Monarch', -- Monarch.3P_Gunshot
+	['107008811118123'] = 'Monarch', -- Monarch.Fire
 }
 
 local GUN_DRAW_TIMES = {
-	Phoenix = 0.56,
-	Siege = 0.86,
-	Monarch = 1.60,
+	Castigate = 0.75,
+	Phoenix = 0.80,
+	Siege = 1.10,
+	Monarch = 1.85,
 }
 local GUN_ITEM_PATTERNS = {
 	{pattern = 'castigate', gun = 'Castigate'},
@@ -274,7 +304,16 @@ local function getParryAnimKind(animId)
 	if BLOCKED_ANIM_IDS[normId] then
 		return nil
 	end
-	return PARRY_ANIM_IDS[normId]
+	if PARRY_ANIM_IDS[normId] then
+		return PARRY_ANIM_IDS[normId]
+	end
+	if GUN_DRAW_ANIM_IDS[normId] then
+		return 'gun_draw'
+	end
+	if GUN_SHOT_ANIM_IDS[normId] then
+		return 'gun_shot'
+	end
+	return nil
 end
 
 local function isParryMeleeAnim(animId)
@@ -299,7 +338,7 @@ local function logParryAnimIds(force)
 		return
 	end
 	parryIdsLogged = true
-	print('[REDLINER] parry ids | melee=105441036119013 | gun=glint+timed | blocked dash=115078691506529,110389010823335')
+	print('[REDLINER] parry ids | melee=105441036119013 | gun_draw+gun_shot from catalog | blocked walk=115078691506529')
 end
 
 local function getAllPlayingTracks(char)
@@ -341,7 +380,8 @@ local function charHasWhitelistAttackPlaying(char)
 	for _, track in getAllPlayingTracksForChar(char) do
 		if track.IsPlaying and track.WeightCurrent >= 0.15 then
 			local _, animId = getTrackAnimInfo(track)
-			if getParryAnimKind(animId) then
+			local kind = getParryAnimKind(animId)
+			if kind then
 				return true
 			end
 		end
@@ -456,23 +496,32 @@ local function getGunParryDelay(gunName)
 	if gunName == 'Castigate' then
 		return castigateParryDelay
 	end
-	return math.max(0.02, (GUN_DRAW_TIMES[gunName] or castigateParryDelay) - 0.14)
+	return math.max(0.02, (GUN_DRAW_TIMES[gunName] or 0.75) - 0.14)
 end
 
-local function scheduleGlintParry(char, gunName)
+local function scheduleGunDrawParry(char, gunName, normId, timePosition, source, track)
 	local state = getEnemyState(char)
-	local drawKey = 'glint:' .. gunName
+	local drawKey = normId .. ':gun_draw'
 	if state.lastDrawId == drawKey then
 		return
 	end
 	state.lastDrawId = drawKey
 	state.scheduledDrawToken += 1
 	local token = state.scheduledDrawToken
-	local delay = getGunParryDelay(gunName)
+	timePosition = timePosition or 0
+	local delay = math.max(0, getGunParryDelay(gunName) - timePosition)
 
-	debugLog('trigger', 'gun_schedule_' .. gunName, 'delay=' .. string.format('%.2f', delay), 'source=glint')
+	debugLog('trigger', 'gun_draw_schedule_' .. gunName, 'id=' .. normId, 'delay=' .. string.format('%.2f', delay), source)
 
-	task.delay(2, function()
+	if track then
+		track.Stopped:Once(function()
+			if state.lastDrawId == drawKey then
+				state.lastDrawId = ''
+			end
+		end)
+	end
+
+	task.delay(delay + 0.5, function()
 		if state.lastDrawId == drawKey then
 			state.lastDrawId = ''
 		end
@@ -485,16 +534,20 @@ local function scheduleGlintParry(char, gunName)
 		if not char.Parent or not isLocalAlive() then
 			return
 		end
-		if not charHasGunEquipped(char) or isEnemyDashing(char) then
-			debugSkip('glint_cancelled', char.Name, gunName)
+		if not charHasGunEquipped(char) then
+			debugSkip('gun_draw_no_gun', char.Name, gunName, normId)
+			return
+		end
+		if isEnemyDashing(char) then
+			debugSkip('gun_draw_dash', char.Name, gunName, normId)
 			return
 		end
 		if not shouldParryGun(char, true) then
-			debugSkip('glint_aim_lost', char.Name, gunName)
+			debugSkip('gun_draw_aim', char.Name, gunName, string.format('%.2f', getAimDot(char)))
 			return
 		end
-		debugLog('trigger', 'gun_timed_' .. gunName, string.format('%.2f', getAimDot(char)))
-		tryParry('gun_timed_' .. gunName)
+		debugLog('trigger', 'gun_draw_timed_' .. gunName, normId, string.format('%.2f', getAimDot(char)))
+		tryParry('gun_draw_' .. gunName .. '_' .. normId)
 	end)
 end
 
@@ -614,6 +667,73 @@ local function handleMeleeAnimation(char, track, source)
 	end
 end
 
+local function handleGunDrawAnimation(char, track, source)
+	source = source or 'edge'
+	if not track.IsPlaying or track.WeightCurrent < 0.05 then
+		debugSkip('gun_draw_low_weight', getTrackAnimInfo(track), source)
+		return
+	end
+
+	local name, animId = getTrackAnimInfo(track)
+	local normId = normalizeAnimId(animId)
+	local gunName = GUN_DRAW_ANIM_IDS[normId]
+	if not gunName then
+		return
+	end
+	if track.TimePosition > GUN_DRAW_EDGE_MAX_TIME then
+		debugSkip('gun_draw_late', name, string.format('%.2f', track.TimePosition), source)
+		return
+	end
+	if not shouldParryGun(char, true) then
+		debugSkip('gun_draw_aim_edge', name, string.format('%.2f', getAimDot(char)), source)
+		return
+	end
+
+	scheduleGunDrawParry(char, gunName, normId, track.TimePosition, source, track)
+end
+
+local function handleGunShotAnimation(char, track, source)
+	source = source or 'edge'
+	if not track.IsPlaying or track.WeightCurrent < 0.08 then
+		debugSkip('gun_shot_low_weight', getTrackAnimInfo(track), source)
+		return
+	end
+
+	local name, animId = getTrackAnimInfo(track)
+	local normId = normalizeAnimId(animId)
+	local gunName = GUN_SHOT_ANIM_IDS[normId]
+	if not gunName then
+		return
+	end
+	if track.TimePosition > GUN_SHOT_MAX_TIME then
+		debugSkip('gun_shot_late', name, string.format('%.2f', track.TimePosition), source)
+		return
+	end
+	if not shouldParryGun(char, true) then
+		debugSkip('gun_shot_aim', name, string.format('%.2f', getAimDot(char)), source)
+		return
+	end
+	if not charHasGunEquipped(char) then
+		debugSkip('gun_shot_no_gun', name, normId, source)
+		return
+	end
+
+	local state = getEnemyState(char)
+	local shotKey = normId .. ':gun_shot'
+	if state.lastShotId == shotKey then
+		return
+	end
+	state.lastShotId = shotKey
+	track.Stopped:Once(function()
+		if state.lastShotId == shotKey then
+			state.lastShotId = ''
+		end
+	end)
+
+	debugLog('trigger', 'gun_shot_' .. gunName, normId, 'aim=' .. string.format('%.2f', getAimDot(char)), source)
+	tryParry('gun_shot_' .. gunName .. '_' .. normId)
+end
+
 local function handleGlintSpawn(char, inst)
 	if not isGlintInstance(inst) then
 		return
@@ -632,7 +752,7 @@ local function handleGlintSpawn(char, inst)
 	end
 	local gunName = detectEquippedGun(char)
 	debugLog('trigger', 'gun_glint', gunName, 'aim=' .. string.format('%.2f', getAimDot(char)))
-	scheduleGlintParry(char, gunName)
+	scheduleGunDrawParry(char, gunName, 'glint:' .. gunName, 0, 'glint')
 end
 
 local function onEnemyAnimationPlayed(char, track)
@@ -645,12 +765,16 @@ local function onEnemyAnimationPlayed(char, track)
 	if debugEnabled then
 		if BLOCKED_ANIM_IDS[normId] then
 			debugAnimLog('blocked', normId, BLOCKED_ANIM_IDS[normId], 'w=' .. string.format('%.2f', track.WeightCurrent))
-		elseif PARRY_ANIM_IDS[normId] or track.WeightCurrent >= 0.35 then
+		elseif kind or track.WeightCurrent >= 0.35 then
 			debugAnimLog('played', name, 'id=' .. normId, kind or '-', 'w=' .. string.format('%.2f', track.WeightCurrent))
 		end
 	end
 	if kind == 'melee' then
 		handleMeleeAnimation(char, track, 'edge')
+	elseif kind == 'gun_draw' then
+		handleGunDrawAnimation(char, track, 'edge')
+	elseif kind == 'gun_shot' then
+		handleGunShotAnimation(char, track, 'edge')
 	end
 end
 
@@ -941,8 +1065,13 @@ local function scanWhitelistRealtime()
 						continue
 					end
 					local _, animId = getTrackAnimInfo(track)
-					if getParryAnimKind(animId) == 'melee' and meleeDist <= meleeRangeSetting and track.TimePosition <= MELEE_SWING_MAX_TIME then
+					local kind = getParryAnimKind(animId)
+					if kind == 'melee' and meleeDist <= meleeRangeSetting and track.TimePosition <= MELEE_SWING_MAX_TIME then
 						handleMeleeAnimation(ownerChar, track, 'scan')
+					elseif kind == 'gun_draw' and track.TimePosition <= GUN_DRAW_EDGE_MAX_TIME then
+						handleGunDrawAnimation(ownerChar, track, 'scan')
+					elseif kind == 'gun_shot' and track.TimePosition <= GUN_SHOT_MAX_TIME then
+						handleGunShotAnimation(ownerChar, track, 'scan')
 					end
 				end
 			end
@@ -968,7 +1097,11 @@ local function enemyThreatensMe(char, meleeRange)
 	for _, track in getAllPlayingTracksForChar(char) do
 		if track.IsPlaying and track.WeightCurrent >= 0.08 then
 			local _, animId = getTrackAnimInfo(track)
-			if getParryAnimKind(animId) == 'melee' and getEnemyDistance(char) <= meleeRange and shouldParryMelee(char, true) then
+			local kind = getParryAnimKind(animId)
+			if kind == 'melee' and getEnemyDistance(char) <= meleeRange and shouldParryMelee(char, true) then
+				return true
+			end
+			if (kind == 'gun_draw' or kind == 'gun_shot') and shouldParryGun(char, true) then
 				return true
 			end
 		end
@@ -1215,6 +1348,12 @@ end
 local function animLogKnownLabel(normId)
 	if PARRY_ANIM_IDS[normId] then
 		return 'parry:' .. PARRY_ANIM_IDS[normId]
+	end
+	if GUN_DRAW_ANIM_IDS[normId] then
+		return 'gun_draw:' .. GUN_DRAW_ANIM_IDS[normId]
+	end
+	if GUN_SHOT_ANIM_IDS[normId] then
+		return 'gun_shot:' .. GUN_SHOT_ANIM_IDS[normId]
 	end
 	if BLOCKED_ANIM_IDS[normId] then
 		return 'blocked:' .. BLOCKED_ANIM_IDS[normId]
@@ -1602,10 +1741,10 @@ run(function()
 				startEnemyWatchers()
 				bindParryScanLoop()
 				bindPacketListeners()
-				notif('Auto Parry', 'Timed melee + gun parry when enemies aim at you.', 5)
+				notif('Auto Parry', 'Melee + gun draw/shot parry when enemies aim at you.', 5)
 			end
 		end,
-		Tooltip = 'Parries whitelisted melee swings and gun shots when enemies aim at you.',
+		Tooltip = 'Parries melee swings and gun draw/shot animations when enemies aim at you.',
 	})
 
 	AutoAttack = minigames:CreateModule({
