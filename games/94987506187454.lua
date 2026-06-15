@@ -45,16 +45,27 @@ local MELEE_PACKET_NAME = '_x2e2c62e0acfc88ae'
 local HEAT_PACKET_NAME = '_xdb2548bded1dd8e3'
 local GRAPPLE_PACKET_NAME = '_xefd6d8e74acc7f88'
 local GUN_PACKET_NAME = '_x77a8b8d28b943359'
-
-local MELEE_AIM_DOT = 0.32
-local GUN_AIM_DOT = 0.32
-local CLOSE_RANGE_STUDS = 3
-local MELEE_SWING_MIN_TIME = 0
-local MELEE_SWING_MAX_TIME = 0.55
-local MELEE_PARRY_DELAY = 0.2
-local GUN_SHOT_MAX_TIME = 0.15
-local GUN_DRAW_EDGE_MAX_TIME = 0.45
 local DASH_VELOCITY_MIN = 20
+
+local AUTO_PARRY_DEFAULTS = {
+	meleeRange = 20,
+	meleeParryDelay = 0.2,
+	meleeAimDot = 0.32,
+	gunAimDot = 0.32,
+	parryCooldown = 0.05,
+	meleeSwingWindow = 0.55,
+	gunDrawWindow = 0.45,
+	gunShotWindow = 0.15,
+	closeRangeStuds = 3,
+	castigateDelay = 0.36,
+	phoenixDelay = 0.66,
+	siegeDelay = 0.96,
+	monarchDelay = 1.71,
+	parryMelee = true,
+	parryGunDraw = true,
+	parryGunShot = true,
+	parryGlint = true,
+}
 
 -- Melee + gun animations from ReplicatedStorage.Assets.Animations catalog.
 local PARRY_ANIM_IDS = {
@@ -92,12 +103,6 @@ local GUN_SHOT_ANIM_IDS = {
 	['107008811118123'] = 'Monarch', -- Monarch.Fire
 }
 
-local GUN_DRAW_TIMES = {
-	Castigate = 0.75,
-	Phoenix = 0.80,
-	Siege = 1.10,
-	Monarch = 1.85,
-}
 local GUN_ITEM_PATTERNS = {
 	{pattern = 'castigate', gun = 'Castigate'},
 	{pattern = 'destroyer', gun = 'Castigate'},
@@ -115,8 +120,25 @@ local autoAttackActive = false
 local reachActive = false
 local reachExtend = 0
 local debugEnabled = false
-local meleeRangeSetting = 20
-local castigateParryDelay = 0.36
+local meleeRangeSetting = AUTO_PARRY_DEFAULTS.meleeRange
+local meleeParryDelaySetting = AUTO_PARRY_DEFAULTS.meleeParryDelay
+local meleeAimDotSetting = AUTO_PARRY_DEFAULTS.meleeAimDot
+local gunAimDotSetting = AUTO_PARRY_DEFAULTS.gunAimDot
+local parryCooldownSetting = AUTO_PARRY_DEFAULTS.parryCooldown
+local meleeSwingWindowSetting = AUTO_PARRY_DEFAULTS.meleeSwingWindow
+local gunDrawWindowSetting = AUTO_PARRY_DEFAULTS.gunDrawWindow
+local gunShotWindowSetting = AUTO_PARRY_DEFAULTS.gunShotWindow
+local closeRangeStudsSetting = AUTO_PARRY_DEFAULTS.closeRangeStuds
+local gunParryDelays = {
+	Castigate = AUTO_PARRY_DEFAULTS.castigateDelay,
+	Phoenix = AUTO_PARRY_DEFAULTS.phoenixDelay,
+	Siege = AUTO_PARRY_DEFAULTS.siegeDelay,
+	Monarch = AUTO_PARRY_DEFAULTS.monarchDelay,
+}
+local parryMeleeEnabled = AUTO_PARRY_DEFAULTS.parryMelee
+local parryGunDrawEnabled = AUTO_PARRY_DEFAULTS.parryGunDraw
+local parryGunShotEnabled = AUTO_PARRY_DEFAULTS.parryGunShot
+local parryGlintEnabled = AUTO_PARRY_DEFAULTS.parryGlint
 local myHurtboxes = {}
 local enemyStates = {}
 local charWatchers = {}
@@ -146,6 +168,7 @@ local lastGrappleAt = 0
 local mapMain = nil
 local utilityHooksInstalled = false
 local utilityLoopBound = false
+local lastUtilityReadyWarn = 0
 local packetTemplates = {
 	grapple = nil,
 	gun = nil,
@@ -189,8 +212,17 @@ local function initPackets()
 		return true
 	end
 	local assets = replicatedStorage:FindFirstChild('Assets')
-	local modules = assets and assets:FindFirstChild('ModuleScripts')
-	local packetsModule = modules and modules:FindFirstChild('Packets')
+		or replicatedStorage:WaitForChild('Assets', 20)
+	if not assets then
+		return false
+	end
+	local modules = assets:FindFirstChild('ModuleScripts')
+		or assets:WaitForChild('ModuleScripts', 20)
+	if not modules then
+		return false
+	end
+	local packetsModule = modules:FindFirstChild('Packets')
+		or modules:WaitForChild('Packets', 20)
 	if not packetsModule then
 		return false
 	end
@@ -206,168 +238,8 @@ local function getMeleeReach()
 	return BASE_SWORD_REACH + (reachActive and reachExtend or 0)
 end
 
-local function getMapMain()
-	if mapMain and mapMain.Parent then
-		return mapMain
-	end
-	local map = workspaceService:FindFirstChild('Map')
-	mapMain = map and map:FindFirstChild('Main')
-	return mapMain
-end
-
-local function getMapRayParams()
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Include
-	params.IgnoreWater = true
-	local main = getMapMain()
-	params.FilterDescendantsInstances = main and {main} or {}
-	return params
-end
-
-local function isPacketReady(packet)
-	return packet ~= nil and packet.Id ~= nil
-end
-
-local function capturePacketTemplate(packed, key)
-	if key and packed and packed.n and packed.n > 0 then
-		packetTemplates[key] = packed
-	end
-end
-
-local function installUtilityPacketHooks()
-	if utilityHooksInstalled or not initPackets() then
-		return
-	end
-	utilityHooksInstalled = true
-
-	local grapplePacket = Packets[GRAPPLE_PACKET_NAME]
-	if grapplePacket and not grapplePacket._utilityCaptureHooked then
-		local oldGrappleFire = grapplePacket.Fire
-		grapplePacket.Fire = function(self, ...)
-			local packed = table.pack(...)
-			capturePacketTemplate(packed, 'grapple')
-			return oldGrappleFire(self, ...)
-		end
-		grapplePacket._utilityCaptureHooked = true
-	end
-
-	local gunPacket = Packets[GUN_PACKET_NAME]
-	if gunPacket and not gunPacket._utilityCaptureHooked then
-		local oldGunFire = gunPacket.Fire
-		gunPacket.Fire = function(self, ...)
-			local packed = table.pack(...)
-			capturePacketTemplate(packed, 'gun')
-			if infiniteHeatActive and packed.n >= 5 then
-				packed[5] = heatValueSetting
-			end
-			return oldGunFire(self, table.unpack(packed, 1, packed.n))
-		end
-		gunPacket._utilityCaptureHooked = true
-	end
-end
-
-local function setHeat(value)
-	if not initPackets() then
-		return false
-	end
-	installUtilityPacketHooks()
-	local packet = Packets[HEAT_PACKET_NAME]
-	if not isPacketReady(packet) then
-		return false
-	end
-	task.spawn(function()
-		pcall(function()
-			packet:Fire(value)
-		end)
-	end)
-	return true
-end
-
-local function fireGrappleTowardLook(range)
-	if not isLocalAlive() or not initPackets() then
-		return false
-	end
-	installUtilityPacketHooks()
-
-	local packet = Packets[GRAPPLE_PACKET_NAME]
-	if not isPacketReady(packet) then
-		return false
-	end
-
-	local root = getLocalRoot()
-	local camera = workspaceService.CurrentCamera
-	if not root or not camera then
-		return false
-	end
-
-	local look = camera.CFrame.LookVector
-	local hit = workspaceService:Raycast(root.Position, look * range, getMapRayParams())
-	local target = hit and hit.Position or (root.Position + look * range)
-	local template = packetTemplates.grapple
-	local itemId = template and template[1] or 'Grappler'
-	local tag = template and template[4] or ''
-
-	task.spawn(function()
-		pcall(function()
-			packet:Fire(itemId, root.Position, target, tag)
-		end)
-	end)
-	return true
-end
-
-local function utilityHeartbeat()
-	if not isLocalAlive() then
-		return
-	end
-
-	initPackets()
-	installUtilityPacketHooks()
-	local now = tick()
-
-	if infiniteHeatActive and now - lastHeatAt >= heatRateSetting then
-		lastHeatAt = now
-		setHeat(heatValueSetting)
-	end
-
-	if infiniteGrappleActive and now - lastGrappleAt >= grappleRateSetting then
-		if not grappleHoldOnly or augmentHeld then
-			lastGrappleAt = now
-			fireGrappleTowardLook(grappleRangeSetting)
-		end
-	end
-end
-
-local function bindUtilityLoop()
-	if utilityLoopBound then
-		return
-	end
-	utilityLoopBound = true
-
-	inputService.InputBegan:Connect(function(input, processed)
-		if processed then
-			return
-		end
-		if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
-			augmentHeld = true
-		end
-	end)
-
-	inputService.InputEnded:Connect(function(input)
-		if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
-			augmentHeld = false
-		end
-	end)
-
-	runService.Heartbeat:Connect(function()
-		if not infiniteHeatActive and not infiniteGrappleActive then
-			return
-		end
-		utilityHeartbeat()
-	end)
-end
-
 -- ---------------------------------------------------------------------------
--- Character helpers
+-- Character helpers (must be above utility/grapple — forward refs break)
 -- ---------------------------------------------------------------------------
 
 local function isLocalAlive()
@@ -432,7 +304,7 @@ local function getEnemyModels(plr)
 	if plr.Character then
 		table.insert(models, plr.Character)
 	end
-	local chronoStorage = workspace:FindFirstChild('Chrono_EntityStorage')
+	local chronoStorage = workspaceService:FindFirstChild('Chrono_EntityStorage')
 	if chronoStorage then
 		for _, child in chronoStorage:GetChildren() do
 			if child:IsA('Model') and getPlayerFromModel(child) == plr then
@@ -455,6 +327,202 @@ local function getEnemyState(char)
 		}
 	end
 	return enemyStates[char]
+end
+
+local function getMapMain()
+	if mapMain and mapMain.Parent then
+		return mapMain
+	end
+	local map = workspaceService:FindFirstChild('Map')
+	mapMain = map and map:FindFirstChild('Main')
+	return mapMain
+end
+
+local function getMapRayParams()
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.IgnoreWater = true
+	local main = getMapMain()
+	params.FilterDescendantsInstances = main and {main} or {}
+	return params
+end
+
+local function isPacketReady(packet)
+	return packet ~= nil and packet.Id ~= nil
+end
+
+local function capturePacketTemplate(packed, key)
+	if key and packed and packed.n and packed.n > 0 then
+		packetTemplates[key] = packed
+	end
+end
+
+local function installUtilityPacketHooks()
+	if utilityHooksInstalled then
+		return true
+	end
+	if not initPackets() then
+		return false
+	end
+
+	local grapplePacket = Packets[GRAPPLE_PACKET_NAME]
+	local gunPacket = Packets[GUN_PACKET_NAME]
+	if not grapplePacket and not gunPacket and not Packets[HEAT_PACKET_NAME] then
+		return false
+	end
+
+	if grapplePacket and not grapplePacket._utilityCaptureHooked then
+		local oldGrappleFire = grapplePacket.Fire
+		grapplePacket.Fire = function(self, ...)
+			local packed = table.pack(...)
+			capturePacketTemplate(packed, 'grapple')
+			return oldGrappleFire(self, ...)
+		end
+		grapplePacket._utilityCaptureHooked = true
+	end
+
+	if gunPacket and not gunPacket._utilityCaptureHooked then
+		local oldGunFire = gunPacket.Fire
+		gunPacket.Fire = function(self, ...)
+			local packed = table.pack(...)
+			capturePacketTemplate(packed, 'gun')
+			if infiniteHeatActive and packed.n >= 5 then
+				packed[5] = heatValueSetting
+			end
+			return oldGunFire(self, table.unpack(packed, 1, packed.n))
+		end
+		gunPacket._utilityCaptureHooked = true
+	end
+
+	utilityHooksInstalled = true
+	return true
+end
+
+local function utilityPacketsReady()
+	if not initPackets() then
+		return false
+	end
+	if infiniteHeatActive and not isPacketReady(Packets[HEAT_PACKET_NAME]) then
+		return false
+	end
+	if infiniteGrappleActive and not isPacketReady(Packets[GRAPPLE_PACKET_NAME]) then
+		return false
+	end
+	return infiniteHeatActive or infiniteGrappleActive
+end
+
+local function warnUtilityNotReady()
+	if tick() - lastUtilityReadyWarn < 8 then
+		return
+	end
+	lastUtilityReadyWarn = tick()
+	notif('REDLINER', 'Packets not ready — spawn in fully or grapple/attack once manually.', 6, 'warning')
+end
+
+local function setHeat(value)
+	if not initPackets() then
+		return false
+	end
+	installUtilityPacketHooks()
+	local packet = Packets[HEAT_PACKET_NAME]
+	if not isPacketReady(packet) then
+		return false
+	end
+	task.spawn(function()
+		pcall(function()
+			packet:Fire(value)
+		end)
+	end)
+	return true
+end
+
+local function fireGrappleTowardLook(range)
+	if not isLocalAlive() or not initPackets() then
+		return false
+	end
+	installUtilityPacketHooks()
+
+	local packet = Packets[GRAPPLE_PACKET_NAME]
+	if not isPacketReady(packet) then
+		return false
+	end
+
+	local root = getLocalRoot()
+	local camera = workspaceService.CurrentCamera
+	if not root or not camera then
+		return false
+	end
+
+	local look = camera.CFrame.LookVector
+	local hit = workspaceService:Raycast(root.Position, look * range, getMapRayParams())
+	local target = hit and hit.Position or (root.Position + look * range)
+	local template = packetTemplates.grapple
+	local itemId = template and template[1] or 'Grappler'
+	local tag = template and template[4] or ''
+
+	task.spawn(function()
+		pcall(function()
+			packet:Fire(itemId, root.Position, target, tag)
+		end)
+	end)
+	return true
+end
+
+local function utilityHeartbeat()
+	if not isLocalAlive() then
+		return
+	end
+
+	if not installUtilityPacketHooks() or not utilityPacketsReady() then
+		warnUtilityNotReady()
+		return
+	end
+
+	local now = tick()
+
+	if infiniteHeatActive and now - lastHeatAt >= heatRateSetting then
+		lastHeatAt = now
+		setHeat(heatValueSetting)
+	end
+
+	if infiniteGrappleActive and now - lastGrappleAt >= grappleRateSetting then
+		if not grappleHoldOnly or augmentHeld then
+			lastGrappleAt = now
+			fireGrappleTowardLook(grappleRangeSetting)
+		end
+	end
+end
+
+local function bindUtilityLoop()
+	if utilityLoopBound then
+		return
+	end
+	utilityLoopBound = true
+
+	inputService.InputBegan:Connect(function(input, processed)
+		if processed then
+			return
+		end
+		if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
+			augmentHeld = true
+		end
+	end)
+
+	inputService.InputEnded:Connect(function(input)
+		if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
+			augmentHeld = false
+		end
+	end)
+
+	runService.Heartbeat:Connect(function()
+		if not infiniteHeatActive and not infiniteGrappleActive then
+			return
+		end
+		local ok, err = pcall(utilityHeartbeat)
+		if not ok then
+			warn('[REDLINER] utility error:', err)
+		end
+	end)
 end
 
 -- ---------------------------------------------------------------------------
@@ -560,12 +628,16 @@ end
 
 local function charHasWhitelistAttackPlaying(char)
 	for _, track in getAllPlayingTracksForChar(char) do
-		if track.IsPlaying and track.WeightCurrent >= 0.15 then
-			local _, animId = getTrackAnimInfo(track)
-			local kind = getParryAnimKind(animId)
-			if kind then
-				return true
-			end
+		if not track.IsPlaying then
+			continue
+		end
+		local _, animId = getTrackAnimInfo(track)
+		local kind = getParryAnimKind(animId)
+		if kind == 'melee' then
+			return true
+		end
+		if track.WeightCurrent >= 0.15 and kind then
+			return true
 		end
 	end
 	return false
@@ -604,7 +676,7 @@ end
 
 local function isEnemyTargetingMe(char, minDot, confirmedAttack)
 	local dist = getEnemyDistance(char)
-	if not confirmedAttack and dist < CLOSE_RANGE_STUDS and not charHasWhitelistAttackPlaying(char) then
+	if not confirmedAttack and dist < closeRangeStudsSetting and not charHasWhitelistAttackPlaying(char) then
 		debugSkip('close_range_no_attack', char.Name, string.format('%.1f', dist))
 		return false
 	end
@@ -612,17 +684,27 @@ local function isEnemyTargetingMe(char, minDot, confirmedAttack)
 end
 
 local function shouldParryMelee(char, confirmedAttack)
+	if not parryMeleeEnabled then
+		return false
+	end
 	if getEnemyDistance(char) > meleeRangeSetting then
 		return false
 	end
-	if not isEnemyTargetingMe(char, MELEE_AIM_DOT, confirmedAttack) then
+	if not isEnemyTargetingMe(char, meleeAimDotSetting, confirmedAttack) then
 		return false
 	end
 	return true
 end
 
 local function shouldParryGun(char, confirmedAttack)
-	return isEnemyTargetingMe(char, GUN_AIM_DOT, confirmedAttack)
+	if not parryGunDrawEnabled and not parryGunShotEnabled then
+		return false
+	end
+	return isEnemyTargetingMe(char, gunAimDotSetting, confirmedAttack)
+end
+
+local function isMeleeSwingTrackActive(track)
+	return track.IsPlaying
 end
 
 -- ---------------------------------------------------------------------------
@@ -675,10 +757,7 @@ local function isGlintInstance(inst)
 end
 
 local function getGunParryDelay(gunName)
-	if gunName == 'Castigate' then
-		return castigateParryDelay
-	end
-	return math.max(0.02, (GUN_DRAW_TIMES[gunName] or 0.75) - 0.14)
+	return gunParryDelays[gunName] or gunParryDelays.Castigate
 end
 
 local function scheduleGunDrawParry(char, gunName, normId, timePosition, source, track)
@@ -764,7 +843,7 @@ tryParry = function(reason)
 	if not autoParryActive or not isLocalAlive() then
 		return false
 	end
-	if tick() - lastParryAt < 0.05 then
+	if tick() - lastParryAt < parryCooldownSetting then
 		return false
 	end
 	lastParryAt = tick()
@@ -791,7 +870,7 @@ local function scheduleMeleeParry(char, animId, track, source)
 		end
 	end)
 
-	local delay = math.max(0, MELEE_PARRY_DELAY - track.TimePosition)
+	local delay = math.max(0, meleeParryDelaySetting - track.TimePosition)
 	debugLog('trigger', 'melee_schedule_' .. normId, 'delay=' .. string.format('%.2f', delay), 'aim=' .. string.format('%.2f', getAimDot(char)), source)
 
 	task.delay(delay, function()
@@ -815,8 +894,8 @@ end
 
 local function handleMeleeAnimation(char, track, source)
 	source = source or 'edge'
-	if not track.IsPlaying or track.WeightCurrent < 0.05 then
-		debugSkip('melee_low_weight', getTrackAnimInfo(track), source)
+	if not isMeleeSwingTrackActive(track) then
+		debugSkip('melee_not_playing', getTrackAnimInfo(track), source)
 		return
 	end
 
@@ -826,7 +905,7 @@ local function handleMeleeAnimation(char, track, source)
 		debugSkip('not_whitelisted', name, normId, source)
 		return
 	end
-	if track.TimePosition > MELEE_SWING_MAX_TIME then
+	if track.TimePosition > meleeSwingWindowSetting then
 		debugSkip('melee_late_window', name, string.format('%.2f', track.TimePosition), source)
 		return
 	end
@@ -850,9 +929,12 @@ local function handleMeleeAnimation(char, track, source)
 end
 
 local function handleGunDrawAnimation(char, track, source)
+	if not parryGunDrawEnabled then
+		return
+	end
 	source = source or 'edge'
-	if not track.IsPlaying or track.WeightCurrent < 0.05 then
-		debugSkip('gun_draw_low_weight', getTrackAnimInfo(track), source)
+	if not track.IsPlaying then
+		debugSkip('gun_draw_not_playing', getTrackAnimInfo(track), source)
 		return
 	end
 
@@ -862,7 +944,7 @@ local function handleGunDrawAnimation(char, track, source)
 	if not gunName then
 		return
 	end
-	if track.TimePosition > GUN_DRAW_EDGE_MAX_TIME then
+	if track.TimePosition > gunDrawWindowSetting then
 		debugSkip('gun_draw_late', name, string.format('%.2f', track.TimePosition), source)
 		return
 	end
@@ -875,9 +957,12 @@ local function handleGunDrawAnimation(char, track, source)
 end
 
 local function handleGunShotAnimation(char, track, source)
+	if not parryGunShotEnabled then
+		return
+	end
 	source = source or 'edge'
-	if not track.IsPlaying or track.WeightCurrent < 0.08 then
-		debugSkip('gun_shot_low_weight', getTrackAnimInfo(track), source)
+	if not track.IsPlaying then
+		debugSkip('gun_shot_not_playing', getTrackAnimInfo(track), source)
 		return
 	end
 
@@ -887,7 +972,7 @@ local function handleGunShotAnimation(char, track, source)
 	if not gunName then
 		return
 	end
-	if track.TimePosition > GUN_SHOT_MAX_TIME then
+	if track.TimePosition > gunShotWindowSetting then
 		debugSkip('gun_shot_late', name, string.format('%.2f', track.TimePosition), source)
 		return
 	end
@@ -918,6 +1003,9 @@ end
 
 local function handleGlintSpawn(char, inst)
 	if not isGlintInstance(inst) then
+		return
+	end
+	if not parryGlintEnabled or not parryGunDrawEnabled then
 		return
 	end
 	if not charHasGunEquipped(char) then
@@ -951,11 +1039,11 @@ local function onEnemyAnimationPlayed(char, track)
 			debugAnimLog('played', name, 'id=' .. normId, kind or '-', 'w=' .. string.format('%.2f', track.WeightCurrent))
 		end
 	end
-	if kind == 'melee' then
+	if kind == 'melee' and parryMeleeEnabled then
 		handleMeleeAnimation(char, track, 'edge')
-	elseif kind == 'gun_draw' then
+	elseif kind == 'gun_draw' and parryGunDrawEnabled then
 		handleGunDrawAnimation(char, track, 'edge')
-	elseif kind == 'gun_shot' then
+	elseif kind == 'gun_shot' and parryGunShotEnabled then
 		handleGunShotAnimation(char, track, 'edge')
 	end
 end
@@ -1244,16 +1332,16 @@ local function scanWhitelistRealtime()
 			local meleeDist = getEnemyDistance(ownerChar)
 			for _, model in getEnemyModels(plr) do
 				for _, track in getAllPlayingTracks(model) do
-					if not track.IsPlaying or track.WeightCurrent < 0.05 then
+					if not track.IsPlaying then
 						continue
 					end
 					local _, animId = getTrackAnimInfo(track)
 					local kind = getParryAnimKind(animId)
-					if kind == 'melee' and meleeDist <= meleeRangeSetting and track.TimePosition <= MELEE_SWING_MAX_TIME then
+					if kind == 'melee' and meleeDist <= meleeRangeSetting and track.TimePosition <= meleeSwingWindowSetting then
 						handleMeleeAnimation(ownerChar, track, 'scan')
-					elseif kind == 'gun_draw' and track.TimePosition <= GUN_DRAW_EDGE_MAX_TIME then
+					elseif kind == 'gun_draw' and track.TimePosition <= gunDrawWindowSetting then
 						handleGunDrawAnimation(ownerChar, track, 'scan')
-					elseif kind == 'gun_shot' and track.TimePosition <= GUN_SHOT_MAX_TIME then
+					elseif kind == 'gun_shot' and track.TimePosition <= gunShotWindowSetting then
 						handleGunShotAnimation(ownerChar, track, 'scan')
 					end
 				end
@@ -1281,10 +1369,13 @@ local function enemyThreatensMe(char, meleeRange)
 		if track.IsPlaying and track.WeightCurrent >= 0.08 then
 			local _, animId = getTrackAnimInfo(track)
 			local kind = getParryAnimKind(animId)
-			if kind == 'melee' and getEnemyDistance(char) <= meleeRange and shouldParryMelee(char, true) then
+			if kind == 'melee' and parryMeleeEnabled and getEnemyDistance(char) <= meleeRange and shouldParryMelee(char, true) then
 				return true
 			end
-			if (kind == 'gun_draw' or kind == 'gun_shot') and shouldParryGun(char, true) then
+			if parryGunDrawEnabled and kind == 'gun_draw' and shouldParryGun(char, true) then
+				return true
+			end
+			if parryGunShotEnabled and kind == 'gun_shot' and shouldParryGun(char, true) then
 				return true
 			end
 		end
@@ -2056,26 +2147,275 @@ run(function()
 		Name = 'Melee Range',
 		Min = 4,
 		Max = 30,
-		Default = 20,
+		Default = AUTO_PARRY_DEFAULTS.meleeRange,
+		Function = function(val)
+			meleeRangeSetting = val
+		end,
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
 	})
 
-	CastigateDelay = AutoParry:CreateSlider({
-		Name = 'Castigate Parry Delay',
-		Min = 0.05,
-		Max = 0.90,
+	local ParryMelee
+	local ParryGunDraw
+	local ParryGunShot
+	local ParryGlint
+	local MeleeParryDelay
+	local MeleeAimDot
+	local GunAimDot
+	local ParryCooldown
+	local CloseRangeStuds
+	local MeleeSwingWindow
+	local GunDrawWindow
+	local GunShotWindow
+	local CastigateDelay
+	local PhoenixDelay
+	local SiegeDelay
+	local MonarchDelay
+
+	ParryMelee = AutoParry:CreateToggle({
+		Name = 'Parry Melee',
+		Default = AUTO_PARRY_DEFAULTS.parryMelee,
+		Function = function(callback)
+			parryMeleeEnabled = callback
+		end,
+	})
+
+	ParryGunDraw = AutoParry:CreateToggle({
+		Name = 'Parry Gun Draw',
+		Default = AUTO_PARRY_DEFAULTS.parryGunDraw,
+		Function = function(callback)
+			parryGunDrawEnabled = callback
+		end,
+	})
+
+	ParryGunShot = AutoParry:CreateToggle({
+		Name = 'Parry Gun Shot',
+		Default = AUTO_PARRY_DEFAULTS.parryGunShot,
+		Function = function(callback)
+			parryGunShotEnabled = callback
+		end,
+	})
+
+	ParryGlint = AutoParry:CreateToggle({
+		Name = 'Glint Backup',
+		Default = AUTO_PARRY_DEFAULTS.parryGlint,
+		Function = function(callback)
+			parryGlintEnabled = callback
+		end,
+		Tooltip = 'Fallback draw parry when glint VFX spawns.',
+	})
+
+	MeleeParryDelay = AutoParry:CreateSlider({
+		Name = 'Melee Parry Delay',
+		Min = 0,
+		Max = 0.5,
 		Decimal = 100,
-		Default = 0.36,
+		Default = AUTO_PARRY_DEFAULTS.meleeParryDelay,
 		Function = function(val)
-			castigateParryDelay = val
+			meleeParryDelaySetting = val
 		end,
 		Suffix = function(val)
 			return val == 1 and 'second' or 'seconds'
 		end,
-		Tooltip = 'Seconds after revolver draw starts to press parry. Lower = earlier.',
 	})
+
+	MeleeAimDot = AutoParry:CreateSlider({
+		Name = 'Melee Aim Dot',
+		Min = 0.1,
+		Max = 0.9,
+		Decimal = 100,
+		Default = AUTO_PARRY_DEFAULTS.meleeAimDot,
+		Function = function(val)
+			meleeAimDotSetting = val
+		end,
+		Tooltip = 'How directly enemies must face you for melee parry.',
+	})
+
+	GunAimDot = AutoParry:CreateSlider({
+		Name = 'Gun Aim Dot',
+		Min = 0.1,
+		Max = 0.9,
+		Decimal = 100,
+		Default = AUTO_PARRY_DEFAULTS.gunAimDot,
+		Function = function(val)
+			gunAimDotSetting = val
+		end,
+		Tooltip = 'How directly enemies must face you for gun parry.',
+	})
+
+	ParryCooldown = AutoParry:CreateSlider({
+		Name = 'Parry Cooldown',
+		Min = 0.02,
+		Max = 0.5,
+		Decimal = 100,
+		Default = AUTO_PARRY_DEFAULTS.parryCooldown,
+		Function = function(val)
+			parryCooldownSetting = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end,
+	})
+
+	CloseRangeStuds = AutoParry:CreateSlider({
+		Name = 'Close Range Guard',
+		Min = 0,
+		Max = 8,
+		Decimal = 10,
+		Default = AUTO_PARRY_DEFAULTS.closeRangeStuds,
+		Function = function(val)
+			closeRangeStudsSetting = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end,
+		Tooltip = 'Within this range, require a confirmed attack anim before parrying.',
+	})
+
+	MeleeSwingWindow = AutoParry:CreateSlider({
+		Name = 'Melee Swing Window',
+		Min = 0.2,
+		Max = 1,
+		Decimal = 100,
+		Default = AUTO_PARRY_DEFAULTS.meleeSwingWindow,
+		Function = function(val)
+			meleeSwingWindowSetting = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end,
+	})
+
+	GunDrawWindow = AutoParry:CreateSlider({
+		Name = 'Gun Draw Window',
+		Min = 0.1,
+		Max = 1.2,
+		Decimal = 100,
+		Default = AUTO_PARRY_DEFAULTS.gunDrawWindow,
+		Function = function(val)
+			gunDrawWindowSetting = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end,
+	})
+
+	GunShotWindow = AutoParry:CreateSlider({
+		Name = 'Gun Shot Window',
+		Min = 0.05,
+		Max = 0.4,
+		Decimal = 100,
+		Default = AUTO_PARRY_DEFAULTS.gunShotWindow,
+		Function = function(val)
+			gunShotWindowSetting = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end,
+	})
+
+	CastigateDelay = AutoParry:CreateSlider({
+		Name = 'Castigate Draw Delay',
+		Min = 0.05,
+		Max = 0.90,
+		Decimal = 100,
+		Default = AUTO_PARRY_DEFAULTS.castigateDelay,
+		Function = function(val)
+			gunParryDelays.Castigate = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end,
+		Tooltip = 'Seconds after revolver draw starts to press parry.',
+	})
+
+	PhoenixDelay = AutoParry:CreateSlider({
+		Name = 'Phoenix Draw Delay',
+		Min = 0.05,
+		Max = 1.2,
+		Decimal = 100,
+		Default = AUTO_PARRY_DEFAULTS.phoenixDelay,
+		Function = function(val)
+			gunParryDelays.Phoenix = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end,
+	})
+
+	SiegeDelay = AutoParry:CreateSlider({
+		Name = 'Siege Draw Delay',
+		Min = 0.05,
+		Max = 1.5,
+		Decimal = 100,
+		Default = AUTO_PARRY_DEFAULTS.siegeDelay,
+		Function = function(val)
+			gunParryDelays.Siege = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end,
+	})
+
+	MonarchDelay = AutoParry:CreateSlider({
+		Name = 'Monarch Draw Delay',
+		Min = 0.05,
+		Max = 2.2,
+		Decimal = 100,
+		Default = AUTO_PARRY_DEFAULTS.monarchDelay,
+		Function = function(val)
+			gunParryDelays.Monarch = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end,
+	})
+
+	local function setToggleDefault(toggle, enabled)
+		if toggle and toggle.Enabled ~= enabled then
+			toggle:Toggle()
+		end
+	end
+
+	local function applyAutoParryDefaults()
+		local d = AUTO_PARRY_DEFAULTS
+		meleeRangeSetting = d.meleeRange
+		meleeParryDelaySetting = d.meleeParryDelay
+		meleeAimDotSetting = d.meleeAimDot
+		gunAimDotSetting = d.gunAimDot
+		parryCooldownSetting = d.parryCooldown
+		meleeSwingWindowSetting = d.meleeSwingWindow
+		gunDrawWindowSetting = d.gunDrawWindow
+		gunShotWindowSetting = d.gunShotWindow
+		closeRangeStudsSetting = d.closeRangeStuds
+		gunParryDelays.Castigate = d.castigateDelay
+		gunParryDelays.Phoenix = d.phoenixDelay
+		gunParryDelays.Siege = d.siegeDelay
+		gunParryDelays.Monarch = d.monarchDelay
+		parryMeleeEnabled = d.parryMelee
+		parryGunDrawEnabled = d.parryGunDraw
+		parryGunShotEnabled = d.parryGunShot
+		parryGlintEnabled = d.parryGlint
+
+		MeleeRange:SetValue(d.meleeRange)
+		MeleeParryDelay:SetValue(d.meleeParryDelay)
+		MeleeAimDot:SetValue(d.meleeAimDot)
+		GunAimDot:SetValue(d.gunAimDot)
+		ParryCooldown:SetValue(d.parryCooldown)
+		CloseRangeStuds:SetValue(d.closeRangeStuds)
+		MeleeSwingWindow:SetValue(d.meleeSwingWindow)
+		GunDrawWindow:SetValue(d.gunDrawWindow)
+		GunShotWindow:SetValue(d.gunShotWindow)
+		CastigateDelay:SetValue(d.castigateDelay)
+		PhoenixDelay:SetValue(d.phoenixDelay)
+		SiegeDelay:SetValue(d.siegeDelay)
+		MonarchDelay:SetValue(d.monarchDelay)
+		setToggleDefault(ParryMelee, d.parryMelee)
+		setToggleDefault(ParryGunDraw, d.parryGunDraw)
+		setToggleDefault(ParryGunShot, d.parryGunShot)
+		setToggleDefault(ParryGlint, d.parryGlint)
+	end
 
 	ExtendReach = Reach:CreateSlider({
 		Name = 'Extend',
@@ -2108,7 +2448,7 @@ run(function()
 			debugEnabled = callback
 			if callback then
 				logParryAnimIds(true)
-				print('[REDLINER] debug on | alive=', isLocalAlive(), 'autoParry=', autoParryActive, 'castigateDelay=', castigateParryDelay)
+				print('[REDLINER] debug on | alive=', isLocalAlive(), 'autoParry=', autoParryActive, 'castigateDelay=', gunParryDelays.Castigate)
 			else
 				table.clear(lastDebugAnimAt)
 			end
@@ -2128,6 +2468,15 @@ run(function()
 			end
 		end,
 		Tooltip = 'Sends one F key press. Use to verify parry works.',
+	})
+
+	AutoParry:CreateButton({
+		Name = 'Reset to Defaults',
+		Function = function()
+			applyAutoParryDefaults()
+			notif('Auto Parry', 'Settings reset to defaults.', 4)
+		end,
+		Tooltip = 'Restore all Auto Parry sliders and toggles to recommended defaults.',
 	})
 
 	local AnimLogger
