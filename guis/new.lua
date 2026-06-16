@@ -6078,10 +6078,11 @@ mainapi:CreateCategory({
 	Size = UDim2.fromOffset(14, 14)
 })
 mainapi:CreateCategory({
-	Name = 'Inventory',
+	Name = 'Extras',
 	Icon = getcustomasset('newvape/assets/new/inventoryicon.png'),
 	Size = UDim2.fromOffset(15, 14)
 })
+mainapi.Categories.Inventory = mainapi.Categories.Extras
 mainapi:CreateCategory({
 	Name = 'Minigames',
 	Icon = getcustomasset('newvape/assets/new/miniicon.png'),
@@ -6395,7 +6396,7 @@ guipane:CreateButton({
 			RenderCategory = 4,
 			UtilityCategory = 5,
 			WorldCategory = 6,
-			InventoryCategory = 7,
+			ExtrasCategory = 7,
 			MinigamesCategory = 8,
 			FriendsCategory = 9,
 			ProfilesCategory = 10

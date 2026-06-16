@@ -4167,7 +4167,7 @@ run(function()
 	rayCheck.RespectCanCollide = true
 	local part
 	
-	AntiFall = vape.Categories.Blatant:CreateModule({
+	AntiFall = vape.Categories.Utility:CreateModule({
 		Name = 'AntiFall',
 		Function = function(callback)
 			if callback then
@@ -4819,7 +4819,7 @@ run(function()
 		end
 	end
 	
-	HitBoxes = vape.Categories.Blatant:CreateModule({
+	HitBoxes = vape.Categories.Combat:CreateModule({
 		Name = 'HitBoxes',
 		Function = function(callback)
 			if callback then
@@ -5162,7 +5162,7 @@ run(function()
 		return tool and tool:FindFirstChildWhichIsA('TouchTransmitter', true) or nil, tool
 	end
 	
-	Killaura = vape.Categories.Blatant:CreateModule({
+	Killaura = vape.Categories.Combat:CreateModule({
 		Name = 'Killaura',
 		Function = function(callback)
 			if callback then
@@ -5539,7 +5539,7 @@ run(function()
 		return returned
 	end
 	
-	MouseTP = vape.Categories.Blatant:CreateModule({
+	MouseTP = vape.Categories.Utility:CreateModule({
 		Name = 'MouseTP',
 		Function = function(callback)
 			if callback then
@@ -6139,7 +6139,7 @@ run(function()
 	rayCheck.RespectCanCollide = true
 	local module, old
 	
-	TargetStrafe = vape.Categories.Blatant:CreateModule({
+	TargetStrafe = vape.Categories.Combat:CreateModule({
 		Name = 'TargetStrafe',
 		Function = function(callback)
 			if callback then
@@ -6302,7 +6302,7 @@ run(function()
 	local OldNamecall, OldIndex, OldNewIndex
 	local mt = getmetatable(game)
 
-	InstanceProtection = vape.Categories.Blatant:CreateModule({
+	InstanceProtection = vape.Categories.Utility:CreateModule({
 		Name = 'Instance Protection',
 		Function = function(callback)
 			if callback then
@@ -6386,7 +6386,7 @@ run(function()
 	local Timer
 	local Value
 	
-	Timer = vape.Categories.Blatant:CreateModule({
+	Timer = vape.Categories.Utility:CreateModule({
 		Name = 'Timer',
 		Function = function(callback)
 			if callback then
@@ -8451,28 +8451,11 @@ run(function()
 	local PlayerModel
 	local Scale
 	local Local
+	local Enemies
 	local Mesh
 	local Texture
-	local ModelPreset
 	local Rots = {}
 	local models = {}
-
-	local PLAYERMODEL_PRESETS = {
-		Custom = nil,
-		['Block Torso'] = {mesh = 'rbxassetid://14241018198', texture = ''},
-		['Fedora Blue'] = {mesh = 'rbxassetid://3030546036', texture = 'rbxassetid://3650191503'},
-		['Fedora Green'] = {mesh = 'rbxassetid://3030546036', texture = 'rbxassetid://3360978739'},
-		['Gaming Chair'] = {mesh = 'rbxassetid://12972961089', texture = '', scale = 0.35},
-		['Igloo'] = {mesh = 'rbxassetid://1086413449', texture = 'rbxassetid://1461576423', scale = 4},
-		['International Fedora'] = {mesh = 'rbxassetid://3030546036', texture = 'rbxassetid://3443321249'},
-		['Long Left Arm'] = {mesh = 'rbxassetid://11263221350', texture = 'rbxassetid://11263219250'},
-		['Long Right Arm'] = {mesh = 'rbxassetid://11159370334', texture = 'rbxassetid://11159284657'},
-		['Mesh Torso'] = {mesh = 'rbxassetid://13421774668', texture = 'rbxassetid://13415110780'},
-		['Robox Fat'] = {mesh = 'rbxassetid://4819720316', texture = 'rbxassetid://4819722776'},
-		['Smooth Torso'] = {mesh = 'rbxassetid://14768666349', texture = ''},
-		['Spike Torso'] = {mesh = 'rbxassetid://12344207333', texture = ''},
-		['Stack Arms'] = {mesh = 'rbxassetid://14255522247', texture = ''},
-	}
 
 	local function formatMeshInput(value)
 		if not value or value == '' then
@@ -8499,44 +8482,27 @@ run(function()
 		end
 	end
 
-	local function applyPlayerModelPreset(presetName)
-		local preset = PLAYERMODEL_PRESETS[presetName]
-		if not preset then
-			return
-		end
-		Mesh.Value = preset.mesh
-		Texture.Value = preset.texture or ''
-		if Mesh.Object then
-			Mesh.Object.Text = preset.mesh:gsub('rbxassetid://', '')
-		end
-		if Texture.Object then
-			Texture.Object.Text = (preset.texture or ''):gsub('rbxassetid://', '')
-		end
-		if preset.scale then
-			Scale.Value = preset.scale
-		end
-		applyPlayerModelMeshes()
-	end
-
-	local presetList = {}
-	for name in PLAYERMODEL_PRESETS do
-		table.insert(presetList, name)
-	end
-	table.sort(presetList, function(a, b)
-		if a == 'Custom' then
+	local function shouldMeshEntity(ent)
+		if not ent or not ent.RootPart then
 			return false
 		end
-		if b == 'Custom' then
-			return true
+		if ent.Player == lplr then
+			return Local.Enabled
 		end
-		return a < b
-	end)
-	
+		return Enemies.Enabled and ent.Player ~= nil
+	end
+
 	local function addMesh(ent)
+		if not shouldMeshEntity(ent) then
+			return
+		end
 		if vape.ThreadFix then 
 			setthreadidentity(8)
 		end
 		local root = ent.RootPart
+		if models[root] then
+			return
+		end
 		local part = Instance.new('Part')
 		part.Size = Vector3.new(3, 3, 3)
 		part.CFrame = root.CFrame * CFrame.Angles(math.rad(Rots[1].Value), math.rad(Rots[2].Value), math.rad(Rots[3].Value))
@@ -8558,36 +8524,50 @@ run(function()
 	end
 	
 	local function removeMesh(ent)
-		if models[ent.RootPart] then 
+		if ent.RootPart and models[ent.RootPart] then 
 			models[ent.RootPart]:Destroy()
 			models[ent.RootPart] = nil
 		end
+	end
+
+	local function refreshPlayerModels()
+		for _, ent in entitylib.List do
+			if shouldMeshEntity(ent) then
+				addMesh(ent)
+			else
+				removeMesh(ent)
+			end
+		end
+		if entitylib.isAlive and not Local.Enabled then
+			removeMesh(entitylib.character)
+		end
+	end
+
+	local function bindPlayerModelEvents()
+		PlayerModel:Clean(entitylib.Events.LocalAdded:Connect(addMesh))
+		PlayerModel:Clean(entitylib.Events.LocalRemoved:Connect(removeMesh))
+		PlayerModel:Clean(entitylib.Events.EntityAdded:Connect(addMesh))
+		PlayerModel:Clean(entitylib.Events.EntityRemoved:Connect(removeMesh))
+	end
+
+	local function unbindPlayerModelMeshes()
+		for _, part in models do 
+			part:Destroy()
+		end
+		table.clear(models)
 	end
 	
 	PlayerModel = vape.Categories.Render:CreateModule({
 		Name = 'PlayerModel',
 		Function = function(callback)
 			if callback then 
-				if Local.Enabled then 
-					PlayerModel:Clean(entitylib.Events.LocalAdded:Connect(addMesh))
-					PlayerModel:Clean(entitylib.Events.LocalRemoved:Connect(removeMesh))
-					if entitylib.isAlive then 
-						task.spawn(addMesh, entitylib.character)
-					end
-				end
-				PlayerModel:Clean(entitylib.Events.EntityAdded:Connect(addMesh))
-				PlayerModel:Clean(entitylib.Events.EntityRemoved:Connect(removeMesh))
-				for _, ent in entitylib.List do 
-					task.spawn(addMesh, ent)
-				end
+				bindPlayerModelEvents()
+				refreshPlayerModels()
 			else
-				for _, part in models do 
-					part:Destroy()
-				end
-				table.clear(models)
+				unbindPlayerModelMeshes()
 			end
 		end,
-		Tooltip = 'Change the player models to a Mesh'
+		Tooltip = 'Replaces player models with a custom mesh overlay'
 	})
 	Scale = PlayerModel:CreateSlider({
 		Name = 'Scale',
@@ -8617,31 +8597,26 @@ run(function()
 	end
 	Local = PlayerModel:CreateToggle({
 		Name = 'Local',
+		Default = false,
 		Function = function()
-			if PlayerModel.Enabled then 
-				PlayerModel:Toggle()
-				PlayerModel:Toggle()
+			if PlayerModel.Enabled then
+				refreshPlayerModels()
 			end
 		end
 	})
-	ModelPreset = PlayerModel:CreateDropdown({
-		Name = 'Preset',
-		List = presetList,
-		Default = 'Robox Fat',
-		Function = function(val)
-			if val == 'Custom' then
-				return
+	Enemies = PlayerModel:CreateToggle({
+		Name = 'Enemies',
+		Default = true,
+		Function = function()
+			if PlayerModel.Enabled then
+				refreshPlayerModels()
 			end
-			applyPlayerModelPreset(val)
 		end
 	})
 	Mesh = PlayerModel:CreateTextBox({
 		Name = 'Mesh',
 		Placeholder = 'mesh id',
 		Function = function()
-			if ModelPreset.Value ~= 'Custom' then
-				ModelPreset.Value = 'Custom'
-			end
 			applyPlayerModelMeshes()
 		end
 	})
@@ -8649,17 +8624,9 @@ run(function()
 		Name = 'Texture',
 		Placeholder = 'texture id',
 		Function = function()
-			if ModelPreset.Value ~= 'Custom' then
-				ModelPreset.Value = 'Custom'
-			end
 			applyPlayerModelMeshes()
 		end
 	})
-	task.defer(function()
-		if ModelPreset.Value ~= 'Custom' then
-			applyPlayerModelPreset(ModelPreset.Value)
-		end
-	end)
 	
 end)
 	
@@ -8861,7 +8828,7 @@ run(function()
 		end
 	end
 	
-	Search = vape.Categories.Render:CreateModule({
+	Search = vape.Categories.Utility:CreateModule({
 		Name = 'Search',
 		Function = function(callback)
 			if callback then
@@ -9280,7 +9247,7 @@ run(function()
 	WaypointFolder = Instance.new('Folder')
 	WaypointFolder.Parent = vape.gui
 	
-	Waypoints = vape.Categories.Render:CreateModule({
+	Waypoints = vape.Categories.Utility:CreateModule({
 		Name = 'Waypoints',
 		Function = function(callback)
 			if callback then
@@ -9410,7 +9377,7 @@ run(function()
 		end
 	end
 	
-	AnimationPlayer = vape.Categories.Utility:CreateModule({
+	AnimationPlayer = vape.Categories.Render:CreateModule({
 		Name = 'AnimationPlayer',
 		Function = function(callback)
 			if callback then
@@ -9492,80 +9459,58 @@ end)
 
 run(function()
 	local AntiFling
-	local physicsService = cloneref(game:GetService('PhysicsService'))
-	local LOCAL_GROUP = 'VapeAntiFlingLocal'
-	local PLAYER_GROUP = 'VapeAntiFlingPlayers'
-	local groupsReady = false
-	local trackedParts = {}
+	local disabledParts = {}
 
-	local function ensureGroups()
-		if groupsReady then
-			return
-		end
-		pcall(function()
-			physicsService:RegisterCollisionGroup(LOCAL_GROUP)
-		end)
-		pcall(function()
-			physicsService:RegisterCollisionGroup(PLAYER_GROUP)
-		end)
-		pcall(function()
-			physicsService:CollisionGroupSetCollidable(LOCAL_GROUP, PLAYER_GROUP, false)
-		end)
-		pcall(function()
-			physicsService:CollisionGroupSetCollidable(LOCAL_GROUP, 'Default', true)
-		end)
-		groupsReady = true
-	end
-
-	local function trackPart(part)
-		if not part:IsA('BasePart') or trackedParts[part] then
-			return
-		end
-		trackedParts[part] = {
-			CollisionGroup = part.CollisionGroup,
-			CanCollide = part.CanCollide,
-		}
-	end
-
-	local function applyToCharacter(char, group, disableCollide)
+	local function ensureLocalCharacterVisible()
+		local char = lplr.Character
 		if not char then
 			return
 		end
 		for _, desc in char:GetDescendants() do
 			if desc:IsA('BasePart') then
-				trackPart(desc)
-				desc.CollisionGroup = group
-				if disableCollide then
-					desc.CanCollide = false
+				desc.CollisionGroup = 'Default'
+				if desc.LocalTransparencyModifier > 0.99 then
+					desc.LocalTransparencyModifier = 0
 				end
 			end
 		end
 	end
 
-	local function refreshAntiFling()
-		ensureGroups()
-		if entitylib.isAlive then
-			applyToCharacter(lplr.Character, LOCAL_GROUP, false)
+	local function disablePlayerCollisions(plr)
+		if plr == lplr then
+			return
 		end
-		for _, plr in playersService:GetPlayers() do
-			if plr ~= lplr then
-				applyToCharacter(plr.Character, PLAYER_GROUP, true)
+		local char = plr.Character
+		if not char then
+			return
+		end
+		for _, desc in char:GetDescendants() do
+			if desc:IsA('BasePart') and desc.CanCollide then
+				disabledParts[desc] = true
+				desc.CanCollide = false
 			end
+		end
+	end
+
+	local function refreshAntiFling()
+		ensureLocalCharacterVisible()
+		for _, plr in playersService:GetPlayers() do
+			disablePlayerCollisions(plr)
 		end
 	end
 
 	local function restoreAntiFling()
-		for part, data in trackedParts do
+		for part, _ in disabledParts do
 			if part.Parent then
-				part.CollisionGroup = data.CollisionGroup
-				part.CanCollide = data.CanCollide
+				part.CanCollide = true
 			end
 		end
-		table.clear(trackedParts)
+		table.clear(disabledParts)
 	end
 
 	local function hookPlayer(plr)
 		if plr == lplr then
+			AntiFling:Clean(plr.CharacterAdded:Connect(ensureLocalCharacterVisible))
 			return
 		end
 		AntiFling:Clean(plr.CharacterAdded:Connect(function()
@@ -9580,13 +9525,11 @@ run(function()
 		Name = 'AntiFling',
 		Function = function(callback)
 			if callback then
-				ensureGroups()
+				ensureLocalCharacterVisible()
 				refreshAntiFling()
 				AntiFling:Clean(runService.Heartbeat:Connect(refreshAntiFling))
-				AntiFling:Clean(entitylib.Events.LocalAdded:Connect(function()
-					task.defer(refreshAntiFling)
-				end))
 				AntiFling:Clean(playersService.PlayerAdded:Connect(hookPlayer))
+				AntiFling:Clean(lplr.CharacterAdded:Connect(ensureLocalCharacterVisible))
 				for _, plr in playersService:GetPlayers() do
 					hookPlayer(plr)
 				end
@@ -9594,7 +9537,7 @@ run(function()
 				restoreAntiFling()
 			end
 		end,
-		Tooltip = 'Disables all collision with other players so you cannot be flung by them'
+		Tooltip = 'Sets other players\' parts non-collidable so they cannot physically fling you'
 	})
 end)
 	
@@ -9835,7 +9778,7 @@ run(function()
 		clone:PivotTo(visualServerCFrame)
 	end
 	
-	Blink = vape.Categories.Utility:CreateModule({
+	Blink = vape.Categories.Blatant:CreateModule({
 		Name = 'Blink',
 		Function = function(callback)
 			if callback then
@@ -10512,7 +10455,7 @@ run(function()
 	end
 	
 	-- Create the module
-	Desync = vape.Categories.Utility:CreateModule({
+	Desync = vape.Categories.Blatant:CreateModule({
 		Name = 'Desync',
 		Function = function(callback)
 			if callback then
@@ -11209,7 +11152,7 @@ run(function()
 		vape.Libraries.refreshVisualizerTracerOrigin()
 	end
 
-	Void = vape.Categories.Utility:CreateModule({
+	Void = vape.Categories.Blatant:CreateModule({
 		Name = 'Void',
 		Function = function(callback)
 			if callback then
@@ -11833,7 +11776,7 @@ run(function()
 		print('[Disabler] All protections disabled')
 	end
 	
-	Disabler = vape.Categories.Utility:CreateModule({
+	Disabler = vape.Categories.Extras:CreateModule({
 		Name = 'Disabler',
 		Function = function(callback)
 			if callback then
@@ -12121,7 +12064,7 @@ run(function()
 		notif('Scriptdumper', 'Saved to workspace/'..prefix, 10)
 	end
 
-	Scriptdumper = vape.Categories.Utility:CreateModule({
+	Scriptdumper = vape.Categories.Extras:CreateModule({
 		Name = 'Scriptdumper',
 		Function = function(callback)
 			if callback then
@@ -12342,34 +12285,19 @@ run(function()
 
 	local CheatDetector
 	local AutoTarget
-	local DetectNoclip
 	local DetectTeleport
 	local DetectFlight
 	local DetectSpin
-	local DetectVoid
-	local DetectAccel
-	local Sensitivity
+	local MinConfidence
 
-	local overlap = OverlapParams.new()
-	overlap.FilterType = Enum.RaycastFilterType.Exclude
 	local floorParams = RaycastParams.new()
 	floorParams.FilterType = Enum.RaycastFilterType.Exclude
 
-	local CheatFlags = {Flags = {}, Flagged = {}}
+	local CheatFlags = {Flags = {}, Flagged = {}, Confidence = {}}
 	local lastPositions = {}
-	local lastVelocities = {}
 	local spawnGrace = {}
 	local flightTicks = {}
 	local spinTicks = {}
-
-	local function checkPoint(pos, params)
-		for _, v in workspace:GetPartBoundsInRadius(pos, 0, params) do
-			if v.CanCollide and (v:GetClosestPointOnSurface(pos) - pos).Magnitude <= 0 then
-				return false
-			end
-		end
-		return true
-	end
 
 	local function updateFilters()
 		local ignore = {}
@@ -12386,7 +12314,6 @@ run(function()
 				table.insert(ignore, extra)
 			end
 		end
-		overlap.FilterDescendantsInstances = ignore
 		floorParams.FilterDescendantsInstances = ignore
 	end
 
@@ -12394,8 +12321,8 @@ run(function()
 		return table.find(vape.Categories.Friends.ListEnabled, plr.Name) ~= nil
 	end
 
-	local function getLimit(base)
-		return math.max(3, math.floor(base * (101 - (Sensitivity.Value or 50)) / 50))
+	local function getThreshold()
+		return math.clamp(MinConfidence.Value or 85, 50, 100)
 	end
 
 	local function addToTargets(plr)
@@ -12417,8 +12344,8 @@ run(function()
 		targets.Update:Fire()
 	end
 
-	local function onCheatDetected(plr, flagtype)
-		notif('CheatDetector', 'Possible cheater ('..flagtype..'): '..plr.Name, 60, 'warning')
+	local function onCheatConfirmed(plr, flagtype)
+		notif('CheatDetector', 'Cheater ('..flagtype..'): '..plr.Name, 60, 'warning')
 		addToTargets(plr)
 
 		local ent = entitylib.getEntity(plr)
@@ -12427,26 +12354,29 @@ run(function()
 		end
 	end
 
-	function CheatFlags:Flag(plr, flagtype, limit)
+	function CheatFlags:Flag(plr, flagtype, weight)
 		if not plr or plr == lplr or CheatFlags.Flagged[plr.UserId] or isOnFriendsList(plr) then
 			return
 		end
 
-		CheatFlags.Flags[plr.UserId] = CheatFlags.Flags[plr.UserId] or {}
-		local flags = CheatFlags.Flags[plr.UserId]
-		flags[flagtype] = (flags[flagtype] or 0) + 1
+		local id = plr.UserId
+		weight = math.max(1, weight or 15)
 
-		if flags[flagtype] > getLimit(limit) then
-			CheatFlags.Flagged[plr.UserId] = true
-			onCheatDetected(plr, flagtype)
+		CheatFlags.Flags[id] = CheatFlags.Flags[id] or {}
+		CheatFlags.Flags[id][flagtype] = (CheatFlags.Flags[id][flagtype] or 0) + 1
+		CheatFlags.Confidence[id] = math.min(100, (CheatFlags.Confidence[id] or 0) + weight)
+
+		if CheatFlags.Confidence[id] >= getThreshold() then
+			CheatFlags.Flagged[id] = true
+			onCheatConfirmed(plr, flagtype)
 		end
 	end
 
 	function CheatFlags:Clear()
 		table.clear(CheatFlags.Flags)
 		table.clear(CheatFlags.Flagged)
+		table.clear(CheatFlags.Confidence)
 		table.clear(lastPositions)
-		table.clear(lastVelocities)
 		table.clear(spawnGrace)
 		table.clear(flightTicks)
 		table.clear(spinTicks)
@@ -12456,22 +12386,32 @@ run(function()
 		local id = plr.UserId
 		CheatFlags.Flags[id] = nil
 		CheatFlags.Flagged[id] = nil
+		CheatFlags.Confidence[id] = nil
 		lastPositions[id] = nil
-		lastVelocities[id] = nil
 		spawnGrace[id] = nil
 		flightTicks[id] = nil
 		spinTicks[id] = nil
 	end
 
 	local function setSpawnGrace(plr)
-		spawnGrace[plr.UserId] = tick() + 4
+		spawnGrace[plr.UserId] = tick() + 5
 		lastPositions[plr.UserId] = nil
-		lastVelocities[plr.UserId] = nil
 		flightTicks[plr.UserId] = nil
 		spinTicks[plr.UserId] = nil
+		CheatFlags.Confidence[plr.UserId] = nil
 	end
 
-	CheatDetector = vape.Categories.Utility:CreateModule({
+	local function decayConfidence(id)
+		local current = CheatFlags.Confidence[id]
+		if current and not CheatFlags.Flagged[id] then
+			CheatFlags.Confidence[id] = math.max(0, current - 1.5)
+			if CheatFlags.Confidence[id] <= 0 then
+				CheatFlags.Confidence[id] = nil
+			end
+		end
+	end
+
+	CheatDetector = vape.Categories.Extras:CreateModule({
 		Name = 'CheatDetector',
 		Function = function(callback)
 			if callback then
@@ -12502,11 +12442,9 @@ run(function()
 
 				repeat
 					updateFilters()
-					local localRoot = entitylib.isAlive and entitylib.character.RootPart
-					local localY = localRoot and localRoot.Position.Y or 0
 
 					for _, ent in entitylib.List do
-						if ent.Player and ent.Player ~= lplr and ent.Health > 0 and ent.RootPart and ent.Head and ent.Humanoid then
+						if ent.Player and ent.Player ~= lplr and ent.Health > 0 and ent.RootPart and ent.Humanoid then
 							local plr = ent.Player
 							local id = plr.UserId
 							local root = ent.RootPart
@@ -12514,60 +12452,69 @@ run(function()
 							local vel = root.AssemblyLinearVelocity
 							local grace = spawnGrace[id] and tick() < spawnGrace[id]
 
-							if DetectNoclip.Enabled and not grace and not checkPoint(ent.Head.Position, overlap) then
-								CheatFlags:Flag(plr, 'noclip', 12)
-							end
+							decayConfidence(id)
 
-							if DetectTeleport.Enabled and not grace then
-								local last = lastPositions[id]
-								if last and (pos - last).Magnitude > 120 then
-									CheatFlags:Flag(plr, 'teleport', 3)
+							if not grace then
+								if DetectTeleport.Enabled then
+									local last = lastPositions[id]
+									local dist = last and (pos - last).Magnitude or 0
+									if dist > 250 then
+										CheatFlags:Flag(plr, 'teleport', 35)
+									elseif dist > 180 then
+										CheatFlags:Flag(plr, 'teleport', 15)
+									end
+									lastPositions[id] = pos
+								else
+									lastPositions[id] = pos
 								end
-								lastPositions[id] = pos
-							end
 
-							if DetectAccel.Enabled and not grace and not ent.Humanoid.SeatPart then
-								local lastVel = lastVelocities[id]
-								if lastVel and (vel - lastVel).Magnitude > 180 then
-									CheatFlags:Flag(plr, 'acceleration', 4)
-								end
-								lastVelocities[id] = vel
-							end
+								if DetectFlight.Enabled and not ent.Humanoid.SeatPart then
+									local state = ent.Humanoid:GetState()
+									local onGround = workspace:Raycast(
+										pos,
+										Vector3.new(0, -(root.Size.Y / 2 + ent.Humanoid.HipHeight + 4), 0),
+										floorParams
+									)
+									local slowVertical = math.abs(vel.Y) < 6
+									local airborne = not onGround
+										and slowVertical
+										and state ~= Enum.HumanoidStateType.Climbing
+										and state ~= Enum.HumanoidStateType.Swimming
+										and state ~= Enum.HumanoidStateType.Seated
 
-							if DetectFlight.Enabled and not grace and not ent.Humanoid.SeatPart then
-								local state = ent.Humanoid:GetState()
-								local onGround = workspace:Raycast(pos, Vector3.new(0, -(root.Size.Y / 2 + ent.Humanoid.HipHeight + 3), 0), floorParams)
-								if not onGround and math.abs(vel.Y) < 8 and state ~= Enum.HumanoidStateType.Climbing and state ~= Enum.HumanoidStateType.Swimming then
-									flightTicks[id] = (flightTicks[id] or 0) + 1
-									if flightTicks[id] > 8 then
-										CheatFlags:Flag(plr, 'flight', 6)
+									if airborne then
+										flightTicks[id] = (flightTicks[id] or 0) + 1
+										if flightTicks[id] >= 18 then
+											CheatFlags:Flag(plr, 'flight', 8)
+										end
+									else
+										flightTicks[id] = 0
 									end
 								else
-									flightTicks[id] = math.max(0, (flightTicks[id] or 0) - 1)
+									flightTicks[id] = 0
 								end
-							end
 
-							if DetectSpin.Enabled then
-								if root.AssemblyAngularVelocity.Magnitude > 35 then
-									spinTicks[id] = (spinTicks[id] or 0) + 1
-									if spinTicks[id] > 5 then
-										CheatFlags:Flag(plr, 'spinbot', 8)
+								if DetectSpin.Enabled then
+									local spinRate = root.AssemblyAngularVelocity.Magnitude
+									if spinRate > 45 then
+										spinTicks[id] = (spinTicks[id] or 0) + 1
+										if spinTicks[id] >= 14 then
+											CheatFlags:Flag(plr, 'spinbot', 40)
+										end
+									else
+										spinTicks[id] = 0
 									end
 								else
-									spinTicks[id] = math.max(0, (spinTicks[id] or 0) - 1)
+									spinTicks[id] = 0
 								end
-							end
-
-							if DetectVoid.Enabled and (pos.Y < -10000 or (localRoot and math.abs(pos.Y - localY) > 50000)) then
-								CheatFlags:Flag(plr, 'void', 5)
 							end
 
 							if vape.CheatDetector and vape.CheatDetector.Scans then
 								for _, scan in vape.CheatDetector.Scans do
 									scan(ent, {
 										grace = grace,
-										Flag = function(flagtype, limit)
-											CheatFlags:Flag(plr, flagtype, limit)
+										Flag = function(flagtype, weight)
+											CheatFlags:Flag(plr, flagtype, (weight or 4) * 12)
 										end
 									})
 								end
@@ -12581,14 +12528,10 @@ run(function()
 				CheatFlags:Clear()
 			end
 		end,
-		Tooltip = 'Detects cheaters using movement exploits and auto-targets them.'
+		Tooltip = 'Client-side cheat detector with confidence scoring — only flags when evidence is strong'
 	})
 	AutoTarget = CheatDetector:CreateToggle({
 		Name = 'Auto target',
-		Default = true
-	})
-	DetectNoclip = CheatDetector:CreateToggle({
-		Name = 'Detect noclip',
 		Default = true
 	})
 	DetectTeleport = CheatDetector:CreateToggle({
@@ -12603,24 +12546,17 @@ run(function()
 		Name = 'Detect spinbot',
 		Default = true
 	})
-	DetectVoid = CheatDetector:CreateToggle({
-		Name = 'Detect void',
-		Default = true
-	})
-	DetectAccel = CheatDetector:CreateToggle({
-		Name = 'Detect acceleration',
-		Default = true
-	})
-	Sensitivity = CheatDetector:CreateSlider({
-		Name = 'Sensitivity',
-		Min = 1,
+	MinConfidence = CheatDetector:CreateSlider({
+		Name = 'Min confidence',
+		Min = 50,
 		Max = 100,
-		Default = 50,
-		Suffix = '%'
+		Default = 85,
+		Suffix = '%',
+		Tooltip = 'Higher = fewer flags, only catches obvious cheaters'
 	})
 
-	vape.CheatDetector.Flag = function(plr, flagtype, limit)
-		CheatFlags:Flag(plr, flagtype, limit)
+	vape.CheatDetector.Flag = function(plr, flagtype, weight)
+		CheatFlags:Flag(plr, flagtype, weight)
 	end
 end)
 
