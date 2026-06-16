@@ -62,16 +62,6 @@ local targetinfo = vape.Libraries.targetinfo
 local getfontsize = vape.Libraries.getfontsize
 local getcustomasset = vape.Libraries.getcustomasset
 
-local function getSliderColor(slider, time)
-	if not slider then
-		return Color3.new(1, 1, 1)
-	end
-	if slider.GetColor then
-		return slider:GetColor(time)
-	end
-	return Color3.fromHSV(slider.Hue, slider.Sat, slider.Value)
-end
-
 local TargetStrafeVector, SpiderShift, WaypointFolder
 local currentDesyncRotation = CFrame.identity
 local Spider = {Enabled = false}
@@ -472,7 +462,7 @@ run(function()
 		ent = ent.Player
 		if not ent then return end
 		if isFriend(ent, true) then
-			return getSliderColor(vape.Categories.Friends.Options['Friends color'])
+			return Color3.fromHSV(vape.Categories.Friends.Options['Friends color'].Hue, vape.Categories.Friends.Options['Friends color'].Sat, vape.Categories.Friends.Options['Friends color'].Value)
 		end
 		if vape.Categories.Main.Options['Teams by torso color'].Enabled then
 			local torsoColor = torsoColorCache[ent]
@@ -486,12 +476,7 @@ run(function()
 			return torsoColor
 		end
 		if vape.Categories.Main.Options['Use team color'].Enabled then
-			if tostring(ent.TeamColor) ~= 'White' then
-				return ent.TeamColor.Color
-			end
-			if ent.Team and tostring(ent.Team.TeamColor) ~= 'White' then
-				return ent.Team.TeamColor.Color
-			end
+			return tostring(ent.TeamColor) ~= 'White' and ent.TeamColor.Color or nil
 		end
 		return nil
 	end
@@ -1343,7 +1328,7 @@ run(function()
 			if callback then
 				CircleObject = Drawing.new('Circle')
 				CircleObject.Filled = CircleFilled.Enabled
-				CircleObject.Color = getSliderColor(CircleColor)
+				CircleObject.Color = Color3.fromHSV(CircleColor.Hue, CircleColor.Sat, CircleColor.Value)
 				CircleObject.Position = vape.gui.AbsoluteSize / 2
 				CircleObject.Radius = FOV.Value
 				CircleObject.NumSides = 100
@@ -2246,7 +2231,7 @@ run(function()
 	end
 
 	local function getTracerColors()
-		local mainColor = getSliderColor(BulletTracerColor)
+		local mainColor = Color3.fromHSV(BulletTracerColor.Hue, BulletTracerColor.Sat, BulletTracerColor.Value)
 		return mainColor, mainColor:Lerp(Color3.new(1, 1, 1), 0.45)
 	end
 
@@ -2478,7 +2463,7 @@ run(function()
 				obj.Transparency = 0.4
 				
 				if PositionManipulationVisualizerColorToggle.Enabled then
-					local color = getSliderColor(PositionManipulationVisualizerColor)
+					local color = Color3.fromHSV(PositionManipulationVisualizerColor.Hue, PositionManipulationVisualizerColor.Sat, PositionManipulationVisualizerColor.Value)
 					obj.Color = color
 				end
 			elseif obj:IsA("Humanoid") then
@@ -2534,7 +2519,7 @@ run(function()
 		pmRadiusPart.CastShadow = false
 		pmRadiusPart.Material = Enum.Material.ForceField
 		pmRadiusPart.Transparency = 0.7
-		pmRadiusPart.Color = getSliderColor(PositionManipulationRadiusVisualizerColor)
+		pmRadiusPart.Color = Color3.fromHSV(PositionManipulationRadiusVisualizerColor.Hue, PositionManipulationRadiusVisualizerColor.Sat, PositionManipulationRadiusVisualizerColor.Value)
 		pmRadiusPart.Parent = workspace
 	end
 	
@@ -3216,7 +3201,7 @@ run(function()
 							if localRoot then
 								pmRadiusPart.Position = localRoot.Position
 								pmRadiusPart.Size = Vector3.new(PositionManipulationRadius.Value * 2, PositionManipulationRadius.Value * 2, PositionManipulationRadius.Value * 2)
-								pmRadiusPart.Color = getSliderColor(PositionManipulationRadiusVisualizerColor)
+								pmRadiusPart.Color = Color3.fromHSV(PositionManipulationRadiusVisualizerColor.Hue, PositionManipulationRadiusVisualizerColor.Sat, PositionManipulationRadiusVisualizerColor.Value)
 							end
 						end
 					end))
@@ -3584,7 +3569,7 @@ run(function()
 			if callback then
 				CircleObject = Drawing.new('Circle')
 				CircleObject.Filled = CircleFilled.Enabled
-				CircleObject.Color = getSliderColor(CircleColor)
+				CircleObject.Color = Color3.fromHSV(CircleColor.Hue, CircleColor.Sat, CircleColor.Value)
 				CircleObject.Position = vape.gui.AbsoluteSize / 2
 				CircleObject.Radius = Range.Value
 				CircleObject.NumSides = 100
@@ -3911,7 +3896,7 @@ run(function()
 			PositionManipulationVisualizerColor.Object.Visible = callback
 			if pmClone then
 				if callback then
-					local color = getSliderColor(PositionManipulationVisualizerColor)
+					local color = Color3.fromHSV(PositionManipulationVisualizerColor.Hue, PositionManipulationVisualizerColor.Sat, PositionManipulationVisualizerColor.Value)
 					for _, obj in ipairs(pmClone:GetDescendants()) do
 						if obj:IsA("BasePart") then
 							obj.Color = color
@@ -4192,7 +4177,7 @@ run(function()
 					part.Size = Vector3.new(10000, 1, 10000)
 					part.Transparency = 1 - Color.Opacity
 					part.Material = Enum.Material[Material.Value]
-					part.Color = getSliderColor(Color)
+					part.Color = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 					part.CanCollide = Mode.Value == 'Collide'
 					part.Anchored = true
 					part.CanQuery = false
@@ -5237,7 +5222,7 @@ run(function()
 					for i, v in Boxes do
 						v.Adornee = attacked[i] and attacked[i].Entity.RootPart or nil
 						if v.Adornee then
-							v.Color3 = getSliderColor(attacked[i].Check)
+							v.Color3 = Color3.fromHSV(attacked[i].Check.Hue, attacked[i].Check.Sat, attacked[i].Check.Value)
 							v.Transparency = 1 - attacked[i].Check.Opacity
 						end
 					end
@@ -5370,8 +5355,8 @@ run(function()
 					particles.Drag = 16
 					particles.ShapePartial = 1
 					particles.Color = ColorSequence.new({
-						ColorSequenceKeypoint.new(0, getSliderColor(ParticleColor1)),
-						ColorSequenceKeypoint.new(1, getSliderColor(ParticleColor2))
+						ColorSequenceKeypoint.new(0, Color3.fromHSV(ParticleColor1.Hue, ParticleColor1.Sat, ParticleColor1.Value)),
+						ColorSequenceKeypoint.new(1, Color3.fromHSV(ParticleColor2.Hue, ParticleColor2.Sat, ParticleColor2.Value))
 					})
 					particles.Parent = part
 					Particles[i] = part
@@ -5401,7 +5386,7 @@ run(function()
 			for _, v in Particles do
 				v.ParticleEmitter.Color = ColorSequence.new({
 					ColorSequenceKeypoint.new(0, Color3.fromHSV(hue, sat, val)),
-					ColorSequenceKeypoint.new(1, getSliderColor(ParticleColor2))
+					ColorSequenceKeypoint.new(1, Color3.fromHSV(ParticleColor2.Hue, ParticleColor2.Sat, ParticleColor2.Value))
 				})
 			end
 		end,
@@ -5413,7 +5398,7 @@ run(function()
 		Function = function(hue, sat, val)
 			for _, v in Particles do
 				v.ParticleEmitter.Color = ColorSequence.new({
-					ColorSequenceKeypoint.new(0, getSliderColor(ParticleColor1)),
+					ColorSequenceKeypoint.new(0, Color3.fromHSV(ParticleColor1.Hue, ParticleColor1.Sat, ParticleColor1.Value)),
 					ColorSequenceKeypoint.new(1, Color3.fromHSV(hue, sat, val))
 				})
 			end
@@ -6463,7 +6448,7 @@ run(function()
 		EntityArrow.BorderSizePixel = 0
 		EntityArrow.Visible = false
 		EntityArrow.Image = getcustomasset('newvape/assets/new/arrowmodule.png')
-		EntityArrow.ImageColor3 = entitylib.getEntityColor(ent) or getSliderColor(Color)
+		EntityArrow.ImageColor3 = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 		EntityArrow.Parent = Folder
 		Reference[ent] = EntityArrow
 	end
@@ -6519,7 +6504,7 @@ run(function()
 					Added(ent)
 				end))
 				Arrows:Clean(vape.Categories.Friends.ColorUpdate.Event:Connect(function()
-					ColorFunc(getSliderColor(Color):ToHSV())
+					ColorFunc(Color.Hue, Color.Sat, Color.Value)
 				end))
 				Arrows:Clean(runService.RenderStepped:Connect(Loop))
 			else
@@ -6607,7 +6592,7 @@ run(function()
 	local function getChamColor(ent, fallbackColor)
 		local color = fallbackColor
 		if VisibleOverride.Enabled and isVisible(ent) then
-			color = getSliderColor(VisibleColor)
+			color = Color3.fromHSV(VisibleColor.Hue, VisibleColor.Sat, VisibleColor.Value)
 		end
 		return color
 	end
@@ -6629,7 +6614,7 @@ run(function()
 		else
 			obj.FillColor = color
 			local s, _ = pcall(function()
-				obj.OutlineColor = getSliderColor(OutlineColor)
+				obj.OutlineColor = Color3.fromHSV(OutlineColor.Hue, OutlineColor.Sat, OutlineColor.Value)
 				obj.OutlineTransparency = OutlineTransparency.Value
 			end)
 		end
@@ -6680,8 +6665,8 @@ run(function()
 			local cham = Instance.new('Highlight')
 			cham.Adornee = ent.Character
 			cham.DepthMode = Enum.HighlightDepthMode[Walls.Enabled and 'AlwaysOnTop' or 'Occluded']
-			cham.FillColor = getChamColor(ent, entitylib.getEntityColor(ent) or getSliderColor(FillColor))
-			cham.OutlineColor = getSliderColor(OutlineColor)
+			cham.FillColor = getChamColor(ent, entitylib.getEntityColor(ent) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value))
+			cham.OutlineColor = Color3.fromHSV(OutlineColor.Hue, OutlineColor.Sat, OutlineColor.Value)
 			cham.FillTransparency = FillTransparency.Value
 			cham.OutlineTransparency = OutlineTransparency.Value
 			cham.Parent = Folder
@@ -6700,7 +6685,7 @@ run(function()
 					box.Adornee = v
 					box.ZIndex = 0
 					box.Transparency = FillTransparency.Value
-					box.Color3 = getChamColor(ent, entitylib.getEntityColor(ent) or getSliderColor(FillColor))
+					box.Color3 = getChamColor(ent, entitylib.getEntityColor(ent) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value))
 					box.Parent = Folder
 					table.insert(chams, box)
 				end
@@ -6731,7 +6716,7 @@ run(function()
 						clone.TextureID = ''
 					end
 					
-					clone.Color = getChamColor(ent, entitylib.getEntityColor(ent) or getSliderColor(FillColor))
+					clone.Color = getChamColor(ent, entitylib.getEntityColor(ent) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value))
 					
 					table.insert(chamsData.Parts, {
 						Real = v,
@@ -6793,7 +6778,7 @@ run(function()
 				end))
 				Chams:Clean(vape.Categories.Friends.ColorUpdate.Event:Connect(function()
 					for i, v in Reference do
-						local color = entitylib.getEntityColor(i) or getSliderColor(FillColor)
+						local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
 						applyColor(i, v, color)
 					end
 				end))
@@ -6803,7 +6788,7 @@ run(function()
 					end
 					for i, v in Reference do
 						if VisibleOverride.Enabled then
-							local color = entitylib.getEntityColor(i) or getSliderColor(FillColor)
+							local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
 							applyColor(i, v, color)
 						end
 						if type(v) == 'table' and v.Parts then
@@ -6862,7 +6847,7 @@ run(function()
 		Name = 'Color',
 		Function = function(hue, sat, val)
 			for i, v in Reference do
-				local color = entitylib.getEntityColor(i) or getSliderColor(FillColor)
+				local color = entitylib.getEntityColor(i) or Color3.fromHSV(hue, sat, val)
 				applyColor(i, v, color)
 			end
 		end
@@ -6874,7 +6859,7 @@ run(function()
 				VisibleColor.Object.Visible = callback
 			end
 			for i, v in Reference do
-				local color = entitylib.getEntityColor(i) or getSliderColor(FillColor)
+				local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
 				applyColor(i, v, color)
 			end
 		end
@@ -6886,7 +6871,7 @@ run(function()
 		Function = function(hue, sat, val)
 			if not VisibleOverride.Enabled then return end
 			for i, v in Reference do
-				local color = entitylib.getEntityColor(i) or getSliderColor(FillColor)
+				local color = entitylib.getEntityColor(i) or Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
 				applyColor(i, v, color)
 			end
 		end
@@ -6992,7 +6977,7 @@ run(function()
 	local esp2d
 
 	local function getESPColor()
-		return getSliderColor(Color)
+		return Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 	end
 
 	local function updateExternal2DESP()
@@ -7059,6 +7044,10 @@ run(function()
 					return ent.Character and ent.Character.Name or plr.Name
 				end
 				return whitelist:tag(plr, true)..(DisplayName.Enabled and plr.DisplayName or plr.Name)
+			end,
+			ColorResolver = function(plr)
+				local ent = entitylib.getEntity(plr)
+				return ent and (entitylib.getEntityColor(ent) or getESPColor()) or getESPColor()
 			end
 		})
 	end
@@ -7107,7 +7096,7 @@ run(function()
 			EntityESP.Main.ZIndex = 2
 			EntityESP.Main.Filled = false
 			EntityESP.Main.Thickness = 1
-			EntityESP.Main.Color = entitylib.getEntityColor(ent) or getSliderColor(Color)
+			EntityESP.Main.Color = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 	
 			if BoundingBox.Enabled then
 				EntityESP.Border = Drawing.new('Square')
@@ -7182,7 +7171,7 @@ run(function()
 			EntityESP.Line11 = Drawing.new('Line')
 			EntityESP.Line12 = Drawing.new('Line')
 	
-			local color = entitylib.getEntityColor(ent) or getSliderColor(Color)
+			local color = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 			for _, v in EntityESP do
 				v.Thickness = 1
 				v.Color = color
@@ -7209,7 +7198,7 @@ run(function()
 			EntityESP.LeftLeg = Drawing.new('Line')
 			EntityESP.RightLeg = Drawing.new('Line')
 	
-			local color = entitylib.getEntityColor(ent) or getSliderColor(Color)
+			local color = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 			for _, v in EntityESP do
 				v.Thickness = 2
 				v.Color = color
@@ -7485,8 +7474,7 @@ run(function()
 				end
 				if ColorFunc[methodused] then
 					ESP:Clean(vape.Categories.Friends.ColorUpdate.Event:Connect(function()
-						local h, s, v = getSliderColor(Color):ToHSV()
-						ColorFunc[methodused](h, s, v)
+						ColorFunc[methodused](Color.Hue, Color.Sat, Color.Value)
 					end))
 				end
 				if ESPLoop[methodused] then
@@ -7790,10 +7778,6 @@ run(function()
 	setControlVisible(DistanceESP, twoddefault)
 	setControlVisible(DistanceESPSize, twoddefault and isControlEnabled(DistanceESP, false))
 	setControlVisible(DistanceESPOffset, twoddefault and isControlEnabled(DistanceESP, false))
-
-	vape.OnTeamSettingsChanged = function()
-		refreshESP()
-	end
 end)
 	
 run(function()
@@ -7845,7 +7829,7 @@ run(function()
 				end
 				chairhighlight = Instance.new('Highlight')
 				chairhighlight.FillTransparency = 1
-				chairhighlight.OutlineColor = getSliderColor(Color)
+				chairhighlight.OutlineColor = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 				chairhighlight.DepthMode = Enum.HighlightDepthMode.Occluded
 				chairhighlight.OutlineTransparency = 0.2
 				chairhighlight.Parent = chair
@@ -8101,7 +8085,7 @@ run(function()
 			nametag.BorderSizePixel = 0
 			nametag.Visible = false
 			nametag.Text = Strings[ent]
-			nametag.TextColor3 = entitylib.getEntityColor(ent) or getSliderColor(Color)
+			nametag.TextColor3 = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 			nametag.RichText = true
 			nametag.Parent = Folder
 			Reference[ent] = nametag
@@ -8135,7 +8119,7 @@ run(function()
 			end
 	
 			nametag.Text.Text = Strings[ent]
-			nametag.Text.Color = entitylib.getEntityColor(ent) or getSliderColor(Color)
+			nametag.Text.Color = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 			nametag.BG.Size = Vector2.new(nametag.Text.TextBounds.X + 8, nametag.Text.TextBounds.Y + 7)
 			Reference[ent] = nametag
 		end
@@ -8218,7 +8202,7 @@ run(function()
 				end
 	
 				nametag.BG.Size = Vector2.new(nametag.Text.TextBounds.X + 8, nametag.Text.TextBounds.Y + 7)
-				nametag.Text.Color = entitylib.getEntityColor(ent) or getSliderColor(Color)
+				nametag.Text.Color = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 			end
 		end
 	}
@@ -8329,8 +8313,7 @@ run(function()
 				end
 				if ColorFunc[methodused] then
 					NameTags:Clean(vape.Categories.Friends.ColorUpdate.Event:Connect(function()
-						local h, s, v = getSliderColor(Color):ToHSV()
-						ColorFunc[methodused](h, s, v)
+						ColorFunc[methodused](Color.Hue, Color.Sat, Color.Value)
 					end))
 				end
 				if Loop[methodused] then
@@ -8470,8 +8453,84 @@ run(function()
 	local Local
 	local Mesh
 	local Texture
+	local ModelPreset
 	local Rots = {}
 	local models = {}
+
+	local PLAYERMODEL_PRESETS = {
+		Custom = nil,
+		['Block Torso'] = {mesh = 'rbxassetid://14241018198', texture = ''},
+		['Fedora Blue'] = {mesh = 'rbxassetid://3030546036', texture = 'rbxassetid://3650191503'},
+		['Fedora Green'] = {mesh = 'rbxassetid://3030546036', texture = 'rbxassetid://3360978739'},
+		['Gaming Chair'] = {mesh = 'rbxassetid://12972961089', texture = '', scale = 0.35},
+		['Igloo'] = {mesh = 'rbxassetid://1086413449', texture = 'rbxassetid://1461576423', scale = 4},
+		['International Fedora'] = {mesh = 'rbxassetid://3030546036', texture = 'rbxassetid://3443321249'},
+		['Long Left Arm'] = {mesh = 'rbxassetid://11263221350', texture = 'rbxassetid://11263219250'},
+		['Long Right Arm'] = {mesh = 'rbxassetid://11159370334', texture = 'rbxassetid://11159284657'},
+		['Mesh Torso'] = {mesh = 'rbxassetid://13421774668', texture = 'rbxassetid://13415110780'},
+		['Robox Fat'] = {mesh = 'rbxassetid://4819720316', texture = 'rbxassetid://4819722776'},
+		['Smooth Torso'] = {mesh = 'rbxassetid://14768666349', texture = ''},
+		['Spike Torso'] = {mesh = 'rbxassetid://12344207333', texture = ''},
+		['Stack Arms'] = {mesh = 'rbxassetid://14255522247', texture = ''},
+	}
+
+	local function formatMeshInput(value)
+		if not value or value == '' then
+			return ''
+		end
+		local trimmed = value:gsub('^%s+', ''):gsub('%s+$', '')
+		if trimmed:find('rbxassetid://') or trimmed:find('http') then
+			return trimmed
+		end
+		local digits = trimmed:gsub('%D', '')
+		if digits == '' then
+			return trimmed
+		end
+		return 'rbxassetid://' .. digits
+	end
+
+	local function applyPlayerModelMeshes()
+		local meshId = formatMeshInput(Mesh.Value)
+		local textureId = formatMeshInput(Texture.Value)
+		for _, part in models do
+			part.Mesh.MeshId = meshId
+			part.Mesh.TextureId = textureId
+			part.Mesh.Scale = Vector3.one * Scale.Value
+		end
+	end
+
+	local function applyPlayerModelPreset(presetName)
+		local preset = PLAYERMODEL_PRESETS[presetName]
+		if not preset then
+			return
+		end
+		Mesh.Value = preset.mesh
+		Texture.Value = preset.texture or ''
+		if Mesh.Object then
+			Mesh.Object.Text = preset.mesh:gsub('rbxassetid://', '')
+		end
+		if Texture.Object then
+			Texture.Object.Text = (preset.texture or ''):gsub('rbxassetid://', '')
+		end
+		if preset.scale then
+			Scale.Value = preset.scale
+		end
+		applyPlayerModelMeshes()
+	end
+
+	local presetList = {}
+	for name in PLAYERMODEL_PRESETS do
+		table.insert(presetList, name)
+	end
+	table.sort(presetList, function(a, b)
+		if a == 'Custom' then
+			return false
+		end
+		if b == 'Custom' then
+			return true
+		end
+		return a < b
+	end)
 	
 	local function addMesh(ent)
 		if vape.ThreadFix then 
@@ -8486,8 +8545,9 @@ run(function()
 		part.Massless = true
 		part.Parent = workspace
 		local meshd = Instance.new('SpecialMesh')
-		meshd.MeshId = Mesh.Value
-		meshd.TextureId = Texture.Value
+		meshd.MeshType = Enum.MeshType.FileMesh
+		meshd.MeshId = formatMeshInput(Mesh.Value)
+		meshd.TextureId = formatMeshInput(Texture.Value)
 		meshd.Scale = Vector3.one * Scale.Value
 		meshd.Parent = part
 		local weld = Instance.new('WeldConstraint')
@@ -8564,24 +8624,42 @@ run(function()
 			end
 		end
 	})
+	ModelPreset = PlayerModel:CreateDropdown({
+		Name = 'Preset',
+		List = presetList,
+		Default = 'Robox Fat',
+		Function = function(val)
+			if val == 'Custom' then
+				return
+			end
+			applyPlayerModelPreset(val)
+		end
+	})
 	Mesh = PlayerModel:CreateTextBox({
 		Name = 'Mesh',
 		Placeholder = 'mesh id',
 		Function = function()
-			for _, part in models do 
-				part.Mesh.MeshId = Mesh.Value
+			if ModelPreset.Value ~= 'Custom' then
+				ModelPreset.Value = 'Custom'
 			end
+			applyPlayerModelMeshes()
 		end
 	})
 	Texture = PlayerModel:CreateTextBox({
 		Name = 'Texture',
 		Placeholder = 'texture id',
 		Function = function()
-			for _, part in models do 
-				part.Mesh.TextureId = Texture.Value
+			if ModelPreset.Value ~= 'Custom' then
+				ModelPreset.Value = 'Custom'
 			end
+			applyPlayerModelMeshes()
 		end
 	})
+	task.defer(function()
+		if ModelPreset.Value ~= 'Custom' then
+			applyPlayerModelPreset(ModelPreset.Value)
+		end
+	end)
 	
 end)
 	
@@ -8605,7 +8683,7 @@ run(function()
 		local EntityDot = Instance.new('Frame')
 		EntityDot.Size = UDim2.fromOffset(4, 4)
 		EntityDot.AnchorPoint = Vector2.new(0.5, 0.5)
-		EntityDot.BackgroundColor3 = entitylib.getEntityColor(ent) or getSliderColor(PlayerColor)
+		EntityDot.BackgroundColor3 = entitylib.getEntityColor(ent) or Color3.fromHSV(PlayerColor.Hue, PlayerColor.Sat, PlayerColor.Value)
 		EntityDot.Parent = bkg
 		local EntityCorner = Instance.new('UICorner')
 		EntityCorner.CornerRadius = UDim.new(DotStyle.Value == 'Circles' and 1 or 0, 0)
@@ -8651,7 +8729,7 @@ run(function()
 				end))
 				Radar:Clean(vape.Categories.Friends.ColorUpdate.Event:Connect(function()
 					for ent, EntityDot in Reference do
-						EntityDot.BackgroundColor3 = entitylib.getEntityColor(ent) or getSliderColor(PlayerColor)
+						EntityDot.BackgroundColor3 = entitylib.getEntityColor(ent) or Color3.fromHSV(PlayerColor.Hue, PlayerColor.Sat, PlayerColor.Value)
 					end
 				end))
 				Radar:Clean(runService.RenderStepped:Connect(function()
@@ -8691,7 +8769,7 @@ run(function()
 		Name = 'Player Color',
 		Function = function(hue, sat, val)
 			for ent, EntityDot in Reference do
-				EntityDot.BackgroundColor3 = entitylib.getEntityColor(ent) or getSliderColor(PlayerColor)
+				EntityDot.BackgroundColor3 = entitylib.getEntityColor(ent) or Color3.fromHSV(hue, sat, val)
 			end
 		end
 	})
@@ -8777,7 +8855,7 @@ run(function()
 			box.Size = v:IsA('Model') and v:GetExtentsSize() or v.Size
 			box.ZIndex = 0
 			box.Transparency = FillTransparency.Value
-			box.Color3 = getSliderColor(Color)
+			box.Color3 = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 			box.Parent = Folder
 			Reference[v] = box
 		end
@@ -9016,7 +9094,7 @@ run(function()
 		local EntityTracer = Drawing.new('Line')
 		EntityTracer.Thickness = 1
 		EntityTracer.Transparency = 1 - Transparency.Value
-		EntityTracer.Color = entitylib.getEntityColor(ent) or getSliderColor(Color)
+		EntityTracer.Color = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 		Reference[ent] = EntityTracer
 	end
 	
@@ -9092,7 +9170,7 @@ run(function()
 					Added(ent)
 				end))
 				Tracers:Clean(vape.Categories.Friends.ColorUpdate.Event:Connect(function()
-					ColorFunc(getSliderColor(Color):ToHSV())
+					ColorFunc(Color.Hue, Color.Sat, Color.Value)
 				end))
 				Tracers:Clean(runService.RenderStepped:Connect(Loop))
 			else
@@ -9224,7 +9302,7 @@ run(function()
 					tag.BackgroundTransparency = Background.Value
 					tag.Size = billboard.Size
 					tag.Text = split[2]
-					tag.TextColor3 = getSliderColor(Color)
+					tag.TextColor3 = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 					tag.Parent = billboard
 				end
 			else
@@ -9495,7 +9573,7 @@ run(function()
 	local function applyVisualizerStyle()
 		if not visualClone then return end
 		local mat = Enum.Material[VisualizerMaterial.Value]
-		local customColor = getSliderColor(VisualizerColor)
+		local customColor = Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value)
 		for _, d in visualClone:GetDescendants() do
 			if d:IsA('BasePart') then
 				local isAccessoryPart = false
@@ -10026,7 +10104,7 @@ run(function()
 				
 				-- Apply custom color if enabled
 				if VisualizerColorToggle.Enabled then
-					local color = getSliderColor(VisualizerColor)
+					local color = Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value)
 					obj.Color = color
 				end
 			elseif obj:IsA("Humanoid") then
@@ -10864,7 +10942,7 @@ run(function()
 	local function applyVisualizerStyle()
 		if not voidClone then return end
 		local mat = Enum.Material[VisualizerMaterial.Value] or Enum.Material.ForceField
-		local customColor = VisualizerColorToggle.Enabled and getSliderColor(VisualizerColor) or nil
+		local customColor = VisualizerColorToggle.Enabled and Color3.fromHSV(VisualizerColor.Hue, VisualizerColor.Sat, VisualizerColor.Value) or nil
 		for _, obj in voidClone:GetDescendants() do
 			if obj:IsA('BasePart') then
 				obj.Material = mat
@@ -13044,7 +13122,7 @@ run(function()
 					ent = ent.Player
 					if not (ent and vape.Categories.Main.Options['Use team color'].Enabled) then return end
 					if isFriend(ent, true) then
-						return getSliderColor(vape.Categories.Friends.Options['Friends color'])
+						return Color3.fromHSV(vape.Categories.Friends.Options['Friends color'].Hue, vape.Categories.Friends.Options['Friends color'].Sat, vape.Categories.Friends.Options['Friends color'].Value)
 					end
 					return murderer == ent and Color3.new(1, 0.3, 0.3) or sheriff == ent and Color3.new(0, 0.5, 1) or nil
 				end
@@ -13303,9 +13381,9 @@ run(function()
 	local function getLineColor(plr)
 		local ent = plr and entitylib.getEntity(plr)
 		if ent then
-			return entitylib.getEntityColor(ent) or getSliderColor(Color)
+			return entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 		end
-		return getSliderColor(Color)
+		return Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 	end
 
 	local function ensureAimFolder()
@@ -14207,7 +14285,7 @@ run(function()
 								continue
 							end
 							if v2.Type == 'ColorSlider' then
-								obj[i2] = getSliderColor(v2)
+								obj[i2] = Color3.fromHSV(v2.Hue, v2.Sat, v2.Value)
 							elseif v2.Type == 'Dropdown' or v2.Type == 'TextBox' then
 								if apidump[i][i2] ~= 'Number' then
 									obj[i2] = v2.Value or ''
@@ -14507,7 +14585,7 @@ run(function()
 				trail = Instance.new('Trail')
 				trail.Texture = Texture.Value == '' and 'http://www.roblox.com/asset/?id=14166981368' or Texture.Value
 				trail.TextureMode = Enum.TextureMode.Static
-				trail.Color = ColorSequence.new(getSliderColor(FadeIn), getSliderColor(FadeOut))
+				trail.Color = ColorSequence.new(Color3.fromHSV(FadeIn.Hue, FadeIn.Sat, FadeIn.Value), Color3.fromHSV(FadeOut.Hue, FadeOut.Sat, FadeOut.Value))
 				trail.Lifetime = Lifetime.Value
 				trail.Attachment0 = point
 				trail.Attachment1 = point2
@@ -14547,7 +14625,7 @@ run(function()
 		Name = 'Fade In',
 		Function = function(hue, sat, val)
 			if trail then
-				trail.Color = ColorSequence.new(Color3.fromHSV(hue, sat, val), getSliderColor(FadeOut))
+				trail.Color = ColorSequence.new(Color3.fromHSV(hue, sat, val), Color3.fromHSV(FadeOut.Hue, FadeOut.Sat, FadeOut.Value))
 			end
 		end
 	})
@@ -14555,7 +14633,7 @@ run(function()
 		Name = 'Fade Out',
 		Function = function(hue, sat, val)
 			if trail then
-				trail.Color = ColorSequence.new(getSliderColor(FadeIn), Color3.fromHSV(hue, sat, val))
+				trail.Color = ColorSequence.new(Color3.fromHSV(FadeIn.Hue, FadeIn.Sat, FadeIn.Value), Color3.fromHSV(hue, sat, val))
 			end
 		end
 	})
@@ -14691,7 +14769,7 @@ run(function()
 				hat.Size = Vector3.new(3, 0.7, 3)
 				hat.Name = 'ChinaHat'
 				hat.Material = Enum.Material[Material.Value]
-				hat.Color = getSliderColor(Color)
+				hat.Color = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 				hat.CanCollide = false
 				hat.CanQuery = false
 				hat.Massless = true
@@ -14980,19 +15058,10 @@ run(function()
 	local FOV
 	local Value
 	local oldfov
-	local fovConnection
 
-	local function applyFOV()
-		local camera = workspace.CurrentCamera or gameCamera
-		if camera then
-			camera.FieldOfView = Value.Value
-		end
-	end
-
-	local function stopFOVLock()
-		if fovConnection then
-			fovConnection:Disconnect()
-			fovConnection = nil
+	local function applyLockedFOV()
+		if FOV.Enabled then
+			gameCamera.FieldOfView = Value.Value
 		end
 	end
 
@@ -15000,29 +15069,23 @@ run(function()
 		Name = 'FOV',
 		Function = function(callback)
 			if callback then
-				local camera = workspace.CurrentCamera or gameCamera
-				oldfov = camera and camera.FieldOfView or 70
-				applyFOV()
-				stopFOVLock()
-				fovConnection = runService.RenderStepped:Connect(applyFOV)
-				FOV:Clean(fovConnection)
-			else
-				stopFOVLock()
-				if oldfov and gameCamera then
-					gameCamera.FieldOfView = oldfov
-				end
+				oldfov = gameCamera.FieldOfView
+				FOV:Clean(runService.Heartbeat:Connect(function()
+					applyLockedFOV()
+				end))
+				applyLockedFOV()
+			elseif oldfov then
+				gameCamera.FieldOfView = oldfov
 			end
 		end,
-		Tooltip = 'Adjusts camera vision'
+		Tooltip = 'Locks camera FOV to the slider value every frame'
 	})
 	Value = FOV:CreateSlider({
 		Name = 'FOV',
 		Min = 30,
 		Max = 160,
 		Function = function()
-			if FOV.Enabled then
-				applyFOV()
-			end
+			applyLockedFOV()
 		end
 	})
 end)
@@ -15101,7 +15164,7 @@ run(function()
 		end
 		local key = Instance.new('Frame')
 		key.Size = keybutton == Enum.KeyCode.Space and UDim2.new(0, 110, 0, 24) or UDim2.new(0, 34, 0, 36)
-		key.BackgroundColor3 = getSliderColor(Color)
+		key.BackgroundColor3 = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 		key.BackgroundTransparency = 1 - Color.Opacity
 		key.Position = pos
 		key.Name = keybutton.Name
@@ -15167,7 +15230,7 @@ run(function()
 	
 						key.Pressed = false
 						key.Tween = tweenService:Create(key.Key, TweenInfo.new(0.1), {
-							BackgroundColor3 = getSliderColor(Color), 
+							BackgroundColor3 = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value), 
 							BackgroundTransparency = 1 - Color.Opacity
 						})
 						key.Tween2 = tweenService:Create(key.Key.TextLabel, TweenInfo.new(0.1), {
