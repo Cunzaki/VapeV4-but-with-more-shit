@@ -8457,21 +8457,20 @@ run(function()
 	local Rots = {}
 	local models = {}
 
+	local insertService = game:GetService('InsertService')
 	local PLAYERMODEL_PRESETS = {
 		Custom = nil,
-		['Block Torso'] = {mesh = 'rbxassetid://14241018198', texture = ''},
-		['Fedora Blue'] = {mesh = 'rbxassetid://3030546036', texture = 'rbxassetid://3650191503'},
-		['Fedora Green'] = {mesh = 'rbxassetid://3030546036', texture = 'rbxassetid://3360978739'},
-		['Gaming Chair'] = {mesh = 'rbxassetid://12972961089', texture = '', scale = 0.35},
-		['Igloo'] = {mesh = 'rbxassetid://1086413449', texture = 'rbxassetid://1461576423', scale = 4},
-		['International Fedora'] = {mesh = 'rbxassetid://3030546036', texture = 'rbxassetid://3443321249'},
-		['Long Left Arm'] = {mesh = 'rbxassetid://11263221350', texture = 'rbxassetid://11263219250'},
-		['Long Right Arm'] = {mesh = 'rbxassetid://11159370334', texture = 'rbxassetid://11159284657'},
-		['Mesh Torso'] = {mesh = 'rbxassetid://13421774668', texture = 'rbxassetid://13415110780'},
-		['Robox Fat'] = {mesh = 'rbxassetid://4819720316', texture = 'rbxassetid://4819722776'},
-		['Smooth Torso'] = {mesh = 'rbxassetid://14768666349', texture = ''},
-		['Spike Torso'] = {mesh = 'rbxassetid://12344207333', texture = ''},
-		['Stack Arms'] = {mesh = 'rbxassetid://14255522247', texture = ''},
+		['2B Nier Dress'] = {catalog = 119509858348920, scale = 0.4},
+		['2B Android Dress'] = {catalog = 119647203356012, scale = 0.35},
+		['Anime Girl'] = {catalog = 13174676419, scale = 0.35},
+		['Megumin'] = {catalog = 17789633180, scale = 0.35},
+		['Among Us Crewmate'] = {catalog = 74599750460896, scale = 0.4},
+		['Ghost Rider'] = {mesh = 'rbxassetid://6552202', texture = 'rbxassetid://6552149', scale = 1.5},
+		['Robox Fat'] = {mesh = 'rbxassetid://4819720316', texture = 'rbxassetid://4819722776', scale = 1},
+		['Shaggy'] = {mesh = 'rbxassetid://19999424', texture = 'rbxassetid://20571982', scale = 1.2},
+		['Mummy'] = {mesh = 'rbxassetid://16868741', texture = 'rbxassetid://16868726', scale = 1.1},
+		['Zombie Fiend'] = {mesh = 'rbxassetid://73150923', texture = 'rbxassetid://73150902', scale = 1.1},
+		['Ghost Morph'] = {mesh = 'rbxassetid://36465413', texture = 'rbxassetid://36465387', scale = 1.1},
 	}
 
 	local function formatMeshInput(value)
@@ -8489,6 +8488,54 @@ run(function()
 		return 'rbxassetid://' .. digits
 	end
 
+	local function stripAssetId(value)
+		if not value or value == '' then
+			return ''
+		end
+		local digits = tostring(value):gsub('%D', '')
+		return digits
+	end
+
+	local function setMeshFields(meshId, textureId)
+		Mesh.Value = meshId or ''
+		Texture.Value = textureId or ''
+		if Mesh.Object then
+			Mesh.Object.Text = stripAssetId(meshId)
+		end
+		if Texture.Object then
+			Texture.Object.Text = stripAssetId(textureId)
+		end
+	end
+
+	local function getMeshFromCatalog(catalogId)
+		local ok, asset = pcall(function()
+			return insertService:LoadAsset(catalogId)
+		end)
+		if not ok or not asset then
+			return
+		end
+		local handle = asset:FindFirstChild('Handle', true)
+		if not handle then
+			asset:Destroy()
+			return
+		end
+		local meshId, textureId
+		if handle:IsA('MeshPart') then
+			meshId = handle.MeshId
+			textureId = handle.TextureID
+		else
+			local mesh = handle:FindFirstChildOfClass('SpecialMesh')
+			if mesh then
+				meshId = mesh.MeshId
+				textureId = mesh.TextureId
+			end
+		end
+		asset:Destroy()
+		if meshId and meshId ~= '' then
+			return meshId, textureId or ''
+		end
+	end
+
 	local function applyPlayerModelMeshes()
 		local meshId = formatMeshInput(Mesh.Value)
 		local textureId = formatMeshInput(Texture.Value)
@@ -8504,17 +8551,22 @@ run(function()
 		if not preset then
 			return
 		end
-		Mesh.Value = preset.mesh
-		Texture.Value = preset.texture or ''
-		if Mesh.Object then
-			Mesh.Object.Text = preset.mesh:gsub('rbxassetid://', '')
-		end
-		if Texture.Object then
-			Texture.Object.Text = (preset.texture or ''):gsub('rbxassetid://', '')
-		end
 		if preset.scale then
 			Scale.Value = preset.scale
 		end
+		if preset.catalog then
+			task.spawn(function()
+				local meshId, textureId = getMeshFromCatalog(preset.catalog)
+				if meshId then
+					preset.mesh = meshId
+					preset.texture = textureId
+					setMeshFields(meshId, textureId)
+					applyPlayerModelMeshes()
+				end
+			end)
+			return
+		end
+		setMeshFields(preset.mesh, preset.texture or '')
 		applyPlayerModelMeshes()
 	end
 
@@ -8592,7 +8644,7 @@ run(function()
 	Scale = PlayerModel:CreateSlider({
 		Name = 'Scale',
 		Min = 0,
-		Max = 2,
+		Max = 8,
 		Default = 1,
 		Decimal = 100,
 		Function = function(val)
@@ -8627,7 +8679,7 @@ run(function()
 	ModelPreset = PlayerModel:CreateDropdown({
 		Name = 'Preset',
 		List = presetList,
-		Default = 'Robox Fat',
+		Default = '2B Nier Dress',
 		Function = function(val)
 			if val == 'Custom' then
 				return
