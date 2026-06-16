@@ -8457,20 +8457,21 @@ run(function()
 	local Rots = {}
 	local models = {}
 
-	local insertService = game:GetService('InsertService')
 	local PLAYERMODEL_PRESETS = {
 		Custom = nil,
-		['2B Nier Dress'] = {catalog = 119509858348920, scale = 0.4},
-		['2B Android Dress'] = {catalog = 119647203356012, scale = 0.35},
-		['Anime Girl'] = {catalog = 13174676419, scale = 0.35},
-		['Megumin'] = {catalog = 17789633180, scale = 0.35},
-		['Among Us Crewmate'] = {catalog = 74599750460896, scale = 0.4},
-		['Ghost Rider'] = {mesh = 'rbxassetid://6552202', texture = 'rbxassetid://6552149', scale = 1.5},
-		['Robox Fat'] = {mesh = 'rbxassetid://4819720316', texture = 'rbxassetid://4819722776', scale = 1},
-		['Shaggy'] = {mesh = 'rbxassetid://19999424', texture = 'rbxassetid://20571982', scale = 1.2},
-		['Mummy'] = {mesh = 'rbxassetid://16868741', texture = 'rbxassetid://16868726', scale = 1.1},
-		['Zombie Fiend'] = {mesh = 'rbxassetid://73150923', texture = 'rbxassetid://73150902', scale = 1.1},
-		['Ghost Morph'] = {mesh = 'rbxassetid://36465413', texture = 'rbxassetid://36465387', scale = 1.1},
+		['Block Torso'] = {mesh = 'rbxassetid://14241018198', texture = ''},
+		['Fedora Blue'] = {mesh = 'rbxassetid://3030546036', texture = 'rbxassetid://3650191503'},
+		['Fedora Green'] = {mesh = 'rbxassetid://3030546036', texture = 'rbxassetid://3360978739'},
+		['Gaming Chair'] = {mesh = 'rbxassetid://12972961089', texture = '', scale = 0.35},
+		['Igloo'] = {mesh = 'rbxassetid://1086413449', texture = 'rbxassetid://1461576423', scale = 4},
+		['International Fedora'] = {mesh = 'rbxassetid://3030546036', texture = 'rbxassetid://3443321249'},
+		['Long Left Arm'] = {mesh = 'rbxassetid://11263221350', texture = 'rbxassetid://11263219250'},
+		['Long Right Arm'] = {mesh = 'rbxassetid://11159370334', texture = 'rbxassetid://11159284657'},
+		['Mesh Torso'] = {mesh = 'rbxassetid://13421774668', texture = 'rbxassetid://13415110780'},
+		['Robox Fat'] = {mesh = 'rbxassetid://4819720316', texture = 'rbxassetid://4819722776'},
+		['Smooth Torso'] = {mesh = 'rbxassetid://14768666349', texture = ''},
+		['Spike Torso'] = {mesh = 'rbxassetid://12344207333', texture = ''},
+		['Stack Arms'] = {mesh = 'rbxassetid://14255522247', texture = ''},
 	}
 
 	local function formatMeshInput(value)
@@ -8488,54 +8489,6 @@ run(function()
 		return 'rbxassetid://' .. digits
 	end
 
-	local function stripAssetId(value)
-		if not value or value == '' then
-			return ''
-		end
-		local digits = tostring(value):gsub('%D', '')
-		return digits
-	end
-
-	local function setMeshFields(meshId, textureId)
-		Mesh.Value = meshId or ''
-		Texture.Value = textureId or ''
-		if Mesh.Object then
-			Mesh.Object.Text = stripAssetId(meshId)
-		end
-		if Texture.Object then
-			Texture.Object.Text = stripAssetId(textureId)
-		end
-	end
-
-	local function getMeshFromCatalog(catalogId)
-		local ok, asset = pcall(function()
-			return insertService:LoadAsset(catalogId)
-		end)
-		if not ok or not asset then
-			return
-		end
-		local handle = asset:FindFirstChild('Handle', true)
-		if not handle then
-			asset:Destroy()
-			return
-		end
-		local meshId, textureId
-		if handle:IsA('MeshPart') then
-			meshId = handle.MeshId
-			textureId = handle.TextureID
-		else
-			local mesh = handle:FindFirstChildOfClass('SpecialMesh')
-			if mesh then
-				meshId = mesh.MeshId
-				textureId = mesh.TextureId
-			end
-		end
-		asset:Destroy()
-		if meshId and meshId ~= '' then
-			return meshId, textureId or ''
-		end
-	end
-
 	local function applyPlayerModelMeshes()
 		local meshId = formatMeshInput(Mesh.Value)
 		local textureId = formatMeshInput(Texture.Value)
@@ -8551,22 +8504,17 @@ run(function()
 		if not preset then
 			return
 		end
+		Mesh.Value = preset.mesh
+		Texture.Value = preset.texture or ''
+		if Mesh.Object then
+			Mesh.Object.Text = preset.mesh:gsub('rbxassetid://', '')
+		end
+		if Texture.Object then
+			Texture.Object.Text = (preset.texture or ''):gsub('rbxassetid://', '')
+		end
 		if preset.scale then
 			Scale.Value = preset.scale
 		end
-		if preset.catalog then
-			task.spawn(function()
-				local meshId, textureId = getMeshFromCatalog(preset.catalog)
-				if meshId then
-					preset.mesh = meshId
-					preset.texture = textureId
-					setMeshFields(meshId, textureId)
-					applyPlayerModelMeshes()
-				end
-			end)
-			return
-		end
-		setMeshFields(preset.mesh, preset.texture or '')
 		applyPlayerModelMeshes()
 	end
 
@@ -8644,7 +8592,7 @@ run(function()
 	Scale = PlayerModel:CreateSlider({
 		Name = 'Scale',
 		Min = 0,
-		Max = 8,
+		Max = 2,
 		Default = 1,
 		Decimal = 100,
 		Function = function(val)
@@ -8679,7 +8627,7 @@ run(function()
 	ModelPreset = PlayerModel:CreateDropdown({
 		Name = 'Preset',
 		List = presetList,
-		Default = '2B Nier Dress',
+		Default = 'Robox Fat',
 		Function = function(val)
 			if val == 'Custom' then
 				return
@@ -9539,6 +9487,114 @@ run(function()
 			end
 		end,
 		Tooltip = 'Prevents you from getting knocked down in a ragdoll state'
+	})
+end)
+
+run(function()
+	local AntiFling
+	local physicsService = cloneref(game:GetService('PhysicsService'))
+	local LOCAL_GROUP = 'VapeAntiFlingLocal'
+	local PLAYER_GROUP = 'VapeAntiFlingPlayers'
+	local groupsReady = false
+	local trackedParts = {}
+
+	local function ensureGroups()
+		if groupsReady then
+			return
+		end
+		pcall(function()
+			physicsService:RegisterCollisionGroup(LOCAL_GROUP)
+		end)
+		pcall(function()
+			physicsService:RegisterCollisionGroup(PLAYER_GROUP)
+		end)
+		pcall(function()
+			physicsService:CollisionGroupSetCollidable(LOCAL_GROUP, PLAYER_GROUP, false)
+		end)
+		pcall(function()
+			physicsService:CollisionGroupSetCollidable(LOCAL_GROUP, 'Default', true)
+		end)
+		groupsReady = true
+	end
+
+	local function trackPart(part)
+		if not part:IsA('BasePart') or trackedParts[part] then
+			return
+		end
+		trackedParts[part] = {
+			CollisionGroup = part.CollisionGroup,
+			CanCollide = part.CanCollide,
+		}
+	end
+
+	local function applyToCharacter(char, group, disableCollide)
+		if not char then
+			return
+		end
+		for _, desc in char:GetDescendants() do
+			if desc:IsA('BasePart') then
+				trackPart(desc)
+				desc.CollisionGroup = group
+				if disableCollide then
+					desc.CanCollide = false
+				end
+			end
+		end
+	end
+
+	local function refreshAntiFling()
+		ensureGroups()
+		if entitylib.isAlive then
+			applyToCharacter(lplr.Character, LOCAL_GROUP, false)
+		end
+		for _, plr in playersService:GetPlayers() do
+			if plr ~= lplr then
+				applyToCharacter(plr.Character, PLAYER_GROUP, true)
+			end
+		end
+	end
+
+	local function restoreAntiFling()
+		for part, data in trackedParts do
+			if part.Parent then
+				part.CollisionGroup = data.CollisionGroup
+				part.CanCollide = data.CanCollide
+			end
+		end
+		table.clear(trackedParts)
+	end
+
+	local function hookPlayer(plr)
+		if plr == lplr then
+			return
+		end
+		AntiFling:Clean(plr.CharacterAdded:Connect(function()
+			task.defer(refreshAntiFling)
+		end))
+		if plr.Character then
+			task.defer(refreshAntiFling)
+		end
+	end
+
+	AntiFling = vape.Categories.Utility:CreateModule({
+		Name = 'AntiFling',
+		Function = function(callback)
+			if callback then
+				ensureGroups()
+				refreshAntiFling()
+				AntiFling:Clean(runService.Heartbeat:Connect(refreshAntiFling))
+				AntiFling:Clean(entitylib.Events.LocalAdded:Connect(function()
+					task.defer(refreshAntiFling)
+				end))
+				AntiFling:Clean(playersService.PlayerAdded:Connect(hookPlayer))
+				for _, plr in playersService:GetPlayers() do
+					hookPlayer(plr)
+				end
+			else
+				restoreAntiFling()
+			end
+		end,
+		Tooltip = 'Disables all collision with other players so you cannot be flung by them'
 	})
 end)
 	
