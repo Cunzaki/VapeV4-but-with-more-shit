@@ -442,6 +442,18 @@ entitylib.addPlayer = function(plr)
 			else
 				entitylib.refreshEntity(plr.Character, plr)
 			end
+		end),
+		plr:GetPropertyChangedSignal('TeamColor'):Connect(function()
+			if plr == lplr then
+				for _, v in entitylib.List do
+					entitylib.refreshEntity(v.Character, v.Player)
+				end
+			else
+				entitylib.refreshEntity(plr.Character, plr)
+			end
+			if shared.vape and shared.vape.OnTeamSettingsChanged then
+				shared.vape.OnTeamSettingsChanged()
+			end
 		end)
 	}
 end

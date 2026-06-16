@@ -16,6 +16,7 @@ local mainapi = {
 	RainbowSpeed = {Value = 1},
 	RainbowUpdateSpeed = {Value = 60},
 	RainbowTable = {},
+	GradientTable = {},
 	Scale = {Value = 1},
 	ThreadFix = setthreadidentity and true or false,
 	ToggleNotifications = {},
@@ -107,6 +108,7 @@ local getcustomassets = {
 	['newvape/assets/new/guisettings.png'] = 'rbxassetid://14368318994',
 	['newvape/assets/new/guislider.png'] = 'rbxassetid://14368320020',
 	['newvape/assets/new/guisliderrain.png'] = 'rbxassetid://14368321228',
+	['newvape/assets/new/guipuma.png'] = 'rbxassetid://14373395239',
 	['newvape/assets/new/guiv4.png'] = 'rbxassetid://14368322199',
 	['newvape/assets/new/guivape.png'] = 'rbxassetid://14657521312',
 	['newvape/assets/new/info.png'] = 'rbxassetid://14368324807',
@@ -354,6 +356,64 @@ end or function(path)
 	return getcustomassets[path] or ''
 end
 
+local function makeBrandLogo(config)
+	local textSize = config.TextSize or 14
+	local textHeight = config.TextHeight or 18
+	local pumaSize = config.PumaSize or 16
+	local textColor = config.TextColor or Color3.new(1, 1, 1)
+
+	local container = Instance.new('Frame')
+	container.Name = config.Name or 'VapeLogo'
+	container.Size = config.Size or UDim2.fromOffset(92, 20)
+	container.Position = config.Position or UDim2.fromOffset(0, 0)
+	container.BackgroundTransparency = 1
+	container.BorderSizePixel = 0
+	container.ClipsDescendants = false
+
+	local layout = Instance.new('UIListLayout')
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Padding = UDim.new(0, 3)
+	layout.Parent = container
+
+	local puma = Instance.new('ImageLabel')
+	puma.Name = 'PumaLogo'
+	puma.LayoutOrder = 1
+	puma.Size = UDim2.fromOffset(pumaSize, pumaSize)
+	puma.BackgroundTransparency = 1
+	puma.Image = getcustomasset('newvape/assets/new/guipuma.png')
+	puma.ScaleType = Enum.ScaleType.Fit
+	puma.Parent = container
+
+	local priv = Instance.new('TextLabel')
+	priv.Name = 'PrivText'
+	priv.LayoutOrder = 2
+	priv.BackgroundTransparency = 1
+	priv.Size = UDim2.fromOffset(0, textHeight)
+	priv.AutomaticSize = Enum.AutomaticSize.X
+	priv.Font = Enum.Font.GothamBold
+	priv.Text = 'Priv'
+	priv.TextSize = textSize
+	priv.TextColor3 = textColor
+	priv.Parent = container
+
+	local v9 = Instance.new('TextLabel')
+	v9.Name = 'V9Logo'
+	v9.LayoutOrder = 3
+	v9.BackgroundTransparency = 1
+	v9.Size = UDim2.fromOffset(0, textHeight)
+	v9.AutomaticSize = Enum.AutomaticSize.X
+	v9.Font = Enum.Font.GothamBold
+	v9.Text = 'v9'
+	v9.TextSize = textSize
+	v9.TextColor3 = Color3.new(1, 1, 1)
+	v9.Parent = container
+
+	return container, priv, v9, puma
+end
+
 local function getTableSize(tab)
 	local ind = 0
 	for _ in tab do ind += 1 end
@@ -564,8 +624,15 @@ components = {
 			Value = optionsettings.DefaultValue or 1,
 			Opacity = optionsettings.DefaultOpacity or 1,
 			Rainbow = false,
+			Gradient = false,
+			GradientHue = optionsettings.DefaultGradientHue or 0.66,
+			GradientSat = optionsettings.DefaultGradientSat or 1,
+			GradientValue = optionsettings.DefaultGradientValue or 1,
+			GradientPreset = 'Shift',
+			GradientSpeed = 1,
 			Index = 0
 		}
+		local gradientPresets = {'Static', 'Shift', 'Wave', 'Pulse', 'Rotate'}
 		
 		local function createSlider(name, gradientColor)
 			local slider = Instance.new('TextButton')
@@ -598,9 +665,15 @@ components = {
 			local gradient = Instance.new('UIGradient')
 			gradient.Color = gradientColor
 			gradient.Parent = bkg
+			local fillScale = name == 'Saturation' and optionapi.Sat
+				or name == 'Vibrance' and optionapi.Value
+				or name == 'Opacity' and optionapi.Opacity
+				or name == 'Gradient Hue' and optionapi.GradientHue
+				or name == 'Gradient Speed' and ((optionapi.GradientSpeed - 0.1) / 2.9)
+				or 0
 			local fill = bkg:Clone()
 			fill.Name = 'Fill'
-			fill.Size = UDim2.fromScale(math.clamp(name == 'Saturation' and optionapi.Sat or name == 'Vibrance' and optionapi.Value or optionapi.Opacity, 0.04, 0.96), 1)
+			fill.Size = UDim2.fromScale(math.clamp(fillScale, 0.04, 0.96), 1)
 			fill.Position = UDim2.new()
 			fill.BackgroundTransparency = 1
 			fill.Parent = bkg
@@ -628,7 +701,25 @@ components = {
 				then
 					local changed = inputService.InputChanged:Connect(function(input)
 						if input.UserInputType == (inputObj.UserInputType == Enum.UserInputType.MouseButton1 and Enum.UserInputType.MouseMovement or Enum.UserInputType.Touch) then
-							optionapi:SetValue(nil, name == 'Saturation' and math.clamp((input.Position.X - bkg.AbsolutePosition.X) / bkg.AbsoluteSize.X, 0, 1) or nil, name == 'Vibrance' and math.clamp((input.Position.X - bkg.AbsolutePosition.X) / bkg.AbsoluteSize.X, 0, 1) or nil, name == 'Opacity' and math.clamp((input.Position.X - bkg.AbsolutePosition.X) / bkg.AbsoluteSize.X, 0, 1) or nil)
+							local amount = math.clamp((input.Position.X - bkg.AbsolutePosition.X) / bkg.AbsoluteSize.X, 0, 1)
+							if name == 'Saturation' then
+								optionapi:SetValue(nil, amount)
+							elseif name == 'Vibrance' then
+								optionapi:SetValue(nil, nil, amount)
+							elseif name == 'Opacity' then
+								optionapi:SetValue(nil, nil, nil, amount)
+							elseif name == 'Gradient Hue' then
+								optionapi.GradientHue = amount
+								tween:Tween(fill, uipallet.Tween, {
+									Size = UDim2.fromScale(math.clamp(amount, 0.04, 0.96), 1)
+								})
+								optionapi:TickGradient()
+							elseif name == 'Gradient Speed' then
+								optionapi.GradientSpeed = 0.1 + amount * 2.9
+								tween:Tween(fill, uipallet.Tween, {
+									Size = UDim2.fromScale(math.clamp(amount, 0.04, 0.96), 1)
+								})
+							end
 						end
 					end)
 		
@@ -784,6 +875,136 @@ components = {
 			ColorSequenceKeypoint.new(0, color.Dark(uipallet.Main, 0.02)),
 			ColorSequenceKeypoint.new(1, Color3.fromHSV(optionapi.Hue, optionapi.Sat, optionapi.Value))
 		}))
+		local gradHueSlider = createSlider('Gradient Hue', ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromHSV(0, optionapi.Sat, optionapi.Value)),
+			ColorSequenceKeypoint.new(1, Color3.fromHSV(1, optionapi.Sat, optionapi.Value))
+		}))
+		local gradSpeedSlider = createSlider('Gradient Speed', ColorSequence.new({
+			ColorSequenceKeypoint.new(0, color.Dark(uipallet.Main, 0.02)),
+			ColorSequenceKeypoint.new(1, uipallet.Text)
+		}))
+
+		local gradToggleRow = Instance.new('TextButton')
+		gradToggleRow.Name = optionsettings.Name..'SliderGradientToggle'
+		gradToggleRow.Size = UDim2.new(1, 0, 0, 30)
+		gradToggleRow.BackgroundColor3 = color.Dark(children.BackgroundColor3, optionsettings.Darker and 0.02 or 0)
+		gradToggleRow.BorderSizePixel = 0
+		gradToggleRow.AutoButtonColor = false
+		gradToggleRow.Visible = false
+		gradToggleRow.Text = '          Gradient'
+		gradToggleRow.TextXAlignment = Enum.TextXAlignment.Left
+		gradToggleRow.TextColor3 = color.Dark(uipallet.Text, 0.16)
+		gradToggleRow.TextSize = 11
+		gradToggleRow.FontFace = uipallet.Font
+		gradToggleRow.Parent = children
+		local gradKnobHolder = Instance.new('Frame')
+		gradKnobHolder.Name = 'Knob'
+		gradKnobHolder.Size = UDim2.fromOffset(22, 12)
+		gradKnobHolder.Position = UDim2.new(1, -30, 0, 9)
+		gradKnobHolder.BackgroundColor3 = color.Light(uipallet.Main, 0.14)
+		gradKnobHolder.Parent = gradToggleRow
+		addCorner(gradKnobHolder, UDim.new(1, 0))
+		local gradKnob = gradKnobHolder:Clone()
+		gradKnob.Size = UDim2.fromOffset(8, 8)
+		gradKnob.Position = UDim2.fromOffset(2, 2)
+		gradKnob.BackgroundColor3 = uipallet.Main
+		gradKnob.Parent = gradKnobHolder
+
+		local gradPresetRow = Instance.new('TextButton')
+		gradPresetRow.Name = optionsettings.Name..'SliderGradientPreset'
+		gradPresetRow.Size = UDim2.new(1, 0, 0, 30)
+		gradPresetRow.BackgroundColor3 = color.Dark(children.BackgroundColor3, optionsettings.Darker and 0.02 or 0)
+		gradPresetRow.BorderSizePixel = 0
+		gradPresetRow.AutoButtonColor = false
+		gradPresetRow.Visible = false
+		gradPresetRow.Text = '          Animation - '..optionapi.GradientPreset
+		gradPresetRow.TextXAlignment = Enum.TextXAlignment.Left
+		gradPresetRow.TextColor3 = color.Dark(uipallet.Text, 0.16)
+		gradPresetRow.TextSize = 11
+		gradPresetRow.FontFace = uipallet.Font
+		gradPresetRow.Parent = children
+
+		local function updateGradientToggleVisual()
+			tween:Tween(gradKnobHolder, uipallet.Tween, {
+				BackgroundColor3 = optionapi.Gradient and Color3.fromHSV(mainapi.GUIColor.Hue, mainapi.GUIColor.Sat, mainapi.GUIColor.Value) or color.Light(uipallet.Main, 0.14)
+			})
+			tween:Tween(gradKnob, uipallet.Tween, {
+				Position = UDim2.fromOffset(optionapi.Gradient and 12 or 2, 2)
+			})
+		end
+
+		local function updateExpandChildren(visible)
+			satSlider.Visible = visible
+			vibSlider.Visible = visible
+			opSlider.Visible = visible
+			gradToggleRow.Visible = visible
+			gradHueSlider.Visible = visible and optionapi.Gradient
+			gradSpeedSlider.Visible = visible and optionapi.Gradient
+			gradPresetRow.Visible = visible and optionapi.Gradient
+		end
+
+		function optionapi:GetGradientBlend(time)
+			time = time or tick()
+			local preset = self.GradientPreset or 'Shift'
+			local speed = self.GradientSpeed or 1
+			local t = time * speed
+			if preset == 'Static' then
+				return 0.5
+			elseif preset == 'Shift' then
+				local phase = t % 2
+				return phase <= 1 and phase or (2 - phase)
+			elseif preset == 'Wave' then
+				return 0.5 + 0.5 * math.sin(t * math.pi * 2)
+			elseif preset == 'Pulse' then
+				local wave = 0.5 + 0.5 * math.sin(t * math.pi * 2)
+				return wave * wave
+			elseif preset == 'Rotate' then
+				return t % 1
+			end
+			return 0.5
+		end
+
+		function optionapi:GetColor(time)
+			time = time or tick()
+			if self.Rainbow then
+				return Color3.fromHSV(mainapi:Color((time * 0.2 * mainapi.RainbowSpeed.Value) % 1), self.Sat, self.Value)
+			end
+			local colorA = Color3.fromHSV(self.Hue, self.Sat, self.Value)
+			if not self.Gradient then
+				return colorA
+			end
+			local colorB = Color3.fromHSV(self.GradientHue, self.GradientSat, self.GradientValue)
+			return colorA:Lerp(colorB, self:GetGradientBlend(time))
+		end
+
+		function optionapi:TickGradient()
+			if not self.Gradient then
+				return
+			end
+			local resolved = self:GetColor()
+			local h, s, v = resolved:ToHSV()
+			optionsettings.Function(h, s, v, self.Opacity)
+		end
+
+		function optionapi:ToggleGradient()
+			self.Gradient = not self.Gradient
+			if self.Gradient then
+				if self.Rainbow then
+					self:Toggle()
+				end
+				self.GradientSat = self.Sat
+				self.GradientValue = self.Value
+				table.insert(mainapi.GradientTable, self)
+			else
+				local ind = table.find(mainapi.GradientTable, self)
+				if ind then
+					table.remove(mainapi.GradientTable, ind)
+				end
+			end
+			updateGradientToggleVisual()
+			updateExpandChildren(expand.Rotation == 180 and slider.Visible)
+			self:TickGradient()
+		end
 		
 		function optionapi:Save(tab)
 			tab[optionsettings.Name] = {
@@ -791,7 +1012,13 @@ components = {
 				Sat = self.Sat,
 				Value = self.Value,
 				Opacity = self.Opacity,
-				Rainbow = self.Rainbow
+				Rainbow = self.Rainbow,
+				Gradient = self.Gradient,
+				GradientHue = self.GradientHue,
+				GradientSat = self.GradientSat,
+				GradientValue = self.GradientValue,
+				GradientPreset = self.GradientPreset,
+				GradientSpeed = self.GradientSpeed
 			}
 		end
 		
@@ -799,8 +1026,33 @@ components = {
 			if tab.Rainbow ~= self.Rainbow then
 				self:Toggle()
 			end
+			if tab.Gradient == true and not self.Gradient then
+				self:ToggleGradient()
+			elseif tab.Gradient == false and self.Gradient then
+				self:ToggleGradient()
+			end
+			if tab.GradientPreset then
+				self.GradientPreset = tab.GradientPreset
+				gradPresetRow.Text = '          Animation - '..self.GradientPreset
+			end
+			if tab.GradientSpeed then
+				self.GradientSpeed = tab.GradientSpeed
+				gradSpeedSlider.Slider.Fill.Size = UDim2.fromScale(math.clamp((self.GradientSpeed - 0.1) / 2.9, 0.04, 0.96), 1)
+			end
+			if tab.GradientHue then
+				self.GradientHue = tab.GradientHue
+				gradHueSlider.Slider.Fill.Size = UDim2.fromScale(math.clamp(self.GradientHue, 0.04, 0.96), 1)
+			end
+			if tab.GradientSat then
+				self.GradientSat = tab.GradientSat
+			end
+			if tab.GradientValue then
+				self.GradientValue = tab.GradientValue
+			end
 			if self.Hue ~= tab.Hue or self.Sat ~= tab.Sat or self.Value ~= tab.Value or self.Opacity ~= tab.Opacity then
 				self:SetValue(tab.Hue, tab.Sat, tab.Value, tab.Opacity)
+			elseif self.Gradient then
+				self:TickGradient()
 			end
 		end
 		
@@ -854,6 +1106,9 @@ components = {
 		function optionapi:Toggle()
 			self.Rainbow = not self.Rainbow
 			if self.Rainbow then
+				if self.Gradient then
+					self:ToggleGradient()
+				end
 				table.insert(mainapi.RainbowTable, self)
 				rainbow1.ImageColor3 = Color3.fromRGB(5, 127, 100)
 				task.delay(0.1, function()
@@ -928,9 +1183,7 @@ components = {
 			})
 		end)
 		slider:GetPropertyChangedSignal('Visible'):Connect(function()
-			satSlider.Visible = expand.Rotation == 180 and slider.Visible
-			vibSlider.Visible = satSlider.Visible
-			opSlider.Visible = satSlider.Visible
+			updateExpandChildren(expand.Rotation == 180 and slider.Visible)
 		end)
 		expandbutton.MouseEnter:Connect(function()
 			expand.ImageColor3 = color.Dark(uipallet.Text, 0.16)
@@ -939,10 +1192,19 @@ components = {
 			expand.ImageColor3 = color.Dark(uipallet.Text, 0.43)
 		end)
 		expandbutton.MouseButton1Click:Connect(function()
-			satSlider.Visible = not satSlider.Visible
-			vibSlider.Visible = satSlider.Visible
-			opSlider.Visible = satSlider.Visible
-			expand.Rotation = satSlider.Visible and 180 or 0
+			local visible = not satSlider.Visible
+			updateExpandChildren(visible)
+			expand.Rotation = visible and 180 or 0
+		end)
+		gradToggleRow.MouseButton1Click:Connect(function()
+			optionapi:ToggleGradient()
+		end)
+		gradPresetRow.MouseButton1Click:Connect(function()
+			local ind = table.find(gradientPresets, optionapi.GradientPreset) or 1
+			ind = ind >= #gradientPresets and 1 or ind + 1
+			optionapi.GradientPreset = gradientPresets[ind]
+			gradPresetRow.Text = '          Animation - '..optionapi.GradientPreset
+			optionapi:TickGradient()
 		end)
 		rainbow.MouseButton1Click:Connect(function()
 			optionapi:Toggle()
@@ -959,6 +1221,9 @@ components = {
 					if optionapi.Rainbow then
 						optionapi:Toggle()
 					end
+					if optionapi.Gradient then
+						optionapi:ToggleGradient()
+					end
 					optionapi:SetValue(res:ToHSV())
 				end
 			end
@@ -966,6 +1231,7 @@ components = {
 		
 		optionapi.Object = slider
 		api.Options[optionsettings.Name] = optionapi
+		updateGradientToggleVisual()
 		
 		return optionapi
 	end,
@@ -2494,9 +2760,24 @@ task.spawn(function()
 				v:SetValue(hue)
 			end
 		end
+		for _, v in mainapi.GradientTable do
+			if v.TickGradient then
+				v:TickGradient()
+			end
+		end
 		task.wait(1 / mainapi.RainbowUpdateSpeed.Value)
 	until mainapi.Loaded == nil
 end)
+
+function mainapi:GetSliderColor(slider, time)
+	if slider and slider.GetColor then
+		return slider:GetColor(time)
+	end
+	if slider then
+		return Color3.fromHSV(slider.Hue, slider.Sat, slider.Value)
+	end
+	return Color3.new(1, 1, 1)
+end
 
 function mainapi:BlurCheck()
 	if self.ThreadFix then
@@ -2524,21 +2805,16 @@ function mainapi:CreateGUI()
 	addBlur(window)
 	addCorner(window)
 	makeDraggable(window)
-	local logo = Instance.new('ImageLabel')
-	logo.Name = 'VapeLogo'
-	logo.Size = UDim2.fromOffset(62, 18)
-	logo.Position = UDim2.fromOffset(11, 10)
-	logo.BackgroundTransparency = 1
-	logo.Image = getcustomasset('newvape/assets/new/guivape.png')
-	logo.ImageColor3 = select(3, uipallet.Main:ToHSV()) > 0.5 and uipallet.Text or Color3.new(1, 1, 1)
+	local logo = makeBrandLogo({
+		Name = 'VapeLogo',
+		Size = UDim2.fromOffset(78, 18),
+		Position = UDim2.fromOffset(11, 10),
+		TextSize = 13,
+		TextHeight = 16,
+		PumaSize = 14,
+		TextColor = select(3, uipallet.Main:ToHSV()) > 0.5 and uipallet.Text or Color3.new(1, 1, 1),
+	})
 	logo.Parent = window
-	local logov4 = Instance.new('ImageLabel')
-	logov4.Name = 'V4Logo'
-	logov4.Size = UDim2.fromOffset(28, 16)
-	logov4.Position = UDim2.new(1, 1, 0, 1)
-	logov4.BackgroundTransparency = 1
-	logov4.Image = getcustomasset('newvape/assets/new/guiv4.png')
-	logov4.Parent = logo
 	local children = Instance.new('Frame')
 	children.Name = 'Children'
 	children.Size = UDim2.new(1, 0, 1, -33)
@@ -5745,7 +6021,7 @@ function mainapi:Load(skipgui, profile)
 		image.Size = UDim2.fromOffset(26, 26)
 		image.Position = UDim2.fromOffset(3, 3)
 		image.BackgroundTransparency = 1
-		image.Image = getcustomasset('newvape/assets/new/vape.png')
+		image.Image = getcustomasset('newvape/assets/new/guipuma.png')
 		image.Parent = button
 		local buttoncorner = Instance.new('UICorner')
 		buttoncorner.Parent = button
@@ -6186,6 +6462,9 @@ modules:CreateToggle({
 		if mainapi.Libraries.entity and mainapi.Libraries.entity.Running then
 			mainapi.Libraries.entity.refresh()
 		end
+		if shared.vape and shared.vape.OnTeamSettingsChanged then
+			shared.vape.OnTeamSettingsChanged()
+		end
 	end
 })
 modules:CreateToggle({
@@ -6196,6 +6475,9 @@ modules:CreateToggle({
 		if mainapi.Libraries.entity and mainapi.Libraries.entity.Running then
 			mainapi.Libraries.entity.refresh()
 		end
+		if shared.vape and shared.vape.OnTeamSettingsChanged then
+			shared.vape.OnTeamSettingsChanged()
+		end
 	end
 })
 modules:CreateToggle({
@@ -6204,6 +6486,9 @@ modules:CreateToggle({
 	Function = function()
 		if mainapi.Libraries.entity and mainapi.Libraries.entity.Running then
 			mainapi.Libraries.entity.refresh()
+		end
+		if shared.vape and shared.vape.OnTeamSettingsChanged then
+			shared.vape.OnTeamSettingsChanged()
 		end
 	end
 })
@@ -6501,7 +6786,7 @@ local textguigradient = textgui:CreateToggle({
 	end
 })
 textguigradientv4 = textgui:CreateToggle({
-	Name = 'V4 Gradient',
+	Name = 'v9 Gradient',
 	Function = function()
 		mainapi:UpdateTextGUI()
 	end,
@@ -6637,15 +6922,15 @@ textguicolorcustom = textgui:CreateColorSlider({
 ]]
 
 local VapeLabels = {}
-local VapeLogo = Instance.new('ImageLabel')
-VapeLogo.Name = 'Logo'
-VapeLogo.Size = UDim2.fromOffset(80, 21)
-VapeLogo.Position = UDim2.new(1, -142, 0, 3)
-VapeLogo.BackgroundTransparency = 1
-VapeLogo.BorderSizePixel = 0
+local VapeLogo, VapeLogoPriv, VapeLogoV9 = makeBrandLogo({
+	Name = 'Logo',
+	Size = UDim2.fromOffset(95, 21),
+	Position = UDim2.new(1, -142, 0, 3),
+	TextSize = 15,
+	TextHeight = 21,
+	PumaSize = 17,
+})
 VapeLogo.Visible = false
-VapeLogo.BackgroundColor3 = Color3.new()
-VapeLogo.Image = getcustomasset('newvape/assets/new/textvape.png')
 VapeLogo.Parent = textgui.Children
 
 local lastside = textgui.Children.AbsolutePosition.X > (gui.AbsoluteSize.X / 2)
@@ -6660,31 +6945,28 @@ mainapi:Clean(textgui.Children:GetPropertyChangedSignal('AbsolutePosition'):Conn
 	end
 end))
 
-local VapeLogoV4 = Instance.new('ImageLabel')
-VapeLogoV4.Name = 'Logo2'
-VapeLogoV4.Size = UDim2.fromOffset(33, 18)
-VapeLogoV4.Position = UDim2.new(1, 1, 0, 1)
-VapeLogoV4.BackgroundColor3 = Color3.new()
-VapeLogoV4.BackgroundTransparency = 1
-VapeLogoV4.BorderSizePixel = 0
-VapeLogoV4.Image = getcustomasset('newvape/assets/new/textv4.png')
-VapeLogoV4.Parent = VapeLogo
 local VapeLogoShadow = VapeLogo:Clone()
 VapeLogoShadow.Position = UDim2.fromOffset(1, 1)
 VapeLogoShadow.ZIndex = 0
 VapeLogoShadow.Visible = true
-VapeLogoShadow.ImageColor3 = Color3.new()
-VapeLogoShadow.ImageTransparency = 0.65
+for _, child in VapeLogoShadow:GetChildren() do
+	if child:IsA('TextLabel') then
+		child.TextColor3 = Color3.new()
+		child.TextTransparency = 0.65
+		child.ZIndex = 0
+	elseif child:IsA('ImageLabel') and child.Name == 'PumaLogo' then
+		child.ImageColor3 = Color3.new()
+		child.ImageTransparency = 0.65
+		child.ZIndex = 0
+	end
+end
 VapeLogoShadow.Parent = VapeLogo
-VapeLogoShadow.Logo2.ZIndex = 0
-VapeLogoShadow.Logo2.ImageColor3 = Color3.new()
-VapeLogoShadow.Logo2.ImageTransparency = 0.65
 local VapeLogoGradient = Instance.new('UIGradient')
 VapeLogoGradient.Rotation = 90
-VapeLogoGradient.Parent = VapeLogo
+VapeLogoGradient.Parent = VapeLogoPriv
 local VapeLogoGradient2 = Instance.new('UIGradient')
 VapeLogoGradient2.Rotation = 90
-VapeLogoGradient2.Parent = VapeLogoV4
+VapeLogoGradient2.Parent = VapeLogoV9
 local VapeLabelCustom = Instance.new('TextLabel')
 VapeLabelCustom.Position = UDim2.fromOffset(5, 2)
 VapeLabelCustom.BackgroundTransparency = 1
@@ -7292,7 +7574,8 @@ function mainapi:UpdateGUI(hue, sat, val, default)
 
 	for i, v in mainapi.Categories do
 		if i == 'Main' then
-			v.Object.VapeLogo.V4Logo.ImageColor3 = Color3.fromHSV(hue, sat, val)
+			v.Object.VapeLogo.V9Logo.TextColor3 = Color3.fromHSV(hue, sat, val)
+			v.Object.VapeLogo.PumaLogo.ImageColor3 = Color3.fromHSV(hue, sat, val)
 			for _, button in v.Buttons do
 				if button.Enabled then
 					button.Object.TextColor3 = rainbow and Color3.fromHSV(mainapi:Color((hue - (button.Index * 0.025)) % 1)) or Color3.fromHSV(hue, sat, val)

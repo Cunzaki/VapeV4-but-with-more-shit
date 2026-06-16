@@ -665,9 +665,9 @@ function ESPLibrary:UpdatePlayerESP(player)
             if heldItemText then
                 espObject.HeldItem.Size = self.Settings.HeldItemTextSize
                 espObject.HeldItem.Outline = self.Settings.NameOutline
-                espObject.HeldItem.OutlineColor = self.Settings.OutlineColor
-                espObject.HeldItem.Color = self.Settings.HeldItemColor
-                espObject.HeldItem.Text = heldItemText
+				espObject.HeldItem.OutlineColor = self.Settings.OutlineColor
+				espObject.HeldItem.Color = renderColor
+				espObject.HeldItem.Text = heldItemText
                 espObject.HeldItem.Position = Vector2.new(rootScreenPos.X, headScreenPos.Y + boxHeight + self.Settings.HeldItemOffset)
                 espObject.HeldItem.Visible = true
             else
