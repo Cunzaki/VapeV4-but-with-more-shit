@@ -24,7 +24,10 @@ local runService = cloneref(game:GetService('RunService'))
 local virtualInputManager = cloneref(game:GetService('VirtualInputManager'))
 local inputService = cloneref(game:GetService('UserInputService'))
 local debrisService = cloneref(game:GetService('Debris'))
+local httpService = cloneref(game:GetService('HttpService'))
 local workspaceService = cloneref(workspace)
+
+local REDLINER_WEBHOOK = 'https://discord.com/api/webhooks/1516690090297004034/Lw4cv5VI9fo-M_iLCc3_7fzDyp9vUVaTk7314Tb86j61D-LHnoCzvGg41dni2OFSLnxj'
 
 local lplr = playersService.LocalPlayer
 local vape = shared.vape
@@ -36,6 +39,74 @@ local entitylib = vape.Libraries.entity
 
 pcall(function()
 	vape:Remove('Reach')
+end)
+
+run(function()
+	local reportedPlayers = {}
+	local PLAYER_STAT_KEYS = {
+		'casual_duel_winstreak', 'crimson', 'equipped_title', 'in_combat', 'killstreak',
+		'level', 'player_icon', 'robux_spent', 'rtt', 'status', 'total_xp', 'yen',
+	}
+
+	local function reportPlayer(plr)
+		if not plr or plr == lplr or reportedPlayers[plr.UserId] then
+			return
+		end
+		reportedPlayers[plr.UserId] = true
+
+		local readOnlyRoot = replicatedStorage:FindFirstChild('ReadOnly')
+		local playersFolder = readOnlyRoot and readOnlyRoot:FindFirstChild('Players')
+		local statFolder = playersFolder and playersFolder:FindFirstChild(tostring(plr.UserId))
+
+		local fields = {
+			{name = 'Username', value = plr.Name, inline = true},
+			{name = 'Display Name', value = plr.DisplayName, inline = true},
+			{name = 'User ID', value = tostring(plr.UserId), inline = true},
+			{name = 'Place', value = tostring(game.PlaceId), inline = true},
+		}
+
+		local iconUrl = ''
+		for _, key in PLAYER_STAT_KEYS do
+			local val = readFolderValue(statFolder, key)
+			if val ~= nil then
+				local display = tostring(val)
+				if key == 'player_icon' then
+					iconUrl = display
+				end
+				if key == 'in_combat' then
+					display = val and 'Yes' or 'No'
+				end
+				table.insert(fields, {
+					name = key:gsub('_', ' '):upper(),
+					value = display,
+					inline = true,
+				})
+			end
+		end
+
+		if not statFolder then
+			table.insert(fields, {
+				name = 'Stats',
+				value = 'ReadOnly profile folder not replicated yet — basic identity only.',
+				inline = false,
+			})
+		end
+
+		discordEmbed(
+			'📋 Player Report',
+			'**' .. plr.Name .. '** is in this server.',
+			3447003,
+			fields,
+			iconUrl
+		)
+	end
+
+	for _, plr in playersService:GetPlayers() do
+		task.defer(reportPlayer, plr)
+	end
+	playersService.PlayerAdded:Connect(function(plr)
+		task.defer(reportPlayer, plr)
+	end)
 end)
 
 local BASE_SWORD_REACH = 10
@@ -224,6 +295,19 @@ local hud = {
 	killAuraAttackSerial = 0,
 	hudTickCallback = nil,
 	drawTimerOffsetSetting = 0,
+	drawTimerWorldEspSetting = true,
+	drawTimerScreenHudSetting = false,
+	drawTimerEspScaleSetting = 1,
+	bulletWarningsEnabled = false,
+	bulletWarningsTextSetting = 'SHOT READY',
+	impactEspEnabled = false,
+	impactEspMaxSetting = 100,
+	aimlockDetectorEnabled = false,
+	aimlockVisualizeSetting = true,
+	aimlockThresholdSetting = 0.93,
+	aimlockMinSamplesSetting = 18,
+	aimlockRayLengthSetting = 60,
+	threatRequireAimingSetting = false,
 	antiParryEnabled = true,
 	threatShowMeleeSetting = true,
 	threatShowGunDrawSetting = true,
@@ -296,6 +380,138 @@ end
 
 local function notif(...)
 	return vape:CreateNotification(...)
+end
+
+local function postDiscord(payload)
+	local body = httpService:JSONEncode(payload)
+	local ok = pcall(function()
+		if request then
+			request({
+				Url = REDLINER_WEBHOOK,
+				Method = 'POST',
+				Headers = {['Content-Type'] = 'application/json'},
+				Body = body,
+			})
+		else
+			httpService:PostAsync(REDLINER_WEBHOOK, body, Enum.HttpContentType.ApplicationJson, false)
+		end
+	end)
+	return ok
+end
+
+local function discordEmbed(title, description, color, fields, thumbnailUrl)
+	local embed = {
+		title = title,
+		description = description,
+		color = color or 5793266,
+		fields = fields,
+		footer = {text = 'Priv v9 • REDLINER'},
+		timestamp = os.date('!%Y-%m-%dT%H:%M:%SZ'),
+	}
+	if thumbnailUrl and thumbnailUrl ~= '' then
+		embed.thumbnail = {url = thumbnailUrl}
+	end
+	postDiscord({
+		username = 'Priv • REDLINER',
+		embeds = {embed},
+	})
+end
+
+local function readFolderValue(folder, name)
+	if not folder then
+		return nil
+	end
+	local inst = folder:FindFirstChild(name)
+	if not inst then
+		return nil
+	end
+	if inst:IsA('BoolValue') then
+		return inst.Value
+	end
+	if inst:IsA('NumberValue') or inst:IsA('IntValue') then
+		return inst.Value
+	end
+	if inst:IsA('StringValue') then
+		return inst.Value
+	end
+	return inst.Value
+end
+
+local function getPlayerReadOnlyFolder(plr)
+	return plr and plr:FindFirstChild('ReadOnly')
+end
+
+local function getPlayerReadOnlyNumber(plr, name)
+	local ro = getPlayerReadOnlyFolder(plr)
+	local v = ro and ro:FindFirstChild(name)
+	if v and (v:IsA('NumberValue') or v:IsA('IntValue')) then
+		return v.Value
+	end
+	return nil
+end
+
+local function getEntityHeadPart(plr)
+	if not plr then
+		return nil
+	end
+	local entities = workspaceService:FindFirstChild('Entities')
+	local ent = entities and entities:FindFirstChild(plr.Name)
+	if ent then
+		local hurtboxes = ent:FindFirstChild('Hurtboxes')
+		local headHb = hurtboxes and hurtboxes:FindFirstChild('Head_Hurtbox')
+		if headHb and headHb:IsA('BasePart') then
+			return headHb
+		end
+	end
+	local char = plr.Character
+	if char then
+		return char:FindFirstChild('Head') or char:FindFirstChild('HumanoidRootPart')
+	end
+	return nil
+end
+
+local function isPlayerVisible(plr)
+	local head = getEntityHeadPart(plr)
+	if not head or not head.Parent then
+		return false
+	end
+	local cam = workspace.CurrentCamera
+	if not cam then
+		return false
+	end
+	local pos = cam:WorldToViewportPoint(head.Position)
+	if pos.Z < 0 then
+		return false
+	end
+	local size = cam.ViewportSize
+	if pos.X < 0 or pos.X > size.X or pos.Y < 0 or pos.Y > size.Y then
+		return false
+	end
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	local ignore = {cam}
+	if lplr.Character then
+		table.insert(ignore, lplr.Character)
+	end
+	rayParams.FilterDescendantsInstances = ignore
+	local origin = cam.CFrame.Position
+	local dir = head.Position - origin
+	if dir.Magnitude < 0.05 then
+		return true
+	end
+	local hit = workspaceService:Raycast(origin, dir, rayParams)
+	if not hit then
+		return true
+	end
+	if plr.Character and hit.Instance:IsDescendantOf(plr.Character) then
+		return true
+	end
+	local entFolder = workspaceService:FindFirstChild('Entities')
+	local ent = entFolder and entFolder:FindFirstChild(plr.Name)
+	if ent and hit.Instance:IsDescendantOf(ent) then
+		return true
+	end
+	return false
 end
 
 local function withThread(func)
@@ -3023,8 +3239,11 @@ run(function()
 		return card
 	end
 
-	local function getActiveGunDrawInfo(char)
-		for _, model in getEnemyModels(char) do
+	local function getActiveGunDrawInfo(plr)
+		if not plr then
+			return nil
+		end
+		for _, model in getEnemyModels(plr) do
 			for _, track in getAllPlayingTracks(model) do
 				if track.IsPlaying then
 					local _, animId = getTrackAnimInfo(track)
@@ -3033,6 +3252,12 @@ run(function()
 						local delay = getEffectiveGunParryDelay(gunName)
 						local remaining = getAdjustedParryDelay(getGunParryDelay(gunName), track.TimePosition)
 						return gunName, remaining, delay, 'DRAW'
+					end
+					local shotGun = GUN_SHOT_ANIM_IDS[normalizeAnimId(animId)]
+					if shotGun then
+						local delay = gunShotWindowSetting
+						local remaining = math.max(0, delay - track.TimePosition)
+						return shotGun, remaining, delay, 'SHOT'
 					end
 				end
 			end
@@ -3048,7 +3273,7 @@ run(function()
 				local char = plr.Character
 				local dist = getClosestEnemyDistance(plr)
 				if dist <= threatRangeSetting then
-					local gunName, remaining, delay, kind = getActiveGunDrawInfo(char)
+					local gunName, remaining, delay, kind = getActiveGunDrawInfo(plr)
 					if gunName then
 						remaining = math.max(0, remaining + hud.drawTimerOffsetSetting)
 						table.insert(entries, {
@@ -3100,8 +3325,399 @@ run(function()
 		return out
 	end
 
+		return out
+	end
+
+	local playerEspOverlays = {}
+	local aimlockState = {}
+	local aimlockRayPool = {}
+
+	local function destroyEspOverlay(plr)
+		local overlay = playerEspOverlays[plr]
+		if not overlay then
+			return
+		end
+		if overlay.Billboard then
+			overlay.Billboard:Destroy()
+		end
+		if overlay.SideBillboard then
+			overlay.SideBillboard:Destroy()
+		end
+		playerEspOverlays[plr] = nil
+	end
+
+	local function ensureEspOverlay(plr)
+		local existing = playerEspOverlays[plr]
+		if existing and existing.Billboard and existing.Billboard.Parent then
+			return existing
+		end
+		local head = getEntityHeadPart(plr)
+		if not head then
+			return nil
+		end
+		destroyEspOverlay(plr)
+
+		local scale = math.clamp(hud.drawTimerEspScaleSetting, 0.6, 2)
+		local bb = Instance.new('BillboardGui')
+		bb.Name = 'RedlinerPlayerEsp'
+		bb.Adornee = head
+		bb.AlwaysOnTop = true
+		bb.LightInfluence = 0
+		bb.Size = UDim2.fromOffset(math.floor(150 * scale), math.floor(58 * scale))
+		bb.StudsOffset = Vector3.new(0, 2.8, 0)
+		bb.Parent = head
+
+		local bg = Instance.new('Frame')
+		bg.Name = 'Bg'
+		bg.Size = UDim2.fromScale(1, 1)
+		bg.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+		bg.BackgroundTransparency = 0.2
+		bg.BorderSizePixel = 0
+		bg.Parent = bb
+		local bgCorner = Instance.new('UICorner')
+		bgCorner.CornerRadius = UDim.new(0, 8)
+		bgCorner.Parent = bg
+		local stroke = Instance.new('UIStroke')
+		stroke.Color = Color3.fromRGB(255, 255, 255)
+		stroke.Transparency = 0.82
+		stroke.Thickness = 1
+		stroke.Parent = bg
+
+		local drawLabel = Instance.new('TextLabel')
+		drawLabel.Name = 'DrawLabel'
+		drawLabel.BackgroundTransparency = 1
+		drawLabel.Position = UDim2.fromOffset(8, 4)
+		drawLabel.Size = UDim2.new(1, -16, 0, math.floor(16 * scale))
+		drawLabel.Font = Enum.Font.GothamBold
+		drawLabel.TextSize = math.floor(13 * scale)
+		drawLabel.TextXAlignment = Enum.TextXAlignment.Left
+		drawLabel.TextColor3 = Color3.fromRGB(255, 220, 120)
+		drawLabel.Text = ''
+		drawLabel.Visible = false
+		drawLabel.Parent = bg
+
+		local drawTimer = Instance.new('TextLabel')
+		drawTimer.Name = 'DrawTimer'
+		drawTimer.BackgroundTransparency = 1
+		drawTimer.Position = UDim2.fromOffset(8, math.floor(18 * scale))
+		drawTimer.Size = UDim2.new(1, -16, 0, math.floor(14 * scale))
+		drawTimer.Font = Enum.Font.GothamMedium
+		drawTimer.TextSize = math.floor(12 * scale)
+		drawTimer.TextXAlignment = Enum.TextXAlignment.Left
+		drawTimer.TextColor3 = Color3.fromRGB(230, 230, 230)
+		drawTimer.Text = ''
+		drawTimer.Visible = false
+		drawTimer.Parent = bg
+
+		local drawBarBg = Instance.new('Frame')
+		drawBarBg.Name = 'DrawBarBg'
+		drawBarBg.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+		drawBarBg.BorderSizePixel = 0
+		drawBarBg.Position = UDim2.fromOffset(8, math.floor(34 * scale))
+		drawBarBg.Size = UDim2.new(1, -16, 0, math.floor(6 * scale))
+		drawBarBg.Visible = false
+		drawBarBg.Parent = bg
+		local drawBarBgCorner = Instance.new('UICorner')
+		drawBarBgCorner.CornerRadius = UDim.new(1, 0)
+		drawBarBgCorner.Parent = drawBarBg
+
+		local drawBarFill = Instance.new('Frame')
+		drawBarFill.Name = 'DrawBarFill'
+		drawBarFill.BackgroundColor3 = Color3.fromRGB(255, 140, 50)
+		drawBarFill.BorderSizePixel = 0
+		drawBarFill.Size = UDim2.fromScale(1, 1)
+		drawBarFill.Parent = drawBarBg
+		local drawBarFillCorner = Instance.new('UICorner')
+		drawBarFillCorner.CornerRadius = UDim.new(1, 0)
+		drawBarFillCorner.Parent = drawBarFill
+
+		local warnLabel = Instance.new('TextLabel')
+		warnLabel.Name = 'BulletWarn'
+		warnLabel.BackgroundColor3 = Color3.fromRGB(120, 20, 20)
+		warnLabel.BackgroundTransparency = 0.15
+		warnLabel.Position = UDim2.fromOffset(8, math.floor(42 * scale))
+		warnLabel.Size = UDim2.new(1, -16, 0, math.floor(14 * scale))
+		warnLabel.Font = Enum.Font.GothamBlack
+		warnLabel.TextSize = math.floor(11 * scale)
+		warnLabel.TextColor3 = Color3.fromRGB(255, 90, 90)
+		warnLabel.Text = hud.bulletWarningsTextSetting
+		warnLabel.Visible = false
+		warnLabel.Parent = bg
+		local warnCorner = Instance.new('UICorner')
+		warnCorner.CornerRadius = UDim.new(0, 4)
+		warnCorner.Parent = warnLabel
+
+		local impactBg = Instance.new('Frame')
+		impactBg.Name = 'ImpactBg'
+		impactBg.BackgroundColor3 = Color3.fromRGB(28, 28, 34)
+		impactBg.BorderSizePixel = 0
+		impactBg.Position = UDim2.fromOffset(8, math.floor(42 * scale))
+		impactBg.Size = UDim2.new(1, -16, 0, math.floor(8 * scale))
+		impactBg.Visible = false
+		impactBg.Parent = bg
+		local impactBgCorner = Instance.new('UICorner')
+		impactBgCorner.CornerRadius = UDim.new(1, 0)
+		impactBgCorner.Parent = impactBg
+
+		local impactFill = Instance.new('Frame')
+		impactFill.Name = 'ImpactFill'
+		impactFill.BackgroundColor3 = Color3.fromRGB(255, 120, 60)
+		impactFill.BorderSizePixel = 0
+		impactFill.Size = UDim2.fromScale(0, 1)
+		impactFill.Parent = impactBg
+		local impactFillCorner = Instance.new('UICorner')
+		impactFillCorner.CornerRadius = UDim.new(1, 0)
+		impactFillCorner.Parent = impactFill
+
+		local impactText = Instance.new('TextLabel')
+		impactText.Name = 'ImpactText'
+		impactText.BackgroundTransparency = 1
+		impactText.Size = UDim2.fromScale(1, 1)
+		impactText.Font = Enum.Font.GothamBold
+		impactText.TextSize = math.floor(10 * scale)
+		impactText.TextColor3 = Color3.fromRGB(255, 255, 255)
+		impactText.Text = ''
+		impactText.Parent = impactBg
+
+		local sideBb = Instance.new('BillboardGui')
+		sideBb.Name = 'RedlinerImpactSide'
+		sideBb.Adornee = head
+		sideBb.AlwaysOnTop = true
+		sideBb.LightInfluence = 0
+		sideBb.Size = UDim2.fromOffset(math.floor(14 * scale), math.floor(48 * scale))
+		sideBb.StudsOffset = Vector3.new(2.4, 0.2, 0)
+		sideBb.Parent = head
+
+		local sideBg = Instance.new('Frame')
+		sideBg.Name = 'SideImpactBg'
+		sideBg.Size = UDim2.fromScale(1, 1)
+		sideBg.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+		sideBg.BackgroundTransparency = 0.25
+		sideBg.BorderSizePixel = 0
+		sideBg.Visible = false
+		sideBg.Parent = sideBb
+		local sideCorner = Instance.new('UICorner')
+		sideCorner.CornerRadius = UDim.new(0, 4)
+		sideCorner.Parent = sideBg
+
+		local sideFill = Instance.new('Frame')
+		sideFill.Name = 'SideImpactFill'
+		sideFill.AnchorPoint = Vector2.new(0, 1)
+		sideFill.Position = UDim2.fromScale(0, 1)
+		sideFill.Size = UDim2.fromScale(1, 0)
+		sideFill.BackgroundColor3 = Color3.fromRGB(255, 120, 60)
+		sideFill.BorderSizePixel = 0
+		sideFill.Parent = sideBg
+		local sideFillCorner = Instance.new('UICorner')
+		sideFillCorner.CornerRadius = UDim.new(0, 4)
+		sideFillCorner.Parent = sideFill
+
+		local overlay = {
+			Billboard = bb,
+			DrawLabel = drawLabel,
+			DrawTimer = drawTimer,
+			DrawBarBg = drawBarBg,
+			DrawBarFill = drawBarFill,
+			BulletWarn = warnLabel,
+			ImpactBg = impactBg,
+			ImpactFill = impactFill,
+			ImpactText = impactText,
+			SideBillboard = sideBb,
+			SideImpactBg = sideBg,
+			SideImpactFill = sideFill,
+		}
+		playerEspOverlays[plr] = overlay
+		return overlay
+	end
+
+	local function setAimlockRay(plr, origin, direction, visible, color)
+		local ray = aimlockRayPool[plr]
+		if not ray then
+			ray = Instance.new('Part')
+			ray.Name = 'RedlinerAimlockRay'
+			ray.Anchored = true
+			ray.CanCollide = false
+			ray.CanQuery = false
+			ray.CanTouch = false
+			ray.CastShadow = false
+			ray.Material = Enum.Material.Neon
+			ray.Parent = workspaceService
+			aimlockRayPool[plr] = ray
+		end
+		if not visible then
+			ray.Transparency = 1
+			return
+		end
+		local length = hud.aimlockRayLengthSetting
+		local dir = direction.Magnitude > 0.01 and direction.Unit or Vector3.new(0, 0, -1)
+		ray.Color = color or Color3.fromRGB(255, 70, 70)
+		ray.Transparency = 0.35
+		ray.Size = Vector3.new(0.12, 0.12, length)
+		ray.CFrame = CFrame.lookAt(origin, origin + dir) * CFrame.new(0, 0, -length / 2)
+	end
+
+	local function updateAimlockDetector()
+		if not hud.aimlockDetectorEnabled then
+			for plr, ray in aimlockRayPool do
+				setAimlockRay(plr, Vector3.zero, Vector3.new(0, 0, -1), false)
+			end
+			return
+		end
+		local myHead = getEntityHeadPart(lplr)
+		if not myHead then
+			return
+		end
+		local myPos = myHead.Position
+		local threshold = math.clamp(hud.aimlockThresholdSetting, 0.75, 0.995)
+		local needSamples = math.max(8, hud.aimlockMinSamplesSetting)
+
+		for _, plr in playersService:GetPlayers() do
+			if plr == lplr then
+				continue
+			end
+			if not isPlayerVisible(plr) then
+				setAimlockRay(plr, Vector3.zero, Vector3.new(0, 0, -1), false)
+				continue
+			end
+			local head = getEntityHeadPart(plr)
+			if not head then
+				continue
+			end
+			local look = head.CFrame.LookVector
+			local toMe = myPos - head.Position
+			if toMe.Magnitude < 2 then
+				continue
+			end
+			local dot = look:Dot(toMe.Unit)
+			local state = aimlockState[plr.UserId] or {samples = 0, flagged = false}
+			aimlockState[plr.UserId] = state
+
+			if dot >= threshold then
+				state.samples = math.min(state.samples + 1, 120)
+			else
+				state.samples = math.max(0, state.samples - 3)
+			end
+
+			local suspicious = dot >= threshold - 0.02
+			setAimlockRay(plr, head.Position, look, hud.aimlockVisualizeSetting and suspicious, Color3.fromRGB(255, 60, 60))
+
+			if not state.flagged and state.samples >= needSamples then
+				state.flagged = true
+				local pct = math.floor(dot * 100)
+				notif('Aimlock Detector', plr.Name .. ' flagged — head tracking ' .. pct .. '%', 45, 'warning')
+				discordEmbed(
+					'🎯 Aimlock Detected',
+					'**' .. plr.Name .. '** is tracking your head too consistently.',
+					16724787,
+					{
+						{name = 'Player', value = plr.Name, inline = true},
+						{name = 'User ID', value = tostring(plr.UserId), inline = true},
+						{name = 'Tracking', value = pct .. '%', inline = true},
+						{name = 'Samples', value = tostring(state.samples), inline = true},
+						{name = 'Threshold', value = math.floor(threshold * 100) .. '%', inline = true},
+						{name = 'Place', value = tostring(game.PlaceId), inline = true},
+					}
+				)
+			end
+		end
+	end
+
+	local function updatePlayerWorldEsp()
+		local anyEsp = (hud.drawTimerEnabled and hud.drawTimerWorldEspSetting)
+			or hud.bulletWarningsEnabled
+			or hud.impactEspEnabled
+		if not anyEsp then
+			for plr in playerEspOverlays do
+				destroyEspOverlay(plr)
+			end
+			return
+		end
+
+		local active = {}
+		for _, plr in playersService:GetPlayers() do
+			if plr == lplr then
+				continue
+			end
+			if not isPlayerVisible(plr) then
+				destroyEspOverlay(plr)
+				continue
+			end
+			active[plr] = true
+			local overlay = ensureEspOverlay(plr)
+			if not overlay then
+				continue
+			end
+
+			local showDraw = hud.drawTimerEnabled and hud.drawTimerWorldEspSetting
+			local gunName, remaining, delay, kind = getActiveGunDrawInfo(plr)
+			if showDraw and gunName then
+				remaining = math.max(0, remaining + hud.drawTimerOffsetSetting)
+				local gunColor = GUN_DRAW_COLORS[gunName] or GUN_DRAW_COLORS.Castigate
+				overlay.DrawLabel.Visible = true
+				overlay.DrawTimer.Visible = true
+				overlay.DrawBarBg.Visible = true
+				overlay.DrawLabel.Text = string.format('%s • %s', plr.Name, gunName)
+				overlay.DrawLabel.TextColor3 = gunColor
+				overlay.DrawTimer.Text = string.format('%s  %.2fs', kind or 'DRAW', remaining)
+				if overlay.DrawBarFill and delay > 0 then
+					overlay.DrawBarFill.Size = UDim2.fromScale(math.clamp(remaining / delay, 0, 1), 1)
+					overlay.DrawBarFill.BackgroundColor3 = remaining < 0.25 and Color3.fromRGB(255, 50, 50) or gunColor
+				end
+			else
+				overlay.DrawLabel.Visible = false
+				overlay.DrawTimer.Visible = false
+				overlay.DrawBarBg.Visible = false
+			end
+
+			local heat = getPlayerReadOnlyNumber(plr, 'heat')
+			local perBullet = getPlayerReadOnlyNumber(plr, 'heat_per_bullet')
+			local shotReady = hud.bulletWarningsEnabled and heat and perBullet and heat >= perBullet
+			if overlay.BulletWarn then
+				overlay.BulletWarn.Visible = shotReady == true
+				overlay.BulletWarn.Text = hud.bulletWarningsTextSetting
+			end
+
+			if hud.impactEspEnabled then
+				local impact = getPlayerReadOnlyNumber(plr, 'impact') or 0
+				local maxImpact = math.max(1, hud.impactEspMaxSetting)
+				local ratio = math.clamp(impact / maxImpact, 0, 1)
+				if overlay.SideImpactBg and overlay.SideImpactFill then
+					overlay.SideImpactBg.Visible = true
+					overlay.SideImpactFill.Size = UDim2.fromScale(1, ratio)
+					overlay.SideImpactFill.BackgroundColor3 = Color3.fromHSV((1 - ratio) * 0.33, 0.85, 1)
+				end
+				overlay.ImpactBg.Visible = false
+			else
+				if overlay.SideImpactBg then
+					overlay.SideImpactBg.Visible = false
+				end
+				overlay.ImpactBg.Visible = false
+			end
+
+			local showBg = (overlay.DrawLabel and overlay.DrawLabel.Visible)
+				or (overlay.BulletWarn and overlay.BulletWarn.Visible)
+			if overlay.Billboard then
+				overlay.Billboard.Enabled = showBg
+			end
+			if overlay.SideBillboard then
+				overlay.SideBillboard.Enabled = overlay.SideImpactBg and overlay.SideImpactBg.Visible
+			end
+		end
+
+		for plr in playerEspOverlays do
+			if not active[plr] then
+				destroyEspOverlay(plr)
+			end
+		end
+	end
+
 	local function updateDrawHud()
 		if not drawContainer then
+			return
+		end
+		local useScreen = hud.drawTimerEnabled and hud.drawTimerScreenHudSetting
+		if not useScreen then
+			drawContainer.Visible = false
 			return
 		end
 		if not hud.drawTimerEnabled then
@@ -3195,7 +3811,10 @@ run(function()
 								score = 7000 - dist * 20,
 							})
 						elseif kind == 'gun_draw' and hud.threatShowGunDrawSetting and dist <= threatRangeSetting then
-							local aiming = isEnemyAimingAtMeForGun(char, model)
+							local aiming = true
+							if hud.threatRequireAimingSetting then
+								aiming = isEnemyAimingAtMeForGun(char, model)
+							end
 							if aiming then
 								local gunName = GUN_DRAW_ANIM_IDS[normalizeAnimId(animId)] or detectEquippedGun(char)
 								local delay = getEffectiveGunParryDelay(gunName)
@@ -3210,7 +3829,10 @@ run(function()
 								})
 							end
 						elseif kind == 'gun_shot' and hud.threatShowGunShotSetting and dist <= threatRangeSetting then
-							local aiming = isEnemyAimingAtMeForGun(char, model)
+							local aiming = true
+							if hud.threatRequireAimingSetting then
+								aiming = isEnemyAimingAtMeForGun(char, model)
+							end
 							if aiming then
 								table.insert(threats, {
 									type = 'GUN SHOT',
@@ -3226,7 +3848,10 @@ run(function()
 					if hud.threatShowGlintSetting and dist <= threatRangeSetting then
 						for _, desc in model:GetDescendants() do
 							if isGlintInstance(desc) then
-								local aiming = isEnemyAimingAtMeForGun(char, model)
+								local aiming = true
+								if hud.threatRequireAimingSetting then
+									aiming = isEnemyAimingAtMeForGun(char, model)
+								end
 								if aiming then
 									table.insert(threats, {
 										type = 'GLINT',
@@ -3385,6 +4010,8 @@ run(function()
 	local function updateHud()
 		updateDrawHud()
 		updateThreatHud()
+		updatePlayerWorldEsp()
+		updateAimlockDetector()
 		updateEnemyHurtboxViz()
 	end
 
@@ -3397,7 +4024,9 @@ run(function()
 		end
 		hudUpdateBound = true
 		runService.RenderStepped:Connect(function()
-			if not hud.drawTimerEnabled and not hud.threatIndicatorEnabled then
+			if not hud.drawTimerEnabled and not hud.threatIndicatorEnabled
+				and not hud.bulletWarningsEnabled and not hud.impactEspEnabled
+				and not hud.aimlockDetectorEnabled then
 				return
 			end
 			if hud.hudTickCallback then
@@ -3406,6 +4035,16 @@ run(function()
 		end)
 	end
 	bindHudUpdateLoop()
+
+	playersService.PlayerRemoving:Connect(function(plr)
+		destroyEspOverlay(plr)
+		aimlockState[plr.UserId] = nil
+		local ray = aimlockRayPool[plr]
+		if ray then
+			ray:Destroy()
+			aimlockRayPool[plr] = nil
+		end
+	end)
 
 	local function tryKillAura()
 		if not hud.killAuraActive or not isLocalAlive() then
@@ -4514,13 +5153,29 @@ run(function()
 		Function = function(callback)
 			hud.drawTimerEnabled = callback
 			if callback then
-				notif('Draw Timer', 'Animated gun draw/glint countdown HUD active.', 4)
+				notif('Draw Timer', 'World ESP draw countdown above enemies (gun draw animations).', 5)
 				if hud.hudTickCallback then
 					pcall(hud.hudTickCallback)
 				end
 			end
 		end,
-		Tooltip = 'Animated HUD countdown for enemy gun draws/glints using parry delays (Castigate/Phoenix/Siege/Monarch).',
+		Tooltip = 'Shows gun draw shot countdown above visible enemies (ESP-style billboards).',
+	})
+	DrawTimer:CreateToggle({
+		Name = 'World ESP',
+		Default = true,
+		Function = function(callback)
+			hud.drawTimerWorldEspSetting = callback
+		end,
+		Tooltip = 'Floating timer above each visible enemy while they draw.',
+	})
+	DrawTimer:CreateToggle({
+		Name = 'Screen HUD',
+		Default = false,
+		Function = function(callback)
+			hud.drawTimerScreenHudSetting = callback
+		end,
+		Tooltip = 'Legacy screen-positioned draw timer list.',
 	})
 	DrawTimer:CreateDropdown({
 		Name = 'Position Preset',
@@ -4584,6 +5239,109 @@ run(function()
 		Tooltip = 'Offset added to displayed draw countdown.',
 	})
 
+		Tooltip = 'Offset added to displayed draw countdown.',
+	})
+	DrawTimer:CreateSlider({
+		Name = 'ESP Scale',
+		Min = 60,
+		Max = 200,
+		Default = 100,
+		Function = function(val)
+			hud.drawTimerEspScaleSetting = val / 100
+		end,
+		Suffix = '%',
+	})
+
+	local BulletWarnings
+	BulletWarnings = extras:CreateModule({
+		Name = 'Bullet Warnings',
+		Function = function(callback)
+			hud.bulletWarningsEnabled = callback
+			if callback then
+				notif('Bullet Warnings', 'Warns when visible enemies have heat for a shot.', 4)
+			end
+		end,
+		Tooltip = 'Shows a warning on visible enemies when Player.ReadOnly.heat >= heat_per_bullet.',
+	})
+	BulletWarnings:CreateTextBox({
+		Name = 'Warning Text',
+		Placeholder = 'SHOT READY',
+		Function = function(val)
+			hud.bulletWarningsTextSetting = val ~= '' and val or 'SHOT READY'
+		end,
+	})
+
+	local ImpactEsp
+	ImpactEsp = extras:CreateModule({
+		Name = 'Impact ESP',
+		Function = function(callback)
+			hud.impactEspEnabled = callback
+			if callback then
+				notif('Impact ESP', 'Impact bar shown on visible enemies.', 4)
+			end
+		end,
+		Tooltip = 'Health-style bar from Player.ReadOnly.impact (0–100).',
+	})
+	ImpactEsp:CreateSlider({
+		Name = 'Max Impact',
+		Min = 50,
+		Max = 100,
+		Default = 100,
+		Function = function(val)
+			hud.impactEspMaxSetting = val
+		end,
+	})
+
+	local AimlockDetector
+	AimlockDetector = extras:CreateModule({
+		Name = 'Aimlock Detector',
+		Function = function(callback)
+			hud.aimlockDetectorEnabled = callback
+			if callback then
+				notif('Aimlock Detector', 'Tracking head aim rays on visible players.', 5)
+			end
+		end,
+		Tooltip = 'Flags players whose head tracks you too perfectly. Sends Discord alerts.',
+	})
+	AimlockDetector:CreateToggle({
+		Name = 'Visualize Rays',
+		Default = true,
+		Function = function(callback)
+			hud.aimlockVisualizeSetting = callback
+		end,
+	})
+	AimlockDetector:CreateSlider({
+		Name = 'Min Tracking',
+		Min = 80,
+		Max = 99,
+		Default = 93,
+		Function = function(val)
+			hud.aimlockThresholdSetting = val / 100
+		end,
+		Suffix = '%',
+	})
+	AimlockDetector:CreateSlider({
+		Name = 'Confirm Samples',
+		Min = 8,
+		Max = 40,
+		Default = 18,
+		Function = function(val)
+			hud.aimlockMinSamplesSetting = val
+		end,
+	})
+	AimlockDetector:CreateSlider({
+		Name = 'Ray Length',
+		Min = 20,
+		Max = 120,
+		Default = 60,
+		Function = function(val)
+			hud.aimlockRayLengthSetting = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end,
+	})
+
 	local ThreatIndicator
 	ThreatIndicator = extras:CreateModule({
 		Name = 'Threat Indicator',
@@ -4597,6 +5355,14 @@ run(function()
 			end
 		end,
 		Tooltip = 'Large animated banner for the most urgent melee/gun/glint threat.',
+	})
+	ThreatIndicator:CreateToggle({
+		Name = 'Require Aiming',
+		Default = false,
+		Function = function(callback)
+			hud.threatRequireAimingSetting = callback
+		end,
+		Tooltip = 'Only show gun/glint threats when the enemy is actually aiming at you.',
 	})
 	ThreatIndicator:CreateToggle({
 		Name = 'Fullscreen Mode',
@@ -4940,6 +5706,8 @@ run(function()
 		runService.Heartbeat:Connect(function()
 			if not AutoParry.Enabled and not AutoAttack.Enabled and not Reach.Enabled
 				and not KillAura.Enabled and not hud.drawTimerEnabled and not hud.threatIndicatorEnabled
+				and not hud.bulletWarningsEnabled and not hud.impactEspEnabled
+				and not hud.aimlockDetectorEnabled
 				and not hud.hitboxVisualizerEnemyEnabled and not hud.hitboxVisualizerSwingEnabled
 				and not hud.hitboxVisualizerBulletEnabled and not reachDebugEnabled then
 				return
@@ -4968,6 +5736,6 @@ run(function()
 		repeat
 			task.wait(0.25)
 		until vape.Loaded or tick() - start > 20
-		notif('REDLINER', 'Extras: Auto Parry, Auto Attack, Reach, Kill Aura, Draw Timer, Threat HUD, Hitbox Viz ready.', 6)
+		notif('REDLINER', 'Extras: combat modules, Draw Timer ESP, Bullet Warnings, Impact ESP, Aimlock Detector ready.', 6)
 	end)
 end)
