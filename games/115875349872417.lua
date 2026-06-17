@@ -39,6 +39,7 @@ local entitylib = vape.Libraries.entity
 
 pcall(function()
 	vape:Remove('Reach')
+	vape:Remove('SilentAim')
 end)
 
 local BASE_SWORD_REACH = 10
@@ -292,27 +293,48 @@ local function isAnimationParryReason(reason)
 		or string.find(reason, 'glint', 1, true) ~= nil
 end
 
-local function spawnBulletVizRay(origin, direction, color)
-	if not hud.hitboxVisualizerBulletEnabled then
-		return
+local function spawnWorldTracer(fromPos, toPos, color, opts)
+	opts = opts or {}
+	if typeof(fromPos) ~= 'Vector3' then
+		return nil
 	end
-	if typeof(origin) ~= 'Vector3' or typeof(direction) ~= 'Vector3' then
-		return
+	local dir, length
+	if opts.useDirection and typeof(toPos) == 'Vector3' then
+		dir = toPos.Magnitude > 0.01 and toPos.Unit or Vector3.new(0, 0, -1)
+		length = opts.length or 120
+	elseif typeof(toPos) == 'Vector3' then
+		local delta = toPos - fromPos
+		length = delta.Magnitude
+		if length < 0.05 then
+			return nil
+		end
+		dir = delta.Unit
+	else
+		return nil
 	end
-	local dir = direction.Magnitude > 0.01 and direction.Unit or Vector3.new(0, 0, -1)
-	local length = 120
-	local part = Instance.new('Part')
+	local thickness = opts.thickness or 0.15
+	local part = opts.part or Instance.new('Part')
 	part.Anchored = true
 	part.CanCollide = false
 	part.CanQuery = false
 	part.CastShadow = false
 	part.Material = Enum.Material.Neon
 	part.Color = color or hud.hitboxVisualizerColorSetting
-	part.Transparency = 0.35
-	part.Size = Vector3.new(0.15, 0.15, length)
-	part.CFrame = CFrame.lookAt(origin, origin + dir) * CFrame.new(0, 0, -length / 2)
+	part.Transparency = opts.transparency or 0.3
+	part.Size = Vector3.new(thickness, thickness, length)
+	part.CFrame = CFrame.lookAt(fromPos, fromPos + dir) * CFrame.new(0, 0, -length / 2)
 	part.Parent = workspaceService
-	debrisService:AddItem(part, hud.hitboxVisualizerDurationSetting)
+	if not opts.part and (opts.duration or hud.hitboxVisualizerDurationSetting) then
+		debrisService:AddItem(part, opts.duration or hud.hitboxVisualizerDurationSetting)
+	end
+	return part
+end
+
+local function spawnBulletVizRay(origin, direction, color)
+	if not hud.hitboxVisualizerBulletEnabled then
+		return
+	end
+	spawnWorldTracer(origin, direction, color, {useDirection = true, length = 120})
 end
 
 local function isGameWindowFocused()
@@ -2851,6 +2873,35 @@ local function logReachHookStatus(context)
 	)
 end
 
+fireKillAuraMeleeStrike = function()
+	if not initPackets() then
+		return false
+	end
+	local root = getLocalRoot()
+	if not root then
+		return false
+	end
+	local range = hud.killAuraRangeSetting + hud.killAuraExtendSetting
+	local hurtboxes = getEnemyHurtboxesInRange(range, root.Position)
+	if #hurtboxes == 0 then
+		return false
+	end
+	local packet = Packets[MELEE_PACKET_NAME]
+	if not packet or type(packet.Fire) ~= 'function' then
+		return false
+	end
+	local template = meleeTemplate
+	local itemId = detectLocalMeleeItemId()
+	local aimDir = (hurtboxes[1].Position - root.Position).Unit
+	local action = (template and template[2]) or 'SWING'
+	local field3 = (template and template[3]) or ''
+	local meta = template and template[6]
+	local ok = pcall(function()
+		packet:Fire(itemId, action, field3, aimDir, hurtboxes, meta)
+	end)
+	return ok
+end
+
 bindPacketListeners = function()
 	if not initPackets() then
 		return
@@ -3469,7 +3520,8 @@ run(function()
 		return out
 	end
 
-	local playerEspOverlays = {}
+	local playerBillboards = {}
+	local bulletWarnState = {}
 	local aimlockState = {}
 	local aimlockRayPool = {}
 
@@ -3477,122 +3529,206 @@ run(function()
 		return workspace.CurrentCamera
 	end
 
-	local function newDraw(typeName, props)
-		if not Drawing then
-			return nil
-		end
-		local obj = Drawing.new(typeName)
-		for key, val in props do
-			obj[key] = val
-		end
-		obj.Visible = false
-		return obj
-	end
-
-	local function hideDraw(obj)
-		if obj then
-			obj.Visible = false
-		end
-	end
-
-	local function destroyEspOverlay(plr)
-		local overlay = playerEspOverlays[plr]
-		if not overlay then
+	local function destroyPlayerBillboard(plr)
+		local board = playerBillboards[plr]
+		if not board then
 			return
 		end
-		for _, obj in overlay do
-			if obj and obj.Remove then
-				pcall(function()
-					obj.Visible = false
-					obj:Remove()
-				end)
-			end
+		if board.gui then
+			pcall(function()
+				board.gui:Destroy()
+			end)
 		end
-		playerEspOverlays[plr] = nil
+		playerBillboards[plr] = nil
+		bulletWarnState[plr] = nil
 	end
 
-	local function ensureEspOverlay(plr)
-		if playerEspOverlays[plr] then
-			return playerEspOverlays[plr]
+	local function ensurePlayerBillboard(plr)
+		local board = playerBillboards[plr]
+		if board and board.gui and board.gui.Parent then
+			return board
 		end
-		if not Drawing then
+		local char = plr.Character
+		local adornee = char and (char:FindFirstChild('Head') or char:FindFirstChild('HumanoidRootPart'))
+		if not adornee then
 			return nil
 		end
-		local overlay = {
-			PanelBg = newDraw('Square', {Filled = true, Thickness = 1, ZIndex = 0, Transparency = 0.42, Color = Color3.fromRGB(10, 10, 14)}),
-			DrawText = newDraw('Text', {Center = true, Size = 13, ZIndex = 3, Color = Color3.fromRGB(185, 185, 195)}),
-			DrawShadow = newDraw('Text', {Center = true, Size = 13, ZIndex = 2, Color = Color3.new()}),
-			TimerText = newDraw('Text', {Center = true, Size = 17, ZIndex = 4, Color = Color3.fromRGB(255, 220, 120)}),
-			TimerShadow = newDraw('Text', {Center = true, Size = 17, ZIndex = 3, Color = Color3.new()}),
-			KindText = newDraw('Text', {Center = true, Size = 11, ZIndex = 3, Color = Color3.fromRGB(150, 150, 160)}),
-			KindShadow = newDraw('Text', {Center = true, Size = 11, ZIndex = 2, Color = Color3.new()}),
-			BarBg = newDraw('Line', {Thickness = 4, ZIndex = 1, Transparency = 0.5, Color = Color3.new()}),
-			BarFill = newDraw('Line', {Thickness = 2, ZIndex = 2, Color = Color3.fromRGB(255, 140, 50)}),
-			WarnText = newDraw('Text', {Center = true, Size = 15, ZIndex = 4, Color = Color3.fromRGB(255, 90, 90)}),
-			WarnShadow = newDraw('Text', {Center = true, Size = 15, ZIndex = 3, Color = Color3.new()}),
-			ImpactBorder = newDraw('Line', {Thickness = 3, ZIndex = 1, Transparency = 0.35, Color = Color3.new()}),
-			ImpactLine = newDraw('Line', {Thickness = 1, ZIndex = 2, Color = Color3.fromRGB(255, 120, 60)}),
+		if board and board.gui then
+			board.gui:Destroy()
+		end
+
+		local gui = Instance.new('BillboardGui')
+		gui.Name = 'RedlinerWorldEsp'
+		gui.Adornee = adornee
+		gui.AlwaysOnTop = true
+		gui.LightInfluence = 0
+		gui.MaxDistance = 260
+		gui.Size = UDim2.fromOffset(136, 62)
+		gui.StudsOffset = Vector3.new(0, 2.7, 0)
+		gui.Parent = adornee
+
+		local root = Instance.new('Frame')
+		root.Name = 'Root'
+		root.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+		root.BackgroundTransparency = 0.22
+		root.BorderSizePixel = 0
+		root.Size = UDim2.fromScale(1, 1)
+		root.Parent = gui
+
+		local corner = Instance.new('UICorner')
+		corner.CornerRadius = UDim.new(0, 8)
+		corner.Parent = root
+
+		local stroke = Instance.new('UIStroke')
+		stroke.Color = Color3.fromRGB(55, 55, 68)
+		stroke.Thickness = 1
+		stroke.Transparency = 0.25
+		stroke.Parent = root
+
+		local pad = Instance.new('UIPadding')
+		pad.PaddingTop = UDim.new(0, 5)
+		pad.PaddingBottom = UDim.new(0, 5)
+		pad.PaddingLeft = UDim.new(0, 7)
+		pad.PaddingRight = UDim.new(0, 7)
+		pad.Parent = root
+
+		local layout = Instance.new('UIListLayout')
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Padding = UDim.new(0, 2)
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		layout.Parent = root
+
+		local kind = Instance.new('TextLabel')
+		kind.Name = 'Kind'
+		kind.LayoutOrder = 1
+		kind.BackgroundTransparency = 1
+		kind.Size = UDim2.new(1, 0, 0, 11)
+		kind.Font = Enum.Font.GothamBold
+		kind.TextSize = 10
+		kind.TextColor3 = Color3.fromRGB(255, 200, 90)
+		kind.Text = 'DRAW'
+		kind.Parent = root
+
+		local gun = Instance.new('TextLabel')
+		gun.Name = 'Gun'
+		gun.LayoutOrder = 2
+		gun.BackgroundTransparency = 1
+		gun.Size = UDim2.new(1, 0, 0, 13)
+		gun.Font = Enum.Font.GothamSemibold
+		gun.TextSize = 12
+		gun.TextColor3 = Color3.fromRGB(210, 210, 220)
+		gun.Text = ''
+		gun.Parent = root
+
+		local timer = Instance.new('TextLabel')
+		timer.Name = 'Timer'
+		timer.LayoutOrder = 3
+		timer.BackgroundTransparency = 1
+		timer.Size = UDim2.new(1, 0, 0, 16)
+		timer.Font = Enum.Font.GothamBlack
+		timer.TextSize = 15
+		timer.TextColor3 = Color3.fromRGB(255, 220, 120)
+		timer.Text = ''
+		timer.Parent = root
+
+		local barBg = Instance.new('Frame')
+		barBg.Name = 'BarBg'
+		barBg.LayoutOrder = 4
+		barBg.Size = UDim2.new(1, 0, 0, 5)
+		barBg.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+		barBg.BorderSizePixel = 0
+		barBg.Visible = false
+		barBg.Parent = root
+		local barCorner = Instance.new('UICorner')
+		barCorner.CornerRadius = UDim.new(1, 0)
+		barCorner.Parent = barBg
+
+		local barFill = Instance.new('Frame')
+		barFill.Name = 'BarFill'
+		barFill.BackgroundColor3 = Color3.fromRGB(255, 150, 55)
+		barFill.BorderSizePixel = 0
+		barFill.Size = UDim2.fromScale(1, 1)
+		barFill.Parent = barBg
+		local fillCorner = Instance.new('UICorner')
+		fillCorner.CornerRadius = UDim.new(1, 0)
+		fillCorner.Parent = barFill
+
+		local warn = Instance.new('TextLabel')
+		warn.Name = 'Warn'
+		warn.LayoutOrder = 5
+		warn.BackgroundTransparency = 1
+		warn.Size = UDim2.new(1, 0, 0, 14)
+		warn.Font = Enum.Font.GothamBlack
+		warn.TextSize = 11
+		warn.TextColor3 = Color3.fromRGB(255, 85, 85)
+		warn.TextStrokeTransparency = 0.55
+		warn.TextStrokeColor3 = Color3.fromRGB(40, 0, 0)
+		warn.Text = ''
+		warn.Visible = false
+		warn.Parent = root
+
+		local impactTrack = Instance.new('Frame')
+		impactTrack.Name = 'ImpactTrack'
+		impactTrack.AnchorPoint = Vector2.new(0, 0.5)
+		impactTrack.Position = UDim2.new(0, -5, 0.5, 0)
+		impactTrack.Size = UDim2.new(0, 3, 0.82, 0)
+		impactTrack.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+		impactTrack.BorderSizePixel = 0
+		impactTrack.Visible = false
+		impactTrack.Parent = root
+		local impactCorner = Instance.new('UICorner')
+		impactCorner.CornerRadius = UDim.new(1, 0)
+		impactCorner.Parent = impactTrack
+
+		local impactFill = Instance.new('Frame')
+		impactFill.Name = 'ImpactFill'
+		impactFill.AnchorPoint = Vector2.new(0, 1)
+		impactFill.Position = UDim2.fromScale(0, 1)
+		impactFill.Size = UDim2.fromScale(1, 0)
+		impactFill.BackgroundColor3 = Color3.fromRGB(255, 120, 60)
+		impactFill.BorderSizePixel = 0
+		impactFill.Parent = impactTrack
+		local impactFillCorner = Instance.new('UICorner')
+		impactFillCorner.CornerRadius = UDim.new(1, 0)
+		impactFillCorner.Parent = impactFill
+
+		playerBillboards[plr] = {
+			gui = gui,
+			root = root,
+			kind = kind,
+			gun = gun,
+			timer = timer,
+			barBg = barBg,
+			barFill = barFill,
+			warn = warn,
+			impactTrack = impactTrack,
+			impactFill = impactFill,
 		}
-		playerEspOverlays[plr] = overlay
-		return overlay
-	end
-
-	local function getPlayerScreenBox(plr)
-		local ent = entitylib.getEntity(plr)
-		local root = ent and ent.RootPart
-		if not root then
-			local char = plr.Character
-			root = char and char:FindFirstChild('HumanoidRootPart')
-		end
-		if not root or not getGameCamera() then
-			return nil
-		end
-		local cam = getGameCamera()
-		local hipHeight = ent and ent.HipHeight or 2
-		local rootPos, rootVis = cam:WorldToViewportPoint(root.Position)
-		if not rootVis then
-			return nil
-		end
-		local topPos = cam:WorldToViewportPoint((CFrame.lookAlong(root.Position, cam.CFrame.LookVector) * CFrame.new(2, hipHeight, 0)).Position)
-		local bottomPos = cam:WorldToViewportPoint((CFrame.lookAlong(root.Position, cam.CFrame.LookVector) * CFrame.new(-2, -hipHeight - 1, 0)).Position)
-		local sizex = math.abs(topPos.X - bottomPos.X)
-		local sizey = math.abs(topPos.Y - bottomPos.Y)
-		return rootPos.X - sizex / 2, rootPos.Y - sizey / 2, sizex, sizey
-	end
-
-	local function hideEspOverlayDraw(overlay)
-		for _, obj in overlay do
-			hideDraw(obj)
-		end
+		return playerBillboards[plr]
 	end
 
 	local function setAimlockRay(plr, fromWorld, toWorld, visible, color, thickness)
-		local line = aimlockRayPool[plr]
-		if not line and Drawing then
-			line = Drawing.new('Line')
-			line.ZIndex = 6
-			aimlockRayPool[plr] = line
-		end
-		if not line then
+		local entry = aimlockRayPool[plr]
+		if not visible or typeof(fromWorld) ~= 'Vector3' or typeof(toWorld) ~= 'Vector3' then
+			if entry and entry.part then
+				entry.part.Parent = nil
+			end
 			return
 		end
-		local cam = getGameCamera()
-		if not visible or not cam or typeof(fromWorld) ~= 'Vector3' or typeof(toWorld) ~= 'Vector3' then
-			line.Visible = false
-			return
+		if not entry then
+			entry = {}
+			aimlockRayPool[plr] = entry
 		end
-		local fromPos, fromOnScreen = cam:WorldToViewportPoint(fromWorld)
-		local toPos, toOnScreen = cam:WorldToViewportPoint(toWorld)
-		if fromPos.Z <= 0 and toPos.Z <= 0 then
-			line.Visible = false
-			return
+		if not entry.part then
+			entry.part = Instance.new('Part')
+			entry.part.Name = 'RedlinerAimlockTracer'
 		end
-		line.From = Vector2.new(fromPos.X, fromPos.Y)
-		line.To = Vector2.new(toPos.X, toPos.Y)
-		line.Color = color or Color3.fromRGB(255, 60, 60)
-		line.Thickness = thickness or 2
-		line.Transparency = 0.15
-		line.Visible = fromOnScreen or toOnScreen
+		spawnWorldTracer(fromWorld, toWorld, color or Color3.fromRGB(255, 60, 60), {
+			part = entry.part,
+			thickness = math.clamp((thickness or 1.5) * 0.06, 0.08, 0.22),
+			transparency = 0.22,
+			duration = nil,
+		})
 	end
 
 	local function updateAimlockDetector()
@@ -3648,7 +3784,7 @@ run(function()
 			local showRay = hud.aimlockVisualizeSetting and dot >= 0.35
 			local rayColor = suspicious and Color3.fromRGB(255, 55, 55) or Color3.fromRGB(255, 195, 75)
 			local rayThickness = suspicious and 2.5 or 1.5
-			local rayEnd = head.Position + look.Unit * math.min(toMe.Magnitude, 120)
+			local rayEnd = suspicious and myPos or (head.Position + look.Unit * math.min(toMe.Magnitude, 120))
 			setAimlockRay(plr, head.Position, rayEnd, showRay, rayColor, rayThickness)
 
 			if not state.flagged and state.samples >= needSamples then
@@ -3678,85 +3814,13 @@ run(function()
 		end
 	end
 
-	local function layoutDrawTimerWidget(overlay, centerX, topY, textScale, labelText, remaining, delay, kind, accentColor)
-		local kindSize = math.floor(11 * textScale)
-		local nameSize = math.floor(13 * textScale)
-		local timerSize = math.floor(18 * textScale)
-		local kindY = topY
-		local nameY = kindY + math.floor(13 * textScale)
-		local timerY = nameY + math.floor(15 * textScale)
-		local barY = timerY + math.floor(14 * textScale)
-		local barWidth = math.floor(math.clamp(72 * textScale, 56, 110))
-		local barLeft = centerX - barWidth / 2
-		local barRight = centerX + barWidth / 2
-
-		overlay.KindText.Size = kindSize
-		overlay.KindShadow.Size = kindSize
-		overlay.KindText.Text = string.upper(kind or 'DRAW')
-		overlay.KindShadow.Text = overlay.KindText.Text
-		overlay.KindText.Color = accentColor
-		overlay.KindText.Position = Vector2.new(centerX, kindY)
-		overlay.KindShadow.Position = overlay.KindText.Position + Vector2.new(1, 1)
-		overlay.KindText.Visible = true
-		overlay.KindShadow.Visible = true
-
-		overlay.DrawText.Size = nameSize
-		overlay.DrawShadow.Size = nameSize
-		overlay.DrawText.Text = labelText
-		overlay.DrawShadow.Text = labelText
-		overlay.DrawText.Color = Color3.fromRGB(190, 190, 200)
-		overlay.DrawText.Position = Vector2.new(centerX, nameY)
-		overlay.DrawShadow.Position = overlay.DrawText.Position + Vector2.new(1, 1)
-		overlay.DrawText.Visible = true
-		overlay.DrawShadow.Visible = true
-
-		local timerText = string.format('%.2fs', remaining)
-		overlay.TimerText.Size = timerSize
-		overlay.TimerShadow.Size = timerSize
-		overlay.TimerText.Text = timerText
-		overlay.TimerShadow.Text = timerText
-		overlay.TimerText.Color = remaining < 0.25 and Color3.fromRGB(255, 70, 70) or accentColor
-		overlay.TimerText.Position = Vector2.new(centerX, timerY)
-		overlay.TimerShadow.Position = overlay.TimerText.Position + Vector2.new(1, 1)
-		overlay.TimerText.Visible = true
-		overlay.TimerShadow.Visible = true
-
-		local panelPadX, panelPadY = 8, 5
-		local panelTop = kindY - panelPadY
-		local panelBottom = barY + panelPadY
-		local panelWidth = math.max(
-			overlay.KindText.TextBounds.X,
-			overlay.DrawText.TextBounds.X,
-			overlay.TimerText.TextBounds.X,
-			barWidth
-		) + panelPadX * 2
-
-		if overlay.PanelBg then
-			overlay.PanelBg.Position = Vector2.new(centerX - panelWidth / 2, panelTop)
-			overlay.PanelBg.Size = Vector2.new(panelWidth, panelBottom - panelTop)
-			overlay.PanelBg.Visible = true
-		end
-
-		if delay > 0 then
-			local ratio = math.clamp(remaining / delay, 0, 1)
-			local fillRight = barLeft + barWidth * ratio
-			overlay.BarBg.From = Vector2.new(barLeft, barY)
-			overlay.BarBg.To = Vector2.new(barRight, barY)
-			overlay.BarBg.Visible = true
-			overlay.BarFill.From = Vector2.new(barLeft, barY)
-			overlay.BarFill.To = Vector2.new(fillRight, barY)
-			overlay.BarFill.Color = remaining < 0.25 and Color3.fromRGB(255, 50, 50) or accentColor
-			overlay.BarFill.Visible = true
-		end
-	end
-
 	local function updatePlayerWorldEsp()
 		local anyEsp = (hud.drawTimerEnabled and hud.drawTimerWorldEspSetting)
 			or hud.bulletWarningsEnabled
 			or hud.impactEspEnabled
 		if not anyEsp then
-			for plr in playerEspOverlays do
-				destroyEspOverlay(plr)
+			for plr in playerBillboards do
+				destroyPlayerBillboard(plr)
 			end
 			return
 		end
@@ -3768,85 +3832,96 @@ run(function()
 				continue
 			end
 			if not isPlayerVisible(plr) then
-				destroyEspOverlay(plr)
+				destroyPlayerBillboard(plr)
 				continue
 			end
 			active[plr] = true
-			local overlay = ensureEspOverlay(plr)
-			if not overlay then
+			local board = ensurePlayerBillboard(plr)
+			if not board then
 				continue
 			end
-			local posx, posy, sizex, sizey = getPlayerScreenBox(plr)
-			if not posx then
-				hideEspOverlayDraw(overlay)
-				continue
-			end
-			local ix, iy = math.floor(posx), math.floor(posy)
-			local isx, isy = math.floor(sizex), math.floor(sizey)
-			local centerX = ix + isx / 2
-			local accentColor = Color3.fromRGB(255, 220, 120)
 
-			hideDraw(overlay.PanelBg)
-			hideDraw(overlay.DrawText)
-			hideDraw(overlay.DrawShadow)
-			hideDraw(overlay.TimerText)
-			hideDraw(overlay.TimerShadow)
-			hideDraw(overlay.KindText)
-			hideDraw(overlay.KindShadow)
-			hideDraw(overlay.BarBg)
-			hideDraw(overlay.BarFill)
-			hideDraw(overlay.WarnText)
-			hideDraw(overlay.WarnShadow)
-			hideDraw(overlay.ImpactBorder)
-			hideDraw(overlay.ImpactLine)
+			local px = math.floor(136 * textScale)
+			local py = math.floor(62 * textScale)
+			board.gui.Size = UDim2.fromOffset(px, py)
+			board.gui.StudsOffset = Vector3.new(0, 2.4 + 0.3 * textScale, 0)
 
 			local showDraw = hud.drawTimerEnabled and hud.drawTimerWorldEspSetting
 			local gunName, remaining, delay, kind = getActiveGunDrawInfo(plr)
+			local accentColor = Color3.fromRGB(255, 220, 120)
 			if showDraw and gunName then
 				remaining = math.max(0, remaining + hud.drawTimerOffsetSetting)
 				accentColor = GUN_DRAW_COLORS[gunName] or GUN_DRAW_COLORS.Castigate
-				local stackHeight = math.floor(52 * textScale)
-				local topY = iy - stackHeight
-				layoutDrawTimerWidget(
-					overlay, centerX, topY, textScale,
-					string.format('%s · %s', plr.Name, gunName),
-					remaining, delay, kind, accentColor
-				)
+				board.kind.Visible = true
+				board.kind.Text = string.upper(kind or 'DRAW')
+				board.kind.TextColor3 = accentColor
+				board.kind.TextSize = math.floor(10 * textScale)
+				board.gun.Visible = true
+				board.gun.Text = gunName
+				board.gun.TextSize = math.floor(12 * textScale)
+				board.timer.Visible = true
+				board.timer.Text = string.format('%.2fs', remaining)
+				board.timer.TextColor3 = remaining < 0.25 and Color3.fromRGB(255, 70, 70) or accentColor
+				board.timer.TextSize = math.floor(15 * textScale)
+				if delay > 0 then
+					local ratio = math.clamp(remaining / delay, 0, 1)
+					board.barBg.Visible = true
+					board.barFill.Size = UDim2.fromScale(ratio, 1)
+					board.barFill.BackgroundColor3 = remaining < 0.25 and Color3.fromRGB(255, 50, 50) or accentColor
+				else
+					board.barBg.Visible = false
+				end
+			else
+				board.kind.Visible = false
+				board.gun.Visible = false
+				board.timer.Visible = false
+				board.barBg.Visible = false
 			end
 
 			local heat = getPlayerReadOnlyNumber(plr, 'heat')
 			local perBullet = getPlayerReadOnlyNumber(plr, 'heat_per_bullet')
-			local shotReady = hud.bulletWarningsEnabled and heat and perBullet and heat >= perBullet
-			if shotReady then
-				local warnText = hud.bulletWarningsTextSetting
-				overlay.WarnText.Size = math.floor(14 * textScale)
-				overlay.WarnShadow.Size = overlay.WarnText.Size
-				overlay.WarnText.Text = warnText
-				overlay.WarnShadow.Text = warnText
-				overlay.WarnText.Position = Vector2.new(centerX, iy + isy + math.floor(8 * textScale))
-				overlay.WarnShadow.Position = overlay.WarnText.Position + Vector2.new(1, 1)
-				overlay.WarnText.Visible = true
-				overlay.WarnShadow.Visible = true
+			local warnState = bulletWarnState[plr] or {active = false, offCount = 0}
+			if hud.bulletWarningsEnabled and heat and perBullet and perBullet > 0 then
+				if heat >= perBullet * 0.97 then
+					warnState.active = true
+					warnState.offCount = 0
+				elseif warnState.active then
+					warnState.offCount += 1
+					if warnState.offCount >= 5 or heat < perBullet * 0.82 then
+						warnState.active = false
+					end
+				end
+			else
+				warnState.active = false
+				warnState.offCount = 0
+			end
+			bulletWarnState[plr] = warnState
+			if warnState.active then
+				board.warn.Visible = true
+				board.warn.Text = hud.bulletWarningsTextSetting
+				board.warn.TextSize = math.floor(11 * textScale)
+			else
+				board.warn.Visible = false
 			end
 
 			if hud.impactEspEnabled then
 				local impact = getPlayerReadOnlyNumber(plr, 'impact') or 0
 				local maxImpact = math.max(1, hud.impactEspMaxSetting)
 				local ratio = math.clamp(impact / maxImpact, 0, 1)
-				local healthposy = isy * ratio
-				overlay.ImpactBorder.From = Vector2.new(ix - 6, iy + 1)
-				overlay.ImpactBorder.To = Vector2.new(ix - 6, iy + isy - 1)
-				overlay.ImpactBorder.Visible = true
-				overlay.ImpactLine.From = Vector2.new(ix - 6, iy + isy - healthposy)
-				overlay.ImpactLine.To = Vector2.new(ix - 6, iy)
-				overlay.ImpactLine.Color = Color3.fromHSV((1 - ratio) * 0.33, 0.89, 0.75)
-				overlay.ImpactLine.Visible = impact > 0
+				board.impactTrack.Visible = impact > 0
+				board.impactFill.Size = UDim2.fromScale(1, ratio)
+				board.impactFill.BackgroundColor3 = Color3.fromHSV((1 - ratio) * 0.33, 0.89, 0.75)
+			else
+				board.impactTrack.Visible = false
 			end
+
+			local anyVisible = board.kind.Visible or board.warn.Visible or board.impactTrack.Visible
+			board.gui.Enabled = anyVisible
 		end
 
-		for plr in playerEspOverlays do
+		for plr in playerBillboards do
 			if not active[plr] then
-				destroyEspOverlay(plr)
+				destroyPlayerBillboard(plr)
 			end
 		end
 	end
@@ -4245,13 +4320,12 @@ run(function()
 	bindHudUpdateLoop()
 
 	playersService.PlayerRemoving:Connect(function(plr)
-		destroyEspOverlay(plr)
+		destroyPlayerBillboard(plr)
 		aimlockState[plr.UserId] = nil
-		local ray = aimlockRayPool[plr]
-		if ray then
+		local entry = aimlockRayPool[plr]
+		if entry and entry.part then
 			pcall(function()
-				ray.Visible = false
-				ray:Remove()
+				entry.part:Destroy()
 			end)
 			aimlockRayPool[plr] = nil
 		end
@@ -4265,14 +4339,17 @@ run(function()
 			return
 		end
 		bindPacketListeners()
-		local range = hud.killAuraRangeSetting
-		if not getNearestEnemyInAttackRange(range) then
+		local range = hud.killAuraRangeSetting + hud.killAuraExtendSetting
+		local root = getLocalRoot()
+		local hurtboxes = root and getEnemyHurtboxesInRange(range, root.Position) or {}
+		if #hurtboxes == 0 then
 			return
 		end
-		if hud.antiParryEnabled and anyEnemyInRangeParrying(range) then
+		if hud.antiParryEnabled and anyEnemyInRangeParrying(hud.killAuraRangeSetting) then
 			return
 		end
 		pressAttackClick()
+		fireKillAuraMeleeStrike()
 	end
 
 	local function bindKillAuraLoop()
@@ -5786,10 +5863,10 @@ run(function()
 			hud.killAuraActive = callback
 			if callback then
 				bindPacketListeners()
-				notif('Kill Aura', 'Real LMB swings with extended reach — swing once manually if hits fail.', 5)
+				notif('Kill Aura', 'Firing melee hurtbox packets at enemies in range.', 5)
 			end
 		end,
-		Tooltip = 'Auto-attacks through the real melee pipeline with Kill Aura reach augment (server-valid hits).',
+		Tooltip = 'Auto melee via real hurtbox packets + attack click. Uses Kill Aura reach augment.',
 	})
 	KillAura:CreateSlider({
 		Name = 'Range',
@@ -5827,7 +5904,7 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'second' or 'seconds'
 		end,
-		Tooltip = 'Delay between kill aura swings. Uses real attack clicks + reach augment, not raw packets.',
+		Tooltip = 'Delay between kill aura swings. Fires melee hurtbox packets at enemies in range.',
 	})
 	KillAura:CreateDropdown({
 		Name = 'Item ID',
@@ -5837,6 +5914,175 @@ run(function()
 			hud.killAuraItemIdSetting = val
 		end,
 		Tooltip = 'Auto detects equipped melee from character; falls back to captured swing template.',
+	})
+
+	local silentActive = false
+	local silentRange = 300
+	local silentHitChance = 100
+	local silentHeadChance = 50
+	local silentHooked = false
+	local silentOldNamecall
+
+	local function silentIgnoreScript(script)
+		if not script then
+			return false
+		end
+		local full = script:GetFullName()
+		return string.find(full, 'PlayerModule', 1, true) ~= nil
+			or string.find(full, 'CameraModule', 1, true) ~= nil
+			or string.find(full, 'ZoomController', 1, true) ~= nil
+	end
+
+	local function isRedlinerCombatRaycast(params)
+		if not params or params.FilterType ~= Enum.RaycastFilterType.Include then
+			return false
+		end
+		local list = params.FilterDescendantsInstances
+		if type(list) ~= 'table' then
+			return false
+		end
+		local map = workspace:FindFirstChild('Map')
+		for _, inst in list do
+			if inst == map then
+				return true
+			end
+		end
+		return false
+	end
+
+	local function getSilentTarget(origin)
+		if not silentActive or not entitylib.isAlive then
+			return nil, nil
+		end
+		if math.random(1, 100) > silentHitChance then
+			return nil, nil
+		end
+		local partName = math.random(1, 100) <= silentHeadChance and 'Head' or 'RootPart'
+		local ent = entitylib.EntityPosition({
+			Range = silentRange,
+			Part = partName,
+			Origin = origin,
+			Players = true,
+			NPCs = true,
+			Wallcheck = true,
+		})
+		if not ent then
+			return nil, nil
+		end
+		return ent, ent[partName] or ent.Head or ent.RootPart
+	end
+
+	local function installGunSilentAimHook()
+		if not silentActive or not initPackets() then
+			return
+		end
+		local packet = Packets[GUN_PACKET_NAME]
+		if not packet or type(packet.Fire) ~= 'function' or packet._silentAimHooked then
+			return
+		end
+		local oldFire = packet.Fire
+		packet._silentAimHooked = true
+		packet.Fire = function(firePacket, ...)
+			local packed = table.pack(...)
+			if silentActive and typeof(packed[6]) == 'Vector3' then
+				local root = getLocalRoot()
+				local _, part = getSilentTarget(root and root.Position or packed[6])
+				if part and root then
+					packed[6] = (part.Position - root.Position).Unit
+				end
+			end
+			return oldFire(firePacket, table.unpack(packed, 1, packed.n))
+		end
+	end
+
+	local function installSilentHooks()
+		if silentHooked or not hookmetamethod then
+			return
+		end
+		local ok, result = pcall(function()
+			return hookmetamethod(game, '__namecall', function(self, ...)
+				local method = getnamecallmethod()
+				if checkcaller() or not silentActive then
+					return silentOldNamecall(self, ...)
+				end
+				if silentIgnoreScript(getcallingscript()) then
+					return silentOldNamecall(self, ...)
+				end
+				local cam = workspace.CurrentCamera
+				if method == 'Raycast' and self == workspaceService then
+					local origin, direction, params = ...
+					if isRedlinerCombatRaycast(params) then
+						local _, part = getSilentTarget(origin)
+						if part then
+							local mag = direction.Magnitude
+							local aim = (part.Position - origin).Unit * mag
+							return silentOldNamecall(self, origin, aim, params)
+						end
+					end
+				elseif (method == 'ViewportPointToRay' or method == 'ScreenPointToRay') and self == cam then
+					local _, part = getSilentTarget(cam.CFrame.Position)
+					if part then
+						local origin = cam.CFrame.Position
+						local dir = (part.Position - origin).Unit
+						local x, y, depth = ...
+						local offset = depth and dir * depth or Vector3.zero
+						return Ray.new(origin + offset, dir)
+					end
+				end
+				return silentOldNamecall(self, ...)
+			end)
+		end)
+		if ok then
+			silentOldNamecall = result
+			silentHooked = true
+		else
+			warn('[REDLINER] Silent Aim hook failed:', result)
+		end
+	end
+
+	local SilentAimMod
+	SilentAimMod = extras:CreateModule({
+		Name = 'Silent Aim',
+		Function = function(callback)
+			silentActive = callback
+			if callback then
+				bindPacketListeners()
+				installSilentHooks()
+				installGunSilentAimHook()
+				notif('Silent Aim', 'Redirecting REDLINER gun rays to nearest enemy.', 5)
+			end
+		end,
+		Tooltip = 'Hooks ViewportPointToRay and Map/Entities raycasts. Replaces universal SilentAim.',
+	})
+	SilentAimMod:CreateSlider({
+		Name = 'Range',
+		Min = 50,
+		Max = 500,
+		Default = 300,
+		Function = function(val)
+			silentRange = val
+		end,
+		Suffix = ' studs',
+	})
+	SilentAimMod:CreateSlider({
+		Name = 'Hit Chance',
+		Min = 0,
+		Max = 100,
+		Default = 100,
+		Function = function(val)
+			silentHitChance = val
+		end,
+		Suffix = '%',
+	})
+	SilentAimMod:CreateSlider({
+		Name = 'Headshot Chance',
+		Min = 0,
+		Max = 100,
+		Default = 50,
+		Function = function(val)
+			silentHeadChance = val
+		end,
+		Suffix = '%',
 	})
 
 	local AnimLogger
@@ -5957,7 +6203,8 @@ run(function()
 	local REDLINER_PROFILE_MODULES = {
 		'Auto Parry', 'Auto Attack', 'Reach',
 		'Draw Timer', 'Bullet Warnings', 'Impact ESP', 'Aimlock Detector',
-		'Threat Indicator', 'Hitbox Visualizer', 'Kill Aura', 'Animation Logger', 'No Break Screen',
+		'Threat Indicator', 'Hitbox Visualizer', 'Kill Aura', 'Silent Aim',
+		'Animation Logger', 'No Break Screen',
 	}
 
 	local function applyRedlinerProfileModules()
@@ -5994,6 +6241,6 @@ run(function()
 		repeat
 			task.wait(0.25)
 		until vape.Loaded or tick() - start > 20
-		notif('REDLINER', 'Extras: packet parry mode, break timer, no-break-screen, draw timer, and combat tools ready.', 6)
+		notif('REDLINER', 'Extras: silent aim, kill aura packets, world ESP, aimlock tracers, and combat tools ready.', 6)
 	end)
 end)
