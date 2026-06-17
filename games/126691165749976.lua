@@ -239,7 +239,8 @@ local hud = {
 	bulletWarningsTextSetting = 'SHOT READY',
 	impactEspEnabled = false,
 	impactEspMaxSetting = 100,
-	breakTimerEnabled = false,
+	healthEspEnabled = false,
+	breakTimerEnabled = true,
 	aimlockDetectorEnabled = false,
 	aimlockVisualizeSetting = true,
 	aimlockThresholdSetting = 0.93,
@@ -3252,36 +3253,56 @@ run(function()
 
 			threatPanel = Instance.new('Frame')
 			threatPanel.Name = 'ThreatPanel'
-			threatPanel.BackgroundColor3 = Color3.fromRGB(12, 8, 8)
-			threatPanel.BackgroundTransparency = 0.35
+			threatPanel.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+			threatPanel.BackgroundTransparency = 0.18
 			threatPanel.BorderSizePixel = 0
 			threatPanel.AnchorPoint = Vector2.new(0.5, 1)
-			threatPanel.Size = UDim2.fromScale(0.92, 0.22)
-			threatPanel.Position = UDim2.fromScale(0.5, 0.92)
+			threatPanel.Size = UDim2.fromOffset(420, 72)
+			threatPanel.Position = UDim2.new(0.5, 0, 0.9, 0)
 			threatPanel.ZIndex = 3
 			threatPanel.Parent = threatOverlay
 			local panelCorner = Instance.new('UICorner')
-			panelCorner.CornerRadius = UDim.new(0, 12)
+			panelCorner.CornerRadius = UDim.new(0, 10)
 			panelCorner.Parent = threatPanel
+			local panelStroke = Instance.new('UIStroke')
+			panelStroke.Color = Color3.fromRGB(55, 55, 68)
+			panelStroke.Thickness = 1
+			panelStroke.Transparency = 0.35
+			panelStroke.Parent = threatPanel
+
+			local threatAccent = Instance.new('Frame')
+			threatAccent.Name = 'ThreatAccent'
+			threatAccent.BackgroundColor3 = Color3.fromRGB(255, 90, 90)
+			threatAccent.BorderSizePixel = 0
+			threatAccent.Size = UDim2.new(0, 4, 1, -12)
+			threatAccent.Position = UDim2.new(0, 8, 0, 6)
+			threatAccent.ZIndex = 4
+			threatAccent.Parent = threatPanel
+			local accentCorner = Instance.new('UICorner')
+			accentCorner.CornerRadius = UDim.new(1, 0)
+			accentCorner.Parent = threatAccent
 
 			threatTitle = Instance.new('TextLabel')
 			threatTitle.Name = 'ThreatTitle'
 			threatTitle.BackgroundTransparency = 1
-			threatTitle.Size = UDim2.fromScale(1, 0.62)
+			threatTitle.Position = UDim2.new(0, 20, 0, 8)
+			threatTitle.Size = UDim2.new(1, -28, 0, 30)
 			threatTitle.Font = Enum.Font.GothamBlack
+			threatTitle.TextXAlignment = Enum.TextXAlignment.Left
 			threatTitle.TextColor3 = Color3.fromRGB(255, 90, 90)
-			threatTitle.TextScaled = true
+			threatTitle.TextSize = 24
 			threatTitle.Text = ''
 			threatTitle.Parent = threatPanel
 
 			threatSub = Instance.new('TextLabel')
 			threatSub.Name = 'ThreatSub'
 			threatSub.BackgroundTransparency = 1
-			threatSub.Position = UDim2.fromScale(0, 0.58)
-			threatSub.Size = UDim2.fromScale(1, 0.38)
+			threatSub.Position = UDim2.new(0, 20, 0, 38)
+			threatSub.Size = UDim2.new(1, -28, 0, 24)
 			threatSub.Font = Enum.Font.GothamMedium
-			threatSub.TextColor3 = Color3.fromRGB(230, 230, 230)
-			threatSub.TextScaled = true
+			threatSub.TextXAlignment = Enum.TextXAlignment.Left
+			threatSub.TextColor3 = Color3.fromRGB(185, 185, 195)
+			threatSub.TextSize = 14
 			threatSub.Text = ''
 			threatSub.Parent = threatPanel
 		end
@@ -3520,7 +3541,7 @@ run(function()
 		return out
 	end
 
-	local playerBillboards = {}
+	local playerEspOverlays = {}
 	local bulletWarnState = {}
 	local aimlockState = {}
 	local aimlockRayPool = {}
@@ -3529,182 +3550,108 @@ run(function()
 		return workspace.CurrentCamera
 	end
 
-	local function destroyPlayerBillboard(plr)
-		local board = playerBillboards[plr]
-		if not board then
+	local function newDraw(typeName, props)
+		if not Drawing then
+			return nil
+		end
+		local obj = Drawing.new(typeName)
+		for key, val in props do
+			obj[key] = val
+		end
+		obj.Visible = false
+		return obj
+	end
+
+	local function hideDraw(obj)
+		if obj then
+			obj.Visible = false
+		end
+	end
+
+	local function destroyEspOverlay(plr)
+		local overlay = playerEspOverlays[plr]
+		if not overlay then
 			return
 		end
-		if board.gui then
-			pcall(function()
-				board.gui:Destroy()
-			end)
+		for _, obj in overlay do
+			if obj and obj.Remove then
+				pcall(function()
+					obj.Visible = false
+					obj:Remove()
+				end)
+			end
 		end
-		playerBillboards[plr] = nil
+		playerEspOverlays[plr] = nil
 		bulletWarnState[plr] = nil
 	end
 
-	local function ensurePlayerBillboard(plr)
-		local board = playerBillboards[plr]
-		if board and board.gui and board.gui.Parent then
-			return board
+	local function ensureEspOverlay(plr)
+		if playerEspOverlays[plr] then
+			return playerEspOverlays[plr]
 		end
-		local char = plr.Character
-		local adornee = char and (char:FindFirstChild('Head') or char:FindFirstChild('HumanoidRootPart'))
-		if not adornee then
+		if not Drawing then
 			return nil
 		end
-		if board and board.gui then
-			board.gui:Destroy()
-		end
-
-		local gui = Instance.new('BillboardGui')
-		gui.Name = 'RedlinerWorldEsp'
-		gui.Adornee = adornee
-		gui.AlwaysOnTop = true
-		gui.LightInfluence = 0
-		gui.MaxDistance = 260
-		gui.Size = UDim2.fromOffset(136, 62)
-		gui.StudsOffset = Vector3.new(0, 2.7, 0)
-		gui.Parent = adornee
-
-		local root = Instance.new('Frame')
-		root.Name = 'Root'
-		root.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
-		root.BackgroundTransparency = 0.22
-		root.BorderSizePixel = 0
-		root.Size = UDim2.fromScale(1, 1)
-		root.Parent = gui
-
-		local corner = Instance.new('UICorner')
-		corner.CornerRadius = UDim.new(0, 8)
-		corner.Parent = root
-
-		local stroke = Instance.new('UIStroke')
-		stroke.Color = Color3.fromRGB(55, 55, 68)
-		stroke.Thickness = 1
-		stroke.Transparency = 0.25
-		stroke.Parent = root
-
-		local pad = Instance.new('UIPadding')
-		pad.PaddingTop = UDim.new(0, 5)
-		pad.PaddingBottom = UDim.new(0, 5)
-		pad.PaddingLeft = UDim.new(0, 7)
-		pad.PaddingRight = UDim.new(0, 7)
-		pad.Parent = root
-
-		local layout = Instance.new('UIListLayout')
-		layout.SortOrder = Enum.SortOrder.LayoutOrder
-		layout.Padding = UDim.new(0, 2)
-		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-		layout.Parent = root
-
-		local kind = Instance.new('TextLabel')
-		kind.Name = 'Kind'
-		kind.LayoutOrder = 1
-		kind.BackgroundTransparency = 1
-		kind.Size = UDim2.new(1, 0, 0, 11)
-		kind.Font = Enum.Font.GothamBold
-		kind.TextSize = 10
-		kind.TextColor3 = Color3.fromRGB(255, 200, 90)
-		kind.Text = 'DRAW'
-		kind.Parent = root
-
-		local gun = Instance.new('TextLabel')
-		gun.Name = 'Gun'
-		gun.LayoutOrder = 2
-		gun.BackgroundTransparency = 1
-		gun.Size = UDim2.new(1, 0, 0, 13)
-		gun.Font = Enum.Font.GothamSemibold
-		gun.TextSize = 12
-		gun.TextColor3 = Color3.fromRGB(210, 210, 220)
-		gun.Text = ''
-		gun.Parent = root
-
-		local timer = Instance.new('TextLabel')
-		timer.Name = 'Timer'
-		timer.LayoutOrder = 3
-		timer.BackgroundTransparency = 1
-		timer.Size = UDim2.new(1, 0, 0, 16)
-		timer.Font = Enum.Font.GothamBlack
-		timer.TextSize = 15
-		timer.TextColor3 = Color3.fromRGB(255, 220, 120)
-		timer.Text = ''
-		timer.Parent = root
-
-		local barBg = Instance.new('Frame')
-		barBg.Name = 'BarBg'
-		barBg.LayoutOrder = 4
-		barBg.Size = UDim2.new(1, 0, 0, 5)
-		barBg.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-		barBg.BorderSizePixel = 0
-		barBg.Visible = false
-		barBg.Parent = root
-		local barCorner = Instance.new('UICorner')
-		barCorner.CornerRadius = UDim.new(1, 0)
-		barCorner.Parent = barBg
-
-		local barFill = Instance.new('Frame')
-		barFill.Name = 'BarFill'
-		barFill.BackgroundColor3 = Color3.fromRGB(255, 150, 55)
-		barFill.BorderSizePixel = 0
-		barFill.Size = UDim2.fromScale(1, 1)
-		barFill.Parent = barBg
-		local fillCorner = Instance.new('UICorner')
-		fillCorner.CornerRadius = UDim.new(1, 0)
-		fillCorner.Parent = barFill
-
-		local warn = Instance.new('TextLabel')
-		warn.Name = 'Warn'
-		warn.LayoutOrder = 5
-		warn.BackgroundTransparency = 1
-		warn.Size = UDim2.new(1, 0, 0, 14)
-		warn.Font = Enum.Font.GothamBlack
-		warn.TextSize = 11
-		warn.TextColor3 = Color3.fromRGB(255, 85, 85)
-		warn.TextStrokeTransparency = 0.55
-		warn.TextStrokeColor3 = Color3.fromRGB(40, 0, 0)
-		warn.Text = ''
-		warn.Visible = false
-		warn.Parent = root
-
-		local impactTrack = Instance.new('Frame')
-		impactTrack.Name = 'ImpactTrack'
-		impactTrack.AnchorPoint = Vector2.new(0, 0.5)
-		impactTrack.Position = UDim2.new(0, -5, 0.5, 0)
-		impactTrack.Size = UDim2.new(0, 3, 0.82, 0)
-		impactTrack.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
-		impactTrack.BorderSizePixel = 0
-		impactTrack.Visible = false
-		impactTrack.Parent = root
-		local impactCorner = Instance.new('UICorner')
-		impactCorner.CornerRadius = UDim.new(1, 0)
-		impactCorner.Parent = impactTrack
-
-		local impactFill = Instance.new('Frame')
-		impactFill.Name = 'ImpactFill'
-		impactFill.AnchorPoint = Vector2.new(0, 1)
-		impactFill.Position = UDim2.fromScale(0, 1)
-		impactFill.Size = UDim2.fromScale(1, 0)
-		impactFill.BackgroundColor3 = Color3.fromRGB(255, 120, 60)
-		impactFill.BorderSizePixel = 0
-		impactFill.Parent = impactTrack
-		local impactFillCorner = Instance.new('UICorner')
-		impactFillCorner.CornerRadius = UDim.new(1, 0)
-		impactFillCorner.Parent = impactFill
-
-		playerBillboards[plr] = {
-			gui = gui,
-			root = root,
-			kind = kind,
-			gun = gun,
-			timer = timer,
-			barBg = barBg,
-			barFill = barFill,
-			warn = warn,
-			impactTrack = impactTrack,
-			impactFill = impactFill,
+		local overlay = {
+			DrawBg = newDraw('Square', {Filled = true, Thickness = 1, ZIndex = 1, Transparency = 0.3, Color = Color3.fromRGB(8, 8, 12)}),
+			DrawGun = newDraw('Text', {Center = true, Size = 11, ZIndex = 4, Color = Color3.fromRGB(200, 200, 210)}),
+			DrawTime = newDraw('Text', {Center = true, Size = 14, ZIndex = 5, Color = Color3.fromRGB(255, 220, 120)}),
+			DrawBarBg = newDraw('Line', {Thickness = 3, ZIndex = 2, Transparency = 0.45, Color = Color3.fromRGB(25, 25, 32)}),
+			DrawBarFill = newDraw('Line', {Thickness = 2, ZIndex = 3, Color = Color3.fromRGB(255, 150, 55)}),
+			WarnBg = newDraw('Square', {Filled = true, Thickness = 1, ZIndex = 2, Transparency = 0.25, Color = Color3.fromRGB(30, 8, 8)}),
+			WarnText = newDraw('Text', {Center = true, Size = 12, ZIndex = 4, Color = Color3.fromRGB(255, 95, 95)}),
+			ImpactBg = newDraw('Line', {Thickness = 4, ZIndex = 2, Transparency = 0.4, Color = Color3.fromRGB(18, 18, 24)}),
+			ImpactFill = newDraw('Line', {Thickness = 3, ZIndex = 3, Color = Color3.fromRGB(255, 120, 60)}),
+			HealthBg = newDraw('Line', {Thickness = 4, ZIndex = 2, Transparency = 0.4, Color = Color3.fromRGB(18, 18, 24)}),
+			HealthFill = newDraw('Line', {Thickness = 3, ZIndex = 3, Color = Color3.fromRGB(80, 220, 120)}),
 		}
-		return playerBillboards[plr]
+		playerEspOverlays[plr] = overlay
+		return overlay
+	end
+
+	local function getPlayerScreenBox(plr)
+		local ent = entitylib.getEntity(plr)
+		local root = ent and ent.RootPart
+		if not root then
+			local char = plr.Character
+			root = char and char:FindFirstChild('HumanoidRootPart')
+		end
+		if not root or not getGameCamera() then
+			return nil
+		end
+		local cam = getGameCamera()
+		local hipHeight = ent and ent.HipHeight or 2
+		local rootPos, rootVis = cam:WorldToViewportPoint(root.Position)
+		if not rootVis then
+			return nil
+		end
+		local topPos = cam:WorldToViewportPoint((CFrame.lookAlong(root.Position, cam.CFrame.LookVector) * CFrame.new(2, hipHeight, 0)).Position)
+		local bottomPos = cam:WorldToViewportPoint((CFrame.lookAlong(root.Position, cam.CFrame.LookVector) * CFrame.new(-2, -hipHeight - 1, 0)).Position)
+		local sizex = math.abs(topPos.X - bottomPos.X)
+		local sizey = math.abs(topPos.Y - bottomPos.Y)
+		return rootPos.X - sizex / 2, rootPos.Y - sizey / 2, sizex, sizey
+	end
+
+	local function hideEspOverlayDraw(overlay)
+		for _, obj in overlay do
+			hideDraw(obj)
+		end
+	end
+
+	local function drawVerticalBar(bgLine, fillLine, x, topY, height, ratio, color)
+		if height < 4 then
+			hideDraw(bgLine)
+			hideDraw(fillLine)
+			return
+		end
+		bgLine.From = Vector2.new(x, topY)
+		bgLine.To = Vector2.new(x, topY + height)
+		bgLine.Visible = true
+		local fillHeight = math.max(1, height * math.clamp(ratio, 0, 1))
+		fillLine.From = Vector2.new(x, topY + height - fillHeight)
+		fillLine.To = Vector2.new(x, topY + height)
+		fillLine.Color = color
+		fillLine.Visible = ratio > 0.01
 	end
 
 	local function setAimlockRay(plr, fromWorld, toWorld, visible, color, thickness)
@@ -3818,64 +3765,78 @@ run(function()
 		local anyEsp = (hud.drawTimerEnabled and hud.drawTimerWorldEspSetting)
 			or hud.bulletWarningsEnabled
 			or hud.impactEspEnabled
+			or hud.healthEspEnabled
 		if not anyEsp then
-			for plr in playerBillboards do
-				destroyPlayerBillboard(plr)
+			for plr in playerEspOverlays do
+				destroyEspOverlay(plr)
 			end
 			return
 		end
 
 		local active = {}
 		local textScale = math.clamp(hud.drawTimerEspScaleSetting, 0.6, 2)
+		local barOffset = math.floor(7 * textScale)
 		for _, plr in playersService:GetPlayers() do
 			if plr == lplr then
 				continue
 			end
 			if not isPlayerVisible(plr) then
-				destroyPlayerBillboard(plr)
+				destroyEspOverlay(plr)
 				continue
 			end
 			active[plr] = true
-			local board = ensurePlayerBillboard(plr)
-			if not board then
+			local overlay = ensureEspOverlay(plr)
+			if not overlay then
 				continue
 			end
+			local posx, posy, sizex, sizey = getPlayerScreenBox(plr)
+			if not posx then
+				hideEspOverlayDraw(overlay)
+				continue
+			end
+			local ix, iy = math.floor(posx), math.floor(posy)
+			local isx, isy = math.floor(sizex), math.floor(sizey)
+			local centerX = ix + isx / 2
+			local barTop = iy + 2
+			local barHeight = math.max(12, isy - 4)
 
-			local px = math.floor(136 * textScale)
-			local py = math.floor(62 * textScale)
-			board.gui.Size = UDim2.fromOffset(px, py)
-			board.gui.StudsOffset = Vector3.new(0, 2.4 + 0.3 * textScale, 0)
+			hideEspOverlayDraw(overlay)
 
 			local showDraw = hud.drawTimerEnabled and hud.drawTimerWorldEspSetting
 			local gunName, remaining, delay, kind = getActiveGunDrawInfo(plr)
-			local accentColor = Color3.fromRGB(255, 220, 120)
 			if showDraw and gunName then
 				remaining = math.max(0, remaining + hud.drawTimerOffsetSetting)
-				accentColor = GUN_DRAW_COLORS[gunName] or GUN_DRAW_COLORS.Castigate
-				board.kind.Visible = true
-				board.kind.Text = string.upper(kind or 'DRAW')
-				board.kind.TextColor3 = accentColor
-				board.kind.TextSize = math.floor(10 * textScale)
-				board.gun.Visible = true
-				board.gun.Text = gunName
-				board.gun.TextSize = math.floor(12 * textScale)
-				board.timer.Visible = true
-				board.timer.Text = string.format('%.2fs', remaining)
-				board.timer.TextColor3 = remaining < 0.25 and Color3.fromRGB(255, 70, 70) or accentColor
-				board.timer.TextSize = math.floor(15 * textScale)
+				local accentColor = GUN_DRAW_COLORS[gunName] or GUN_DRAW_COLORS.Castigate
+				local chipW = math.floor(math.clamp(88 * textScale, 72, 130))
+				local chipH = math.floor(math.clamp(34 * textScale, 28, 44))
+				local chipX = centerX - chipW / 2
+				local chipY = iy - chipH - math.floor(6 * textScale)
+				overlay.DrawBg.Position = Vector2.new(chipX, chipY)
+				overlay.DrawBg.Size = Vector2.new(chipW, chipH)
+				overlay.DrawBg.Visible = true
+				overlay.DrawGun.Size = math.floor(11 * textScale)
+				overlay.DrawGun.Text = string.upper(kind or 'DRAW') .. ' · ' .. gunName
+				overlay.DrawGun.Color = accentColor
+				overlay.DrawGun.Position = Vector2.new(centerX, chipY + math.floor(10 * textScale))
+				overlay.DrawGun.Visible = true
+				overlay.DrawTime.Size = math.floor(14 * textScale)
+				overlay.DrawTime.Text = string.format('%.2fs', remaining)
+				overlay.DrawTime.Color = remaining < 0.25 and Color3.fromRGB(255, 70, 70) or accentColor
+				overlay.DrawTime.Position = Vector2.new(centerX, chipY + math.floor(22 * textScale))
+				overlay.DrawTime.Visible = true
 				if delay > 0 then
 					local ratio = math.clamp(remaining / delay, 0, 1)
-					board.barBg.Visible = true
-					board.barFill.Size = UDim2.fromScale(ratio, 1)
-					board.barFill.BackgroundColor3 = remaining < 0.25 and Color3.fromRGB(255, 50, 50) or accentColor
-				else
-					board.barBg.Visible = false
+					local barY = chipY + chipH - math.floor(4 * textScale)
+					local barLeft = chipX + 6
+					local barRight = chipX + chipW - 6
+					overlay.DrawBarBg.From = Vector2.new(barLeft, barY)
+					overlay.DrawBarBg.To = Vector2.new(barRight, barY)
+					overlay.DrawBarBg.Visible = true
+					overlay.DrawBarFill.From = Vector2.new(barLeft, barY)
+					overlay.DrawBarFill.To = Vector2.new(barLeft + (barRight - barLeft) * ratio, barY)
+					overlay.DrawBarFill.Color = remaining < 0.25 and Color3.fromRGB(255, 50, 50) or accentColor
+					overlay.DrawBarFill.Visible = true
 				end
-			else
-				board.kind.Visible = false
-				board.gun.Visible = false
-				board.timer.Visible = false
-				board.barBg.Visible = false
 			end
 
 			local heat = getPlayerReadOnlyNumber(plr, 'heat')
@@ -3887,7 +3848,7 @@ run(function()
 					warnState.offCount = 0
 				elseif warnState.active then
 					warnState.offCount += 1
-					if warnState.offCount >= 5 or heat < perBullet * 0.82 then
+					if warnState.offCount >= 6 or heat < perBullet * 0.8 then
 						warnState.active = false
 					end
 				end
@@ -3897,31 +3858,45 @@ run(function()
 			end
 			bulletWarnState[plr] = warnState
 			if warnState.active then
-				board.warn.Visible = true
-				board.warn.Text = hud.bulletWarningsTextSetting
-				board.warn.TextSize = math.floor(11 * textScale)
-			else
-				board.warn.Visible = false
+				local warnText = hud.bulletWarningsTextSetting
+				overlay.WarnText.Size = math.floor(12 * textScale)
+				overlay.WarnText.Text = warnText
+				overlay.WarnText.Position = Vector2.new(centerX, iy + isy + math.floor(10 * textScale))
+				overlay.WarnText.Visible = true
+				local padX = math.max(overlay.WarnText.TextBounds.X * 0.5 + 10, 36)
+				overlay.WarnBg.Position = Vector2.new(centerX - padX, iy + isy + math.floor(4 * textScale))
+				overlay.WarnBg.Size = Vector2.new(padX * 2, math.floor(18 * textScale))
+				overlay.WarnBg.Visible = true
 			end
 
 			if hud.impactEspEnabled then
 				local impact = getPlayerReadOnlyNumber(plr, 'impact') or 0
 				local maxImpact = math.max(1, hud.impactEspMaxSetting)
 				local ratio = math.clamp(impact / maxImpact, 0, 1)
-				board.impactTrack.Visible = impact > 0
-				board.impactFill.Size = UDim2.fromScale(1, ratio)
-				board.impactFill.BackgroundColor3 = Color3.fromHSV((1 - ratio) * 0.33, 0.89, 0.75)
-			else
-				board.impactTrack.Visible = false
+				drawVerticalBar(
+					overlay.ImpactBg, overlay.ImpactFill,
+					ix - barOffset, barTop, barHeight, ratio,
+					Color3.fromHSV((1 - ratio) * 0.33, 0.89, 0.75)
+				)
 			end
 
-			local anyVisible = board.kind.Visible or board.warn.Visible or board.impactTrack.Visible
-			board.gui.Enabled = anyVisible
+			if hud.healthEspEnabled then
+				local health = getPlayerReadOnlyNumber(plr, 'health')
+				local healthMax = getPlayerReadOnlyNumber(plr, 'health_max')
+				if health and healthMax and healthMax > 0 then
+					local ratio = math.clamp(health / healthMax, 0, 1)
+					drawVerticalBar(
+						overlay.HealthBg, overlay.HealthFill,
+						ix + isx + barOffset, barTop, barHeight, ratio,
+						Color3.fromHSV(ratio * 0.33, 0.85, 0.9)
+					)
+				end
+			end
 		end
 
-		for plr in playerBillboards do
+		for plr in playerEspOverlays do
 			if not active[plr] then
-				destroyPlayerBillboard(plr)
+				destroyEspOverlay(plr)
 			end
 		end
 	end
@@ -4095,13 +4070,18 @@ run(function()
 			return
 		end
 		local speed = math.clamp(hud.threatIndicatorAnimSpeedSetting, 0.05, 1)
-		threatPanel.Size = UDim2.fromScale(0.85, 0.18)
-		tweenService:Create(threatPanel, TweenInfo.new(speed, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Size = hud.threatIndicatorFullscreenSetting and UDim2.fromScale(1, 1) or UDim2.fromScale(0.92, 0.22),
+		local targetSize = hud.threatIndicatorFullscreenSetting and UDim2.fromScale(0.96, 0.32) or UDim2.fromOffset(420, 72)
+		threatPanel.Size = UDim2.fromOffset(360, 58)
+		tweenService:Create(threatPanel, TweenInfo.new(speed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = targetSize,
 		}):Play()
+		local accent = threatPanel:FindFirstChild('ThreatAccent')
+		if accent and threat then
+			accent.BackgroundColor3 = threat.color
+		end
 		if flashRed and threatFlash then
-			threatFlash.BackgroundTransparency = 0.55
-			tweenService:Create(threatFlash, TweenInfo.new(speed * 1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			threatFlash.BackgroundTransparency = 0.82
+			tweenService:Create(threatFlash, TweenInfo.new(speed * 2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 				BackgroundTransparency = 1,
 			}):Play()
 		end
@@ -4120,48 +4100,40 @@ run(function()
 		local threats = collectThreatEntries()
 		local primary = threats[1]
 		threatOverlay.Visible = true
+		threatOverlay.BackgroundTransparency = 1
+		local accent = threatPanel and threatPanel:FindFirstChild('ThreatAccent')
 		if not primary then
 			lastPrimaryKey = ''
-			if hud.threatIndicatorFullscreenSetting then
-				threatOverlay.BackgroundTransparency = 1 - hud.threatIndicatorOpacitySetting * 0.35
-				threatPanel.AnchorPoint = Vector2.new(0.5, 0.5)
-				threatPanel.Position = UDim2.fromScale(0.5, 0.5)
-				threatPanel.Size = UDim2.fromScale(0.7, 0.18)
-			else
-				threatOverlay.BackgroundTransparency = 1
-				threatPanel.AnchorPoint = Vector2.new(0.5, 1)
-				threatPanel.Position = UDim2.fromScale(0.5, math.clamp(hud.threatIndicatorPosYSetting, 0.55, 0.98))
-				threatPanel.Size = UDim2.fromScale(0.92, 0.16)
+			threatPanel.AnchorPoint = Vector2.new(0.5, 1)
+			threatPanel.Position = UDim2.new(0.5, 0, math.clamp(hud.threatIndicatorPosYSetting, 0.55, 0.98), 0)
+			threatPanel.Size = UDim2.fromOffset(320, 58)
+			threatPanel.BackgroundTransparency = 0.22
+			if accent then
+				accent.BackgroundColor3 = Color3.fromRGB(80, 200, 110)
 			end
-			threatPanel.BackgroundTransparency = 1 - hud.threatIndicatorOpacitySetting
 			if threatTitle then
-				threatTitle.TextSize = math.floor(hud.threatIndicatorFontSizeSetting * 0.65)
+				threatTitle.TextSize = math.floor(hud.threatIndicatorFontSizeSetting * 0.55)
 				threatTitle.Text = 'ALL CLEAR'
-				threatTitle.TextColor3 = Color3.fromRGB(120, 220, 140)
+				threatTitle.TextColor3 = Color3.fromRGB(100, 220, 130)
 			end
 			if threatSub then
 				threatSub.TextSize = math.floor(hud.threatIndicatorFontSizeSetting * 0.28)
-				threatSub.Text = 'Threat indicator active — watching for melee / gun / glint'
+				threatSub.Text = 'Monitoring melee · gun draw · gun shot · glint'
 			end
 			return
 		end
-		if hud.threatIndicatorFullscreenSetting then
-			threatOverlay.BackgroundTransparency = 1 - hud.threatIndicatorOpacitySetting * 0.65
-			threatPanel.AnchorPoint = Vector2.new(0.5, 0.5)
-			threatPanel.Position = UDim2.fromScale(0.5, 0.5)
-			threatPanel.Size = UDim2.fromScale(0.96, 0.38)
-		else
-			threatOverlay.BackgroundTransparency = 1
-			threatPanel.AnchorPoint = Vector2.new(0.5, 1)
-			threatPanel.Position = UDim2.fromScale(0.5, math.clamp(hud.threatIndicatorPosYSetting, 0.55, 0.98))
-			threatPanel.Size = UDim2.fromScale(0.92, 0.22)
-		end
-		threatPanel.BackgroundTransparency = 1 - hud.threatIndicatorOpacitySetting
+		threatPanel.AnchorPoint = Vector2.new(0.5, 1)
+		threatPanel.Position = UDim2.new(0.5, 0, math.clamp(hud.threatIndicatorPosYSetting, 0.55, 0.98), 0)
+		threatPanel.Size = hud.threatIndicatorFullscreenSetting and UDim2.fromScale(0.96, 0.32) or UDim2.fromOffset(420, 72)
+		threatPanel.BackgroundTransparency = 1 - hud.threatIndicatorOpacitySetting * 0.5
 		local key = primary.type .. ':' .. primary.name
 		local flash = primary.type == 'GUN SHOT' or primary.type == 'GLINT'
 		if key ~= lastPrimaryKey then
 			lastPrimaryKey = key
 			animateThreatChange(primary, flash)
+		end
+		if accent then
+			accent.BackgroundColor3 = primary.color
 		end
 		if threatTitle then
 			threatTitle.TextSize = hud.threatIndicatorFontSizeSetting
@@ -4169,12 +4141,11 @@ run(function()
 			threatTitle.TextColor3 = primary.color
 		end
 		if threatSub then
-			local subSize = math.floor(hud.threatIndicatorFontSizeSetting * 0.45)
-			threatSub.TextSize = subSize
+			threatSub.TextSize = math.floor(hud.threatIndicatorFontSizeSetting * 0.42)
 			if primary.type == 'GUN DRAW' and primary.remaining > 0 then
-				threatSub.Text = string.format('%s  •  %.1f studs  •  %.2fs', primary.name, primary.dist, primary.remaining)
+				threatSub.Text = string.format('%s  ·  %.0f studs  ·  draw %.2fs', primary.name, primary.dist, primary.remaining)
 			else
-				threatSub.Text = string.format('%s  •  %.1f studs', primary.name, primary.dist)
+				threatSub.Text = string.format('%s  ·  %.0f studs away', primary.name, primary.dist)
 			end
 		end
 	end
@@ -4309,7 +4280,8 @@ run(function()
 		runService.RenderStepped:Connect(function()
 			if not hud.drawTimerEnabled and not hud.threatIndicatorEnabled
 				and not hud.bulletWarningsEnabled and not hud.impactEspEnabled
-				and not hud.aimlockDetectorEnabled then
+				and not hud.healthEspEnabled and not hud.aimlockDetectorEnabled
+				and not hud.breakTimerEnabled then
 				return
 			end
 			if hud.hudTickCallback then
@@ -4320,7 +4292,7 @@ run(function()
 	bindHudUpdateLoop()
 
 	playersService.PlayerRemoving:Connect(function(plr)
-		destroyPlayerBillboard(plr)
+		destroyEspOverlay(plr)
 		aimlockState[plr.UserId] = nil
 		local entry = aimlockRayPool[plr]
 		if entry and entry.part then
@@ -5471,7 +5443,7 @@ run(function()
 		Function = function(callback)
 			hud.drawTimerWorldEspSetting = callback
 		end,
-		Tooltip = 'Floating timer above each visible enemy while they draw.',
+		Tooltip = 'Floating draw timer chip above each visible enemy (screen ESP).',
 	})
 	DrawTimer:CreateToggle({
 		Name = 'Screen HUD',
@@ -5483,7 +5455,7 @@ run(function()
 	})
 	DrawTimer:CreateToggle({
 		Name = 'True Break Timer',
-		Default = false,
+		Default = true,
 		Function = function(callback)
 			hud.breakTimerEnabled = callback
 			if callback then
@@ -5612,7 +5584,7 @@ run(function()
 				notif('Impact ESP', 'Impact bar shown on visible enemies.', 4)
 			end
 		end,
-		Tooltip = 'Health-style bar from Player.ReadOnly.impact (0–100).',
+		Tooltip = 'Impact bar on the left side of visible enemies (Player.ReadOnly.impact).',
 	})
 	ImpactEsp:CreateSlider({
 		Name = 'Max Impact',
@@ -5622,6 +5594,18 @@ run(function()
 		Function = function(val)
 			hud.impactEspMaxSetting = val
 		end,
+	})
+
+	local HealthEsp
+	HealthEsp = extras:CreateModule({
+		Name = 'Health ESP',
+		Function = function(callback)
+			hud.healthEspEnabled = callback
+			if callback then
+				notif('Health ESP', 'Health bar on the right side of visible enemies.', 4)
+			end
+		end,
+		Tooltip = 'Health bar from Player.ReadOnly.health / health_max. Pairs with Impact ESP (left bar).',
 	})
 
 	local AimlockDetector
@@ -5920,18 +5904,8 @@ run(function()
 	local silentRange = 300
 	local silentHitChance = 100
 	local silentHeadChance = 50
-	local silentHooked = false
-	local silentOldNamecall
-
-	local function silentIgnoreScript(script)
-		if not script then
-			return false
-		end
-		local full = script:GetFullName()
-		return string.find(full, 'PlayerModule', 1, true) ~= nil
-			or string.find(full, 'CameraModule', 1, true) ~= nil
-			or string.find(full, 'ZoomController', 1, true) ~= nil
-	end
+	local silentRaycastHooked = false
+	local silentOldRaycast
 
 	local function isRedlinerCombatRaycast(params)
 		if not params or params.FilterType ~= Enum.RaycastFilterType.Include then
@@ -5996,47 +5970,30 @@ run(function()
 	end
 
 	local function installSilentHooks()
-		if silentHooked or not hookmetamethod then
+		if silentRaycastHooked or not hookfunction then
 			return
 		end
-		local ok, result = pcall(function()
-			return hookmetamethod(game, '__namecall', function(self, ...)
-				local method = getnamecallmethod()
-				if checkcaller() or not silentActive then
-					return silentOldNamecall(self, ...)
+		local wsRaycast = workspace.Raycast
+		if type(wsRaycast) ~= 'function' then
+			return
+		end
+		local ok, original = pcall(function()
+			return hookfunction(wsRaycast, function(origin, direction, params, ...)
+				if checkcaller() or not silentActive or not isRedlinerCombatRaycast(params) then
+					return silentOldRaycast(origin, direction, params, ...)
 				end
-				if silentIgnoreScript(getcallingscript()) then
-					return silentOldNamecall(self, ...)
+				local _, part = getSilentTarget(origin)
+				if part and typeof(direction) == 'Vector3' then
+					direction = (part.Position - origin).Unit * direction.Magnitude
 				end
-				local cam = workspace.CurrentCamera
-				if method == 'Raycast' and self == workspaceService then
-					local origin, direction, params = ...
-					if isRedlinerCombatRaycast(params) then
-						local _, part = getSilentTarget(origin)
-						if part then
-							local mag = direction.Magnitude
-							local aim = (part.Position - origin).Unit * mag
-							return silentOldNamecall(self, origin, aim, params)
-						end
-					end
-				elseif (method == 'ViewportPointToRay' or method == 'ScreenPointToRay') and self == cam then
-					local _, part = getSilentTarget(cam.CFrame.Position)
-					if part then
-						local origin = cam.CFrame.Position
-						local dir = (part.Position - origin).Unit
-						local x, y, depth = ...
-						local offset = depth and dir * depth or Vector3.zero
-						return Ray.new(origin + offset, dir)
-					end
-				end
-				return silentOldNamecall(self, ...)
+				return silentOldRaycast(origin, direction, params, ...)
 			end)
 		end)
-		if ok then
-			silentOldNamecall = result
-			silentHooked = true
+		if ok and type(original) == 'function' then
+			silentOldRaycast = original
+			silentRaycastHooked = true
 		else
-			warn('[REDLINER] Silent Aim hook failed:', result)
+			warn('[REDLINER] Silent Aim raycast hook failed:', original)
 		end
 	end
 
@@ -6049,10 +6006,10 @@ run(function()
 				bindPacketListeners()
 				installSilentHooks()
 				installGunSilentAimHook()
-				notif('Silent Aim', 'Redirecting REDLINER gun rays to nearest enemy.', 5)
+				notif('Silent Aim', 'Combat raycast + gun packet hooks active (safe mode).', 5)
 			end
 		end,
-		Tooltip = 'Hooks ViewportPointToRay and Map/Entities raycasts. Replaces universal SilentAim.',
+		Tooltip = 'Hooks combat raycasts and gun packet aim. Does not touch camera/character scripts.',
 	})
 	SilentAimMod:CreateSlider({
 		Name = 'Range',
@@ -6202,7 +6159,7 @@ run(function()
 
 	local REDLINER_PROFILE_MODULES = {
 		'Auto Parry', 'Auto Attack', 'Reach',
-		'Draw Timer', 'Bullet Warnings', 'Impact ESP', 'Aimlock Detector',
+		'Draw Timer', 'Bullet Warnings', 'Impact ESP', 'Health ESP', 'Aimlock Detector',
 		'Threat Indicator', 'Hitbox Visualizer', 'Kill Aura', 'Silent Aim',
 		'Animation Logger', 'No Break Screen',
 	}
