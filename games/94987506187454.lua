@@ -251,7 +251,7 @@ local WATCHER_REFRESH_INTERVAL = 0.25
 local GUN_AIM_RANGE_BONUS = 0.12
 local GUN_MUZZLE_NAMES = {'Muzzle', 'Barrel', 'FirePoint', 'Gun', 'Handle', 'Tip', 'ShootPoint', 'Ray', 'Flash', 'Emitter', 'Glint'}
 local GUN_RAY_HIT_RADIUS = 5
-local GUN_RAY_MAX_RANGE = 140
+local GUN_RAY_MAX_RANGE = 100000
 local PING_PARRY_MULTIPLIER = 0.9
 local PING_PARRY_MAX_OFFSET = 0.5
 local tryParry
@@ -306,7 +306,6 @@ local hud = {
 	aimlockVisualizeSetting = true,
 	aimlockThresholdSetting = 0.93,
 	aimlockMinSamplesSetting = 18,
-	aimlockRayLengthSetting = 60,
 	threatRequireAimingSetting = false,
 	antiParryEnabled = true,
 	threatShowMeleeSetting = true,
@@ -673,6 +672,20 @@ local function getPlayerFromModel(model)
 	return nil
 end
 
+local function isEnemyCharVisible(char)
+	if not char then
+		return false
+	end
+	local plr = playersService:GetPlayerFromCharacter(char)
+	if not plr then
+		plr = getPlayerFromModel(char)
+	end
+	if not plr or plr == lplr then
+		return false
+	end
+	return isPlayerVisible(plr)
+end
+
 local function getEnemyModels(plr)
 	local models = {}
 	if plr.Character then
@@ -738,15 +751,15 @@ local function getEnemyState(char)
 end
 
 local function isEnemyInMeleeThreatRange(char)
-	return getEnemyDistance(char) <= meleeRangeSetting
+	return isEnemyCharVisible(char)
 end
 
 local function isEnemyInGunThreatRange(char)
-	return getEnemyDistance(char) <= threatRangeSetting
+	return isEnemyCharVisible(char)
 end
 
 local function getEffectiveWatcherRange()
-	return math.max(watcherThreatRangeSetting, threatRangeSetting, meleeRangeSetting)
+	return math.huge
 end
 
 local function isInstUnderEnemyModels(char, inst)
@@ -1036,13 +1049,8 @@ local function getHeadAimDotFromModel(model)
 	return getAimDot3D(head.Position, head.CFrame.LookVector, root.Position)
 end
 
-local function getEffectiveGunAimThreshold(dist)
-	local base = gunAimDotSetting
-	if threatRangeSetting <= 0 then
-		return math.min(base, 0.95)
-	end
-	local rangeFactor = math.clamp(dist / threatRangeSetting, 0, 1)
-	return math.min(base + rangeFactor * GUN_AIM_RANGE_BONUS, 0.95)
+local function getEffectiveGunAimThreshold(_dist)
+	return math.min(gunAimDotSetting, 0.95)
 end
 
 local function getGunAimDot(char, aimModel)
@@ -1088,8 +1096,8 @@ local function shouldParryMelee(char, _confirmedAttack)
 	if not parryMeleeEnabled then
 		return false
 	end
-	if not isEnemyInMeleeThreatRange(char) then
-		threatDebugSkip('out_of_range', char.Name, 'melee', string.format('%.1f', getClosestEnemyDistance(char)))
+	if not isEnemyCharVisible(char) then
+		threatDebugSkip('not_visible', char.Name, 'melee')
 		return false
 	end
 	return true
@@ -1102,8 +1110,8 @@ local function shouldParryGun(char, confirmedAttack, aimModel)
 	if not char then
 		return false
 	end
-	if not isEnemyInGunThreatRange(char) then
-		threatDebugSkip('out_of_range', char.Name, 'gun', string.format('%.1f', getClosestEnemyDistance(char)))
+	if not isEnemyCharVisible(char) then
+		threatDebugSkip('not_visible', char.Name, 'gun')
 		return false
 	end
 	local aiming, dot, need = isEnemyAimingAtMeForGun(char, aimModel)
@@ -1113,7 +1121,7 @@ local function shouldParryGun(char, confirmedAttack, aimModel)
 	if confirmedAttack then
 		local myRoot = getLocalRoot()
 		if myRoot then
-			local permissiveRange = threatRangeSetting
+			local permissiveRange = GUN_RAY_MAX_RANGE
 			local permissiveRadius = 8
 			local rays = collectEnemyGunAimSources(char, aimModel)
 			for _, ray in rays do
@@ -1663,22 +1671,10 @@ local function onEnemyAnimationPlayed(char, track)
 		end
 	end
 	if kind == 'melee' and parryMeleeEnabled then
-		if getClosestEnemyDistance(char) > meleeRangeSetting then
-			threatDebugSkip('out_of_range', char.Name, 'melee_edge', string.format('%.1f', getClosestEnemyDistance(char)))
-			return
-		end
 		handleMeleeAnimation(char, track, 'edge', aimModel)
 	elseif kind == 'gun_draw' and parryGunDrawEnabled then
-		if getClosestEnemyDistance(char) > threatRangeSetting then
-			threatDebugSkip('out_of_range', char.Name, 'gun_draw_edge', string.format('%.1f', getClosestEnemyDistance(char)))
-			return
-		end
 		handleGunDrawAnimation(char, track, 'edge', aimModel)
 	elseif kind == 'gun_shot' and parryGunShotEnabled then
-		if getClosestEnemyDistance(char) > threatRangeSetting then
-			threatDebugSkip('out_of_range', char.Name, 'gun_shot_edge', string.format('%.1f', getClosestEnemyDistance(char)))
-			return
-		end
 		handleGunShotAnimation(char, track, 'edge', aimModel)
 	end
 end
@@ -1787,8 +1783,7 @@ local function watchEnemyPlayer(plr)
 	if plr == lplr then
 		return
 	end
-	local plrDist = getClosestEnemyDistance(plr)
-	if plrDist > getEffectiveWatcherRange() then
+	if not isPlayerVisible(plr) then
 		unwatchAllForPlayer(plr)
 		return
 	end
@@ -1814,7 +1809,7 @@ refreshThreatWatchers = function(force)
 	purgeOrphanWatchers()
 	for _, plr in playersService:GetPlayers() do
 		if plr ~= lplr then
-			if getClosestEnemyDistance(plr) <= getEffectiveWatcherRange() then
+			if isPlayerVisible(plr) then
 				watchEnemyPlayer(plr)
 			else
 				unwatchAllForPlayer(plr)
@@ -2088,9 +2083,12 @@ getEnemyHurtboxesInRange = function(range, origin)
 		if part.Parent then
 			local owner = part:FindFirstAncestorWhichIsA('Model')
 			if owner and isEnemyOwner(owner) then
-				local dist = (part.Position - origin).Magnitude
-				if dist <= range then
-					table.insert(sorted, {Part = part, Distance = dist})
+				local plr = getPlayerFromModel(owner)
+				if plr and isPlayerVisible(plr) then
+					local dist = (part.Position - origin).Magnitude
+					if not range or dist <= range then
+						table.insert(sorted, {Part = part, Distance = dist})
+					end
 				end
 			end
 		end
@@ -2103,6 +2101,10 @@ getEnemyHurtboxesInRange = function(range, origin)
 		table.insert(results, entry.Part)
 	end
 	return results
+end
+
+local function getVisibleEnemyHurtboxes()
+	return getEnemyHurtboxesInRange(nil, getLocalRoot() and getLocalRoot().Position)
 end
 
 detectLocalMeleeItemId = function()
@@ -2847,7 +2849,7 @@ local function scanMeleeWhitelistRealtime()
 		if not ownerChar then
 			continue
 		end
-		if getClosestEnemyDistance(plr) > meleeRangeSetting then
+		if not isPlayerVisible(plr) then
 			continue
 		end
 		for _, model in getEnemyModels(plr) do
@@ -2856,10 +2858,6 @@ local function scanMeleeWhitelistRealtime()
 			end
 			local enemyRoot = model:FindFirstChild('HumanoidRootPart')
 			if not enemyRoot then
-				continue
-			end
-			local dist = (enemyRoot.Position - root.Position).Magnitude
-			if dist > meleeRangeSetting then
 				continue
 			end
 			for _, track in getAllPlayingTracks(model) do
@@ -3021,7 +3019,7 @@ combatHeartbeat = function(meleeRange)
 					if charWatchers[plr.Character] then
 						watchedCount += 1
 					end
-					if getClosestEnemyDistance(plr) <= getEffectiveWatcherRange() then
+					if isPlayerVisible(plr) then
 						threatCount += 1
 					end
 				end
@@ -3269,10 +3267,9 @@ run(function()
 		local entries = {}
 		local seen = {}
 		for _, plr in playersService:GetPlayers() do
-			if plr ~= lplr and plr.Character then
+			if plr ~= lplr and plr.Character and isPlayerVisible(plr) then
 				local char = plr.Character
 				local dist = getClosestEnemyDistance(plr)
-				if dist <= threatRangeSetting then
 					local gunName, remaining, delay, kind = getActiveGunDrawInfo(plr)
 					if gunName then
 						remaining = math.max(0, remaining + hud.drawTimerOffsetSetting)
@@ -3312,7 +3309,6 @@ run(function()
 							end
 						end
 					end
-				end
 			end
 		end
 		table.sort(entries, function(a, b)
@@ -3328,229 +3324,121 @@ run(function()
 	local playerEspOverlays = {}
 	local aimlockState = {}
 	local aimlockRayPool = {}
+	local gameCamera = workspace.CurrentCamera
+
+	local function newDraw(typeName, props)
+		if not Drawing then
+			return nil
+		end
+		local obj = Drawing.new(typeName)
+		for key, val in props do
+			obj[key] = val
+		end
+		obj.Visible = false
+		return obj
+	end
+
+	local function hideDraw(obj)
+		if obj then
+			obj.Visible = false
+		end
+	end
 
 	local function destroyEspOverlay(plr)
 		local overlay = playerEspOverlays[plr]
 		if not overlay then
 			return
 		end
-		if overlay.Billboard then
-			overlay.Billboard:Destroy()
-		end
-		if overlay.SideBillboard then
-			overlay.SideBillboard:Destroy()
+		for _, obj in overlay do
+			if obj and obj.Remove then
+				pcall(function()
+					obj.Visible = false
+					obj:Remove()
+				end)
+			end
 		end
 		playerEspOverlays[plr] = nil
 	end
 
 	local function ensureEspOverlay(plr)
-		local existing = playerEspOverlays[plr]
-		if existing and existing.Billboard and existing.Billboard.Parent then
-			return existing
+		if playerEspOverlays[plr] then
+			return playerEspOverlays[plr]
 		end
-		local head = getEntityHeadPart(plr)
-		if not head then
+		if not Drawing then
 			return nil
 		end
-		destroyEspOverlay(plr)
-
-		local scale = math.clamp(hud.drawTimerEspScaleSetting, 0.6, 2)
-		local bb = Instance.new('BillboardGui')
-		bb.Name = 'RedlinerPlayerEsp'
-		bb.Adornee = head
-		bb.AlwaysOnTop = true
-		bb.LightInfluence = 0
-		bb.Size = UDim2.fromOffset(math.floor(150 * scale), math.floor(58 * scale))
-		bb.StudsOffset = Vector3.new(0, 2.8, 0)
-		bb.Parent = head
-
-		local bg = Instance.new('Frame')
-		bg.Name = 'Bg'
-		bg.Size = UDim2.fromScale(1, 1)
-		bg.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
-		bg.BackgroundTransparency = 0.2
-		bg.BorderSizePixel = 0
-		bg.Parent = bb
-		local bgCorner = Instance.new('UICorner')
-		bgCorner.CornerRadius = UDim.new(0, 8)
-		bgCorner.Parent = bg
-		local stroke = Instance.new('UIStroke')
-		stroke.Color = Color3.fromRGB(255, 255, 255)
-		stroke.Transparency = 0.82
-		stroke.Thickness = 1
-		stroke.Parent = bg
-
-		local drawLabel = Instance.new('TextLabel')
-		drawLabel.Name = 'DrawLabel'
-		drawLabel.BackgroundTransparency = 1
-		drawLabel.Position = UDim2.fromOffset(8, 4)
-		drawLabel.Size = UDim2.new(1, -16, 0, math.floor(16 * scale))
-		drawLabel.Font = Enum.Font.GothamBold
-		drawLabel.TextSize = math.floor(13 * scale)
-		drawLabel.TextXAlignment = Enum.TextXAlignment.Left
-		drawLabel.TextColor3 = Color3.fromRGB(255, 220, 120)
-		drawLabel.Text = ''
-		drawLabel.Visible = false
-		drawLabel.Parent = bg
-
-		local drawTimer = Instance.new('TextLabel')
-		drawTimer.Name = 'DrawTimer'
-		drawTimer.BackgroundTransparency = 1
-		drawTimer.Position = UDim2.fromOffset(8, math.floor(18 * scale))
-		drawTimer.Size = UDim2.new(1, -16, 0, math.floor(14 * scale))
-		drawTimer.Font = Enum.Font.GothamMedium
-		drawTimer.TextSize = math.floor(12 * scale)
-		drawTimer.TextXAlignment = Enum.TextXAlignment.Left
-		drawTimer.TextColor3 = Color3.fromRGB(230, 230, 230)
-		drawTimer.Text = ''
-		drawTimer.Visible = false
-		drawTimer.Parent = bg
-
-		local drawBarBg = Instance.new('Frame')
-		drawBarBg.Name = 'DrawBarBg'
-		drawBarBg.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-		drawBarBg.BorderSizePixel = 0
-		drawBarBg.Position = UDim2.fromOffset(8, math.floor(34 * scale))
-		drawBarBg.Size = UDim2.new(1, -16, 0, math.floor(6 * scale))
-		drawBarBg.Visible = false
-		drawBarBg.Parent = bg
-		local drawBarBgCorner = Instance.new('UICorner')
-		drawBarBgCorner.CornerRadius = UDim.new(1, 0)
-		drawBarBgCorner.Parent = drawBarBg
-
-		local drawBarFill = Instance.new('Frame')
-		drawBarFill.Name = 'DrawBarFill'
-		drawBarFill.BackgroundColor3 = Color3.fromRGB(255, 140, 50)
-		drawBarFill.BorderSizePixel = 0
-		drawBarFill.Size = UDim2.fromScale(1, 1)
-		drawBarFill.Parent = drawBarBg
-		local drawBarFillCorner = Instance.new('UICorner')
-		drawBarFillCorner.CornerRadius = UDim.new(1, 0)
-		drawBarFillCorner.Parent = drawBarFill
-
-		local warnLabel = Instance.new('TextLabel')
-		warnLabel.Name = 'BulletWarn'
-		warnLabel.BackgroundColor3 = Color3.fromRGB(120, 20, 20)
-		warnLabel.BackgroundTransparency = 0.15
-		warnLabel.Position = UDim2.fromOffset(8, math.floor(42 * scale))
-		warnLabel.Size = UDim2.new(1, -16, 0, math.floor(14 * scale))
-		warnLabel.Font = Enum.Font.GothamBlack
-		warnLabel.TextSize = math.floor(11 * scale)
-		warnLabel.TextColor3 = Color3.fromRGB(255, 90, 90)
-		warnLabel.Text = hud.bulletWarningsTextSetting
-		warnLabel.Visible = false
-		warnLabel.Parent = bg
-		local warnCorner = Instance.new('UICorner')
-		warnCorner.CornerRadius = UDim.new(0, 4)
-		warnCorner.Parent = warnLabel
-
-		local impactBg = Instance.new('Frame')
-		impactBg.Name = 'ImpactBg'
-		impactBg.BackgroundColor3 = Color3.fromRGB(28, 28, 34)
-		impactBg.BorderSizePixel = 0
-		impactBg.Position = UDim2.fromOffset(8, math.floor(42 * scale))
-		impactBg.Size = UDim2.new(1, -16, 0, math.floor(8 * scale))
-		impactBg.Visible = false
-		impactBg.Parent = bg
-		local impactBgCorner = Instance.new('UICorner')
-		impactBgCorner.CornerRadius = UDim.new(1, 0)
-		impactBgCorner.Parent = impactBg
-
-		local impactFill = Instance.new('Frame')
-		impactFill.Name = 'ImpactFill'
-		impactFill.BackgroundColor3 = Color3.fromRGB(255, 120, 60)
-		impactFill.BorderSizePixel = 0
-		impactFill.Size = UDim2.fromScale(0, 1)
-		impactFill.Parent = impactBg
-		local impactFillCorner = Instance.new('UICorner')
-		impactFillCorner.CornerRadius = UDim.new(1, 0)
-		impactFillCorner.Parent = impactFill
-
-		local impactText = Instance.new('TextLabel')
-		impactText.Name = 'ImpactText'
-		impactText.BackgroundTransparency = 1
-		impactText.Size = UDim2.fromScale(1, 1)
-		impactText.Font = Enum.Font.GothamBold
-		impactText.TextSize = math.floor(10 * scale)
-		impactText.TextColor3 = Color3.fromRGB(255, 255, 255)
-		impactText.Text = ''
-		impactText.Parent = impactBg
-
-		local sideBb = Instance.new('BillboardGui')
-		sideBb.Name = 'RedlinerImpactSide'
-		sideBb.Adornee = head
-		sideBb.AlwaysOnTop = true
-		sideBb.LightInfluence = 0
-		sideBb.Size = UDim2.fromOffset(math.floor(14 * scale), math.floor(48 * scale))
-		sideBb.StudsOffset = Vector3.new(2.4, 0.2, 0)
-		sideBb.Parent = head
-
-		local sideBg = Instance.new('Frame')
-		sideBg.Name = 'SideImpactBg'
-		sideBg.Size = UDim2.fromScale(1, 1)
-		sideBg.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
-		sideBg.BackgroundTransparency = 0.25
-		sideBg.BorderSizePixel = 0
-		sideBg.Visible = false
-		sideBg.Parent = sideBb
-		local sideCorner = Instance.new('UICorner')
-		sideCorner.CornerRadius = UDim.new(0, 4)
-		sideCorner.Parent = sideBg
-
-		local sideFill = Instance.new('Frame')
-		sideFill.Name = 'SideImpactFill'
-		sideFill.AnchorPoint = Vector2.new(0, 1)
-		sideFill.Position = UDim2.fromScale(0, 1)
-		sideFill.Size = UDim2.fromScale(1, 0)
-		sideFill.BackgroundColor3 = Color3.fromRGB(255, 120, 60)
-		sideFill.BorderSizePixel = 0
-		sideFill.Parent = sideBg
-		local sideFillCorner = Instance.new('UICorner')
-		sideFillCorner.CornerRadius = UDim.new(0, 4)
-		sideFillCorner.Parent = sideFill
-
 		local overlay = {
-			Billboard = bb,
-			DrawLabel = drawLabel,
-			DrawTimer = drawTimer,
-			DrawBarBg = drawBarBg,
-			DrawBarFill = drawBarFill,
-			BulletWarn = warnLabel,
-			ImpactBg = impactBg,
-			ImpactFill = impactFill,
-			ImpactText = impactText,
-			SideBillboard = sideBb,
-			SideImpactBg = sideBg,
-			SideImpactFill = sideFill,
+			BoxMain = newDraw('Square', {Filled = false, Thickness = 1, ZIndex = 2, Transparency = 0}),
+			BoxBorder = newDraw('Square', {Filled = false, Thickness = 1, ZIndex = 1, Transparency = 0.35, Color = Color3.new()}),
+			BoxBorder2 = newDraw('Square', {Filled = false, Thickness = 1, ZIndex = 1, Transparency = 0.35, Color = Color3.new()}),
+			DrawText = newDraw('Text', {Center = true, Size = 20, ZIndex = 3, Color = Color3.fromRGB(255, 220, 120)}),
+			DrawShadow = newDraw('Text', {Center = true, Size = 20, ZIndex = 2, Color = Color3.new()}),
+			TextBkg = newDraw('Square', {Filled = true, Thickness = 1, ZIndex = 0, Transparency = 0.35, Color = Color3.new()}),
+			SubText = newDraw('Text', {Center = true, Size = 15, ZIndex = 3, Color = Color3.fromRGB(230, 230, 230)}),
+			SubShadow = newDraw('Text', {Center = true, Size = 15, ZIndex = 2, Color = Color3.new()}),
+			BarBg = newDraw('Line', {Thickness = 3, ZIndex = 1, Transparency = 0.35, Color = Color3.new()}),
+			BarFill = newDraw('Line', {Thickness = 1, ZIndex = 2, Color = Color3.fromRGB(255, 140, 50)}),
+			WarnText = newDraw('Text', {Center = true, Size = 16, ZIndex = 4, Color = Color3.fromRGB(255, 80, 80)}),
+			WarnShadow = newDraw('Text', {Center = true, Size = 16, ZIndex = 3, Color = Color3.new()}),
+			ImpactBorder = newDraw('Line', {Thickness = 3, ZIndex = 1, Transparency = 0.35, Color = Color3.new()}),
+			ImpactLine = newDraw('Line', {Thickness = 1, ZIndex = 2, Color = Color3.fromRGB(255, 120, 60)}),
 		}
 		playerEspOverlays[plr] = overlay
 		return overlay
 	end
 
-	local function setAimlockRay(plr, origin, direction, visible, color)
-		local ray = aimlockRayPool[plr]
-		if not ray then
-			ray = Instance.new('Part')
-			ray.Name = 'RedlinerAimlockRay'
-			ray.Anchored = true
-			ray.CanCollide = false
-			ray.CanQuery = false
-			ray.CanTouch = false
-			ray.CastShadow = false
-			ray.Material = Enum.Material.Neon
-			ray.Parent = workspaceService
-			aimlockRayPool[plr] = ray
+	local function getPlayerScreenBox(plr)
+		local ent = entitylib.getEntity(plr)
+		local root = ent and ent.RootPart
+		if not root then
+			local char = plr.Character
+			root = char and char:FindFirstChild('HumanoidRootPart')
 		end
-		if not visible then
-			ray.Transparency = 1
+		if not root or not gameCamera then
+			return nil
+		end
+		local hipHeight = ent and ent.HipHeight or 2
+		local rootPos, rootVis = gameCamera:WorldToViewportPoint(root.Position)
+		if not rootVis then
+			return nil
+		end
+		local topPos = gameCamera:WorldToViewportPoint((CFrame.lookAlong(root.Position, gameCamera.CFrame.LookVector) * CFrame.new(2, hipHeight, 0)).Position)
+		local bottomPos = gameCamera:WorldToViewportPoint((CFrame.lookAlong(root.Position, gameCamera.CFrame.LookVector) * CFrame.new(-2, -hipHeight - 1, 0)).Position)
+		local sizex = math.abs(topPos.X - bottomPos.X)
+		local sizey = math.abs(topPos.Y - bottomPos.Y)
+		return rootPos.X - sizex / 2, rootPos.Y - sizey / 2, sizex, sizey
+	end
+
+	local function hideEspOverlayDraw(overlay)
+		for _, obj in overlay do
+			hideDraw(obj)
+		end
+	end
+
+	local function setAimlockRay(plr, origin, direction, visible, color)
+		local line = aimlockRayPool[plr]
+		if not line and Drawing then
+			line = Drawing.new('Line')
+			line.Thickness = 2
+			line.ZIndex = 5
+			aimlockRayPool[plr] = line
+		end
+		if not line then
 			return
 		end
-		local length = hud.aimlockRayLengthSetting
-		local dir = direction.Magnitude > 0.01 and direction.Unit or Vector3.new(0, 0, -1)
-		ray.Color = color or Color3.fromRGB(255, 70, 70)
-		ray.Transparency = 0.35
-		ray.Size = Vector3.new(0.12, 0.12, length)
-		ray.CFrame = CFrame.lookAt(origin, origin + dir) * CFrame.new(0, 0, -length / 2)
+		if not visible or not gameCamera then
+			line.Visible = false
+			return
+		end
+		local endWorld = origin + direction.Unit * 500
+		local fromPos, fromVis = gameCamera:WorldToViewportPoint(origin)
+		local toPos, toVis = gameCamera:WorldToViewportPoint(endWorld)
+		line.Visible = fromVis and toVis and fromPos.Z > 0 and toPos.Z > 0
+		if line.Visible then
+			line.From = Vector2.new(fromPos.X, fromPos.Y)
+			line.To = Vector2.new(toPos.X, toPos.Y)
+			line.Color = color or Color3.fromRGB(255, 60, 60)
+		end
 	end
 
 	local function updateAimlockDetector()
@@ -3631,6 +3519,7 @@ run(function()
 		end
 
 		local active = {}
+		local textScale = math.clamp(hud.drawTimerEspScaleSetting, 0.6, 2)
 		for _, plr in playersService:GetPlayers() do
 			if plr == lplr then
 				continue
@@ -3644,60 +3533,117 @@ run(function()
 			if not overlay then
 				continue
 			end
+			local posx, posy, sizex, sizey = getPlayerScreenBox(plr)
+			if not posx then
+				hideEspOverlayDraw(overlay)
+				continue
+			end
+			local ix, iy = math.floor(posx), math.floor(posy)
+			local isx, isy = math.floor(sizex), math.floor(sizey)
+			local centerX = ix + isx / 2
+			local accentColor = Color3.fromRGB(255, 220, 120)
+
+			hideDraw(overlay.BoxMain)
+			hideDraw(overlay.BoxBorder)
+			hideDraw(overlay.BoxBorder2)
+			hideDraw(overlay.DrawText)
+			hideDraw(overlay.DrawShadow)
+			hideDraw(overlay.TextBkg)
+			hideDraw(overlay.SubText)
+			hideDraw(overlay.SubShadow)
+			hideDraw(overlay.BarBg)
+			hideDraw(overlay.BarFill)
+			hideDraw(overlay.WarnText)
+			hideDraw(overlay.WarnShadow)
+			hideDraw(overlay.ImpactBorder)
+			hideDraw(overlay.ImpactLine)
 
 			local showDraw = hud.drawTimerEnabled and hud.drawTimerWorldEspSetting
 			local gunName, remaining, delay, kind = getActiveGunDrawInfo(plr)
 			if showDraw and gunName then
 				remaining = math.max(0, remaining + hud.drawTimerOffsetSetting)
-				local gunColor = GUN_DRAW_COLORS[gunName] or GUN_DRAW_COLORS.Castigate
-				overlay.DrawLabel.Visible = true
-				overlay.DrawTimer.Visible = true
-				overlay.DrawBarBg.Visible = true
-				overlay.DrawLabel.Text = string.format('%s • %s', plr.Name, gunName)
-				overlay.DrawLabel.TextColor3 = gunColor
-				overlay.DrawTimer.Text = string.format('%s  %.2fs', kind or 'DRAW', remaining)
-				if overlay.DrawBarFill and delay > 0 then
-					overlay.DrawBarFill.Size = UDim2.fromScale(math.clamp(remaining / delay, 0, 1), 1)
-					overlay.DrawBarFill.BackgroundColor3 = remaining < 0.25 and Color3.fromRGB(255, 50, 50) or gunColor
+				accentColor = GUN_DRAW_COLORS[gunName] or GUN_DRAW_COLORS.Castigate
+				local mainText = string.format('%s • %s', plr.Name, gunName)
+				local subText = string.format('%s  %.2fs', kind or 'DRAW', remaining)
+				overlay.DrawText.Size = math.floor(20 * textScale)
+				overlay.DrawShadow.Size = overlay.DrawText.Size
+				overlay.DrawText.Text = mainText
+				overlay.DrawShadow.Text = mainText
+				overlay.DrawText.Color = accentColor
+				overlay.DrawText.Position = Vector2.new(centerX, iy + isy - math.floor(28 * textScale))
+				overlay.DrawShadow.Position = overlay.DrawText.Position + Vector2.new(1, 1)
+				overlay.DrawText.Visible = true
+				overlay.DrawShadow.Visible = true
+				if overlay.TextBkg then
+					overlay.TextBkg.Size = overlay.DrawText.TextBounds + Vector2.new(8, 4)
+					overlay.TextBkg.Position = overlay.DrawText.Position - Vector2.new(4 + overlay.DrawText.TextBounds.X / 2, 0)
+					overlay.TextBkg.Visible = true
 				end
-			else
-				overlay.DrawLabel.Visible = false
-				overlay.DrawTimer.Visible = false
-				overlay.DrawBarBg.Visible = false
+				overlay.SubText.Size = math.floor(15 * textScale)
+				overlay.SubShadow.Size = overlay.SubText.Size
+				overlay.SubText.Text = subText
+				overlay.SubShadow.Text = subText
+				overlay.SubText.Position = Vector2.new(centerX, overlay.DrawText.Position.Y - math.floor(18 * textScale))
+				overlay.SubShadow.Position = overlay.SubText.Position + Vector2.new(1, 1)
+				overlay.SubText.Visible = true
+				overlay.SubShadow.Visible = true
+				if delay > 0 then
+					local ratio = math.clamp(remaining / delay, 0, 1)
+					local barY = overlay.SubText.Position.Y - math.floor(10 * textScale)
+					local barLeft = ix + 2
+					local barRight = ix + isx - 2
+					local fillRight = barLeft + (barRight - barLeft) * ratio
+					overlay.BarBg.From = Vector2.new(barLeft, barY)
+					overlay.BarBg.To = Vector2.new(barRight, barY)
+					overlay.BarBg.Visible = true
+					overlay.BarFill.From = Vector2.new(barLeft, barY)
+					overlay.BarFill.To = Vector2.new(fillRight, barY)
+					overlay.BarFill.Color = remaining < 0.25 and Color3.fromRGB(255, 50, 50) or accentColor
+					overlay.BarFill.Visible = true
+				end
 			end
 
 			local heat = getPlayerReadOnlyNumber(plr, 'heat')
 			local perBullet = getPlayerReadOnlyNumber(plr, 'heat_per_bullet')
 			local shotReady = hud.bulletWarningsEnabled and heat and perBullet and heat >= perBullet
-			if overlay.BulletWarn then
-				overlay.BulletWarn.Visible = shotReady == true
-				overlay.BulletWarn.Text = hud.bulletWarningsTextSetting
+			if shotReady then
+				local warnText = hud.bulletWarningsTextSetting
+				overlay.WarnText.Size = math.floor(16 * textScale)
+				overlay.WarnShadow.Size = overlay.WarnText.Size
+				overlay.WarnText.Text = warnText
+				overlay.WarnShadow.Text = warnText
+				overlay.WarnText.Position = Vector2.new(centerX, iy + isy + math.floor(6 * textScale))
+				overlay.WarnShadow.Position = overlay.WarnText.Position + Vector2.new(1, 1)
+				overlay.WarnText.Visible = true
+				overlay.WarnShadow.Visible = true
 			end
 
 			if hud.impactEspEnabled then
 				local impact = getPlayerReadOnlyNumber(plr, 'impact') or 0
 				local maxImpact = math.max(1, hud.impactEspMaxSetting)
 				local ratio = math.clamp(impact / maxImpact, 0, 1)
-				if overlay.SideImpactBg and overlay.SideImpactFill then
-					overlay.SideImpactBg.Visible = true
-					overlay.SideImpactFill.Size = UDim2.fromScale(1, ratio)
-					overlay.SideImpactFill.BackgroundColor3 = Color3.fromHSV((1 - ratio) * 0.33, 0.85, 1)
-				end
-				overlay.ImpactBg.Visible = false
-			else
-				if overlay.SideImpactBg then
-					overlay.SideImpactBg.Visible = false
-				end
-				overlay.ImpactBg.Visible = false
+				local healthposy = isy * ratio
+				overlay.ImpactBorder.From = Vector2.new(ix - 6, iy + 1)
+				overlay.ImpactBorder.To = Vector2.new(ix - 6, iy + isy - 1)
+				overlay.ImpactBorder.Visible = true
+				overlay.ImpactLine.From = Vector2.new(ix - 6, iy + isy - healthposy)
+				overlay.ImpactLine.To = Vector2.new(ix - 6, iy)
+				overlay.ImpactLine.Color = Color3.fromHSV((1 - ratio) * 0.33, 0.89, 0.75)
+				overlay.ImpactLine.Visible = impact > 0
 			end
 
-			local showBg = (overlay.DrawLabel and overlay.DrawLabel.Visible)
-				or (overlay.BulletWarn and overlay.BulletWarn.Visible)
-			if overlay.Billboard then
-				overlay.Billboard.Enabled = showBg
-			end
-			if overlay.SideBillboard then
-				overlay.SideBillboard.Enabled = overlay.SideImpactBg and overlay.SideImpactBg.Visible
+			local showBox = showDraw and gunName or shotReady or hud.impactEspEnabled
+			if showBox then
+				overlay.BoxMain.Position = Vector2.new(ix, iy)
+				overlay.BoxMain.Size = Vector2.new(isx, isy)
+				overlay.BoxMain.Color = accentColor
+				overlay.BoxMain.Visible = true
+				overlay.BoxBorder.Position = Vector2.new(ix - 1, iy + 1)
+				overlay.BoxBorder.Size = Vector2.new(isx + 2, isy - 2)
+				overlay.BoxBorder.Visible = true
+				overlay.BoxBorder2.Position = Vector2.new(ix + 1, iy - 1)
+				overlay.BoxBorder2.Size = Vector2.new(isx - 2, isy + 2)
+				overlay.BoxBorder2.Visible = true
 			end
 		end
 
@@ -3785,7 +3731,7 @@ run(function()
 	local function collectThreatEntries()
 		local threats = {}
 		for _, plr in playersService:GetPlayers() do
-			if plr ~= lplr and plr.Character then
+			if plr ~= lplr and plr.Character and isPlayerVisible(plr) then
 				local char = plr.Character
 				local dist = getClosestEnemyDistance(plr)
 				for _, model in getEnemyModels(plr) do
@@ -3798,7 +3744,7 @@ run(function()
 						end
 						local _, animId = getTrackAnimInfo(track)
 						local kind = getParryAnimKind(animId)
-						if kind == 'melee' and hud.threatShowMeleeSetting and dist <= meleeRangeSetting then
+						if kind == 'melee' and hud.threatShowMeleeSetting then
 							table.insert(threats, {
 								type = 'MELEE',
 								name = plr.Name,
@@ -3807,7 +3753,7 @@ run(function()
 								remaining = 0,
 								score = 7000 - dist * 20,
 							})
-						elseif kind == 'gun_draw' and hud.threatShowGunDrawSetting and dist <= threatRangeSetting then
+						elseif kind == 'gun_draw' and hud.threatShowGunDrawSetting then
 							local aiming = true
 							if hud.threatRequireAimingSetting then
 								aiming = isEnemyAimingAtMeForGun(char, model)
@@ -3825,7 +3771,7 @@ run(function()
 									score = 8000 - dist * 5 - remaining * 200,
 								})
 							end
-						elseif kind == 'gun_shot' and hud.threatShowGunShotSetting and dist <= threatRangeSetting then
+						elseif kind == 'gun_shot' and hud.threatShowGunShotSetting then
 							local aiming = true
 							if hud.threatRequireAimingSetting then
 								aiming = isEnemyAimingAtMeForGun(char, model)
@@ -3842,7 +3788,7 @@ run(function()
 							end
 						end
 					end
-					if hud.threatShowGlintSetting and dist <= threatRangeSetting then
+					if hud.threatShowGlintSetting then
 						for _, desc in model:GetDescendants() do
 							if isGlintInstance(desc) then
 								local aiming = true
@@ -3975,12 +3921,8 @@ run(function()
 			return
 		end
 		hud.lastEnemyHurtboxVizAt = now
-		local root = getLocalRoot()
-		if not root then
-			return
-		end
 		local active = {}
-		for _, part in getEnemyHurtboxesInRange(hud.hitboxVisualizerRangeSetting, root.Position) do
+		for _, part in getVisibleEnemyHurtboxes() do
 			active[part] = true
 			local adorn = enemyAdornPool[part]
 			if not adorn then
@@ -4038,7 +3980,10 @@ run(function()
 		aimlockState[plr.UserId] = nil
 		local ray = aimlockRayPool[plr]
 		if ray then
-			ray:Destroy()
+			pcall(function()
+				ray.Visible = false
+				ray:Remove()
+			end)
 			aimlockRayPool[plr] = nil
 		end
 	end)
@@ -4708,7 +4653,7 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
-		Tooltip = '360° melee parry radius. Default 20 studs.',
+		Tooltip = 'Legacy setting — melee parry uses visible players at any distance (360°).',
 	})
 
 	local ThreatRange
@@ -4728,7 +4673,7 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
-		Tooltip = 'Gun draw/shot/glint parry radius. Enemy must be aiming at you (Gun Aim Dot). Default 100 studs.',
+		Tooltip = 'Legacy setting — gun parry uses visible players and ray validation at any distance.',
 	})
 
 	WatcherThreatRange = AutoParry:CreateSlider({
@@ -4742,7 +4687,7 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
-		Tooltip = 'Anim/glint watcher attach radius. Effective range is max of this, Threat Range, and Melee Range.',
+		Tooltip = 'Legacy setting — animation watchers attach to all visible players.',
 	})
 
 	MeleeEnemyDebounce = AutoParry:CreateSlider({
@@ -5323,18 +5268,6 @@ run(function()
 			hud.aimlockMinSamplesSetting = val
 		end,
 	})
-	AimlockDetector:CreateSlider({
-		Name = 'Ray Length',
-		Min = 20,
-		Max = 120,
-		Default = 60,
-		Function = function(val)
-			hud.aimlockRayLengthSetting = val
-		end,
-		Suffix = function(val)
-			return val == 1 and 'stud' or 'studs'
-		end,
-	})
 
 	local ThreatIndicator
 	ThreatIndicator = extras:CreateModule({
@@ -5474,7 +5407,7 @@ run(function()
 				bindPacketListeners()
 			end
 		end,
-		Tooltip = 'Visualize swing hitboxes and/or nearby enemy hurtboxes.',
+		Tooltip = 'Visualize swing hitboxes and visible enemy hurtboxes (no distance cap).',
 	})
 	HitboxVisualizer:CreateToggle({
 		Name = 'Show Swing Hitboxes',
@@ -5492,6 +5425,7 @@ run(function()
 		Function = function(callback)
 			hud.hitboxVisualizerEnemyEnabled = callback
 		end,
+		Tooltip = 'Box adornments on all visible enemy hurtboxes at any distance.',
 	})
 	HitboxVisualizer:CreateToggle({
 		Name = 'Show Bullet Rays',
@@ -5504,18 +5438,6 @@ run(function()
 			end
 		end,
 		Tooltip = 'Draw aim rays on local gun fire and enemy gun shots.',
-	})
-	HitboxVisualizer:CreateSlider({
-		Name = 'Enemy Range',
-		Min = 4,
-		Max = 40,
-		Default = 22,
-		Function = function(val)
-			hud.hitboxVisualizerRangeSetting = val
-		end,
-		Suffix = function(val)
-			return val == 1 and 'stud' or 'studs'
-		end,
 	})
 	HitboxVisualizer:CreateSlider({
 		Name = 'Marker Duration',
