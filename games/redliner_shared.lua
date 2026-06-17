@@ -1520,24 +1520,6 @@ task.defer(function()
 	end
 end)
 
-local startEnemyWatchers
-local refreshEnemyWatchers
-local refreshThreatWatchers
-local bindLocalRespawnHandler
-local bindPacketListeners
-local bindParryScanLoop
-local bindAutoAttackLoop
-local combatHeartbeat
-local getEnemyHurtboxesInRange
-local handleMeleeAnimation
-local unwatchAllForPlayer
-local installHitboxReachHook
-local installGunBulletVizHook
-local installGunParryPacketHook
-local detectLocalMeleeItemId
-local pressAttackClick
-local getNearestEnemyInAttackRange
-
 run(function()
 -- ---------------------------------------------------------------------------
 -- Threat handlers (edge-triggered only)
