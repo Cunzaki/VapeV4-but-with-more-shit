@@ -3325,9 +3325,6 @@ run(function()
 		return out
 	end
 
-		return out
-	end
-
 	local playerEspOverlays = {}
 	local aimlockState = {}
 	local aimlockRayPool = {}
