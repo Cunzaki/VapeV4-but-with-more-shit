@@ -1,9 +1,9 @@
---[[
+﻿--[[
 	REDLINER shared game script (MAIN + FFA + MATCH place IDs).
 	Place IDs: 94987506187454 (main), 115875349872417 (FFA), 126691165749976 (match).
 	All three places share one Vape profile config (FFA place ID 115875349872417).
-	Auto Parry, Auto Attack, Reach, Kill Aura, Draw Timer HUD, Threat Indicator,
-	Hitbox Visualizer (swing/cone/bullet/enemy), Animation Logger.
+	Auto Parry, Auto Attack, Reach, Kill Aura, Draw Timer HUD,
+	Hitbox Visualizer (swing/cone/bullet/enemy).
 ]]
 
 local run = function(func)
@@ -243,8 +243,8 @@ local hud = {
 	breakTimerEnabled = true,
 	aimlockDetectorEnabled = false,
 	aimlockVisualizeSetting = true,
-	aimlockThresholdSetting = 0.93,
-	aimlockMinSamplesSetting = 18,
+	aimlockThresholdSetting = 0.985,
+	aimlockMinSamplesSetting = 40,
 	threatRequireAimingSetting = false,
 	antiParryEnabled = true,
 	threatShowMeleeSetting = true,
@@ -399,14 +399,14 @@ local function discordEmbed(title, description, color, fields, thumbnailUrl)
 		description = description,
 		color = color or 5793266,
 		fields = fields,
-		footer = {text = 'Priv v9 • REDLINER'},
+		footer = {text = 'Priv v9 â€¢ REDLINER'},
 		timestamp = os.date('!%Y-%m-%dT%H:%M:%SZ'),
 	}
 	if thumbnailUrl and thumbnailUrl ~= '' then
 		embed.thumbnail = {url = thumbnailUrl}
 	end
 	postDiscord({
-		username = 'Priv • REDLINER',
+		username = 'Priv â€¢ REDLINER',
 		embeds = {embed},
 	})
 end
@@ -478,13 +478,13 @@ run(function()
 			if not statFolder then
 				table.insert(fields, {
 					name = 'Stats',
-					value = 'ReadOnly profile folder not replicated yet — basic identity only.',
+					value = 'ReadOnly profile folder not replicated yet â€” basic identity only.',
 					inline = false,
 				})
 			end
 
 			discordEmbed(
-				'📋 Player Report',
+				'ðŸ“‹ Player Report',
 				'**' .. plr.Name .. '** is in this server.',
 				3447003,
 				fields,
@@ -2164,7 +2164,7 @@ getEnemyHurtboxesInRange = function(range, origin)
 	if not origin then
 		return {}
 	end
-	local sorted = {}
+	local bestPerEnemy = {}
 	for _, part in collectionService:GetTagged('Hurtbox') do
 		if part.Parent then
 			local owner = part:FindFirstAncestorWhichIsA('Model')
@@ -2173,18 +2173,26 @@ getEnemyHurtboxesInRange = function(range, origin)
 				if plr and isPlayerVisible(plr) then
 					local dist = (part.Position - origin).Magnitude
 					if not range or dist <= range then
-						table.insert(sorted, {Part = part, Distance = dist})
+						local key = plr.UserId
+						local entry = bestPerEnemy[key]
+						if not entry or dist < entry.Distance then
+							bestPerEnemy[key] = {Part = part, Distance = dist}
+						end
 					end
 				end
 			end
 		end
 	end
+	local sorted = {}
+	for _, entry in bestPerEnemy do
+		table.insert(sorted, entry)
+	end
 	table.sort(sorted, function(a, b)
 		return a.Distance < b.Distance
 	end)
 	local results = {}
-	for _, entry in sorted do
-		table.insert(results, entry.Part)
+	for i = 1, math.min(#sorted, 8) do
+		table.insert(results, sorted[i].Part)
 	end
 	return results
 end
@@ -2385,7 +2393,7 @@ local function augmentMeleePacket(packed)
 		reachDebugSkip('no_root', 'augment skipped (no HumanoidRootPart)')
 		return packed
 	end
-	local meleeReach = usingReach and getMeleeReach() or (hud.killAuraRangeSetting + hud.killAuraExtendSetting)
+	local meleeReach = getActiveMeleeReach()
 	local extended = getEnemyHurtboxesInRange(meleeReach, root.Position)
 	local nearestPart, nearestDist, nearestName = describeNearestEnemy(meleeReach, root.Position)
 	if #extended == 0 then
@@ -2400,7 +2408,7 @@ local function augmentMeleePacket(packed)
 		)
 		return packed
 	end
-	local aimDir = (extended[1].Position - root.Position).Unit
+	local aimDir = safeAimDirection(root.Position, extended[1].Position, root.CFrame.LookVector)
 	local template = meleeTemplate
 	packed[1] = packed[1] or (template and template[1]) or 'Redliner'
 	packed[2] = packed[2] or (template and template[2]) or 'SWING'
@@ -2409,7 +2417,7 @@ local function augmentMeleePacket(packed)
 	if typeof(packed[4]) == 'Vector3' and packed[4].Magnitude > 0 then
 		aimDir = packed[4].Unit
 	end
-	packed[5] = mergeHurtboxLists(packed[5], extended)
+	packed[5] = trimHurtboxList(mergeHurtboxLists(packed[5], extended), 8)
 	packed[6] = packed[6] or (template and template[6])
 	packed.n = math.max(packed.n, 5)
 	reachDebugLog(
@@ -2469,8 +2477,55 @@ local function wrapReachCallable(label, fn, wrapperFactory)
 	return fn, label .. ': assign'
 end
 
+getActiveMeleeReach = function()
+	if reachActive and reachExtend > 0 then
+		return getMeleeReach()
+	end
+	if hud.killAuraActive then
+		return hud.killAuraRangeSetting + hud.killAuraExtendSetting
+	end
+	return BASE_SWORD_REACH
+end
+
+local function getHitboxCastExtend()
+	if reachActive and reachExtend > 0 then
+		return reachExtend
+	end
+	if hud.killAuraActive then
+		return hud.killAuraExtendSetting
+	end
+	return 0
+end
+
+local function shouldExtendMeleeCombat()
+	return (reachActive and reachExtend > 0) or hud.killAuraActive
+end
+
+safeAimDirection = function(origin, targetPos, fallback)
+	local delta = targetPos - origin
+	if delta.Magnitude < 0.05 then
+		return typeof(fallback) == 'Vector3' and fallback.Magnitude > 0.01 and fallback.Unit or Vector3.new(0, 0, -1)
+	end
+	return delta.Unit
+end
+
+local function trimHurtboxList(list, maxCount)
+	if type(list) ~= 'table' then
+		return {}
+	end
+	maxCount = maxCount or 8
+	if #list <= maxCount then
+		return list
+	end
+	local trimmed = {}
+	for i = 1, maxCount do
+		trimmed[i] = list[i]
+	end
+	return trimmed
+end
+
 local function extendAttackHurtboxes(attack)
-	if not reachActive or reachExtend <= 0 or type(attack) ~= 'table' then
+	if not shouldExtendMeleeCombat() or type(attack) ~= 'table' then
 		return 0
 	end
 	if type(attack.hit_hurtboxes) ~= 'table' then
@@ -2481,12 +2536,13 @@ local function extendAttackHurtboxes(attack)
 		return 0
 	end
 	local before = #attack.hit_hurtboxes
-	local extended = getEnemyHurtboxesInRange(getMeleeReach(), root.Position)
+	local extended = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position)
 	for _, part in extended do
 		if not table.find(attack.hit_hurtboxes, part) then
 			table.insert(attack.hit_hurtboxes, part)
 		end
 	end
+	attack.hit_hurtboxes = trimHurtboxList(attack.hit_hurtboxes, 8)
 	return #attack.hit_hurtboxes - before
 end
 
@@ -2527,7 +2583,7 @@ local function installAttackReachHook()
 	end
 	local Attack, source = discoverAttackModule()
 	if not Attack then
-		reachDebugWarn('Attack hook FAILED — module not found')
+		reachDebugWarn('Attack hook FAILED â€” module not found')
 		return false
 	end
 	local function wrapCast(methodName)
@@ -2554,14 +2610,14 @@ local function installAttackReachHook()
 		local wrapper = makeWrapper(oldMethod)
 		local _, detail = wrapReachCallable('Attack.' .. methodName, oldMethod, makeWrapper)
 		Attack[methodName] = wrapper
-		reachDebugLog('Attack.' .. methodName, 'hook OK —', detail)
+		reachDebugLog('Attack.' .. methodName, 'hook OK â€”', detail)
 	end
 	wrapCast('castOnce')
 	wrapCast('castMore')
 	wrapCast('castContinuous')
 	attackReachHooked = true
 	reachAttackHookSource = source
-	reachDebugLog('Attack hook OK —', source)
+	reachDebugLog('Attack hook OK â€”', source)
 	return true
 end
 
@@ -2586,8 +2642,8 @@ local function buildHitboxCastWrapper(oldCast)
 				'reachActive=', reachActive
 			)
 		end
-		if reachActive and reachExtend > 0 then
-			local extra = reachExtend
+		if getHitboxCastExtend() > 0 then
+			local extra = getHitboxCastExtend()
 			if shape == 'Box' and typeof(self.size) == 'Vector3' then
 				local savedSize, savedOffset = self.size, self.offset
 				self.size = Vector3.new(savedSize.X, savedSize.Y, savedSize.Z + extra)
@@ -2660,7 +2716,7 @@ installHitboxReachHook = function()
 	end
 	local Hitbox, source, attempts = discoverHitboxModule()
 	if not Hitbox then
-		reachDebugWarn('Hitbox hook FAILED — no module found')
+		reachDebugWarn('Hitbox hook FAILED â€” no module found')
 		for _, line in attempts do
 			reachDebugWarn('  try:', line)
 		end
@@ -2674,7 +2730,7 @@ installHitboxReachHook = function()
 	Hitbox.cast = wrapper
 	hitboxReachHooked = true
 	reachHitboxHookSource = source .. ' (' .. detail .. ')'
-	reachDebugLog('Hitbox.cast hook OK —', reachHitboxHookSource)
+	reachDebugLog('Hitbox.cast hook OK â€”', reachHitboxHookSource)
 	if getgc then
 		local gcOk, gc = pcall(getgc, true)
 		if gcOk and type(gc) == 'table' then
@@ -2741,7 +2797,7 @@ local function installPacketMetatableHook()
 	end
 	local mt = getmetatable(packet)
 	if not mt or type(mt.Fire) ~= 'function' then
-		reachDebugWarn('Packet metatable Fire hook FAILED — metatable missing Fire')
+		reachDebugWarn('Packet metatable Fire hook FAILED â€” metatable missing Fire')
 		return false
 	end
 	if mt._reachFireHooked then
@@ -2777,7 +2833,7 @@ local function installPacketMetatableHook()
 	mt.Fire = wrappedFire
 	mt._reachFireHooked = true
 	packetMetatableHooked = true
-	reachDebugLog('Packet metatable Fire hook OK —', detail, 'remote=', MELEE_PACKET_REMOTE)
+	reachDebugLog('Packet metatable Fire hook OK â€”', detail, 'remote=', MELEE_PACKET_REMOTE)
 	return true
 end
 
@@ -2787,7 +2843,7 @@ local function installMeleePacketHook()
 		return true
 	end
 	if not initPackets() then
-		reachDebugWarn('packet hook FAILED — initPackets() returned false (Assets/ModuleScripts/Packets?)')
+		reachDebugWarn('packet hook FAILED â€” initPackets() returned false (Assets/ModuleScripts/Packets?)')
 		return false
 	end
 	local packet = Packets[MELEE_PACKET_NAME]
@@ -2800,7 +2856,7 @@ local function installMeleePacketHook()
 		end
 		table.sort(keys)
 		reachDebugWarn(
-			'packet hook FAILED — Packets[' .. MELEE_PACKET_NAME .. '] missing',
+			'packet hook FAILED â€” Packets[' .. MELEE_PACKET_NAME .. '] missing',
 			'obfuscatedKeys=', table.concat(keys, ', ')
 		)
 		return false
@@ -2816,7 +2872,7 @@ local function installMeleePacketHook()
 	meleePacketHooked = true
 	local oldFire = packet.Fire
 	if type(oldFire) ~= 'function' then
-		reachDebugWarn('packet hook FAILED — packet.Fire is not a function')
+		reachDebugWarn('packet hook FAILED â€” packet.Fire is not a function')
 		return false
 	end
 	local function wrappedFire(self, ...)
@@ -2842,7 +2898,7 @@ local function installMeleePacketHook()
 		return wrappedFire
 	end)
 	packet.Fire = wrappedFire
-	reachDebugLog('packet instance hook OK —', MELEE_PACKET_NAME, detail)
+	reachDebugLog('packet instance hook OK â€”', MELEE_PACKET_NAME, detail)
 	return true
 end
 
@@ -2872,35 +2928,6 @@ local function logReachHookStatus(context)
 		'packetsLoaded=', Packets ~= nil,
 		'hookfunction=', hookfunction ~= nil
 	)
-end
-
-fireKillAuraMeleeStrike = function()
-	if not initPackets() then
-		return false
-	end
-	local root = getLocalRoot()
-	if not root then
-		return false
-	end
-	local range = hud.killAuraRangeSetting + hud.killAuraExtendSetting
-	local hurtboxes = getEnemyHurtboxesInRange(range, root.Position)
-	if #hurtboxes == 0 then
-		return false
-	end
-	local packet = Packets[MELEE_PACKET_NAME]
-	if not packet or type(packet.Fire) ~= 'function' then
-		return false
-	end
-	local template = meleeTemplate
-	local itemId = detectLocalMeleeItemId()
-	local aimDir = (hurtboxes[1].Position - root.Position).Unit
-	local action = (template and template[2]) or 'SWING'
-	local field3 = (template and template[3]) or ''
-	local meta = template and template[6]
-	local ok = pcall(function()
-		packet:Fire(itemId, action, field3, aimDir, hurtboxes, meta)
-	end)
-	return ok
 end
 
 bindPacketListeners = function()
@@ -3593,12 +3620,10 @@ run(function()
 			return nil
 		end
 		local overlay = {
-			DrawBg = newDraw('Square', {Filled = true, Thickness = 1, ZIndex = 1, Transparency = 0.3, Color = Color3.fromRGB(8, 8, 12)}),
 			DrawGun = newDraw('Text', {Center = true, Size = 11, ZIndex = 4, Color = Color3.fromRGB(200, 200, 210)}),
 			DrawTime = newDraw('Text', {Center = true, Size = 14, ZIndex = 5, Color = Color3.fromRGB(255, 220, 120)}),
 			DrawBarBg = newDraw('Line', {Thickness = 3, ZIndex = 2, Transparency = 0.45, Color = Color3.fromRGB(25, 25, 32)}),
 			DrawBarFill = newDraw('Line', {Thickness = 2, ZIndex = 3, Color = Color3.fromRGB(255, 150, 55)}),
-			WarnBg = newDraw('Square', {Filled = true, Thickness = 1, ZIndex = 2, Transparency = 0.25, Color = Color3.fromRGB(30, 8, 8)}),
 			WarnText = newDraw('Text', {Center = true, Size = 12, ZIndex = 4, Color = Color3.fromRGB(255, 95, 95)}),
 			ImpactBg = newDraw('Line', {Thickness = 4, ZIndex = 2, Transparency = 0.4, Color = Color3.fromRGB(18, 18, 24)}),
 			ImpactFill = newDraw('Line', {Thickness = 3, ZIndex = 3, Color = Color3.fromRGB(255, 120, 60)}),
@@ -3693,8 +3718,8 @@ run(function()
 			return
 		end
 		local myPos = myHead.Position
-		local threshold = math.clamp(hud.aimlockThresholdSetting, 0.75, 0.995)
-		local needSamples = math.max(8, hud.aimlockMinSamplesSetting)
+		local threshold = math.clamp(hud.aimlockThresholdSetting, 0.96, 0.999)
+		local needStreak = math.max(30, hud.aimlockMinSamplesSetting)
 		local drawn = {}
 
 		for _, plr in playersService:GetPlayers() do
@@ -3710,45 +3735,60 @@ run(function()
 				setAimlockRay(plr, Vector3.zero, Vector3.zero, false)
 				continue
 			end
-			drawn[plr] = true
-			local look = head.CFrame.LookVector
-			local toMe = myPos - head.Position
-			if toMe.Magnitude < 2 then
+			local char = plr.Character
+			local enemyRoot = char and char:FindFirstChild('HumanoidRootPart')
+			if not enemyRoot then
 				setAimlockRay(plr, Vector3.zero, Vector3.zero, false)
 				continue
 			end
-			local dot = look:Dot(toMe.Unit)
-			local state = aimlockState[plr.UserId] or {samples = 0, flagged = false}
+			drawn[plr] = true
+			local toMe = myPos - head.Position
+			local dist = toMe.Magnitude
+			if dist < 8 or dist > 250 then
+				aimlockState[plr.UserId] = {streak = 0, flagged = false, lastDot = 0}
+				setAimlockRay(plr, Vector3.zero, Vector3.zero, false)
+				continue
+			end
+			local look = head.CFrame.LookVector
+			local toMeUnit = toMe.Unit
+			local dot = look:Dot(toMeUnit)
+			local bodyDot = enemyRoot.CFrame.LookVector:Dot(toMeUnit)
+			local enemyVel = enemyRoot.AssemblyLinearVelocity
+			local runningAtMe = enemyVel.Magnitude > 7 and enemyVel.Unit:Dot(toMeUnit) > 0.65
+			local state = aimlockState[plr.UserId] or {streak = 0, flagged = false, lastDot = 0}
 			aimlockState[plr.UserId] = state
 
-			if dot >= threshold then
-				state.samples = math.min(state.samples + 1, 120)
+			local aimMismatch = math.abs(dot - bodyDot) > 0.18
+			local perfectTrack = dot >= threshold and not runningAtMe and aimMismatch
+			if perfectTrack then
+				state.streak = math.min(state.streak + 1, 240)
 			else
-				state.samples = math.max(0, state.samples - 3)
+				state.streak = 0
 			end
+			state.lastDot = dot
 
-			local suspicious = dot >= threshold - 0.02
-			local showRay = hud.aimlockVisualizeSetting and dot >= 0.35
-			local rayColor = suspicious and Color3.fromRGB(255, 55, 55) or Color3.fromRGB(255, 195, 75)
+			local suspicious = state.streak >= math.floor(needStreak * 0.6) and dot >= threshold - 0.005
+			local showRay = hud.aimlockVisualizeSetting and suspicious
+			local rayColor = (state.streak >= needStreak) and Color3.fromRGB(255, 55, 55) or Color3.fromRGB(255, 195, 75)
 			local rayThickness = suspicious and 2.5 or 1.5
-			local rayEnd = suspicious and myPos or (head.Position + look.Unit * math.min(toMe.Magnitude, 120))
+			local rayEnd = suspicious and myPos or (head.Position + look.Unit * math.min(dist, 120))
 			setAimlockRay(plr, head.Position, rayEnd, showRay, rayColor, rayThickness)
 
-			if not state.flagged and state.samples >= needSamples then
+			if not state.flagged and state.streak >= needStreak and dot >= threshold then
 				state.flagged = true
-				local pct = math.floor(dot * 100)
-				notif('Aimlock Detector', plr.Name .. ' flagged — head tracking ' .. pct .. '%', 45, 'warning')
+				local pct = math.floor(dot * 1000) / 10
+				notif('Aimlock Detector', plr.Name .. ' flagged â€” sustained head tracking ' .. pct .. '%', 45, 'warning')
 				discordEmbed(
-					'🎯 Aimlock Detected',
-					'**' .. plr.Name .. '** is tracking your head too consistently.',
+					'ðŸŽ¯ Aimlock Detected',
+					'**' .. plr.Name .. '** sustained perfect head tracking without movement explain.',
 					16724787,
 					{
 						{name = 'Player', value = plr.Name, inline = true},
 						{name = 'User ID', value = tostring(plr.UserId), inline = true},
 						{name = 'Tracking', value = pct .. '%', inline = true},
-						{name = 'Samples', value = tostring(state.samples), inline = true},
-						{name = 'Threshold', value = math.floor(threshold * 100) .. '%', inline = true},
-						{name = 'Place', value = tostring(game.PlaceId), inline = true},
+						{name = 'Streak', value = tostring(state.streak), inline = true},
+						{name = 'Threshold', value = math.floor(threshold * 1000) / 10 .. '%', inline = true},
+						{name = 'Distance', value = string.format('%.1f studs', dist), inline = true},
 					}
 				)
 			end
@@ -3807,33 +3847,26 @@ run(function()
 			if showDraw and gunName then
 				remaining = math.max(0, remaining + hud.drawTimerOffsetSetting)
 				local accentColor = GUN_DRAW_COLORS[gunName] or GUN_DRAW_COLORS.Castigate
-				local chipW = math.floor(math.clamp(88 * textScale, 72, 130))
-				local chipH = math.floor(math.clamp(34 * textScale, 28, 44))
-				local chipX = centerX - chipW / 2
-				local chipY = iy - chipH - math.floor(6 * textScale)
-				overlay.DrawBg.Position = Vector2.new(chipX, chipY)
-				overlay.DrawBg.Size = Vector2.new(chipW, chipH)
-				overlay.DrawBg.Visible = true
+				local topY = iy - math.floor(30 * textScale)
 				overlay.DrawGun.Size = math.floor(11 * textScale)
-				overlay.DrawGun.Text = string.upper(kind or 'DRAW') .. ' · ' .. gunName
+				overlay.DrawGun.Text = string.upper(kind or 'DRAW') .. ' Â· ' .. gunName
 				overlay.DrawGun.Color = accentColor
-				overlay.DrawGun.Position = Vector2.new(centerX, chipY + math.floor(10 * textScale))
+				overlay.DrawGun.Position = Vector2.new(centerX, topY)
 				overlay.DrawGun.Visible = true
 				overlay.DrawTime.Size = math.floor(14 * textScale)
 				overlay.DrawTime.Text = string.format('%.2fs', remaining)
 				overlay.DrawTime.Color = remaining < 0.25 and Color3.fromRGB(255, 70, 70) or accentColor
-				overlay.DrawTime.Position = Vector2.new(centerX, chipY + math.floor(22 * textScale))
+				overlay.DrawTime.Position = Vector2.new(centerX, topY + math.floor(13 * textScale))
 				overlay.DrawTime.Visible = true
 				if delay > 0 then
 					local ratio = math.clamp(remaining / delay, 0, 1)
-					local barY = chipY + chipH - math.floor(4 * textScale)
-					local barLeft = chipX + 6
-					local barRight = chipX + chipW - 6
-					overlay.DrawBarBg.From = Vector2.new(barLeft, barY)
-					overlay.DrawBarBg.To = Vector2.new(barRight, barY)
+					local barY = topY + math.floor(24 * textScale)
+					local barHalf = math.floor(34 * textScale)
+					overlay.DrawBarBg.From = Vector2.new(centerX - barHalf, barY)
+					overlay.DrawBarBg.To = Vector2.new(centerX + barHalf, barY)
 					overlay.DrawBarBg.Visible = true
-					overlay.DrawBarFill.From = Vector2.new(barLeft, barY)
-					overlay.DrawBarFill.To = Vector2.new(barLeft + (barRight - barLeft) * ratio, barY)
+					overlay.DrawBarFill.From = Vector2.new(centerX - barHalf, barY)
+					overlay.DrawBarFill.To = Vector2.new(centerX - barHalf + barHalf * 2 * ratio, barY)
 					overlay.DrawBarFill.Color = remaining < 0.25 and Color3.fromRGB(255, 50, 50) or accentColor
 					overlay.DrawBarFill.Visible = true
 				end
@@ -3858,15 +3891,10 @@ run(function()
 			end
 			bulletWarnState[plr] = warnState
 			if warnState.active then
-				local warnText = hud.bulletWarningsTextSetting
 				overlay.WarnText.Size = math.floor(12 * textScale)
-				overlay.WarnText.Text = warnText
+				overlay.WarnText.Text = hud.bulletWarningsTextSetting
 				overlay.WarnText.Position = Vector2.new(centerX, iy + isy + math.floor(10 * textScale))
 				overlay.WarnText.Visible = true
-				local padX = math.max(overlay.WarnText.TextBounds.X * 0.5 + 10, 36)
-				overlay.WarnBg.Position = Vector2.new(centerX - padX, iy + isy + math.floor(4 * textScale))
-				overlay.WarnBg.Size = Vector2.new(padX * 2, math.floor(18 * textScale))
-				overlay.WarnBg.Visible = true
 			end
 
 			if hud.impactEspEnabled then
@@ -3932,7 +3960,7 @@ run(function()
 				local barFill = barBg and barBg:FindFirstChild('BarFill')
 				if title then
 					title.TextSize = hud.drawTimerFontSizeSetting
-					title.Text = string.format('%s  •  %s', entry.name, entry.gun)
+					title.Text = string.format('%s  â€¢  %s', entry.name, entry.gun)
 					title.TextColor3 = gunColor
 				end
 				if timer then
@@ -3971,181 +3999,6 @@ run(function()
 					barFill.Size = UDim2.fromScale(0.35, 1)
 					barFill.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
 				end
-			end
-		end
-	end
-
-	local function collectThreatEntries()
-		local threats = {}
-		for _, plr in playersService:GetPlayers() do
-			if plr ~= lplr and plr.Character and isPlayerVisible(plr) then
-				local char = plr.Character
-				local dist = getClosestEnemyDistance(plr)
-				for _, model in getEnemyModels(plr) do
-					if not model or not model.Parent then
-						continue
-					end
-					for _, track in getAllPlayingTracks(model) do
-						if not track.IsPlaying then
-							continue
-						end
-						local _, animId = getTrackAnimInfo(track)
-						local kind = getParryAnimKind(animId)
-						if kind == 'melee' and hud.threatShowMeleeSetting then
-							table.insert(threats, {
-								type = 'MELEE',
-								name = plr.Name,
-								dist = dist,
-								color = hud.threatColorMeleeSetting,
-								remaining = 0,
-								score = 7000 - dist * 20,
-							})
-						elseif kind == 'gun_draw' and hud.threatShowGunDrawSetting then
-							local aiming = true
-							if hud.threatRequireAimingSetting then
-								aiming = isEnemyAimingAtMeForGun(char, model)
-							end
-							if aiming then
-								local gunName = GUN_DRAW_ANIM_IDS[normalizeAnimId(animId)] or detectEquippedGun(char)
-								local delay = getEffectiveGunParryDelay(gunName)
-								local remaining = getAdjustedParryDelay(getGunParryDelay(gunName), track.TimePosition)
-								table.insert(threats, {
-									type = 'GUN DRAW',
-									name = plr.Name,
-									dist = dist,
-									color = hud.threatColorGunDrawSetting,
-									remaining = remaining,
-									score = 8000 - dist * 5 - remaining * 200,
-								})
-							end
-						elseif kind == 'gun_shot' and hud.threatShowGunShotSetting then
-							local aiming = true
-							if hud.threatRequireAimingSetting then
-								aiming = isEnemyAimingAtMeForGun(char, model)
-							end
-							if aiming then
-								table.insert(threats, {
-									type = 'GUN SHOT',
-									name = plr.Name,
-									dist = dist,
-									color = hud.threatColorGunShotSetting,
-									remaining = 0,
-									score = 10000 - dist * 10,
-								})
-							end
-						end
-					end
-					if hud.threatShowGlintSetting then
-						for _, desc in model:GetDescendants() do
-							if isGlintInstance(desc) then
-								local aiming = true
-								if hud.threatRequireAimingSetting then
-									aiming = isEnemyAimingAtMeForGun(char, model)
-								end
-								if aiming then
-									table.insert(threats, {
-										type = 'GLINT',
-										name = plr.Name,
-										dist = dist,
-										color = hud.threatColorGlintSetting,
-										remaining = 0,
-										score = 9000 - dist * 10,
-									})
-								end
-								break
-							end
-						end
-					end
-				end
-			end
-		end
-		table.sort(threats, function(a, b)
-			return a.score > b.score
-		end)
-		return threats
-	end
-
-	local function animateThreatChange(threat, flashRed)
-		if not threatPanel then
-			return
-		end
-		local speed = math.clamp(hud.threatIndicatorAnimSpeedSetting, 0.05, 1)
-		local targetSize = hud.threatIndicatorFullscreenSetting and UDim2.fromScale(0.96, 0.32) or UDim2.fromOffset(420, 72)
-		threatPanel.Size = UDim2.fromOffset(360, 58)
-		tweenService:Create(threatPanel, TweenInfo.new(speed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			Size = targetSize,
-		}):Play()
-		local accent = threatPanel:FindFirstChild('ThreatAccent')
-		if accent and threat then
-			accent.BackgroundColor3 = threat.color
-		end
-		if flashRed and threatFlash then
-			threatFlash.BackgroundTransparency = 0.82
-			tweenService:Create(threatFlash, TweenInfo.new(speed * 2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-				BackgroundTransparency = 1,
-			}):Play()
-		end
-	end
-
-	local function updateThreatHud()
-		if not threatOverlay then
-			return
-		end
-		if not hud.threatIndicatorEnabled then
-			threatOverlay.Visible = false
-			lastPrimaryKey = ''
-			return
-		end
-		ensureHudGui()
-		local threats = collectThreatEntries()
-		local primary = threats[1]
-		threatOverlay.Visible = true
-		threatOverlay.BackgroundTransparency = 1
-		local accent = threatPanel and threatPanel:FindFirstChild('ThreatAccent')
-		if not primary then
-			lastPrimaryKey = ''
-			threatPanel.AnchorPoint = Vector2.new(0.5, 1)
-			threatPanel.Position = UDim2.new(0.5, 0, math.clamp(hud.threatIndicatorPosYSetting, 0.55, 0.98), 0)
-			threatPanel.Size = UDim2.fromOffset(320, 58)
-			threatPanel.BackgroundTransparency = 0.22
-			if accent then
-				accent.BackgroundColor3 = Color3.fromRGB(80, 200, 110)
-			end
-			if threatTitle then
-				threatTitle.TextSize = math.floor(hud.threatIndicatorFontSizeSetting * 0.55)
-				threatTitle.Text = 'ALL CLEAR'
-				threatTitle.TextColor3 = Color3.fromRGB(100, 220, 130)
-			end
-			if threatSub then
-				threatSub.TextSize = math.floor(hud.threatIndicatorFontSizeSetting * 0.28)
-				threatSub.Text = 'Monitoring melee · gun draw · gun shot · glint'
-			end
-			return
-		end
-		threatPanel.AnchorPoint = Vector2.new(0.5, 1)
-		threatPanel.Position = UDim2.new(0.5, 0, math.clamp(hud.threatIndicatorPosYSetting, 0.55, 0.98), 0)
-		threatPanel.Size = hud.threatIndicatorFullscreenSetting and UDim2.fromScale(0.96, 0.32) or UDim2.fromOffset(420, 72)
-		threatPanel.BackgroundTransparency = 1 - hud.threatIndicatorOpacitySetting * 0.5
-		local key = primary.type .. ':' .. primary.name
-		local flash = primary.type == 'GUN SHOT' or primary.type == 'GLINT'
-		if key ~= lastPrimaryKey then
-			lastPrimaryKey = key
-			animateThreatChange(primary, flash)
-		end
-		if accent then
-			accent.BackgroundColor3 = primary.color
-		end
-		if threatTitle then
-			threatTitle.TextSize = hud.threatIndicatorFontSizeSetting
-			threatTitle.Text = primary.type
-			threatTitle.TextColor3 = primary.color
-		end
-		if threatSub then
-			threatSub.TextSize = math.floor(hud.threatIndicatorFontSizeSetting * 0.42)
-			if primary.type == 'GUN DRAW' and primary.remaining > 0 then
-				threatSub.Text = string.format('%s  ·  %.0f studs  ·  draw %.2fs', primary.name, primary.dist, primary.remaining)
-			else
-				threatSub.Text = string.format('%s  ·  %.0f studs away', primary.name, primary.dist)
 			end
 		end
 	end
@@ -4214,56 +4067,9 @@ run(function()
 		end
 	end
 
-	local function suppressBreakVisuals()
-		if not noBreakScreenEnabled and not destabilizeBypassEnabled then
-			return
-		end
-		local playerGui = lplr:FindFirstChild('PlayerGui')
-		if playerGui then
-			local gameplayUi = playerGui:FindFirstChild('GameplayUI')
-			if gameplayUi then
-				local destabilized = gameplayUi:FindFirstChild('Destabilized', true)
-				if destabilized then
-					pcall(function()
-						destabilized:Destroy()
-					end)
-				end
-				local impactFrame = gameplayUi:FindFirstChild('ImpactFrame', true)
-				if impactFrame and noBreakScreenEnabled then
-					pcall(function()
-						impactFrame.Visible = false
-					end)
-				end
-				if destabilizeBypassEnabled then
-					pcall(function()
-						gameplayUi.Enabled = true
-					end)
-				end
-			end
-		end
-		local lighting = cloneref(game:GetService('Lighting'))
-		for _, effect in lighting:GetChildren() do
-			if effect:IsA('ColorCorrectionEffect') and effect.Saturation <= -0.9 then
-				pcall(function()
-					effect:Destroy()
-				end)
-			end
-		end
-		if destabilizeBypassEnabled and isLocalAlive() then
-			local root = getLocalRoot()
-			if root and root.Anchored then
-				pcall(function()
-					root.Anchored = false
-				end)
-			end
-		end
-	end
-
 	local function updateHud()
-		suppressBreakVisuals()
 		updateDrawHud()
 		updateBreakTimerHud()
-		updateThreatHud()
 		updatePlayerWorldEsp()
 		updateAimlockDetector()
 		updateEnemyHurtboxViz()
@@ -4278,7 +4084,7 @@ run(function()
 		end
 		hudUpdateBound = true
 		runService.RenderStepped:Connect(function()
-			if not hud.drawTimerEnabled and not hud.threatIndicatorEnabled
+			if not hud.drawTimerEnabled
 				and not hud.bulletWarningsEnabled and not hud.impactEspEnabled
 				and not hud.healthEspEnabled and not hud.aimlockDetectorEnabled
 				and not hud.breakTimerEnabled then
@@ -4311,7 +4117,7 @@ run(function()
 			return
 		end
 		bindPacketListeners()
-		local range = hud.killAuraRangeSetting + hud.killAuraExtendSetting
+		local range = getActiveMeleeReach()
 		local root = getLocalRoot()
 		local hurtboxes = root and getEnemyHurtboxesInRange(range, root.Position) or {}
 		if #hurtboxes == 0 then
@@ -4321,7 +4127,6 @@ run(function()
 			return
 		end
 		pressAttackClick()
-		fireKillAuraMeleeStrike()
 	end
 
 	local function bindKillAuraLoop()
@@ -4345,548 +4150,12 @@ run(function()
 	task.defer(bindKillAuraLoop)
 end)
 
--- ---------------------------------------------------------------------------
--- Animation Logger (file dump for ID identification)
--- ---------------------------------------------------------------------------
-
-run(function()
-local AnimLog = {
-	active = false,
-	logLocal = false,
-	logEnemies = true,
-	filePath = '',
-}
-local animLogBuffer = {}
-local animLogBufferChars = 0
-local animLogLastFlush = 0
-local animLogWatchers = {}
-local animLogGlobalConns = {}
-local animLogEventCount = 0
-local animLogFlushToken = 0
-local animLogMirrorConsole = false
-local animLogLastWriteError = ''
-
-local function animLogGetExecutorName()
-	if identifyexecutor then
-		local ok, name = pcall(identifyexecutor)
-		if ok and name then
-			return tostring(name)
-		end
-	end
-	return 'executor'
-end
-
-local function animLogCanWrite()
-	return type(writefile) == 'function'
-end
-
-local function animLogEnsureFolder()
-	if type(makefolder) ~= 'function' or type(isfolder) ~= 'function' then
-		return true
-	end
-	local ok = pcall(function()
-		if not isfolder('newvape') then
-			makefolder('newvape')
-		end
-		if not isfolder('newvape/redliner') then
-			makefolder('newvape/redliner')
-		end
-	end)
-	return ok
-end
-
-local function animLogVerifyFile(path)
-	return type(isfile) == 'function' and isfile(path)
-end
-
-local function animLogAppendFile(text, path)
-	path = path or AnimLog.filePath
-	if not animLogCanWrite() or path == '' then
-		animLogLastWriteError = 'writefile unavailable'
-		return false, animLogLastWriteError
-	end
-	animLogEnsureFolder()
-
-	local ok, err
-	if type(appendfile) == 'function' then
-		ok, err = pcall(appendfile, path, text)
-	else
-		local existing = ''
-		if type(readfile) == 'function' and animLogVerifyFile(path) then
-			pcall(function()
-				existing = readfile(path)
-			end)
-		end
-		ok, err = pcall(writefile, path, existing .. text)
-	end
-
-	if not ok then
-		animLogLastWriteError = tostring(err)
-		return false, animLogLastWriteError
-	end
-	if not animLogVerifyFile(path) then
-		animLogLastWriteError = 'write returned ok but isfile=false (check ' .. animLogGetExecutorName() .. ' workspace, not this repo folder)'
-		return false, animLogLastWriteError
-	end
-	animLogLastWriteError = ''
-	return true
-end
-
-local function animLogWriteFile(text, path)
-	path = path or AnimLog.filePath
-	if not animLogCanWrite() or path == '' then
-		animLogLastWriteError = 'writefile unavailable'
-		return false, animLogLastWriteError
-	end
-	animLogEnsureFolder()
-	local ok, err = pcall(writefile, path, text)
-	if not ok then
-		animLogLastWriteError = tostring(err)
-		return false, animLogLastWriteError
-	end
-	if not animLogVerifyFile(path) then
-		animLogLastWriteError = 'write returned ok but isfile=false (check ' .. animLogGetExecutorName() .. ' workspace, not this repo folder)'
-		return false, animLogLastWriteError
-	end
-	animLogLastWriteError = ''
-	return true
-end
-
-local function animLogFlush(force)
-	if animLogBufferChars == 0 then
-		return
-	end
-	if not force and tick() - animLogLastFlush < 1.5 then
-		return
-	end
-	local chunk = table.concat(animLogBuffer)
-	table.clear(animLogBuffer)
-	animLogBufferChars = 0
-	animLogLastFlush = tick()
-	local ok, err = animLogAppendFile(chunk)
-	if not ok then
-		animLogMirrorConsole = true
-		warn('[REDLINER] anim log flush failed:', err)
-		print(chunk)
-	end
-end
-
-local function animLogQueue(text)
-	if animLogMirrorConsole then
-		print(text)
-	end
-	table.insert(animLogBuffer, text)
-	animLogBufferChars += #text
-	if animLogBufferChars >= 12000 then
-		animLogFlush(true)
-	end
-end
-
-local function animLogWriteLine(...)
-	local parts = {}
-	for i = 1, select('#', ...) do
-		table.insert(parts, tostring(select(i, ...)))
-	end
-	animLogQueue(table.concat(parts, ' ') .. '\n')
-end
-
-local function animLogWriteBlock(lines)
-	for _, line in lines do
-		animLogQueue(line .. '\n')
-	end
-	animLogQueue('\n')
-end
-
-local function animLogGetFilePath()
-	return 'newvape/redliner/' .. tostring(game.PlaceId) .. '_anim_log.txt'
-end
-
-local function animLogKnownLabel(normId)
-	if PARRY_ANIM_IDS[normId] then
-		return 'parry:' .. PARRY_ANIM_IDS[normId]
-	end
-	if GUN_DRAW_ANIM_IDS[normId] then
-		return 'gun_draw:' .. GUN_DRAW_ANIM_IDS[normId]
-	end
-	if GUN_SHOT_ANIM_IDS[normId] then
-		return 'gun_shot:' .. GUN_SHOT_ANIM_IDS[normId]
-	end
-	if BLOCKED_ANIM_IDS[normId] then
-		return 'blocked:' .. BLOCKED_ANIM_IDS[normId]
-	end
-	return ''
-end
-
-local function animLogShouldLogPlayer(plr)
-	if not plr then
-		return AnimLog.logEnemies
-	end
-	if plr == lplr then
-		return AnimLog.logLocal
-	end
-	return AnimLog.logEnemies
-end
-
-local function animLogSafeNumber(value, digits)
-	if typeof(value) ~= 'number' then
-		return 'n/a'
-	end
-	if digits then
-		return string.format('%.' .. digits .. 'f', value)
-	end
-	return tostring(value)
-end
-
-local function animLogFormatTrackEvent(char, plr, track, eventName)
-	local name, animId = getTrackAnimInfo(track)
-	local normId = normalizeAnimId(animId)
-	local root = char:FindFirstChild('HumanoidRootPart')
-	local horizVel = 0
-	if root then
-		local vel = root.AssemblyLinearVelocity
-		horizVel = Vector3.new(vel.X, 0, vel.Z).Magnitude
-	end
-	local known = animLogKnownLabel(normId)
-	local lines = {
-		'=== ' .. string.upper(eventName) .. ' #' .. animLogEventCount .. ' ===',
-		'time=' .. string.format('%.3f', tick()),
-		'event=' .. eventName,
-		'player=' .. (plr and plr.Name or 'npc') .. (plr == lplr and ' (local)' or (plr and ' (enemy)' or '')),
-		'character=' .. char.Name,
-		'anim_name=' .. name,
-		'anim_id=' .. (animId ~= '' and animId or 'n/a'),
-		'norm_id=' .. (normId ~= '' and normId or 'n/a'),
-		'known=' .. (known ~= '' and known or '-'),
-		'priority=' .. tostring(track.Priority),
-		'weight=' .. animLogSafeNumber(track.WeightCurrent, 3),
-		'weight_target=' .. animLogSafeNumber(track.WeightTarget, 3),
-		'time_pos=' .. animLogSafeNumber(track.TimePosition, 3),
-		'length=' .. animLogSafeNumber(track.Length, 3),
-		'speed=' .. animLogSafeNumber(track.Speed, 3),
-		'is_playing=' .. tostring(track.IsPlaying),
-		'looped=' .. tostring(track.Looped),
-	}
-	if plr ~= lplr then
-		lines[#lines + 1] = 'dist=' .. animLogSafeNumber(getClosestEnemyDistance(char), 2)
-		local hrpDot = getGunAimDotFromModel(char)
-		local need = getEffectiveGunAimThreshold(getClosestEnemyDistance(char))
-		lines[#lines + 1] = 'gun_hrp_dot=' .. animLogSafeNumber(hrpDot, 3) .. ' need=' .. animLogSafeNumber(need, 2)
-		lines[#lines + 1] = 'aim_dot=' .. animLogSafeNumber(getAimDot(char), 3)
-	end
-	lines[#lines + 1] = 'horiz_vel=' .. animLogSafeNumber(horizVel, 2)
-	lines[#lines + 1] = 'gun_equipped=' .. tostring(charHasGunEquipped(char))
-	lines[#lines + 1] = 'gun=' .. detectEquippedGun(char)
-	local anim = track.Animation
-	if anim then
-		lines[#lines + 1] = 'animation_parent=' .. anim.Parent:GetFullName()
-	end
-	return lines
-end
-
-local function animLogOnTrackEvent(char, plr, track, eventName)
-	if not AnimLog.active then
-		return
-	end
-	animLogEventCount += 1
-	animLogWriteBlock(animLogFormatTrackEvent(char, plr, track, eventName))
-end
-
-local function animLogHookAnimator(animator, ownerChar, ownerPlr, conns)
-	table.insert(conns, animator.AnimationPlayed:Connect(function(track)
-		animLogOnTrackEvent(ownerChar, ownerPlr, track, 'played')
-		pcall(function()
-			track.Stopped:Once(function()
-				if AnimLog.active then
-					animLogOnTrackEvent(ownerChar, ownerPlr, track, 'stopped')
-				end
-			end)
-		end)
-	end))
-end
-
-local function animLogHookModel(model, ownerChar, ownerPlr, conns)
-	for _, desc in model:GetDescendants() do
-		if desc:IsA('Animator') then
-			animLogHookAnimator(desc, ownerChar, ownerPlr, conns)
-		end
-	end
-	table.insert(conns, model.DescendantAdded:Connect(function(inst)
-		if inst:IsA('Animator') then
-			animLogHookAnimator(inst, ownerChar, ownerPlr, conns)
-		end
-	end))
-end
-
-local function animLogUnwatch(key)
-	local conns = animLogWatchers[key]
-	if conns then
-		for _, conn in conns do
-			conn:Disconnect()
-		end
-	end
-	animLogWatchers[key] = nil
-end
-
-local function animLogWatchCharacter(char, ownerPlr)
-	if not char or not animLogShouldLogPlayer(ownerPlr) then
-		return
-	end
-	local key = char
-	if animLogWatchers[key] then
-		return
-	end
-	local conns = {}
-	animLogWatchers[key] = conns
-	local ownerChar = (ownerPlr and ownerPlr.Character) or char
-	animLogHookModel(char, ownerChar, ownerPlr, conns)
-	if ownerPlr then
-		for _, extraModel in getEnemyModels(ownerPlr) do
-			if extraModel ~= char then
-				animLogHookModel(extraModel, ownerChar, ownerPlr, conns)
-			end
-		end
-	end
-end
-
-local function animLogWatchPlayer(plr)
-	if not animLogShouldLogPlayer(plr) then
-		return
-	end
-	if plr.Character then
-		animLogWatchCharacter(plr.Character, plr)
-	end
-	if plr ~= lplr then
-		for _, model in getEnemyModels(plr) do
-			if model ~= plr.Character then
-				animLogWatchCharacter(model, plr)
-			end
-		end
-	end
-end
-
-local function animLogRefreshWatchers()
-	for key in animLogWatchers do
-		animLogUnwatch(key)
-	end
-	if AnimLog.logLocal then
-		animLogWatchPlayer(lplr)
-	end
-	if AnimLog.logEnemies then
-		for _, plr in playersService:GetPlayers() do
-			if plr ~= lplr then
-				animLogWatchPlayer(plr)
-			end
-		end
-	end
-end
-
-local function animLogStopWatchers()
-	for key in animLogWatchers do
-		animLogUnwatch(key)
-	end
-	for _, conn in animLogGlobalConns do
-		conn:Disconnect()
-	end
-	table.clear(animLogGlobalConns)
-end
-
-local function animLogStartWatchers()
-	animLogStopWatchers()
-	animLogRefreshWatchers()
-
-	table.insert(animLogGlobalConns, playersService.PlayerAdded:Connect(function(plr)
-		plr.CharacterAdded:Connect(function()
-			task.defer(function()
-				if AnimLog.active then
-					animLogWatchPlayer(plr)
-				end
-			end)
-		end)
-		task.defer(function()
-			if AnimLog.active then
-				animLogWatchPlayer(plr)
-			end
-		end)
-	end))
-
-	table.insert(animLogGlobalConns, playersService.PlayerRemoving:Connect(function(plr)
-		if plr.Character then
-			animLogUnwatch(plr.Character)
-		end
-		for _, model in getEnemyModels(plr) do
-			animLogUnwatch(model)
-		end
-	end))
-
-	for _, plr in playersService:GetPlayers() do
-		plr.CharacterAdded:Connect(function()
-			task.defer(function()
-				if AnimLog.active then
-					animLogWatchPlayer(plr)
-				end
-			end)
-		end)
-	end
-
-	animLogFlushToken += 1
-	local token = animLogFlushToken
-	task.spawn(function()
-		while AnimLog.active and token == animLogFlushToken do
-			animLogFlush(false)
-			task.wait(1.5)
-		end
-	end)
-end
-
-local function animLogScanAnimations(root, pathPrefix, out)
-	for _, inst in root:GetDescendants() do
-		if inst:IsA('Animation') then
-			local normId = normalizeAnimId(inst.AnimationId)
-			local fullPath = pathPrefix .. inst:GetFullName()
-			table.insert(out, {
-				path = fullPath,
-				name = inst.Name,
-				animId = inst.AnimationId,
-				normId = normId,
-				known = animLogKnownLabel(normId),
-			})
-		end
-	end
-end
-
-local function animLogDumpCatalog()
-	if not animLogCanWrite() then
-		notif('Animation Logger', 'writefile not available in this executor.', 6, 'warning')
-		return '', 'writefile unavailable'
-	end
-
-	animLogEnsureFolder()
-	if AnimLog.filePath == '' then
-		AnimLog.filePath = animLogGetFilePath()
-	end
-	local path = AnimLog.filePath
-	local entries = {}
-	local roots = {
-		{root = replicatedStorage:FindFirstChild('Assets'), prefix = ''},
-		{root = replicatedStorage, prefix = ''},
-		{root = workspace:FindFirstChild('Chrono_EntityStorage'), prefix = ''},
-	}
-	for _, entry in roots do
-		if entry.root then
-			animLogScanAnimations(entry.root, entry.prefix, entries)
-		end
-	end
-
-	table.sort(entries, function(a, b)
-		return a.normId < b.normId or (a.normId == b.normId and a.path < b.path)
-	end)
-
-	local lines = {
-		'################################################################################',
-		'# ANIMATION CATALOG DUMP',
-		'# place=' .. tostring(game.PlaceId),
-		'# time=' .. os.date('%Y-%m-%d %H:%M:%S'),
-		'# total=' .. #entries,
-		'################################################################################',
-	}
-	local seenIds = {}
-	for _, entry in entries do
-		local idKey = entry.normId .. '|' .. entry.name
-		if not seenIds[idKey] then
-			seenIds[idKey] = true
-			lines[#lines + 1] = string.format(
-				'[CATALOG] path=%s | name=%s | id=%s | norm_id=%s | known=%s',
-				entry.path,
-				entry.name,
-				entry.animId ~= '' and entry.animId or 'n/a',
-				entry.normId ~= '' and entry.normId or 'n/a',
-				entry.known ~= '' and entry.known or '-'
-			)
-		end
-	end
-	lines[#lines + 1] = ''
-	lines[#lines + 1] = '# End catalog'
-	lines[#lines + 1] = ''
-
-	local text = table.concat(lines, '\n')
-	local ok, err = animLogAppendFile(text, path)
-	if not ok then
-		warn('[REDLINER] catalog dump failed:', err)
-		print(text)
-		return path, err
-	end
-	return path
-end
-
-local function animLogBeginSession(clearFile)
-	if not animLogCanWrite() then
-		notif('Animation Logger', 'writefile not available in this executor.', 6, 'warning')
-		return false, 'writefile unavailable'
-	end
-	animLogEnsureFolder()
-	AnimLog.filePath = animLogGetFilePath()
-	animLogEventCount = 0
-	animLogMirrorConsole = false
-	local header = table.concat({
-		'',
-		'################################################################################',
-		'# REDLINER Animation Log',
-		'# place=' .. tostring(game.PlaceId),
-		'# started=' .. os.date('%Y-%m-%d %H:%M:%S'),
-		'# local=' .. lplr.Name,
-		'# log_local=' .. tostring(AnimLog.logLocal),
-		'# log_enemies=' .. tostring(AnimLog.logEnemies),
-		'# file=' .. AnimLog.filePath,
-		'# executor=' .. animLogGetExecutorName(),
-		'################################################################################',
-		'',
-	}, '\n')
-	local ok, err
-	if clearFile then
-		ok, err = animLogWriteFile(header, AnimLog.filePath)
-	else
-		ok, err = animLogAppendFile(header, AnimLog.filePath)
-	end
-	if not ok then
-		animLogMirrorConsole = true
-		warn('[REDLINER] anim log file write failed:', err)
-		notif('Animation Logger', 'File write failed — mirroring to console. ' .. err, 10, 'warning')
-		print(header)
-		return true, err
-	end
-	local catalogPath, catalogErr = animLogDumpCatalog()
-	if catalogErr then
-		return true, catalogErr
-	end
-	print('[REDLINER] Animation Logger | wrote test OK | executor=' .. animLogGetExecutorName() .. ' | file=' .. AnimLog.filePath)
-	return true
-end
-
-local function animLogStop()
-	animLogWriteLine('# session ended', os.date('%Y-%m-%d %H:%M:%S'), 'events=' .. animLogEventCount)
-	animLogFlush(true)
-	AnimLog.active = false
-	animLogStopWatchers()
-end
-
-
-AnimLog.beginSession = animLogBeginSession
-AnimLog.stop = animLogStop
-AnimLog.startWatchers = animLogStartWatchers
-AnimLog.refreshWatchers = animLogRefreshWatchers
-AnimLog.dumpCatalog = animLogDumpCatalog
-AnimLog.flush = animLogFlush
-AnimLog.getFilePath = animLogGetFilePath
-AnimLog.getExecutorName = animLogGetExecutorName
-shared.RedlinerAnimLog = AnimLog
-end)
 
 -- ---------------------------------------------------------------------------
 -- UI modules
 -- ---------------------------------------------------------------------------
 
 run(function()
-	local AnimLog = shared.RedlinerAnimLog
 	local extras = vape.Categories.Extras
 	if not extras then
 		extras = vape:CreateCategory({
@@ -4915,10 +4184,10 @@ run(function()
 				startEnemyWatchers()
 				bindParryScanLoop()
 				bindPacketListeners()
-				notif('Auto Parry', '360° within threat range — melee + gun draw/shot (proximity gated).', 5)
+				notif('Auto Parry', '360Â° within threat range â€” melee + gun draw/shot (proximity gated).', 5)
 			end
 		end,
-		Tooltip = 'Parries nearby enemy melee swings and gun draw/shot animations (360° within Melee/Threat range).',
+		Tooltip = 'Parries nearby enemy melee swings and gun draw/shot animations (360Â° within Melee/Threat range).',
 	})
 
 	AutoAttack = extras:CreateModule({
@@ -4927,7 +4196,7 @@ run(function()
 			autoAttackActive = callback
 			if callback then
 				bindAutoAttackLoop()
-				notif('Auto Attack', 'Active — LMB when enemies are in range (game window must be focused).', 4)
+				notif('Auto Attack', 'Active â€” LMB when enemies are in range (game window must be focused).', 4)
 			end
 		end,
 		Tooltip = 'Left clicks when an enemy is within Attack Range. Only fires while Roblox is focused. Pauses while parrying.',
@@ -4949,7 +4218,7 @@ run(function()
 			if callback then
 				bindPacketListeners()
 				logReachHookStatus('enabled')
-				reachDebugLog('Reach ENABLED — extend=', reachExtend, 'totalReach=', getMeleeReach())
+				reachDebugLog('Reach ENABLED â€” extend=', reachExtend, 'totalReach=', getMeleeReach())
 				notif('Reach', 'Extends melee hitboxes + packet hurtbox list. Swing once manually first if needed.', 5)
 			else
 				reachExtend = 0
@@ -4971,7 +4240,7 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
-		Tooltip = 'Legacy setting — melee parry uses visible players at any distance (360°).',
+		Tooltip = 'Legacy setting â€” melee parry uses visible players at any distance (360Â°).',
 	})
 
 	local ThreatRange
@@ -4991,7 +4260,7 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
-		Tooltip = 'Legacy setting — gun parry uses visible players and ray validation at any distance.',
+		Tooltip = 'Legacy setting â€” gun parry uses visible players and ray validation at any distance.',
 	})
 
 	WatcherThreatRange = AutoParry:CreateSlider({
@@ -5005,7 +4274,7 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
-		Tooltip = 'Legacy setting — animation watchers attach to all visible players.',
+		Tooltip = 'Legacy setting â€” animation watchers attach to all visible players.',
 	})
 
 	MeleeEnemyDebounce = AutoParry:CreateSlider({
@@ -5330,7 +4599,7 @@ run(function()
 		Function = function(callback)
 			reachDebugEnabled = callback
 			if callback then
-				print('[REDLINER][Reach] debug ON — swing sword near an enemy and watch console')
+				print('[REDLINER][Reach] debug ON â€” swing sword near an enemy and watch console')
 				bindPacketListeners()
 				logReachHookStatus('debug toggled on')
 			else
@@ -5536,26 +4805,6 @@ run(function()
 		Suffix = '%',
 	})
 
-	local NoBreakScreen
-	NoBreakScreen = extras:CreateModule({
-		Name = 'No Break Screen',
-		Function = function(callback)
-			noBreakScreenEnabled = callback
-			if callback then
-				notif('No Break Screen', 'Suppressing destabilized UI and break flash effects.', 4)
-			end
-		end,
-		Tooltip = 'Hides destabilized overlays and strong break visual effects.',
-	})
-	NoBreakScreen:CreateToggle({
-		Name = 'Destabilize Bypass (Experimental)',
-		Default = false,
-		Function = function(callback)
-			destabilizeBypassEnabled = callback
-		end,
-		Tooltip = 'Best effort only: keeps visuals usable and attempts to reduce local lock feel. Server still decides true disable.',
-	})
-
 	local BulletWarnings
 	BulletWarnings = extras:CreateModule({
 		Name = 'Bullet Warnings',
@@ -5629,153 +4878,25 @@ run(function()
 	})
 	AimlockDetector:CreateSlider({
 		Name = 'Min Tracking',
-		Min = 80,
+		Min = 96,
 		Max = 99,
-		Default = 93,
+		Default = 98,
 		Function = function(val)
 			hud.aimlockThresholdSetting = val / 100
 		end,
 		Suffix = '%',
 	})
 	AimlockDetector:CreateSlider({
-		Name = 'Confirm Samples',
-		Min = 8,
-		Max = 40,
-		Default = 18,
+		Name = 'Confirm Streak',
+		Min = 30,
+		Max = 90,
+		Default = 40,
 		Function = function(val)
 			hud.aimlockMinSamplesSetting = val
 		end,
+		Tooltip = 'Consecutive perfect-tracking frames required before flagging.',
 	})
 
-	local ThreatIndicator
-	ThreatIndicator = extras:CreateModule({
-		Name = 'Threat Indicator',
-		Function = function(callback)
-			hud.threatIndicatorEnabled = callback
-			if callback then
-				notif('Threat Indicator', 'Primary threat banner HUD active.', 4)
-				if hud.hudTickCallback then
-					pcall(hud.hudTickCallback)
-				end
-			end
-		end,
-		Tooltip = 'Large animated banner for the most urgent melee/gun/glint threat.',
-	})
-	ThreatIndicator:CreateToggle({
-		Name = 'Require Aiming',
-		Default = false,
-		Function = function(callback)
-			hud.threatRequireAimingSetting = callback
-		end,
-		Tooltip = 'Only show gun/glint threats when the enemy is actually aiming at you.',
-	})
-	ThreatIndicator:CreateToggle({
-		Name = 'Fullscreen Mode',
-		Default = false,
-		Function = function(callback)
-			hud.threatIndicatorFullscreenSetting = callback
-		end,
-		Tooltip = 'Use full-screen semi-transparent overlay instead of bottom panel.',
-	})
-	ThreatIndicator:CreateToggle({
-		Name = 'Show Melee',
-		Default = true,
-		Function = function(callback)
-			hud.threatShowMeleeSetting = callback
-		end,
-	})
-	ThreatIndicator:CreateToggle({
-		Name = 'Show Gun Draw',
-		Default = true,
-		Function = function(callback)
-			hud.threatShowGunDrawSetting = callback
-		end,
-	})
-	ThreatIndicator:CreateToggle({
-		Name = 'Show Gun Shot',
-		Default = true,
-		Function = function(callback)
-			hud.threatShowGunShotSetting = callback
-		end,
-	})
-	ThreatIndicator:CreateToggle({
-		Name = 'Show Glint',
-		Default = true,
-		Function = function(callback)
-			hud.threatShowGlintSetting = callback
-		end,
-	})
-	ThreatIndicator:CreateSlider({
-		Name = 'Font Size',
-		Min = 24,
-		Max = 72,
-		Default = 42,
-		Function = function(val)
-			hud.threatIndicatorFontSizeSetting = val
-		end,
-		Suffix = 'px',
-	})
-	ThreatIndicator:CreateSlider({
-		Name = 'Overlay Opacity',
-		Min = 10,
-		Max = 90,
-		Default = 55,
-		Function = function(val)
-			hud.threatIndicatorOpacitySetting = val / 100
-		end,
-		Suffix = '%',
-	})
-	ThreatIndicator:CreateSlider({
-		Name = 'Position Y',
-		Min = 55,
-		Max = 98,
-		Default = 82,
-		Function = function(val)
-			hud.threatIndicatorPosYSetting = val / 100
-		end,
-		Suffix = '%',
-		Tooltip = 'Vertical anchor for panel mode (ignored in fullscreen).',
-	})
-	ThreatIndicator:CreateSlider({
-		Name = 'Animation Speed',
-		Min = 5,
-		Max = 100,
-		Default = 25,
-		Function = function(val)
-			hud.threatIndicatorAnimSpeedSetting = val / 100
-		end,
-		Suffix = 's',
-	})
-	if ThreatIndicator.CreateColorSlider then
-		ThreatIndicator:CreateColorSlider({
-			Name = 'Melee Color',
-			Default = Color3.fromRGB(255, 130, 90),
-			Function = function(val)
-				hud.threatColorMeleeSetting = val
-			end,
-		})
-		ThreatIndicator:CreateColorSlider({
-			Name = 'Gun Draw Color',
-			Default = Color3.fromRGB(255, 210, 90),
-			Function = function(val)
-				hud.threatColorGunDrawSetting = val
-			end,
-		})
-		ThreatIndicator:CreateColorSlider({
-			Name = 'Gun Shot Color',
-			Default = Color3.fromRGB(255, 90, 90),
-			Function = function(val)
-				hud.threatColorGunShotSetting = val
-			end,
-		})
-		ThreatIndicator:CreateColorSlider({
-			Name = 'Glint Color',
-			Default = Color3.fromRGB(180, 130, 255),
-			Function = function(val)
-				hud.threatColorGlintSetting = val
-			end,
-		})
-	end
 
 	local HitboxVisualizer
 	HitboxVisualizer = extras:CreateModule({
@@ -5847,10 +4968,10 @@ run(function()
 			hud.killAuraActive = callback
 			if callback then
 				bindPacketListeners()
-				notif('Kill Aura', 'Firing melee hurtbox packets at enemies in range.', 5)
+				notif('Kill Aura', 'Auto swings with extended melee reach augment.', 5)
 			end
 		end,
-		Tooltip = 'Auto melee via real hurtbox packets + attack click. Uses Kill Aura reach augment.',
+		Tooltip = 'Auto melee swings with extended hurtbox augment through the real attack pipeline.',
 	})
 	KillAura:CreateSlider({
 		Name = 'Range',
@@ -5905,7 +5026,26 @@ run(function()
 	local silentHitChance = 100
 	local silentHeadChance = 50
 	local silentRaycastHooked = false
-	local silentOldRaycast
+	local silentGunAimHooked = false
+	local silentOldNamecall
+
+	local function silentAllowCombatScript(script)
+		if not script then
+			return false
+		end
+		local full = script:GetFullName()
+		if string.find(full, 'PlayerScripts', 1, true) then
+			return false
+		end
+		if string.find(full, 'StarterPlayer', 1, true) then
+			return false
+		end
+		if string.find(full, 'CoreGui', 1, true) then
+			return false
+		end
+		return string.find(full, 'Start', 1, true) ~= nil
+			or string.find(full, 'ReplicatedStorage', 1, true) ~= nil
+	end
 
 	local function isRedlinerCombatRaycast(params)
 		if not params or params.FilterType ~= Enum.RaycastFilterType.Include then
@@ -5946,8 +5086,58 @@ run(function()
 		return ent, ent[partName] or ent.Head or ent.RootPart
 	end
 
+	local function discoverGunAimController()
+		if getgc then
+			local gcOk, gc = pcall(getgc, true)
+			if gcOk and type(gc) == 'table' then
+				for _, value in gc do
+					if type(value) == 'table' and type(value._x061224a5e52c670b) == 'function' then
+						return value
+					end
+				end
+			end
+		end
+		local startFolder = replicatedStorage:FindFirstChild('Start')
+		local client = startFolder and startFolder:FindFirstChild('Client')
+		local classes = client and client:FindFirstChild('Classes')
+		local modScript = classes and classes:FindFirstChild('_xdca80115d2839102')
+		if modScript then
+			local ok, mod = pcall(require, modScript)
+			if ok and type(mod) == 'table' and type(mod._x061224a5e52c670b) == 'function' then
+				return mod
+			end
+		end
+		return nil
+	end
+
+	local function installGunAimHook()
+		if silentGunAimHooked then
+			return
+		end
+		local gunCtrl = discoverGunAimController()
+		if not gunCtrl or gunCtrl._silentAimHooked then
+			return
+		end
+		local oldAim = gunCtrl._x061224a5e52c670b
+		if type(oldAim) ~= 'function' then
+			return
+		end
+		gunCtrl._x061224a5e52c670b = function(self, ...)
+			if silentActive then
+				local root = getLocalRoot()
+				local _, part = getSilentTarget(root and root.Position)
+				if part and root then
+					return safeAimDirection(root.Position, part.Position, root.CFrame.LookVector)
+				end
+			end
+			return oldAim(self, ...)
+		end
+		gunCtrl._silentAimHooked = true
+		silentGunAimHooked = true
+	end
+
 	local function installGunSilentAimHook()
-		if not silentActive or not initPackets() then
+		if not initPackets() then
 			return
 		end
 		local packet = Packets[GUN_PACKET_NAME]
@@ -5960,9 +5150,9 @@ run(function()
 			local packed = table.pack(...)
 			if silentActive and typeof(packed[6]) == 'Vector3' then
 				local root = getLocalRoot()
-				local _, part = getSilentTarget(root and root.Position or packed[6])
+				local _, part = getSilentTarget(root and root.Position)
 				if part and root then
-					packed[6] = (part.Position - root.Position).Unit
+					packed[6] = safeAimDirection(root.Position, part.Position, packed[6])
 				end
 			end
 			return oldFire(firePacket, table.unpack(packed, 1, packed.n))
@@ -5970,30 +5160,35 @@ run(function()
 	end
 
 	local function installSilentHooks()
-		if silentRaycastHooked or not hookfunction then
+		installGunAimHook()
+		if silentRaycastHooked or not hookmetamethod then
 			return
 		end
-		local wsRaycast = workspace.Raycast
-		if type(wsRaycast) ~= 'function' then
-			return
-		end
-		local ok, original = pcall(function()
-			return hookfunction(wsRaycast, function(origin, direction, params, ...)
-				if checkcaller() or not silentActive or not isRedlinerCombatRaycast(params) then
-					return silentOldRaycast(origin, direction, params, ...)
+		local ok, result = pcall(function()
+			return hookmetamethod(workspace, '__namecall', function(self, ...)
+				local method = getnamecallmethod()
+				if method ~= 'Raycast' or self ~= workspaceService then
+					return silentOldNamecall(self, ...)
+				end
+				if checkcaller() or not silentActive or not silentAllowCombatScript(getcallingscript()) then
+					return silentOldNamecall(self, ...)
+				end
+				local origin, direction, params = ...
+				if not isRedlinerCombatRaycast(params) then
+					return silentOldNamecall(self, ...)
 				end
 				local _, part = getSilentTarget(origin)
 				if part and typeof(direction) == 'Vector3' then
-					direction = (part.Position - origin).Unit * direction.Magnitude
+					direction = safeAimDirection(origin, part.Position, direction) * direction.Magnitude
 				end
-				return silentOldRaycast(origin, direction, params, ...)
+				return silentOldNamecall(self, origin, direction, params)
 			end)
 		end)
-		if ok and type(original) == 'function' then
-			silentOldRaycast = original
+		if ok then
+			silentOldNamecall = result
 			silentRaycastHooked = true
 		else
-			warn('[REDLINER] Silent Aim raycast hook failed:', original)
+			warn('[REDLINER] Silent Aim raycast hook failed:', result)
 		end
 	end
 
@@ -6006,7 +5201,8 @@ run(function()
 				bindPacketListeners()
 				installSilentHooks()
 				installGunSilentAimHook()
-				notif('Silent Aim', 'Combat raycast + gun packet hooks active (safe mode).', 5)
+				task.defer(installGunAimHook)
+				notif('Silent Aim', 'Gun aim + combat raycast hooks active.', 5)
 			end
 		end,
 		Tooltip = 'Hooks combat raycasts and gun packet aim. Does not touch camera/character scripts.',
@@ -6042,94 +5238,6 @@ run(function()
 		Suffix = '%',
 	})
 
-	local AnimLogger
-	AnimLogger = extras:CreateModule({
-		Name = 'Animation Logger',
-		Function = function(callback)
-			if callback then
-				local ok, err = AnimLog.beginSession(false)
-				if not ok then
-					return
-				end
-				AnimLog.active = true
-				AnimLog.startWatchers()
-				if err then
-					notif('Animation Logger', 'File write failed — logging to console. ' .. err, 10, 'warning')
-				else
-					notif('Animation Logger', AnimLog.filePath .. ' (' .. AnimLog.getExecutorName() .. ' workspace)', 8)
-				end
-			else
-				AnimLog.stop()
-			end
-		end,
-		Tooltip = 'Writes played animations to a text file. File is in your executor workspace, not this repo folder.',
-	})
-
-	AnimLogger:CreateToggle({
-		Name = 'Log Local',
-		Default = false,
-		Function = function(callback)
-			AnimLog.logLocal = callback
-			if AnimLog.active then
-				AnimLog.refreshWatchers()
-			end
-		end,
-		Tooltip = 'Include your own character animations in the log.',
-	})
-
-	AnimLogger:CreateToggle({
-		Name = 'Log Enemies',
-		Default = true,
-		Function = function(callback)
-			AnimLog.logEnemies = callback
-			if AnimLog.active then
-				AnimLog.refreshWatchers()
-			end
-		end,
-		Tooltip = 'Include enemy player animations in the log.',
-	})
-
-	AnimLogger:CreateButton({
-		Name = 'Dump Catalog',
-		Function = function()
-			local path, err = AnimLog.dumpCatalog()
-			if err then
-				notif('Animation Logger', 'Catalog dump failed — check console. ' .. err, 8, 'warning')
-			else
-				notif('Animation Logger', 'Catalog written to ' .. path, 6)
-			end
-		end,
-		Tooltip = 'Scan ReplicatedStorage/workspace for Animation instances and append to log.',
-	})
-
-	AnimLogger:CreateButton({
-		Name = 'New Session',
-		Function = function()
-			local ok, err = AnimLog.beginSession(true)
-			if not ok then
-				return
-			end
-			if AnimLog.active then
-				AnimLog.startWatchers()
-			end
-			if err then
-				notif('Animation Logger', 'New session (console mirror). ' .. err, 8, 'warning')
-			else
-				notif('Animation Logger', 'New session: ' .. AnimLog.filePath, 6)
-			end
-		end,
-		Tooltip = 'Clears the log file and writes a fresh header + catalog.',
-	})
-
-	AnimLogger:CreateButton({
-		Name = 'Flush Now',
-		Function = function()
-			AnimLog.flush(true)
-			notif('Animation Logger', 'Buffer flushed to ' .. (AnimLog.filePath ~= '' and AnimLog.filePath or AnimLog.getFilePath()), 4)
-		end,
-		Tooltip = 'Immediately write buffered events to the log file.',
-	})
-
 	local combatBound = false
 	local function bindCombatLoop()
 		if combatBound then
@@ -6141,10 +5249,10 @@ run(function()
 
 		runService.Heartbeat:Connect(function()
 			if not AutoParry.Enabled and not AutoAttack.Enabled and not Reach.Enabled
-				and not KillAura.Enabled and not hud.drawTimerEnabled and not hud.threatIndicatorEnabled
+				and not KillAura.Enabled and not hud.drawTimerEnabled
 				and not hud.bulletWarningsEnabled and not hud.impactEspEnabled
-				and not hud.aimlockDetectorEnabled
-				and not hud.breakTimerEnabled and not noBreakScreenEnabled and not destabilizeBypassEnabled
+				and not hud.healthEspEnabled and not hud.aimlockDetectorEnabled
+				and not hud.breakTimerEnabled
 				and not hud.hitboxVisualizerEnemyEnabled and not hud.hitboxVisualizerSwingEnabled
 				and not hud.hitboxVisualizerBulletEnabled and not reachDebugEnabled then
 				return
@@ -6160,8 +5268,7 @@ run(function()
 	local REDLINER_PROFILE_MODULES = {
 		'Auto Parry', 'Auto Attack', 'Reach',
 		'Draw Timer', 'Bullet Warnings', 'Impact ESP', 'Health ESP', 'Aimlock Detector',
-		'Threat Indicator', 'Hitbox Visualizer', 'Kill Aura', 'Silent Aim',
-		'Animation Logger', 'No Break Screen',
+		'Hitbox Visualizer', 'Kill Aura', 'Silent Aim',
 	}
 
 	local function applyRedlinerProfileModules()
@@ -6198,6 +5305,6 @@ run(function()
 		repeat
 			task.wait(0.25)
 		until vape.Loaded or tick() - start > 20
-		notif('REDLINER', 'Extras: silent aim, kill aura packets, world ESP, aimlock tracers, and combat tools ready.', 6)
+		notif('REDLINER', 'Extras loaded: silent aim, reach, kill aura, ESP, and aimlock ready.', 6)
 	end)
 end)
