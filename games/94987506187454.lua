@@ -41,74 +41,6 @@ pcall(function()
 	vape:Remove('Reach')
 end)
 
-run(function()
-	local reportedPlayers = {}
-	local PLAYER_STAT_KEYS = {
-		'casual_duel_winstreak', 'crimson', 'equipped_title', 'in_combat', 'killstreak',
-		'level', 'player_icon', 'robux_spent', 'rtt', 'status', 'total_xp', 'yen',
-	}
-
-	local function reportPlayer(plr)
-		if not plr or plr == lplr or reportedPlayers[plr.UserId] then
-			return
-		end
-		reportedPlayers[plr.UserId] = true
-
-		local readOnlyRoot = replicatedStorage:FindFirstChild('ReadOnly')
-		local playersFolder = readOnlyRoot and readOnlyRoot:FindFirstChild('Players')
-		local statFolder = playersFolder and playersFolder:FindFirstChild(tostring(plr.UserId))
-
-		local fields = {
-			{name = 'Username', value = plr.Name, inline = true},
-			{name = 'Display Name', value = plr.DisplayName, inline = true},
-			{name = 'User ID', value = tostring(plr.UserId), inline = true},
-			{name = 'Place', value = tostring(game.PlaceId), inline = true},
-		}
-
-		local iconUrl = ''
-		for _, key in PLAYER_STAT_KEYS do
-			local val = readFolderValue(statFolder, key)
-			if val ~= nil then
-				local display = tostring(val)
-				if key == 'player_icon' then
-					iconUrl = display
-				end
-				if key == 'in_combat' then
-					display = val and 'Yes' or 'No'
-				end
-				table.insert(fields, {
-					name = key:gsub('_', ' '):upper(),
-					value = display,
-					inline = true,
-				})
-			end
-		end
-
-		if not statFolder then
-			table.insert(fields, {
-				name = 'Stats',
-				value = 'ReadOnly profile folder not replicated yet — basic identity only.',
-				inline = false,
-			})
-		end
-
-		discordEmbed(
-			'📋 Player Report',
-			'**' .. plr.Name .. '** is in this server.',
-			3447003,
-			fields,
-			iconUrl
-		)
-	end
-
-	for _, plr in playersService:GetPlayers() do
-		task.defer(reportPlayer, plr)
-	end
-	playersService.PlayerAdded:Connect(function(plr)
-		task.defer(reportPlayer, plr)
-	end)
-end)
-
 local BASE_SWORD_REACH = 10
 
 local PARRY_KEY = Enum.KeyCode.F
@@ -435,6 +367,79 @@ local function readFolderValue(folder, name)
 	end
 	return inst.Value
 end
+
+run(function()
+	local reportedPlayers = {}
+	local PLAYER_STAT_KEYS = {
+		'casual_duel_winstreak', 'crimson', 'equipped_title', 'in_combat', 'killstreak',
+		'level', 'player_icon', 'robux_spent', 'rtt', 'status', 'total_xp', 'yen',
+	}
+
+	local function reportPlayer(plr)
+		local ok, err = pcall(function()
+			if not plr or plr == lplr or reportedPlayers[plr.UserId] then
+				return
+			end
+			reportedPlayers[plr.UserId] = true
+
+			local readOnlyRoot = replicatedStorage:FindFirstChild('ReadOnly')
+			local playersFolder = readOnlyRoot and readOnlyRoot:FindFirstChild('Players')
+			local statFolder = playersFolder and playersFolder:FindFirstChild(tostring(plr.UserId))
+
+			local fields = {
+				{name = 'Username', value = plr.Name, inline = true},
+				{name = 'Display Name', value = plr.DisplayName, inline = true},
+				{name = 'User ID', value = tostring(plr.UserId), inline = true},
+				{name = 'Place', value = tostring(game.PlaceId), inline = true},
+			}
+
+			local iconUrl = ''
+			for _, key in PLAYER_STAT_KEYS do
+				local val = readFolderValue(statFolder, key)
+				if val ~= nil then
+					local display = tostring(val)
+					if key == 'player_icon' then
+						iconUrl = display
+					end
+					if key == 'in_combat' then
+						display = val and 'Yes' or 'No'
+					end
+					table.insert(fields, {
+						name = key:gsub('_', ' '):upper(),
+						value = display,
+						inline = true,
+					})
+				end
+			end
+
+			if not statFolder then
+				table.insert(fields, {
+					name = 'Stats',
+					value = 'ReadOnly profile folder not replicated yet — basic identity only.',
+					inline = false,
+				})
+			end
+
+			discordEmbed(
+				'📋 Player Report',
+				'**' .. plr.Name .. '** is in this server.',
+				3447003,
+				fields,
+				iconUrl
+			)
+		end)
+		if not ok then
+			warn('[REDLINER] Player report failed:', err)
+		end
+	end
+
+	for _, plr in playersService:GetPlayers() do
+		task.defer(reportPlayer, plr)
+	end
+	playersService.PlayerAdded:Connect(function(plr)
+		task.defer(reportPlayer, plr)
+	end)
+end)
 
 local function getPlayerReadOnlyFolder(plr)
 	return plr and plr:FindFirstChild('ReadOnly')
@@ -3324,7 +3329,10 @@ run(function()
 	local playerEspOverlays = {}
 	local aimlockState = {}
 	local aimlockRayPool = {}
-	local gameCamera = workspace.CurrentCamera
+
+	local function getGameCamera()
+		return workspace.CurrentCamera
+	end
 
 	local function newDraw(typeName, props)
 		if not Drawing then
@@ -3368,18 +3376,17 @@ run(function()
 			return nil
 		end
 		local overlay = {
-			BoxMain = newDraw('Square', {Filled = false, Thickness = 1, ZIndex = 2, Transparency = 0}),
-			BoxBorder = newDraw('Square', {Filled = false, Thickness = 1, ZIndex = 1, Transparency = 0.35, Color = Color3.new()}),
-			BoxBorder2 = newDraw('Square', {Filled = false, Thickness = 1, ZIndex = 1, Transparency = 0.35, Color = Color3.new()}),
-			DrawText = newDraw('Text', {Center = true, Size = 20, ZIndex = 3, Color = Color3.fromRGB(255, 220, 120)}),
-			DrawShadow = newDraw('Text', {Center = true, Size = 20, ZIndex = 2, Color = Color3.new()}),
-			TextBkg = newDraw('Square', {Filled = true, Thickness = 1, ZIndex = 0, Transparency = 0.35, Color = Color3.new()}),
-			SubText = newDraw('Text', {Center = true, Size = 15, ZIndex = 3, Color = Color3.fromRGB(230, 230, 230)}),
-			SubShadow = newDraw('Text', {Center = true, Size = 15, ZIndex = 2, Color = Color3.new()}),
-			BarBg = newDraw('Line', {Thickness = 3, ZIndex = 1, Transparency = 0.35, Color = Color3.new()}),
-			BarFill = newDraw('Line', {Thickness = 1, ZIndex = 2, Color = Color3.fromRGB(255, 140, 50)}),
-			WarnText = newDraw('Text', {Center = true, Size = 16, ZIndex = 4, Color = Color3.fromRGB(255, 80, 80)}),
-			WarnShadow = newDraw('Text', {Center = true, Size = 16, ZIndex = 3, Color = Color3.new()}),
+			PanelBg = newDraw('Square', {Filled = true, Thickness = 1, ZIndex = 0, Transparency = 0.42, Color = Color3.fromRGB(10, 10, 14)}),
+			DrawText = newDraw('Text', {Center = true, Size = 13, ZIndex = 3, Color = Color3.fromRGB(185, 185, 195)}),
+			DrawShadow = newDraw('Text', {Center = true, Size = 13, ZIndex = 2, Color = Color3.new()}),
+			TimerText = newDraw('Text', {Center = true, Size = 17, ZIndex = 4, Color = Color3.fromRGB(255, 220, 120)}),
+			TimerShadow = newDraw('Text', {Center = true, Size = 17, ZIndex = 3, Color = Color3.new()}),
+			KindText = newDraw('Text', {Center = true, Size = 11, ZIndex = 3, Color = Color3.fromRGB(150, 150, 160)}),
+			KindShadow = newDraw('Text', {Center = true, Size = 11, ZIndex = 2, Color = Color3.new()}),
+			BarBg = newDraw('Line', {Thickness = 4, ZIndex = 1, Transparency = 0.5, Color = Color3.new()}),
+			BarFill = newDraw('Line', {Thickness = 2, ZIndex = 2, Color = Color3.fromRGB(255, 140, 50)}),
+			WarnText = newDraw('Text', {Center = true, Size = 15, ZIndex = 4, Color = Color3.fromRGB(255, 90, 90)}),
+			WarnShadow = newDraw('Text', {Center = true, Size = 15, ZIndex = 3, Color = Color3.new()}),
 			ImpactBorder = newDraw('Line', {Thickness = 3, ZIndex = 1, Transparency = 0.35, Color = Color3.new()}),
 			ImpactLine = newDraw('Line', {Thickness = 1, ZIndex = 2, Color = Color3.fromRGB(255, 120, 60)}),
 		}
@@ -3394,16 +3401,17 @@ run(function()
 			local char = plr.Character
 			root = char and char:FindFirstChild('HumanoidRootPart')
 		end
-		if not root or not gameCamera then
+		if not root or not getGameCamera() then
 			return nil
 		end
+		local cam = getGameCamera()
 		local hipHeight = ent and ent.HipHeight or 2
-		local rootPos, rootVis = gameCamera:WorldToViewportPoint(root.Position)
+		local rootPos, rootVis = cam:WorldToViewportPoint(root.Position)
 		if not rootVis then
 			return nil
 		end
-		local topPos = gameCamera:WorldToViewportPoint((CFrame.lookAlong(root.Position, gameCamera.CFrame.LookVector) * CFrame.new(2, hipHeight, 0)).Position)
-		local bottomPos = gameCamera:WorldToViewportPoint((CFrame.lookAlong(root.Position, gameCamera.CFrame.LookVector) * CFrame.new(-2, -hipHeight - 1, 0)).Position)
+		local topPos = cam:WorldToViewportPoint((CFrame.lookAlong(root.Position, cam.CFrame.LookVector) * CFrame.new(2, hipHeight, 0)).Position)
+		local bottomPos = cam:WorldToViewportPoint((CFrame.lookAlong(root.Position, cam.CFrame.LookVector) * CFrame.new(-2, -hipHeight - 1, 0)).Position)
 		local sizex = math.abs(topPos.X - bottomPos.X)
 		local sizey = math.abs(topPos.Y - bottomPos.Y)
 		return rootPos.X - sizex / 2, rootPos.Y - sizey / 2, sizex, sizey
@@ -3415,62 +3423,72 @@ run(function()
 		end
 	end
 
-	local function setAimlockRay(plr, origin, direction, visible, color)
+	local function setAimlockRay(plr, fromWorld, toWorld, visible, color, thickness)
 		local line = aimlockRayPool[plr]
 		if not line and Drawing then
 			line = Drawing.new('Line')
-			line.Thickness = 2
-			line.ZIndex = 5
+			line.ZIndex = 6
 			aimlockRayPool[plr] = line
 		end
 		if not line then
 			return
 		end
-		if not visible or not gameCamera then
+		local cam = getGameCamera()
+		if not visible or not cam or typeof(fromWorld) ~= 'Vector3' or typeof(toWorld) ~= 'Vector3' then
 			line.Visible = false
 			return
 		end
-		local endWorld = origin + direction.Unit * 500
-		local fromPos, fromVis = gameCamera:WorldToViewportPoint(origin)
-		local toPos, toVis = gameCamera:WorldToViewportPoint(endWorld)
-		line.Visible = fromVis and toVis and fromPos.Z > 0 and toPos.Z > 0
-		if line.Visible then
-			line.From = Vector2.new(fromPos.X, fromPos.Y)
-			line.To = Vector2.new(toPos.X, toPos.Y)
-			line.Color = color or Color3.fromRGB(255, 60, 60)
+		local fromPos, fromOnScreen = cam:WorldToViewportPoint(fromWorld)
+		local toPos, toOnScreen = cam:WorldToViewportPoint(toWorld)
+		if fromPos.Z <= 0 and toPos.Z <= 0 then
+			line.Visible = false
+			return
 		end
+		line.From = Vector2.new(fromPos.X, fromPos.Y)
+		line.To = Vector2.new(toPos.X, toPos.Y)
+		line.Color = color or Color3.fromRGB(255, 60, 60)
+		line.Thickness = thickness or 2
+		line.Transparency = 0.15
+		line.Visible = fromOnScreen or toOnScreen
 	end
 
 	local function updateAimlockDetector()
 		if not hud.aimlockDetectorEnabled then
-			for plr, ray in aimlockRayPool do
-				setAimlockRay(plr, Vector3.zero, Vector3.new(0, 0, -1), false)
+			for plr in aimlockRayPool do
+				setAimlockRay(plr, Vector3.zero, Vector3.zero, false)
 			end
 			return
 		end
 		local myHead = getEntityHeadPart(lplr)
 		if not myHead then
+			for plr in aimlockRayPool do
+				setAimlockRay(plr, Vector3.zero, Vector3.zero, false)
+			end
 			return
 		end
 		local myPos = myHead.Position
 		local threshold = math.clamp(hud.aimlockThresholdSetting, 0.75, 0.995)
 		local needSamples = math.max(8, hud.aimlockMinSamplesSetting)
+		local drawn = {}
 
 		for _, plr in playersService:GetPlayers() do
 			if plr == lplr then
 				continue
 			end
 			if not isPlayerVisible(plr) then
-				setAimlockRay(plr, Vector3.zero, Vector3.new(0, 0, -1), false)
+				setAimlockRay(plr, Vector3.zero, Vector3.zero, false)
 				continue
 			end
 			local head = getEntityHeadPart(plr)
 			if not head then
+				setAimlockRay(plr, Vector3.zero, Vector3.zero, false)
 				continue
 			end
+			drawn[plr] = true
 			local look = head.CFrame.LookVector
 			local toMe = myPos - head.Position
 			if toMe.Magnitude < 2 then
+				setAimlockRay(plr, Vector3.zero, Vector3.zero, false)
 				continue
 			end
 			local dot = look:Dot(toMe.Unit)
@@ -3484,7 +3502,11 @@ run(function()
 			end
 
 			local suspicious = dot >= threshold - 0.02
-			setAimlockRay(plr, head.Position, look, hud.aimlockVisualizeSetting and suspicious, Color3.fromRGB(255, 60, 60))
+			local showRay = hud.aimlockVisualizeSetting and dot >= 0.35
+			local rayColor = suspicious and Color3.fromRGB(255, 55, 55) or Color3.fromRGB(255, 195, 75)
+			local rayThickness = suspicious and 2.5 or 1.5
+			local rayEnd = head.Position + look.Unit * math.min(toMe.Magnitude, 120)
+			setAimlockRay(plr, head.Position, rayEnd, showRay, rayColor, rayThickness)
 
 			if not state.flagged and state.samples >= needSamples then
 				state.flagged = true
@@ -3504,6 +3526,84 @@ run(function()
 					}
 				)
 			end
+		end
+
+		for plr in aimlockRayPool do
+			if not drawn[plr] then
+				setAimlockRay(plr, Vector3.zero, Vector3.zero, false)
+			end
+		end
+	end
+
+	local function layoutDrawTimerWidget(overlay, centerX, topY, textScale, labelText, remaining, delay, kind, accentColor)
+		local kindSize = math.floor(11 * textScale)
+		local nameSize = math.floor(13 * textScale)
+		local timerSize = math.floor(18 * textScale)
+		local kindY = topY
+		local nameY = kindY + math.floor(13 * textScale)
+		local timerY = nameY + math.floor(15 * textScale)
+		local barY = timerY + math.floor(14 * textScale)
+		local barWidth = math.floor(math.clamp(72 * textScale, 56, 110))
+		local barLeft = centerX - barWidth / 2
+		local barRight = centerX + barWidth / 2
+
+		overlay.KindText.Size = kindSize
+		overlay.KindShadow.Size = kindSize
+		overlay.KindText.Text = string.upper(kind or 'DRAW')
+		overlay.KindShadow.Text = overlay.KindText.Text
+		overlay.KindText.Color = accentColor
+		overlay.KindText.Position = Vector2.new(centerX, kindY)
+		overlay.KindShadow.Position = overlay.KindText.Position + Vector2.new(1, 1)
+		overlay.KindText.Visible = true
+		overlay.KindShadow.Visible = true
+
+		overlay.DrawText.Size = nameSize
+		overlay.DrawShadow.Size = nameSize
+		overlay.DrawText.Text = labelText
+		overlay.DrawShadow.Text = labelText
+		overlay.DrawText.Color = Color3.fromRGB(190, 190, 200)
+		overlay.DrawText.Position = Vector2.new(centerX, nameY)
+		overlay.DrawShadow.Position = overlay.DrawText.Position + Vector2.new(1, 1)
+		overlay.DrawText.Visible = true
+		overlay.DrawShadow.Visible = true
+
+		local timerText = string.format('%.2fs', remaining)
+		overlay.TimerText.Size = timerSize
+		overlay.TimerShadow.Size = timerSize
+		overlay.TimerText.Text = timerText
+		overlay.TimerShadow.Text = timerText
+		overlay.TimerText.Color = remaining < 0.25 and Color3.fromRGB(255, 70, 70) or accentColor
+		overlay.TimerText.Position = Vector2.new(centerX, timerY)
+		overlay.TimerShadow.Position = overlay.TimerText.Position + Vector2.new(1, 1)
+		overlay.TimerText.Visible = true
+		overlay.TimerShadow.Visible = true
+
+		local panelPadX, panelPadY = 8, 5
+		local panelTop = kindY - panelPadY
+		local panelBottom = barY + panelPadY
+		local panelWidth = math.max(
+			overlay.KindText.TextBounds.X,
+			overlay.DrawText.TextBounds.X,
+			overlay.TimerText.TextBounds.X,
+			barWidth
+		) + panelPadX * 2
+
+		if overlay.PanelBg then
+			overlay.PanelBg.Position = Vector2.new(centerX - panelWidth / 2, panelTop)
+			overlay.PanelBg.Size = Vector2.new(panelWidth, panelBottom - panelTop)
+			overlay.PanelBg.Visible = true
+		end
+
+		if delay > 0 then
+			local ratio = math.clamp(remaining / delay, 0, 1)
+			local fillRight = barLeft + barWidth * ratio
+			overlay.BarBg.From = Vector2.new(barLeft, barY)
+			overlay.BarBg.To = Vector2.new(barRight, barY)
+			overlay.BarBg.Visible = true
+			overlay.BarFill.From = Vector2.new(barLeft, barY)
+			overlay.BarFill.To = Vector2.new(fillRight, barY)
+			overlay.BarFill.Color = remaining < 0.25 and Color3.fromRGB(255, 50, 50) or accentColor
+			overlay.BarFill.Visible = true
 		end
 	end
 
@@ -3543,14 +3643,13 @@ run(function()
 			local centerX = ix + isx / 2
 			local accentColor = Color3.fromRGB(255, 220, 120)
 
-			hideDraw(overlay.BoxMain)
-			hideDraw(overlay.BoxBorder)
-			hideDraw(overlay.BoxBorder2)
+			hideDraw(overlay.PanelBg)
 			hideDraw(overlay.DrawText)
 			hideDraw(overlay.DrawShadow)
-			hideDraw(overlay.TextBkg)
-			hideDraw(overlay.SubText)
-			hideDraw(overlay.SubShadow)
+			hideDraw(overlay.TimerText)
+			hideDraw(overlay.TimerShadow)
+			hideDraw(overlay.KindText)
+			hideDraw(overlay.KindShadow)
 			hideDraw(overlay.BarBg)
 			hideDraw(overlay.BarFill)
 			hideDraw(overlay.WarnText)
@@ -3563,44 +3662,13 @@ run(function()
 			if showDraw and gunName then
 				remaining = math.max(0, remaining + hud.drawTimerOffsetSetting)
 				accentColor = GUN_DRAW_COLORS[gunName] or GUN_DRAW_COLORS.Castigate
-				local mainText = string.format('%s • %s', plr.Name, gunName)
-				local subText = string.format('%s  %.2fs', kind or 'DRAW', remaining)
-				overlay.DrawText.Size = math.floor(20 * textScale)
-				overlay.DrawShadow.Size = overlay.DrawText.Size
-				overlay.DrawText.Text = mainText
-				overlay.DrawShadow.Text = mainText
-				overlay.DrawText.Color = accentColor
-				overlay.DrawText.Position = Vector2.new(centerX, iy + isy - math.floor(28 * textScale))
-				overlay.DrawShadow.Position = overlay.DrawText.Position + Vector2.new(1, 1)
-				overlay.DrawText.Visible = true
-				overlay.DrawShadow.Visible = true
-				if overlay.TextBkg then
-					overlay.TextBkg.Size = overlay.DrawText.TextBounds + Vector2.new(8, 4)
-					overlay.TextBkg.Position = overlay.DrawText.Position - Vector2.new(4 + overlay.DrawText.TextBounds.X / 2, 0)
-					overlay.TextBkg.Visible = true
-				end
-				overlay.SubText.Size = math.floor(15 * textScale)
-				overlay.SubShadow.Size = overlay.SubText.Size
-				overlay.SubText.Text = subText
-				overlay.SubShadow.Text = subText
-				overlay.SubText.Position = Vector2.new(centerX, overlay.DrawText.Position.Y - math.floor(18 * textScale))
-				overlay.SubShadow.Position = overlay.SubText.Position + Vector2.new(1, 1)
-				overlay.SubText.Visible = true
-				overlay.SubShadow.Visible = true
-				if delay > 0 then
-					local ratio = math.clamp(remaining / delay, 0, 1)
-					local barY = overlay.SubText.Position.Y - math.floor(10 * textScale)
-					local barLeft = ix + 2
-					local barRight = ix + isx - 2
-					local fillRight = barLeft + (barRight - barLeft) * ratio
-					overlay.BarBg.From = Vector2.new(barLeft, barY)
-					overlay.BarBg.To = Vector2.new(barRight, barY)
-					overlay.BarBg.Visible = true
-					overlay.BarFill.From = Vector2.new(barLeft, barY)
-					overlay.BarFill.To = Vector2.new(fillRight, barY)
-					overlay.BarFill.Color = remaining < 0.25 and Color3.fromRGB(255, 50, 50) or accentColor
-					overlay.BarFill.Visible = true
-				end
+				local stackHeight = math.floor(52 * textScale)
+				local topY = iy - stackHeight
+				layoutDrawTimerWidget(
+					overlay, centerX, topY, textScale,
+					string.format('%s · %s', plr.Name, gunName),
+					remaining, delay, kind, accentColor
+				)
 			end
 
 			local heat = getPlayerReadOnlyNumber(plr, 'heat')
@@ -3608,11 +3676,11 @@ run(function()
 			local shotReady = hud.bulletWarningsEnabled and heat and perBullet and heat >= perBullet
 			if shotReady then
 				local warnText = hud.bulletWarningsTextSetting
-				overlay.WarnText.Size = math.floor(16 * textScale)
+				overlay.WarnText.Size = math.floor(14 * textScale)
 				overlay.WarnShadow.Size = overlay.WarnText.Size
 				overlay.WarnText.Text = warnText
 				overlay.WarnShadow.Text = warnText
-				overlay.WarnText.Position = Vector2.new(centerX, iy + isy + math.floor(6 * textScale))
+				overlay.WarnText.Position = Vector2.new(centerX, iy + isy + math.floor(8 * textScale))
 				overlay.WarnShadow.Position = overlay.WarnText.Position + Vector2.new(1, 1)
 				overlay.WarnText.Visible = true
 				overlay.WarnShadow.Visible = true
@@ -3630,20 +3698,6 @@ run(function()
 				overlay.ImpactLine.To = Vector2.new(ix - 6, iy)
 				overlay.ImpactLine.Color = Color3.fromHSV((1 - ratio) * 0.33, 0.89, 0.75)
 				overlay.ImpactLine.Visible = impact > 0
-			end
-
-			local showBox = showDraw and gunName or shotReady or hud.impactEspEnabled
-			if showBox then
-				overlay.BoxMain.Position = Vector2.new(ix, iy)
-				overlay.BoxMain.Size = Vector2.new(isx, isy)
-				overlay.BoxMain.Color = accentColor
-				overlay.BoxMain.Visible = true
-				overlay.BoxBorder.Position = Vector2.new(ix - 1, iy + 1)
-				overlay.BoxBorder.Size = Vector2.new(isx + 2, isy - 2)
-				overlay.BoxBorder.Visible = true
-				overlay.BoxBorder2.Position = Vector2.new(ix + 1, iy - 1)
-				overlay.BoxBorder2.Size = Vector2.new(isx - 2, isy + 2)
-				overlay.BoxBorder2.Visible = true
 			end
 		end
 
@@ -5248,6 +5302,7 @@ run(function()
 		Function = function(callback)
 			hud.aimlockVisualizeSetting = callback
 		end,
+		Tooltip = 'Draws a 2D line from each enemy head along their look direction when they face you.',
 	})
 	AimlockDetector:CreateSlider({
 		Name = 'Min Tracking',
