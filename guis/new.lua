@@ -358,59 +358,28 @@ end
 local function makeBrandLogo(config)
 	local textSize = config.TextSize or 14
 	local textHeight = config.TextHeight or 18
-	local pumaSize = config.PumaSize or 16
 	local textColor = config.TextColor or Color3.new(1, 1, 1)
 
 	local container = Instance.new('Frame')
 	container.Name = config.Name or 'VapeLogo'
-	container.Size = config.Size or UDim2.fromOffset(92, 20)
+	container.Size = config.Size or UDim2.fromOffset(72, 20)
 	container.Position = config.Position or UDim2.fromOffset(0, 0)
 	container.BackgroundTransparency = 1
 	container.BorderSizePixel = 0
 	container.ClipsDescendants = false
 
-	local layout = Instance.new('UIListLayout')
-	layout.FillDirection = Enum.FillDirection.Horizontal
-	layout.VerticalAlignment = Enum.VerticalAlignment.Center
-	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Padding = UDim.new(0, 3)
-	layout.Parent = container
+	local brand = Instance.new('TextLabel')
+	brand.Name = 'BrandText'
+	brand.BackgroundTransparency = 1
+	brand.Size = UDim2.new(1, 0, 0, textHeight)
+	brand.AutomaticSize = Enum.AutomaticSize.X
+	brand.Font = Enum.Font.GothamBold
+	brand.Text = 'Priv v9'
+	brand.TextSize = textSize
+	brand.TextColor3 = textColor
+	brand.Parent = container
 
-	local puma = Instance.new('ImageLabel')
-	puma.Name = 'PumaLogo'
-	puma.LayoutOrder = 1
-	puma.Size = UDim2.fromOffset(pumaSize, pumaSize)
-	puma.BackgroundTransparency = 1
-	puma.Image = getcustomasset('newvape/assets/new/guipuma.png')
-	puma.ScaleType = Enum.ScaleType.Fit
-	puma.Parent = container
-
-	local priv = Instance.new('TextLabel')
-	priv.Name = 'PrivText'
-	priv.LayoutOrder = 2
-	priv.BackgroundTransparency = 1
-	priv.Size = UDim2.fromOffset(0, textHeight)
-	priv.AutomaticSize = Enum.AutomaticSize.X
-	priv.Font = Enum.Font.GothamBold
-	priv.Text = 'Priv'
-	priv.TextSize = textSize
-	priv.TextColor3 = textColor
-	priv.Parent = container
-
-	local v9 = Instance.new('TextLabel')
-	v9.Name = 'V9Logo'
-	v9.LayoutOrder = 3
-	v9.BackgroundTransparency = 1
-	v9.Size = UDim2.fromOffset(0, textHeight)
-	v9.AutomaticSize = Enum.AutomaticSize.X
-	v9.Font = Enum.Font.GothamBold
-	v9.Text = 'v9'
-	v9.TextSize = textSize
-	v9.TextColor3 = Color3.new(1, 1, 1)
-	v9.Parent = container
-
-	return container, priv, v9, puma
+	return container, brand, brand
 end
 
 local function getTableSize(tab)
@@ -1325,9 +1294,7 @@ components = {
 		
 		function optionapi:Load(tab)
 			local newval = tab.Value == tab.Max and tab.Max ~= self.Max and self.Max or tab.Value
-			if self.Value ~= newval then
-				self:SetValue(newval, nil, true)
-			end
+			self:SetValue(newval, nil, true)
 		end
 		
 		function optionapi:Color(hue, sat, val, rainbowcheck)
@@ -2585,11 +2552,10 @@ function mainapi:CreateGUI()
 	makeDraggable(window)
 	local logo = makeBrandLogo({
 		Name = 'VapeLogo',
-		Size = UDim2.fromOffset(78, 18),
+		Size = UDim2.fromOffset(64, 18),
 		Position = UDim2.fromOffset(11, 10),
 		TextSize = 13,
 		TextHeight = 16,
-		PumaSize = 14,
 		TextColor = select(3, uipallet.Main:ToHSV()) > 0.5 and uipallet.Text or Color3.new(1, 1, 1),
 	})
 	logo.Parent = window
@@ -5788,23 +5754,20 @@ function mainapi:Load(skipgui, profile)
 	self.Categories.Main.Options.Bind:SetBind(self.Keybind)
 
 	if inputService.TouchEnabled and #self.Keybind == 1 and self.Keybind[1] == 'RightShift' then
-		local button = Instance.new('TextButton')
-		button.Size = UDim2.fromOffset(32, 32)
-		button.Position = UDim2.new(1, -90, 0, 4)
-		button.BackgroundColor3 = Color3.new()
-		button.BackgroundTransparency = 0.5
-		button.Text = ''
-		button.Parent = gui
-		local image = Instance.new('ImageLabel')
-		image.Size = UDim2.fromOffset(26, 26)
-		image.Position = UDim2.fromOffset(3, 3)
-		image.BackgroundTransparency = 1
-		image.Image = getcustomasset('newvape/assets/new/guipuma.png')
-		image.Parent = button
+		local label = Instance.new('TextLabel')
+		label.Size = UDim2.fromOffset(32, 32)
+		label.Position = UDim2.new(1, -90, 0, 4)
+		label.BackgroundColor3 = Color3.new()
+		label.BackgroundTransparency = 0.5
+		label.Text = 'Pv9'
+		label.TextColor3 = Color3.new(1, 1, 1)
+		label.TextSize = 11
+		label.Font = Enum.Font.GothamBold
+		label.Parent = gui
 		local buttoncorner = Instance.new('UICorner')
-		buttoncorner.Parent = button
-		self.VapeButton = button
-		button.MouseButton1Click:Connect(function()
+		buttoncorner.Parent = label
+		self.VapeButton = label
+		label.MouseButton1Click:Connect(function()
 			if self.ThreadFix then
 				setthreadidentity(8)
 			end
@@ -5821,6 +5784,54 @@ function mainapi:Load(skipgui, profile)
 			self:BlurCheck()
 		end)
 	end
+end
+
+function mainapi:SyncModuleOptions(module)
+	if not module or not module.Options then
+		return
+	end
+	for _, opt in module.Options do
+		if opt.Type == 'Toggle' then
+			opt.Function(opt.Enabled)
+		elseif opt.Type == 'Slider' or opt.Type == 'TwoSlider' then
+			opt.Function(opt.Value, true)
+		elseif opt.Type == 'Dropdown' then
+			opt.Function(opt.Value)
+		elseif opt.Type == 'TextBox' then
+			opt.Function(opt.Value, true)
+		elseif opt.Type == 'ColorSlider' then
+			opt:SetValue(opt.Hue, opt.Sat, opt.Value, opt.Opacity)
+		end
+	end
+end
+
+function mainapi:ApplyModuleProfile(name)
+	local module = self.Modules[name]
+	if not module then
+		return
+	end
+	local profilePath = self:GetProfileConfigPath(self.Profile, self.Place)
+	if not isfile(profilePath) then
+		return
+	end
+	local savedata = loadJson(profilePath)
+	if not savedata or not savedata.Modules then
+		return
+	end
+	local saved = savedata.Modules[name]
+	if not saved then
+		return
+	end
+	if saved.Options then
+		self:LoadOptions(module, saved.Options)
+	end
+	if saved.Bind then
+		module:SetBind(saved.Bind)
+	end
+	if saved.Enabled ~= module.Enabled then
+		module:Toggle(true)
+	end
+	self:SyncModuleOptions(module)
 end
 
 function mainapi:LoadOptions(object, savedoptions)
@@ -6078,16 +6089,16 @@ mainapi:CreateCategory({
 	Size = UDim2.fromOffset(14, 14)
 })
 mainapi:CreateCategory({
+	Name = 'Minigames',
+	Icon = getcustomasset('newvape/assets/new/miniicon.png'),
+	Size = UDim2.fromOffset(19, 12)
+})
+mainapi:CreateCategory({
 	Name = 'Extras',
 	Icon = getcustomasset('newvape/assets/new/inventoryicon.png'),
 	Size = UDim2.fromOffset(15, 14)
 })
 mainapi.Categories.Inventory = mainapi.Categories.Extras
-mainapi:CreateCategory({
-	Name = 'Minigames',
-	Icon = getcustomasset('newvape/assets/new/miniicon.png'),
-	Size = UDim2.fromOffset(19, 12)
-})
 mainapi.Categories.Main:CreateDivider('misc')
 
 --[[
@@ -6396,8 +6407,8 @@ guipane:CreateButton({
 			RenderCategory = 4,
 			UtilityCategory = 5,
 			WorldCategory = 6,
-			ExtrasCategory = 7,
-			MinigamesCategory = 8,
+			ExtrasCategory = 8,
+			MinigamesCategory = 7,
 			FriendsCategory = 9,
 			ProfilesCategory = 10
 		}
@@ -6692,13 +6703,12 @@ textguicolorcustom = textgui:CreateColorSlider({
 ]]
 
 local VapeLabels = {}
-local VapeLogo, VapeLogoPriv, VapeLogoV9 = makeBrandLogo({
+local VapeLogo, VapeLogoBrand = makeBrandLogo({
 	Name = 'Logo',
-	Size = UDim2.fromOffset(95, 21),
-	Position = UDim2.new(1, -142, 0, 3),
+	Size = UDim2.fromOffset(72, 21),
+	Position = UDim2.new(1, -120, 0, 3),
 	TextSize = 15,
 	TextHeight = 21,
-	PumaSize = 17,
 })
 VapeLogo.Visible = false
 VapeLogo.Parent = textgui.Children
@@ -6724,19 +6734,12 @@ for _, child in VapeLogoShadow:GetChildren() do
 		child.TextColor3 = Color3.new()
 		child.TextTransparency = 0.65
 		child.ZIndex = 0
-	elseif child:IsA('ImageLabel') and child.Name == 'PumaLogo' then
-		child.ImageColor3 = Color3.new()
-		child.ImageTransparency = 0.65
-		child.ZIndex = 0
 	end
 end
 VapeLogoShadow.Parent = VapeLogo
 local VapeLogoGradient = Instance.new('UIGradient')
 VapeLogoGradient.Rotation = 90
-VapeLogoGradient.Parent = VapeLogoPriv
-local VapeLogoGradient2 = Instance.new('UIGradient')
-VapeLogoGradient2.Rotation = 90
-VapeLogoGradient2.Parent = VapeLogoV9
+VapeLogoGradient.Parent = VapeLogoBrand
 local VapeLabelCustom = Instance.new('TextLabel')
 VapeLabelCustom.Position = UDim2.fromOffset(5, 2)
 VapeLabelCustom.BackgroundTransparency = 1
@@ -7321,10 +7324,9 @@ function mainapi:UpdateGUI(hue, sat, val, default)
 			ColorSequenceKeypoint.new(0, Color3.fromHSV(hue, sat, val)),
 			ColorSequenceKeypoint.new(1, textguigradient.Enabled and Color3.fromHSV(mainapi:Color((hue - 0.075) % 1)) or Color3.fromHSV(hue, sat, val))
 		})
-		VapeLogoGradient2.Color = textguigradient.Enabled and textguigradientv4.Enabled and VapeLogoGradient.Color or ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
-			ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))
-		})
+		if not textguigradient.Enabled or not textguigradientv4.Enabled then
+			VapeLogoBrand.TextColor3 = VapeLogoGradient.Color.Keypoints[1].Value
+		end
 		VapeLabelCustom.TextColor3 = textguicolorcustomtoggle.Enabled and Color3.fromHSV(textguicolorcustom.Hue, textguicolorcustom.Sat, textguicolorcustom.Value) or VapeLogoGradient.Color.Keypoints[2].Value
 
 		local customcolor = textguicolordrop.Value == 'Custom color' and Color3.fromHSV(textguicolor.Hue, textguicolor.Sat, textguicolor.Value) or nil
@@ -7344,8 +7346,10 @@ function mainapi:UpdateGUI(hue, sat, val, default)
 
 	for i, v in mainapi.Categories do
 		if i == 'Main' then
-			v.Object.VapeLogo.V9Logo.TextColor3 = Color3.fromHSV(hue, sat, val)
-			v.Object.VapeLogo.PumaLogo.ImageColor3 = Color3.fromHSV(hue, sat, val)
+			local brand = v.Object.VapeLogo:FindFirstChild('BrandText')
+			if brand then
+				brand.TextColor3 = Color3.fromHSV(hue, sat, val)
+			end
 			for _, button in v.Buttons do
 				if button.Enabled then
 					button.Object.TextColor3 = rainbow and Color3.fromHSV(mainapi:Color((hue - (button.Index * 0.025)) % 1)) or Color3.fromHSV(hue, sat, val)

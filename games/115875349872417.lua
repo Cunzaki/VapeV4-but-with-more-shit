@@ -5691,6 +5691,30 @@ run(function()
 		end)
 	end
 
+	local REDLINER_PROFILE_MODULES = {
+		'Auto Parry', 'Auto Attack', 'Reach',
+		'Draw Timer', 'Bullet Warnings', 'Impact ESP', 'Aimlock Detector',
+		'Threat Indicator', 'Hitbox Visualizer', 'Kill Aura', 'Animation Logger',
+	}
+
+	local function applyRedlinerProfileModules()
+		if not vape.Loaded then
+			return
+		end
+		for _, name in REDLINER_PROFILE_MODULES do
+			pcall(function()
+				vape:ApplyModuleProfile(name)
+			end)
+		end
+	end
+
+	task.defer(function()
+		repeat
+			task.wait()
+		until vape.Loaded
+		applyRedlinerProfileModules()
+	end)
+
 	task.defer(bindCombatLoop)
 	task.defer(function()
 		local start = tick()
