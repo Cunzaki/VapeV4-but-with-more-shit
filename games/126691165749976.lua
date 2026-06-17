@@ -3988,14 +3988,15 @@ end)
 
 run(function()
 	local AnimLog = shared.RedlinerAnimLog
-	if not vape.Categories.Minigames then
-		vape.Categories.Minigames = vape:CreateCategory({
-			Name = 'Minigames',
-			Icon = 'vape/assets/new/minigames.png'
+	local extras = vape.Categories.Extras
+	if not extras then
+		extras = vape:CreateCategory({
+			Name = 'Extras',
+			Icon = 'vape/assets/new/inventoryicon.png'
 		})
+		vape.Categories.Inventory = extras
 	end
 
-	local minigames = vape.Categories.Minigames
 	local AutoParry
 	local AutoAttack
 	local Reach
@@ -4005,7 +4006,7 @@ run(function()
 	local Debug
 	local TestParry
 
-	AutoParry = minigames:CreateModule({
+	AutoParry = extras:CreateModule({
 		Name = 'Auto Parry',
 		Function = function(callback)
 			autoParryActive = callback
@@ -4021,7 +4022,7 @@ run(function()
 		Tooltip = 'Parries nearby enemy melee swings and gun draw/shot animations (360° within Melee/Threat range).',
 	})
 
-	AutoAttack = minigames:CreateModule({
+	AutoAttack = extras:CreateModule({
 		Name = 'Auto Attack',
 		Function = function(callback)
 			autoAttackActive = callback
@@ -4042,7 +4043,7 @@ run(function()
 		Tooltip = 'Skips attacking when a nearby enemy is playing a parry animation (scanned from Assets.Animations).',
 	})
 
-	Reach = minigames:CreateModule({
+	Reach = extras:CreateModule({
 		Name = 'Reach',
 		Function = function(callback)
 			reachActive = callback
@@ -4396,7 +4397,7 @@ run(function()
 	ExtendReach = Reach:CreateSlider({
 		Name = 'Extend',
 		Min = 0,
-		Max = 12,
+		Max = 15,
 		Default = 4,
 		Function = function(val)
 			reachExtend = val
@@ -4508,7 +4509,7 @@ run(function()
 	})
 
 	local DrawTimer
-	DrawTimer = minigames:CreateModule({
+	DrawTimer = extras:CreateModule({
 		Name = 'Draw Timer',
 		Function = function(callback)
 			hud.drawTimerEnabled = callback
@@ -4584,7 +4585,7 @@ run(function()
 	})
 
 	local ThreatIndicator
-	ThreatIndicator = minigames:CreateModule({
+	ThreatIndicator = extras:CreateModule({
 		Name = 'Threat Indicator',
 		Function = function(callback)
 			hud.threatIndicatorEnabled = callback
@@ -4706,7 +4707,7 @@ run(function()
 	end
 
 	local HitboxVisualizer
-	HitboxVisualizer = minigames:CreateModule({
+	HitboxVisualizer = extras:CreateModule({
 		Name = 'Hitbox Visualizer',
 		Function = function(callback)
 			if callback then
@@ -4780,7 +4781,7 @@ run(function()
 	end
 
 	local KillAura
-	KillAura = minigames:CreateModule({
+	KillAura = extras:CreateModule({
 		Name = 'Kill Aura',
 		Function = function(callback)
 			hud.killAuraActive = callback
@@ -4840,7 +4841,7 @@ run(function()
 	})
 
 	local AnimLogger
-	AnimLogger = minigames:CreateModule({
+	AnimLogger = extras:CreateModule({
 		Name = 'Animation Logger',
 		Function = function(callback)
 			if callback then
@@ -4967,6 +4968,6 @@ run(function()
 		repeat
 			task.wait(0.25)
 		until vape.Loaded or tick() - start > 20
-		notif('REDLINER', 'Minigames: Auto Parry, Auto Attack, Reach, Kill Aura, Draw Timer, Threat HUD, Hitbox Viz ready.', 6)
+		notif('REDLINER', 'Extras: Auto Parry, Auto Attack, Reach, Kill Aura, Draw Timer, Threat HUD, Hitbox Viz ready.', 6)
 	end)
 end)

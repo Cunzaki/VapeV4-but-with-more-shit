@@ -4851,7 +4851,7 @@ run(function()
 	Expand = HitBoxes:CreateSlider({
 		Name = 'Expand amount',
 		Min = 0,
-		Max = 5,
+		Max = 15,
 		Decimal = 10,
 		Function = function(val)
 			if not HitBoxes.Enabled then
