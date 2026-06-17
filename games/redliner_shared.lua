@@ -39,7 +39,6 @@ local entitylib = vape.Libraries.entity
 
 pcall(function()
 	vape:Remove('Reach')
-	vape:Remove('SilentAim')
 end)
 
 local BASE_SWORD_REACH = 10
@@ -171,6 +170,7 @@ local lastParryAt = 0
 local lastMeleeParryAt = 0
 local lastAttackAt = 0
 local parryBlockAttackUntil = 0
+local clashBlockUntil = 0
 local PARRY_ATTACK_BLOCK_SEC = 0.08
 local lastDebugHeartbeat = 0
 local lastDebugSkipAt = {}
@@ -222,7 +222,7 @@ local hud = {
 	killAuraActive = false,
 	killAuraRangeSetting = 18,
 	killAuraExtendSetting = 10,
-	killAuraDelaySetting = 0.35,
+	killAuraDelaySetting = 0,
 	killAuraItemIdSetting = 'Auto',
 	killAuraBound = false,
 	lastKillAuraAt = 0,
@@ -1510,9 +1510,9 @@ local function isEnemyParrying(charOrPlr)
 	for _, model in models do
 		if model and model.Parent then
 			for _, track in getAllPlayingTracks(model) do
-				if track.IsPlaying and track.WeightCurrent >= 0.25 then
+				if track.IsPlaying and track.WeightCurrent >= 0.12 then
 					local name, animId = getTrackAnimInfo(track)
-					if isEnemyParryAnim(animId, name) and track.TimePosition <= 0.85 then
+					if isEnemyParryAnim(animId, name) and track.TimePosition <= 1.05 then
 						return true
 					end
 				end
@@ -1522,11 +1522,66 @@ local function isEnemyParrying(charOrPlr)
 	return false
 end
 
-local function anyEnemyInRangeParrying(attackRange)
+local MELEE_SWING_NAME_HINTS = {'SLASH', 'SWING', 'WIDE', 'STAB', 'CUT', 'HIT', 'CROUCH'}
+local MELEE_SWING_NAME_BLOCK = {'PARRY', 'DRAW', 'GUN', 'IDLE', 'WALK', 'RUN', 'JUMP', 'LAND', 'BLOCK', 'DASH', 'DEATH', 'HURT'}
+
+local function isMeleeSwingAnimName(animName)
+	local upper = string.upper(animName or '')
+	for _, blocked in MELEE_SWING_NAME_BLOCK do
+		if string.find(upper, blocked, 1, true) then
+			return false
+		end
+	end
+	for _, hint in MELEE_SWING_NAME_HINTS do
+		if string.find(upper, hint, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+local function isEnemyMeleeSwinging(charOrPlr, maxSwingTime)
+	maxSwingTime = maxSwingTime or 0.85
+	local plr, char
+	if charOrPlr and charOrPlr:IsA('Player') then
+		plr = charOrPlr
+		char = charOrPlr.Character
+	else
+		char = charOrPlr
+		plr = char and playersService:GetPlayerFromCharacter(char)
+	end
+	if not char or not char.Parent then
+		return false
+	end
+	local models = plr and getEnemyModels(plr) or {char}
+	for _, model in models do
+		if model and model.Parent then
+			for _, track in getAllPlayingTracks(model) do
+				if track.IsPlaying and track.WeightCurrent >= 0.12 then
+					local name, animId = getTrackAnimInfo(track)
+					if isEnemyParryAnim(animId, name) then
+						continue
+					end
+					if isMeleeSwingAnimName(name) and track.TimePosition <= maxSwingTime then
+						return true
+					end
+				end
+			end
+		end
+	end
+	return false
+end
+
+shouldBlockMeleeAttack = function(attackRange)
+	if tick() < clashBlockUntil or tick() < parryBlockAttackUntil then
+		return true
+	end
 	for _, plr in playersService:GetPlayers() do
-		if plr ~= lplr and plr.Character then
-			if getClosestEnemyDistance(plr) <= attackRange and isEnemyParrying(plr) then
-				return true
+		if plr ~= lplr and plr.Character and isPlayerVisible(plr) then
+			if getClosestEnemyDistance(plr) <= attackRange then
+				if isEnemyParrying(plr) or isEnemyMeleeSwinging(plr) then
+					return true
+				end
 			end
 		end
 	end
@@ -2082,7 +2137,7 @@ installGunParryPacketHook = function()
 	return true
 end
 
-local function updateBreakState(duration)
+updateBreakState = function(duration)
 	if typeof(duration) ~= 'number' then
 		return
 	end
@@ -2535,7 +2590,7 @@ fireMeleeCombatHit = function()
 	if not root or not isLocalAlive() then
 		return false
 	end
-	local hurtboxes = castMeleeCombatHitboxes()
+	local hurtboxes = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position)
 	if #hurtboxes == 0 then
 		return false
 	end
@@ -2545,16 +2600,13 @@ fireMeleeCombatHit = function()
 	end
 	local itemId = detectLocalMeleeItemId()
 	local aimDir = safeAimDirection(root.Position, hurtboxes[1].Position, root.CFrame.LookVector)
-	for _, action in MELEE_ACTION_FALLBACKS do
-		local ok = pcall(function()
-			packet:Fire(itemId, action, '', aimDir, hurtboxes, nil)
-		end)
-		if ok then
-			lastAttackAt = tick()
-			return true
-		end
+	local ok = pcall(function()
+		packet:Fire(itemId, MELEE_DEFAULT_ACTION, '', aimDir, hurtboxes, nil)
+	end)
+	if ok then
+		lastAttackAt = tick()
 	end
-	return false
+	return ok
 end
 
 local function installAttackReachHook()
@@ -2787,11 +2839,42 @@ logReachHookStatus = function(context)
 	)
 end
 
+local combatEventHooked = false
+
+local function installCombatEventHook()
+	if combatEventHooked or not initPackets() then
+		return
+	end
+	local packet = Packets and Packets.unreliablePackets and Packets.unreliablePackets._x8e4db6c83cd1f1b6
+	if not packet or not packet.OnClientEvent or type(packet.OnClientEvent.Connect) ~= 'function' then
+		return
+	end
+	combatEventHooked = true
+	packet.OnClientEvent:Connect(function(event)
+		if type(event) ~= 'table' then
+			return
+		end
+		local action = event.action
+		if action ~= 'clashed' and action ~= 'parried' then
+			return
+		end
+		local char = getLocalCharacter()
+		if not char then
+			return
+		end
+		if event.agent == char or event.victim == char then
+			clashBlockUntil = tick() + 0.4
+			parryBlockAttackUntil = math.max(parryBlockAttackUntil, tick() + 0.25)
+		end
+	end)
+end
+
 bindPacketListeners = function()
 	if not initPackets() then
 		return
 	end
 	installCombatReachHooks()
+	installCombatEventHook()
 	if not breakPacketHooked then
 		local breakPacket = Packets and Packets._xdb2548bded1dd8e3
 		if breakPacket and breakPacket.OnClientEvent and type(breakPacket.OnClientEvent.Connect) == 'function' then
@@ -2960,7 +3043,7 @@ local function tryAutoAttack(attackDelay)
 		return
 	end
 
-	if hud.antiParryEnabled and anyEnemyInRangeParrying(autoAttackRangeSetting) then
+	if hud.antiParryEnabled and shouldBlockMeleeAttack(autoAttackRangeSetting) then
 		return
 	end
 
@@ -3974,20 +4057,21 @@ run(function()
 		if not hud.killAuraActive or not isLocalAlive() then
 			return
 		end
-		if not isGameWindowFocused() then
+		if not initPackets() then
 			return
 		end
-		installCombatReachHooks()
 		local range = getActiveMeleeReach()
 		local root = getLocalRoot()
-		local hurtboxes = root and getEnemyHurtboxesInRange(range, root.Position) or {}
-		if #hurtboxes == 0 then
+		if not root then
 			return
 		end
-		if hud.antiParryEnabled and anyEnemyInRangeParrying(hud.killAuraRangeSetting) then
+		if #getEnemyHurtboxesInRange(range, root.Position) == 0 then
 			return
 		end
-		triggerGameMeleeAttack()
+		if hud.antiParryEnabled and shouldBlockMeleeAttack(hud.killAuraRangeSetting) then
+			return
+		end
+		fireMeleeCombatHit()
 	end
 
 	local function bindKillAuraLoop()
@@ -3999,8 +4083,8 @@ run(function()
 			if not hud.killAuraActive or not isLocalAlive() then
 				return
 			end
-			local delay = math.max(0.2, hud.killAuraDelaySetting)
-			if tick() - hud.lastKillAuraAt < delay then
+			local delay = hud.killAuraDelaySetting
+			if delay > 0 and tick() - hud.lastKillAuraAt < delay then
 				return
 			end
 			hud.lastKillAuraAt = tick()
@@ -4064,12 +4148,12 @@ run(function()
 	})
 
 	AutoAttack:CreateToggle({
-		Name = 'Anti Parry',
+		Name = 'Anti Parry / Clash',
 		Default = true,
 		Function = function(callback)
 			hud.antiParryEnabled = callback
 		end,
-		Tooltip = 'Skips attacking when a nearby enemy is playing a parry animation (scanned from Assets.Animations).',
+		Tooltip = 'Skips attacking when a nearby enemy is parrying or mid melee swing (clash risk). Also backs off briefly after you clash/parry.',
 	})
 
 	Reach = extras:CreateModule({
@@ -4828,12 +4912,11 @@ run(function()
 		Function = function(callback)
 			hud.killAuraActive = callback
 			if callback then
-				installCombatReachHooks()
 				bindPacketListeners()
-				notif('Kill Aura', 'Attack.Hitbox cast + melee packet from ItemDef schema.', 5)
+				notif('Kill Aura', 'Spamming melee hurtbox packets to enemies in range.', 5)
 			end
 		end,
-		Tooltip = 'Auto melee via game MELEE input + Attack module reach hooks.',
+		Tooltip = 'Fires melee damage packets every frame (delay slider). Uses hurtboxes in radius.',
 	})
 	KillAura:CreateSlider({
 		Name = 'Range',
@@ -4861,17 +4944,17 @@ run(function()
 	})
 	KillAura:CreateSlider({
 		Name = 'Attack Delay',
-		Min = 0.2,
+		Min = 0,
 		Max = 0.5,
 		Decimal = 100,
-		Default = 0.35,
+		Default = 0,
 		Function = function(val)
 			hud.killAuraDelaySetting = val
 		end,
 		Suffix = function(val)
 			return val == 1 and 'second' or 'seconds'
 		end,
-		Tooltip = 'Delay between kill aura swings. Fires melee hurtbox packets at enemies in range.',
+		Tooltip = '0 = every Heartbeat frame. Higher values slow packet spam.',
 	})
 	KillAura:CreateDropdown({
 		Name = 'Item ID',
@@ -4880,224 +4963,7 @@ run(function()
 		Function = function(val)
 			hud.killAuraItemIdSetting = val
 		end,
-		Tooltip = 'Auto detects equipped melee from character; falls back to captured swing template.',
-	})
-
-	local silentActive = false
-	local silentRange = 300
-	local silentHitChance = 100
-	local silentHeadChance = 50
-	local silentRaycastHooked = false
-	local silentGunAimHooked = false
-	local silentOldNamecall
-
-	local function silentAllowCombatScript(script)
-		if not script then
-			return false
-		end
-		local full = script:GetFullName()
-		if string.find(full, 'PlayerScripts', 1, true) then
-			return false
-		end
-		if string.find(full, 'StarterPlayer', 1, true) then
-			return false
-		end
-		if string.find(full, 'CoreGui', 1, true) then
-			return false
-		end
-		return string.find(full, 'Start', 1, true) ~= nil
-			or string.find(full, 'ReplicatedStorage', 1, true) ~= nil
-	end
-
-	local function isRedlinerCombatRaycast(params)
-		if not params or params.FilterType ~= Enum.RaycastFilterType.Include then
-			return false
-		end
-		local list = params.FilterDescendantsInstances
-		if type(list) ~= 'table' then
-			return false
-		end
-		local map = workspace:FindFirstChild('Map')
-		for _, inst in list do
-			if inst == map then
-				return true
-			end
-		end
-		return false
-	end
-
-	local function getSilentTarget(origin)
-		if not silentActive or not entitylib.isAlive then
-			return nil, nil
-		end
-		if math.random(1, 100) > silentHitChance then
-			return nil, nil
-		end
-		local partName = math.random(1, 100) <= silentHeadChance and 'Head' or 'RootPart'
-		local ent = entitylib.EntityPosition({
-			Range = silentRange,
-			Part = partName,
-			Origin = origin,
-			Players = true,
-			NPCs = true,
-			Wallcheck = true,
-		})
-		if not ent then
-			return nil, nil
-		end
-		return ent, ent[partName] or ent.Head or ent.RootPart
-	end
-
-	local function discoverGunAimController()
-		if getgc then
-			local gcOk, gc = pcall(getgc, true)
-			if gcOk and type(gc) == 'table' then
-				for _, value in gc do
-					if type(value) == 'table' and type(value._x061224a5e52c670b) == 'function' then
-						return value
-					end
-				end
-			end
-		end
-		local startFolder = replicatedStorage:FindFirstChild('Start')
-		local client = startFolder and startFolder:FindFirstChild('Client')
-		local classes = client and client:FindFirstChild('Classes')
-		local modScript = classes and classes:FindFirstChild('_xdca80115d2839102')
-		if modScript then
-			local ok, mod = pcall(require, modScript)
-			if ok and type(mod) == 'table' and type(mod._x061224a5e52c670b) == 'function' then
-				return mod
-			end
-		end
-		return nil
-	end
-
-	local function installGunAimHook()
-		if silentGunAimHooked then
-			return
-		end
-		local gunCtrl = discoverGunAimController()
-		if not gunCtrl or gunCtrl._silentAimHooked then
-			return
-		end
-		local oldAim = gunCtrl._x061224a5e52c670b
-		if type(oldAim) ~= 'function' then
-			return
-		end
-		gunCtrl._x061224a5e52c670b = function(self, ...)
-			if silentActive then
-				local root = getLocalRoot()
-				local _, part = getSilentTarget(root and root.Position)
-				if part and root then
-					return safeAimDirection(root.Position, part.Position, root.CFrame.LookVector)
-				end
-			end
-			return oldAim(self, ...)
-		end
-		gunCtrl._silentAimHooked = true
-		silentGunAimHooked = true
-	end
-
-	local function installGunSilentAimHook()
-		if not initPackets() then
-			return
-		end
-		local packet = Packets[GUN_PACKET_NAME]
-		if not packet or type(packet.Fire) ~= 'function' or packet._silentAimHooked then
-			return
-		end
-		local oldFire = packet.Fire
-		packet._silentAimHooked = true
-		packet.Fire = function(firePacket, ...)
-			local packed = table.pack(...)
-			if silentActive and typeof(packed[6]) == 'Vector3' then
-				local root = getLocalRoot()
-				local _, part = getSilentTarget(root and root.Position)
-				if part and root then
-					packed[6] = safeAimDirection(root.Position, part.Position, packed[6])
-				end
-			end
-			return oldFire(firePacket, table.unpack(packed, 1, packed.n))
-		end
-	end
-
-	local function installSilentHooks()
-		installGunAimHook()
-		if silentRaycastHooked or not hookmetamethod then
-			return
-		end
-		local ok, result = pcall(function()
-			return hookmetamethod(workspace, '__namecall', function(self, ...)
-				local method = getnamecallmethod()
-				if method ~= 'Raycast' or self ~= workspaceService then
-					return silentOldNamecall(self, ...)
-				end
-				if checkcaller() or not silentActive or not silentAllowCombatScript(getcallingscript()) then
-					return silentOldNamecall(self, ...)
-				end
-				local origin, direction, params = ...
-				if not isRedlinerCombatRaycast(params) then
-					return silentOldNamecall(self, ...)
-				end
-				local _, part = getSilentTarget(origin)
-				if part and typeof(direction) == 'Vector3' then
-					direction = safeAimDirection(origin, part.Position, direction) * direction.Magnitude
-				end
-				return silentOldNamecall(self, origin, direction, params)
-			end)
-		end)
-		if ok then
-			silentOldNamecall = result
-			silentRaycastHooked = true
-		else
-			warn('[REDLINER] Silent Aim raycast hook failed:', result)
-		end
-	end
-
-	local SilentAimMod
-	SilentAimMod = extras:CreateModule({
-		Name = 'Silent Aim',
-		Function = function(callback)
-			silentActive = callback
-			if callback then
-				bindPacketListeners()
-				installSilentHooks()
-				installGunSilentAimHook()
-				task.defer(installGunAimHook)
-				notif('Silent Aim', 'Gun aim + combat raycast hooks active.', 5)
-			end
-		end,
-		Tooltip = 'Hooks combat raycasts and gun packet aim. Does not touch camera/character scripts.',
-	})
-	SilentAimMod:CreateSlider({
-		Name = 'Range',
-		Min = 50,
-		Max = 500,
-		Default = 300,
-		Function = function(val)
-			silentRange = val
-		end,
-		Suffix = ' studs',
-	})
-	SilentAimMod:CreateSlider({
-		Name = 'Hit Chance',
-		Min = 0,
-		Max = 100,
-		Default = 100,
-		Function = function(val)
-			silentHitChance = val
-		end,
-		Suffix = '%',
-	})
-	SilentAimMod:CreateSlider({
-		Name = 'Headshot Chance',
-		Min = 0,
-		Max = 100,
-		Default = 50,
-		Function = function(val)
-			silentHeadChance = val
-		end,
-		Suffix = '%',
+		Tooltip = 'Melee item_id sent with each damage packet (ItemDef default: Redliner).',
 	})
 
 	local combatBound = false
@@ -5130,7 +4996,7 @@ run(function()
 	local REDLINER_PROFILE_MODULES = {
 		'Auto Parry', 'Auto Attack', 'Reach',
 		'Draw Timer', 'Bullet Warnings', 'Impact ESP', 'Health ESP', 'Aimlock Detector',
-		'Hitbox Visualizer', 'Kill Aura', 'Silent Aim',
+		'Hitbox Visualizer', 'Kill Aura',
 	}
 
 	local function applyRedlinerProfileModules()
@@ -5167,6 +5033,6 @@ run(function()
 		repeat
 			task.wait(0.25)
 		until vape.Loaded or tick() - start > 20
-		notif('REDLINER', 'Extras loaded: silent aim, reach, kill aura, ESP, and aimlock ready.', 6)
+		notif('REDLINER', 'Extras loaded: reach, kill aura, ESP, and aimlock ready. Use Combat tab for Silent Aim.', 6)
 	end)
 end)
