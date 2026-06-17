@@ -50,7 +50,8 @@ local PARRY_VK = 0x46
 local MELEE_PACKET_NAME = '_x2e2c62e0acfc88ae'
 local MELEE_PACKET_REMOTE = '_xe6cbd0bf2a4cf278'
 local GUN_PACKET_NAME = '_x77a8b8d28b943359'
-local MELEE_DEFAULT_ACTION = 'wideslash'
+local MELEE_DEFAULT_ACTION = 'SWING'
+local MELEE_ACTION_FALLBACKS = {'SWING', 'SWING_HEAVY', 'wideslash', 'WIDESLASH', 'SLASH'}
 local DASH_VELOCITY_MIN = 20
 local AUTO_ATTACK_RANGE_DEFAULT = 14
 local AUTO_ATTACK_MIN_DELAY = 1 / 60
@@ -395,14 +396,14 @@ local function discordEmbed(title, description, color, fields, thumbnailUrl)
 		description = description,
 		color = color or 5793266,
 		fields = fields,
-		footer = {text = 'Priv v9 â€¢ REDLINER'},
+		footer = {text = 'Priv v9 | REDLINER'},
 		timestamp = os.date('!%Y-%m-%dT%H:%M:%SZ'),
 	}
 	if thumbnailUrl and thumbnailUrl ~= '' then
 		embed.thumbnail = {url = thumbnailUrl}
 	end
 	postDiscord({
-		username = 'Priv â€¢ REDLINER',
+		username = 'Priv | REDLINER',
 		embeds = {embed},
 	})
 end
@@ -474,7 +475,7 @@ run(function()
 			if not statFolder then
 				table.insert(fields, {
 					name = 'Stats',
-					value = 'ReadOnly profile folder not replicated yet â€” basic identity only.',
+					value = 'ReadOnly profile folder not replicated yet - basic identity only.',
 					inline = false,
 				})
 			end
@@ -2198,7 +2199,7 @@ local function spawnConeHitboxViz(hitbox, radius, length)
 	debrisService:AddItem(part, hud.hitboxVisualizerDurationSetting)
 end
 
-local function describeNearestEnemy(range, origin)
+describeNearestEnemy = function(range, origin)
 	local root = getLocalRoot()
 	origin = origin or (root and root.Position)
 	if not origin then
@@ -2544,13 +2545,16 @@ fireMeleeCombatHit = function()
 	end
 	local itemId = detectLocalMeleeItemId()
 	local aimDir = safeAimDirection(root.Position, hurtboxes[1].Position, root.CFrame.LookVector)
-	local ok = pcall(function()
-		packet:Fire(itemId, MELEE_DEFAULT_ACTION, '', aimDir, hurtboxes, nil)
-	end)
-	if ok then
-		lastAttackAt = tick()
+	for _, action in MELEE_ACTION_FALLBACKS do
+		local ok = pcall(function()
+			packet:Fire(itemId, action, '', aimDir, hurtboxes, nil)
+		end)
+		if ok then
+			lastAttackAt = tick()
+			return true
+		end
 	end
-	return ok
+	return false
 end
 
 local function installAttackReachHook()
@@ -2560,7 +2564,7 @@ local function installAttackReachHook()
 	end
 	local Attack, source = discoverAttackModule()
 	if not Attack then
-		reachDebugWarn('Attack hook FAILED â€” module not found')
+		reachDebugWarn('Attack hook FAILED - module not found')
 		return false
 	end
 	local function wrapCast(methodName)
@@ -2587,14 +2591,14 @@ local function installAttackReachHook()
 		local wrapper = makeWrapper(oldMethod)
 		local _, detail = wrapReachCallable('Attack.' .. methodName, oldMethod, makeWrapper)
 		Attack[methodName] = wrapper
-		reachDebugLog('Attack.' .. methodName, 'hook OK â€”', detail)
+		reachDebugLog('Attack.' .. methodName, 'hook OK -', detail)
 	end
 	wrapCast('castOnce')
 	wrapCast('castMore')
 	wrapCast('castContinuous')
 	attackReachHooked = true
 	reachAttackHookSource = source
-	reachDebugLog('Attack hook OK â€”', source)
+	reachDebugLog('Attack hook OK -', source)
 	return true
 end
 
@@ -2693,7 +2697,7 @@ installHitboxReachHook = function()
 	end
 	local Hitbox, source, attempts = discoverHitboxModule()
 	if not Hitbox then
-		reachDebugWarn('Hitbox hook FAILED â€” no module found')
+		reachDebugWarn('Hitbox hook FAILED - no module found')
 		for _, line in attempts do
 			reachDebugWarn('  try:', line)
 		end
@@ -2707,7 +2711,7 @@ installHitboxReachHook = function()
 	Hitbox.cast = wrapper
 	hitboxReachHooked = true
 	reachHitboxHookSource = source .. ' (' .. detail .. ')'
-	reachDebugLog('Hitbox.cast hook OK â€”', reachHitboxHookSource)
+	reachDebugLog('Hitbox.cast hook OK -', reachHitboxHookSource)
 	if getgc then
 		local gcOk, gc = pcall(getgc, true)
 		if gcOk and type(gc) == 'table' then
@@ -2765,7 +2769,7 @@ installCombatReachHooks = function()
 	installAttackReachHook()
 end
 
-local function logReachHookStatus(context)
+logReachHookStatus = function(context)
 	if not reachDebugEnabled then
 		return
 	end
@@ -3634,7 +3638,7 @@ run(function()
 			if not state.flagged and state.streak >= needStreak and dot >= threshold then
 				state.flagged = true
 				local pct = math.floor(dot * 1000) / 10
-				notif('Aimlock Detector', plr.Name .. ' flagged â€” sustained head tracking ' .. pct .. '%', 45, 'warning')
+				notif('Aimlock Detector', plr.Name .. ' flagged - sustained head tracking ' .. pct .. '%', 45, 'warning')
 				discordEmbed(
 					'ðŸŽ¯ Aimlock Detected',
 					'**' .. plr.Name .. '** sustained perfect head tracking without movement explain.',
@@ -3817,7 +3821,7 @@ run(function()
 				local barFill = barBg and barBg:FindFirstChild('BarFill')
 				if title then
 					title.TextSize = hud.drawTimerFontSizeSetting
-					title.Text = string.format('%s  â€¢  %s', entry.name, entry.gun)
+					title.Text = string.format('%s  |  %s', entry.name, entry.gun)
 					title.TextColor3 = gunColor
 				end
 				if timer then
@@ -3983,9 +3987,7 @@ run(function()
 		if hud.antiParryEnabled and anyEnemyInRangeParrying(hud.killAuraRangeSetting) then
 			return
 		end
-		if not fireMeleeCombatHit() then
-			triggerGameMeleeAttack()
-		end
+		triggerGameMeleeAttack()
 	end
 
 	local function bindKillAuraLoop()
@@ -4043,10 +4045,10 @@ run(function()
 				startEnemyWatchers()
 				bindParryScanLoop()
 				bindPacketListeners()
-				notif('Auto Parry', '360Â° within threat range â€” melee + gun draw/shot (proximity gated).', 5)
+				notif('Auto Parry', '360 within threat range - melee + gun draw/shot (proximity gated).', 5)
 			end
 		end,
-		Tooltip = 'Parries nearby enemy melee swings and gun draw/shot animations (360Â° within Melee/Threat range).',
+		Tooltip = 'Parries nearby enemy melee swings and gun draw/shot animations (360 within Melee/Threat range).',
 	})
 
 	AutoAttack = extras:CreateModule({
@@ -4055,7 +4057,7 @@ run(function()
 			autoAttackActive = callback
 			if callback then
 				bindAutoAttackLoop()
-				notif('Auto Attack', 'Active â€” LMB when enemies are in range (game window must be focused).', 4)
+				notif('Auto Attack', 'Active - LMB when enemies are in range (game window must be focused).', 4)
 			end
 		end,
 		Tooltip = 'Left clicks when an enemy is within Attack Range. Only fires while Roblox is focused. Pauses while parrying.',
@@ -4099,7 +4101,7 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
-		Tooltip = 'Legacy setting â€” melee parry uses visible players at any distance (360Â°).',
+		Tooltip = 'Legacy setting - melee parry uses visible players at any distance (360).',
 	})
 
 	local ThreatRange
@@ -4119,7 +4121,7 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
-		Tooltip = 'Legacy setting â€” gun parry uses visible players and ray validation at any distance.',
+		Tooltip = 'Legacy setting - gun parry uses visible players and ray validation at any distance.',
 	})
 
 	WatcherThreatRange = AutoParry:CreateSlider({
@@ -4133,7 +4135,7 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end,
-		Tooltip = 'Legacy setting â€” animation watchers attach to all visible players.',
+		Tooltip = 'Legacy setting - animation watchers attach to all visible players.',
 	})
 
 	MeleeEnemyDebounce = AutoParry:CreateSlider({
@@ -4458,7 +4460,7 @@ run(function()
 		Function = function(callback)
 			reachDebugEnabled = callback
 			if callback then
-				print('[REDLINER][Reach] debug ON â€” swing sword near an enemy and watch console')
+				print('[REDLINER][Reach] debug ON - swing sword near an enemy and watch console')
 				bindPacketListeners()
 				logReachHookStatus('debug toggled on')
 			else
@@ -4466,7 +4468,7 @@ run(function()
 				table.clear(lastReachDebugSkipAt)
 			end
 		end,
-		Tooltip = 'Prints [REDLINER][Reach] hook install, hitbox cast, packet augment, and heartbeat logs to console.',
+		Tooltip = 'Prints [REDLINER][Reach] hook install, hitbox cast, and heartbeat logs to console.',
 	})
 
 	AttackCooldown = AutoAttack:CreateSlider({
@@ -4831,7 +4833,7 @@ run(function()
 				notif('Kill Aura', 'Attack.Hitbox cast + melee packet from ItemDef schema.', 5)
 			end
 		end,
-		Tooltip = 'Casts cone hitboxes via Attack module, then fires the decompiled melee packet. Falls back to game MELEE input.',
+		Tooltip = 'Auto melee via game MELEE input + Attack module reach hooks.',
 	})
 	KillAura:CreateSlider({
 		Name = 'Range',
