@@ -5235,9 +5235,6 @@ run(function()
 		end,
 		Tooltip = 'Offset added to displayed draw countdown.',
 	})
-
-		Tooltip = 'Offset added to displayed draw countdown.',
-	})
 	DrawTimer:CreateSlider({
 		Name = 'ESP Scale',
 		Min = 60,
