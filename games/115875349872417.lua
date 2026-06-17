@@ -1534,7 +1534,6 @@ local unwatchAllForPlayer
 local installHitboxReachHook
 local installGunBulletVizHook
 local installGunParryPacketHook
-local installBreakPacketHooks
 local detectLocalMeleeItemId
 local pressAttackClick
 local getNearestEnemyInAttackRange
@@ -2097,31 +2096,6 @@ local function updateBreakState(duration)
 	breakState.lastDuration = duration
 	breakState.lastTriggeredAt = tick()
 	breakState.endsAt = tick() + duration
-end
-
-installBreakPacketHooks = function()
-	if breakPacketHooked then
-		return true
-	end
-	if not initPackets() then
-		return false
-	end
-	local breakPacket = Packets and Packets._xdb2548bded1dd8e3
-	if breakPacket and breakPacket.OnClientEvent and type(breakPacket.OnClientEvent.Connect) == 'function' then
-		breakPacket.OnClientEvent:Connect(function(duration)
-			updateBreakState(duration)
-		end)
-		breakPacketHooked = true
-	end
-	local resetPacket = Packets and Packets.unreliablePackets and Packets.unreliablePackets._x6e915d67a1f06f56
-	if resetPacket and resetPacket.OnClientEvent and type(resetPacket.OnClientEvent.Connect) == 'function' then
-		resetPacket.OnClientEvent:Connect(function(isBreaking)
-			if isBreaking == false then
-				updateBreakState(0)
-			end
-		end)
-	end
-	return breakPacketHooked
 end
 
 end)
@@ -2900,7 +2874,23 @@ bindPacketListeners = function()
 		return
 	end
 	installMeleeReachHook()
-	installBreakPacketHooks()
+	if not breakPacketHooked then
+		local breakPacket = Packets and Packets._xdb2548bded1dd8e3
+		if breakPacket and breakPacket.OnClientEvent and type(breakPacket.OnClientEvent.Connect) == 'function' then
+			breakPacket.OnClientEvent:Connect(function(duration)
+				updateBreakState(duration)
+			end)
+			breakPacketHooked = true
+		end
+		local resetPacket = Packets and Packets.unreliablePackets and Packets.unreliablePackets._x6e915d67a1f06f56
+		if resetPacket and resetPacket.OnClientEvent and type(resetPacket.OnClientEvent.Connect) == 'function' then
+			resetPacket.OnClientEvent:Connect(function(isBreaking)
+				if isBreaking == false then
+					updateBreakState(0)
+				end
+			end)
+		end
+	end
 	if hud.hitboxVisualizerBulletEnabled then
 		installGunBulletVizHook()
 	end
