@@ -1,0 +1,66 @@
+# read_only
+
+ReplicatedStorage.ReadOnly children=7
+## Bj2f6 (11041300289)
+  console_roles (StringValue) = member
+  impact (NumberValue) = 0
+  impact_limit (NumberValue) = 100
+  heat (IntValue) = 0
+  heat_max (IntValue) = 0
+  heat_per_bullet (IntValue) = 0
+  health (IntValue) = 0
+  health_max (IntValue) = 0
+## Sk8erreli (1810175480)
+  heat (IntValue) = 39
+  impact (NumberValue) = 0
+  health (IntValue) = 130
+  health_max (IntValue) = 150
+  heat_per_bullet (IntValue) = 100
+  heat_max (IntValue) = 300
+  impact_limit (NumberValue) = 100
+  console_roles (StringValue) = member
+## higyakunohana (150540887)
+  health (IntValue) = 150
+  impact (NumberValue) = 0
+  heat (IntValue) = 107
+  console_roles (StringValue) = member
+  impact_limit (NumberValue) = 100
+  heat_max (IntValue) = 340
+  heat_per_bullet (IntValue) = 170
+  health_max (IntValue) = 150
+## blackjag0357 (1586492615)
+  impact (NumberValue) = 0
+  heat (IntValue) = 283
+  console_roles (StringValue) = member
+  impact_limit (NumberValue) = 100
+  heat_max (IntValue) = 340
+  heat_per_bullet (IntValue) = 170
+  health_max (IntValue) = 150
+  health (IntValue) = 150
+## GOT_SILK (459896899)
+  heat (IntValue) = 137
+  impact (NumberValue) = 0
+  health (IntValue) = 37
+  health_max (IntValue) = 150
+  heat_per_bullet (IntValue) = 140
+  heat_max (IntValue) = 280
+  impact_limit (NumberValue) = 100
+  console_roles (StringValue) = member
+## holdenbrunchmann (77922982)
+  heat (IntValue) = 200
+  health (IntValue) = 150
+  health_max (IntValue) = 150
+  heat_per_bullet (IntValue) = 200
+  heat_max (IntValue) = 200
+  impact_limit (NumberValue) = 100
+  console_roles (StringValue) = member
+  impact (NumberValue) = 0
+## flexruIe (10957214661)
+  impact (NumberValue) = 3.799999999999987
+  health (IntValue) = 150
+  heat (IntValue) = 21
+  health_max (IntValue) = 150
+  heat_per_bullet (IntValue) = 100
+  heat_max (IntValue) = 300
+  impact_limit (NumberValue) = 100
+  console_roles (StringValue) = member

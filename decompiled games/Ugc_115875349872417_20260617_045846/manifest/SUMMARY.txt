@@ -1,0 +1,9 @@
+REDLINER Stable Dumper Summary
+root=redliner_dumps/Ugc_115875349872417_20260617_045846
+place=115875349872417 (Ugc)
+job=59c86726-c85f-4dd3-ad6e-c87ea8924d17
+
+scripts_found=271
+decompiled=271
+bytecode=0
+failed=0

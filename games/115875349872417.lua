@@ -77,6 +77,7 @@ local AUTO_PARRY_DEFAULTS = {
 	parryGunShot = true,
 	parryGlint = true,
 	threatDebug = false,
+	parryMode = 'Hybrid',
 }
 
 -- Melee + gun animations from ReplicatedStorage.Assets.Animations catalog.
@@ -125,6 +126,7 @@ local GUN_ITEM_PATTERNS = {
 	{pattern = 'monarch', gun = 'Monarch'},
 	{pattern = 'awp', gun = 'Monarch'},
 }
+local PARRY_MODE_LIST = {'Hybrid', 'Animation', 'Packet'}
 
 local Packets
 local autoParryActive = false
@@ -158,6 +160,7 @@ local parryMeleeEnabled = AUTO_PARRY_DEFAULTS.parryMelee
 local parryGunDrawEnabled = AUTO_PARRY_DEFAULTS.parryGunDraw
 local parryGunShotEnabled = AUTO_PARRY_DEFAULTS.parryGunShot
 local parryGlintEnabled = AUTO_PARRY_DEFAULTS.parryGlint
+local parryModeSetting = AUTO_PARRY_DEFAULTS.parryMode
 local myHurtboxes = {}
 local enemyStates = {}
 local charWatchers = {}
@@ -191,6 +194,8 @@ local canSafelyParry
 local hitboxReachHooked = false
 local meleePacketHooked = false
 local gunParryPacketHooked = false
+local parryCuePacketHooked = false
+local breakPacketHooked = false
 local packetMetatableHooked = false
 local attackReachHooked = false
 local reachHitboxHookSource = nil
@@ -234,6 +239,7 @@ local hud = {
 	bulletWarningsTextSetting = 'SHOT READY',
 	impactEspEnabled = false,
 	impactEspMaxSetting = 100,
+	breakTimerEnabled = false,
 	aimlockDetectorEnabled = false,
 	aimlockVisualizeSetting = true,
 	aimlockThresholdSetting = 0.93,
@@ -251,6 +257,41 @@ local hud = {
 	hitboxVisualizerColorSetting = Color3.fromRGB(255, 60, 60),
 	lastEnemyHurtboxVizAt = 0,
 }
+local noBreakScreenEnabled = false
+local destabilizeBypassEnabled = false
+local breakState = {
+	active = false,
+	duration = 0,
+	endsAt = 0,
+	lastDuration = 0,
+	lastTriggeredAt = 0,
+}
+
+local function parryModeUsesAnimation()
+	return parryModeSetting ~= 'Packet'
+end
+
+local function parryModeUsesPacket()
+	return parryModeSetting ~= 'Animation'
+end
+
+local function isPacketParryReason(reason)
+	if type(reason) ~= 'string' then
+		return false
+	end
+	return string.find(reason, 'gun_packet_', 1, true) ~= nil
+		or string.find(reason, 'packet_cue_', 1, true) ~= nil
+end
+
+local function isAnimationParryReason(reason)
+	if type(reason) ~= 'string' then
+		return false
+	end
+	return string.find(reason, 'melee_', 1, true) ~= nil
+		or string.find(reason, 'gun_draw_', 1, true) ~= nil
+		or string.find(reason, 'gun_shot_', 1, true) ~= nil
+		or string.find(reason, 'glint', 1, true) ~= nil
+end
 
 local function spawnBulletVizRay(origin, direction, color)
 	if not hud.hitboxVisualizerBulletEnabled then
@@ -1328,6 +1369,12 @@ tryParry = function(reason, char)
 	if not canSafelyParry() then
 		return false
 	end
+	if isAnimationParryReason(reason) and not parryModeUsesAnimation() then
+		return false
+	end
+	if isPacketParryReason(reason) and not parryModeUsesPacket() then
+		return false
+	end
 	local now = tick()
 	local isMeleeParry = reason and string.sub(reason, 1, 6) == 'melee_'
 	if isMeleeParry then
@@ -1498,6 +1545,9 @@ run(function()
 -- ---------------------------------------------------------------------------
 
 handleMeleeAnimation = function(char, track, source, aimModel)
+	if not parryModeUsesAnimation() then
+		return
+	end
 	source = source or 'edge'
 	if not isMeleeSwingTrackActive(track) then
 		debugSkip('melee_not_playing', getTrackAnimInfo(track), source)
@@ -1530,6 +1580,9 @@ handleMeleeAnimation = function(char, track, source, aimModel)
 end
 
 local function handleGunDrawAnimation(char, track, source, aimModel)
+	if not parryModeUsesAnimation() then
+		return
+	end
 	if not parryGunDrawEnabled then
 		return
 	end
@@ -1562,6 +1615,9 @@ local function handleGunDrawAnimation(char, track, source, aimModel)
 end
 
 local function handleGunShotAnimation(char, track, source, aimModel)
+	if not parryModeUsesAnimation() then
+		return
+	end
 	if not parryGunShotEnabled then
 		return
 	end
@@ -1619,6 +1675,9 @@ local function handleGunShotAnimation(char, track, source, aimModel)
 end
 
 local function handleGlintSpawn(char, inst)
+	if not parryModeUsesAnimation() then
+		return
+	end
 	if not isGlintInstance(inst) then
 		return
 	end
@@ -1963,7 +2022,7 @@ installGunParryPacketHook = function()
 	packet._gunParryHooked = true
 	gunParryPacketHooked = true
 	packet.OnClientEvent:Connect(function(arg1, _arg2, _arg3, _arg4, _arg5, aimDir, gunName, arg8, arg9)
-		if not autoParryActive or not parryGunShotEnabled or not isLocalAlive() then
+		if not autoParryActive or not parryGunShotEnabled or not parryModeUsesPacket() or not isLocalAlive() then
 			return
 		end
 		if typeof(aimDir) ~= 'Vector3' or aimDir.Magnitude < 0.05 then
@@ -2020,6 +2079,137 @@ installGunParryPacketHook = function()
 		tryParry('gun_packet_' .. label, char)
 	end)
 	return true
+end
+
+local function resolveEnemyCharacterFromAnyValue(value)
+	if typeof(value) == 'Instance' then
+		if value:IsA('Player') then
+			return value ~= lplr and value.Character or nil
+		end
+		if value:IsA('Model') and isEnemyCharacter(value) then
+			return value
+		end
+		local model = value:FindFirstAncestorWhichIsA('Model')
+		if model and isEnemyCharacter(model) then
+			return model
+		end
+	elseif typeof(value) == 'string' then
+		if value ~= '' then
+			local plr = playersService:FindFirstChild(value)
+			if plr and plr ~= lplr then
+				return plr.Character
+			end
+		end
+	elseif typeof(value) == 'number' then
+		if value > 0 then
+			local plr = playersService:GetPlayerByUserId(value)
+			if plr and plr ~= lplr then
+				return plr.Character
+			end
+		end
+	elseif type(value) == 'table' then
+		local tryFields = {'character', 'model', 'agent', 'victim', 'player', 'username', 'user_id', 'userid', 'uid'}
+		for _, key in tryFields do
+			local char = resolveEnemyCharacterFromAnyValue(value[key])
+			if char then
+				return char
+			end
+		end
+	end
+	return nil
+end
+
+local function resolveEnemyCharacterFromArgs(...)
+	for i = 1, select('#', ...) do
+		local char = resolveEnemyCharacterFromAnyValue(select(i, ...))
+		if char then
+			return char
+		end
+	end
+	return nil
+end
+
+local function updateBreakState(duration)
+	if typeof(duration) ~= 'number' then
+		return
+	end
+	duration = math.max(0, duration)
+	if duration <= 0 then
+		breakState.active = false
+		breakState.duration = 0
+		breakState.endsAt = 0
+		return
+	end
+	breakState.active = true
+	breakState.duration = duration
+	breakState.lastDuration = duration
+	breakState.lastTriggeredAt = tick()
+	breakState.endsAt = tick() + duration
+end
+
+local function installBreakPacketHooks()
+	if breakPacketHooked then
+		return true
+	end
+	if not initPackets() then
+		return false
+	end
+	local breakPacket = Packets and Packets._xdb2548bded1dd8e3
+	if breakPacket and breakPacket.OnClientEvent and type(breakPacket.OnClientEvent.Connect) == 'function' then
+		breakPacket.OnClientEvent:Connect(function(duration)
+			updateBreakState(duration)
+		end)
+		breakPacketHooked = true
+	end
+	local resetPacket = Packets and Packets.unreliablePackets and Packets.unreliablePackets._x6e915d67a1f06f56
+	if resetPacket and resetPacket.OnClientEvent and type(resetPacket.OnClientEvent.Connect) == 'function' then
+		resetPacket.OnClientEvent:Connect(function(isBreaking)
+			if isBreaking == false then
+				updateBreakState(0)
+			end
+		end)
+	end
+	return breakPacketHooked
+end
+
+local function installParryCuePacketHooks()
+	if parryCuePacketHooked then
+		return true
+	end
+	if not initPackets() then
+		return false
+	end
+	local cueMap = {
+		{key = '_x34754b6705aa3689', label = 'cue_draw'},
+		{key = '_x79961bff1a8a3f4c', label = 'cue_shot'},
+		{key = '_xf29dcc6a78e136c2', label = 'cue_draw_scoped'},
+		{key = '_x0b2e7b7fe0af03fc', label = 'cue_shot_scoped'},
+	}
+	local connected = false
+	for _, cue in cueMap do
+		local packet = Packets[cue.key]
+		if packet and packet.OnClientEvent and type(packet.OnClientEvent.Connect) == 'function' and not packet._vapePacketParryHooked then
+			packet._vapePacketParryHooked = true
+			packet.OnClientEvent:Connect(function(...)
+				if not autoParryActive or not parryModeUsesPacket() or not isLocalAlive() then
+					return
+				end
+				local char = resolveEnemyCharacterFromArgs(...)
+				if not char or not char.Parent then
+					return
+				end
+				if not shouldParryGun(char, true, char) then
+					return
+				end
+				tryParry('packet_cue_' .. cue.label, char)
+			end)
+			connected = true
+		end
+	end
+	if connected then
+		parryCuePacketHooked = true
+	end
+	return parryCuePacketHooked
 end
 
 end)
@@ -2798,11 +2988,13 @@ bindPacketListeners = function()
 		return
 	end
 	installMeleeReachHook()
+	installBreakPacketHooks()
 	if hud.hitboxVisualizerBulletEnabled then
 		installGunBulletVizHook()
 	end
 	if autoParryActive then
 		installGunParryPacketHook()
+		installParryCuePacketHooks()
 	end
 end
 
@@ -3066,6 +3258,11 @@ run(function()
 	local threatTitle
 	local threatSub
 	local threatFlash
+	local breakOverlay
+	local breakTitle
+	local breakSub
+	local breakBarBg
+	local breakBarFill
 	local lastPrimaryKey = ''
 	local enemyAdornPool = {}
 
@@ -3153,6 +3350,69 @@ run(function()
 			threatSub.TextScaled = true
 			threatSub.Text = ''
 			threatSub.Parent = threatPanel
+		end
+		if not breakOverlay or not breakOverlay.Parent then
+			breakOverlay = Instance.new('Frame')
+			breakOverlay.Name = 'BreakOverlay'
+			breakOverlay.BackgroundColor3 = Color3.fromRGB(8, 8, 10)
+			breakOverlay.BackgroundTransparency = 0.3
+			breakOverlay.BorderSizePixel = 0
+			breakOverlay.AnchorPoint = Vector2.new(0.5, 0)
+			breakOverlay.Position = UDim2.fromScale(0.5, 0.04)
+			breakOverlay.Size = UDim2.fromOffset(300, 60)
+			breakOverlay.Visible = false
+			breakOverlay.ZIndex = 8
+			breakOverlay.Parent = hudGui
+
+			local breakCorner = Instance.new('UICorner')
+			breakCorner.CornerRadius = UDim.new(0, 10)
+			breakCorner.Parent = breakOverlay
+
+			breakTitle = Instance.new('TextLabel')
+			breakTitle.Name = 'BreakTitle'
+			breakTitle.BackgroundTransparency = 1
+			breakTitle.Size = UDim2.fromScale(1, 0.52)
+			breakTitle.Font = Enum.Font.GothamBold
+			breakTitle.TextScaled = true
+			breakTitle.TextColor3 = Color3.fromRGB(255, 70, 70)
+			breakTitle.Text = 'BREAK LOCK'
+			breakTitle.ZIndex = 9
+			breakTitle.Parent = breakOverlay
+
+			breakSub = Instance.new('TextLabel')
+			breakSub.Name = 'BreakSub'
+			breakSub.BackgroundTransparency = 1
+			breakSub.Position = UDim2.fromScale(0, 0.5)
+			breakSub.Size = UDim2.fromScale(1, 0.3)
+			breakSub.Font = Enum.Font.GothamMedium
+			breakSub.TextScaled = true
+			breakSub.TextColor3 = Color3.fromRGB(220, 220, 220)
+			breakSub.Text = ''
+			breakSub.ZIndex = 9
+			breakSub.Parent = breakOverlay
+
+			breakBarBg = Instance.new('Frame')
+			breakBarBg.Name = 'BreakBarBg'
+			breakBarBg.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+			breakBarBg.BorderSizePixel = 0
+			breakBarBg.Position = UDim2.fromScale(0.06, 0.84)
+			breakBarBg.Size = UDim2.fromScale(0.88, 0.1)
+			breakBarBg.ZIndex = 9
+			breakBarBg.Parent = breakOverlay
+			local breakBarCorner = Instance.new('UICorner')
+			breakBarCorner.CornerRadius = UDim.new(1, 0)
+			breakBarCorner.Parent = breakBarBg
+
+			breakBarFill = Instance.new('Frame')
+			breakBarFill.Name = 'BreakBarFill'
+			breakBarFill.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+			breakBarFill.BorderSizePixel = 0
+			breakBarFill.Size = UDim2.fromScale(1, 1)
+			breakBarFill.ZIndex = 10
+			breakBarFill.Parent = breakBarBg
+			local breakFillCorner = Instance.new('UICorner')
+			breakFillCorner.CornerRadius = UDim.new(1, 0)
+			breakFillCorner.Parent = breakBarFill
 		end
 		return hudGui
 	end
@@ -4000,8 +4260,80 @@ run(function()
 		end
 	end
 
+	local function updateBreakTimerHud()
+		if not breakOverlay then
+			return
+		end
+		if not hud.breakTimerEnabled then
+			breakOverlay.Visible = false
+			return
+		end
+		local remaining = math.max(0, breakState.endsAt - tick())
+		if remaining <= 0 then
+			breakState.active = false
+		end
+		if breakState.active and breakState.duration > 0 then
+			breakOverlay.Visible = true
+			breakTitle.Text = string.format('BREAK LOCK  %.2fs', remaining)
+			breakTitle.TextColor3 = remaining <= 0.35 and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(255, 110, 90)
+			breakSub.Text = string.format('server duration %.2fs', breakState.duration)
+			local ratio = math.clamp(remaining / breakState.duration, 0, 1)
+			breakBarFill.Size = UDim2.fromScale(ratio, 1)
+			breakBarFill.BackgroundColor3 = remaining <= 0.35 and Color3.fromRGB(255, 55, 55) or Color3.fromRGB(255, 140, 90)
+		else
+			breakOverlay.Visible = false
+		end
+	end
+
+	local function suppressBreakVisuals()
+		if not noBreakScreenEnabled and not destabilizeBypassEnabled then
+			return
+		end
+		local playerGui = lplr:FindFirstChild('PlayerGui')
+		if playerGui then
+			local gameplayUi = playerGui:FindFirstChild('GameplayUI')
+			if gameplayUi then
+				local destabilized = gameplayUi:FindFirstChild('Destabilized', true)
+				if destabilized then
+					pcall(function()
+						destabilized:Destroy()
+					end)
+				end
+				local impactFrame = gameplayUi:FindFirstChild('ImpactFrame', true)
+				if impactFrame and noBreakScreenEnabled then
+					pcall(function()
+						impactFrame.Visible = false
+					end)
+				end
+				if destabilizeBypassEnabled then
+					pcall(function()
+						gameplayUi.Enabled = true
+					end)
+				end
+			end
+		end
+		local lighting = cloneref(game:GetService('Lighting'))
+		for _, effect in lighting:GetChildren() do
+			if effect:IsA('ColorCorrectionEffect') and effect.Saturation <= -0.9 then
+				pcall(function()
+					effect:Destroy()
+				end)
+			end
+		end
+		if destabilizeBypassEnabled and isLocalAlive() then
+			local root = getLocalRoot()
+			if root and root.Anchored then
+				pcall(function()
+					root.Anchored = false
+				end)
+			end
+		end
+	end
+
 	local function updateHud()
+		suppressBreakVisuals()
 		updateDrawHud()
+		updateBreakTimerHud()
 		updateThreatHud()
 		updatePlayerWorldEsp()
 		updateAimlockDetector()
@@ -4778,6 +5110,7 @@ run(function()
 	local ParryGunDraw
 	local ParryGunShot
 	local ParryGlint
+	local ParryModeDropdown
 	local MeleeAimDot
 	local GunAimDot
 	local ParryCooldown
@@ -4821,6 +5154,19 @@ run(function()
 			parryGlintEnabled = callback
 		end,
 		Tooltip = 'Fallback draw parry when glint VFX spawns.',
+	})
+
+	ParryModeDropdown = AutoParry:CreateDropdown({
+		Name = 'Parry Mode',
+		List = PARRY_MODE_LIST,
+		Default = AUTO_PARRY_DEFAULTS.parryMode,
+		Function = function(val)
+			parryModeSetting = table.find(PARRY_MODE_LIST, val) and val or AUTO_PARRY_DEFAULTS.parryMode
+			if autoParryActive then
+				bindPacketListeners()
+			end
+		end,
+		Tooltip = 'Hybrid = animation + packets. Animation = old behavior. Packet = packet cues + gun packet only.',
 	})
 
 	MeleeAimDot = AutoParry:CreateSlider({
@@ -5005,6 +5351,7 @@ run(function()
 		parryGunDrawEnabled = d.parryGunDraw
 		parryGunShotEnabled = d.parryGunShot
 		parryGlintEnabled = d.parryGlint
+		parryModeSetting = d.parryMode
 
 		MeleeRange:SetValue(d.meleeRange)
 		ThreatRange:SetValue(d.threatRange)
@@ -5026,6 +5373,7 @@ run(function()
 		setToggleDefault(ParryGunDraw, d.parryGunDraw)
 		setToggleDefault(ParryGunShot, d.parryGunShot)
 		setToggleDefault(ParryGlint, d.parryGlint)
+		ParryModeDropdown:SetValue(d.parryMode)
 		setToggleDefault(ThreatDebug, d.threatDebug)
 	end
 
@@ -5173,6 +5521,17 @@ run(function()
 		end,
 		Tooltip = 'Legacy screen-positioned draw timer list.',
 	})
+	DrawTimer:CreateToggle({
+		Name = 'True Break Timer',
+		Default = false,
+		Function = function(callback)
+			hud.breakTimerEnabled = callback
+			if callback then
+				bindPacketListeners()
+			end
+		end,
+		Tooltip = 'Shows exact break-lock countdown from server break packet duration.',
+	})
 	DrawTimer:CreateDropdown({
 		Name = 'Position Preset',
 		List = { 'Center-Top', 'Center', 'Bottom' },
@@ -5243,6 +5602,26 @@ run(function()
 			hud.drawTimerEspScaleSetting = val / 100
 		end,
 		Suffix = '%',
+	})
+
+	local NoBreakScreen
+	NoBreakScreen = extras:CreateModule({
+		Name = 'No Break Screen',
+		Function = function(callback)
+			noBreakScreenEnabled = callback
+			if callback then
+				notif('No Break Screen', 'Suppressing destabilized UI and break flash effects.', 4)
+			end
+		end,
+		Tooltip = 'Hides destabilized overlays and strong break visual effects.',
+	})
+	NoBreakScreen:CreateToggle({
+		Name = 'Destabilize Bypass (Experimental)',
+		Default = false,
+		Function = function(callback)
+			destabilizeBypassEnabled = callback
+		end,
+		Tooltip = 'Best effort only: keeps visuals usable and attempts to reduce local lock feel. Server still decides true disable.',
 	})
 
 	local BulletWarnings
@@ -5679,6 +6058,7 @@ run(function()
 				and not KillAura.Enabled and not hud.drawTimerEnabled and not hud.threatIndicatorEnabled
 				and not hud.bulletWarningsEnabled and not hud.impactEspEnabled
 				and not hud.aimlockDetectorEnabled
+				and not hud.breakTimerEnabled and not noBreakScreenEnabled and not destabilizeBypassEnabled
 				and not hud.hitboxVisualizerEnemyEnabled and not hud.hitboxVisualizerSwingEnabled
 				and not hud.hitboxVisualizerBulletEnabled and not reachDebugEnabled then
 				return
@@ -5694,7 +6074,7 @@ run(function()
 	local REDLINER_PROFILE_MODULES = {
 		'Auto Parry', 'Auto Attack', 'Reach',
 		'Draw Timer', 'Bullet Warnings', 'Impact ESP', 'Aimlock Detector',
-		'Threat Indicator', 'Hitbox Visualizer', 'Kill Aura', 'Animation Logger',
+		'Threat Indicator', 'Hitbox Visualizer', 'Kill Aura', 'Animation Logger', 'No Break Screen',
 	}
 
 	local function applyRedlinerProfileModules()
@@ -5731,6 +6111,6 @@ run(function()
 		repeat
 			task.wait(0.25)
 		until vape.Loaded or tick() - start > 20
-		notif('REDLINER', 'Extras: combat modules, Draw Timer ESP, Bullet Warnings, Impact ESP, Aimlock Detector ready.', 6)
+		notif('REDLINER', 'Extras: packet parry mode, break timer, no-break-screen, draw timer, and combat tools ready.', 6)
 	end)
 end)
