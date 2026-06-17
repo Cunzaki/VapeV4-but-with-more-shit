@@ -194,7 +194,6 @@ local canSafelyParry
 local hitboxReachHooked = false
 local meleePacketHooked = false
 local gunParryPacketHooked = false
-local parryCuePacketHooked = false
 local breakPacketHooked = false
 local packetMetatableHooked = false
 local attackReachHooked = false
@@ -1535,6 +1534,7 @@ local unwatchAllForPlayer
 local installHitboxReachHook
 local installGunBulletVizHook
 local installGunParryPacketHook
+local installBreakPacketHooks
 local detectLocalMeleeItemId
 local pressAttackClick
 local getNearestEnemyInAttackRange
@@ -2081,54 +2081,6 @@ installGunParryPacketHook = function()
 	return true
 end
 
-local function resolveEnemyCharacterFromAnyValue(value)
-	if typeof(value) == 'Instance' then
-		if value:IsA('Player') then
-			return value ~= lplr and value.Character or nil
-		end
-		if value:IsA('Model') and isEnemyCharacter(value) then
-			return value
-		end
-		local model = value:FindFirstAncestorWhichIsA('Model')
-		if model and isEnemyCharacter(model) then
-			return model
-		end
-	elseif typeof(value) == 'string' then
-		if value ~= '' then
-			local plr = playersService:FindFirstChild(value)
-			if plr and plr ~= lplr then
-				return plr.Character
-			end
-		end
-	elseif typeof(value) == 'number' then
-		if value > 0 then
-			local plr = playersService:GetPlayerByUserId(value)
-			if plr and plr ~= lplr then
-				return plr.Character
-			end
-		end
-	elseif type(value) == 'table' then
-		local tryFields = {'character', 'model', 'agent', 'victim', 'player', 'username', 'user_id', 'userid', 'uid'}
-		for _, key in tryFields do
-			local char = resolveEnemyCharacterFromAnyValue(value[key])
-			if char then
-				return char
-			end
-		end
-	end
-	return nil
-end
-
-local function resolveEnemyCharacterFromArgs(...)
-	for i = 1, select('#', ...) do
-		local char = resolveEnemyCharacterFromAnyValue(select(i, ...))
-		if char then
-			return char
-		end
-	end
-	return nil
-end
-
 local function updateBreakState(duration)
 	if typeof(duration) ~= 'number' then
 		return
@@ -2147,7 +2099,7 @@ local function updateBreakState(duration)
 	breakState.endsAt = tick() + duration
 end
 
-local function installBreakPacketHooks()
+installBreakPacketHooks = function()
 	if breakPacketHooked then
 		return true
 	end
@@ -2170,46 +2122,6 @@ local function installBreakPacketHooks()
 		end)
 	end
 	return breakPacketHooked
-end
-
-local function installParryCuePacketHooks()
-	if parryCuePacketHooked then
-		return true
-	end
-	if not initPackets() then
-		return false
-	end
-	local cueMap = {
-		{key = '_x34754b6705aa3689', label = 'cue_draw'},
-		{key = '_x79961bff1a8a3f4c', label = 'cue_shot'},
-		{key = '_xf29dcc6a78e136c2', label = 'cue_draw_scoped'},
-		{key = '_x0b2e7b7fe0af03fc', label = 'cue_shot_scoped'},
-	}
-	local connected = false
-	for _, cue in cueMap do
-		local packet = Packets[cue.key]
-		if packet and packet.OnClientEvent and type(packet.OnClientEvent.Connect) == 'function' and not packet._vapePacketParryHooked then
-			packet._vapePacketParryHooked = true
-			packet.OnClientEvent:Connect(function(...)
-				if not autoParryActive or not parryModeUsesPacket() or not isLocalAlive() then
-					return
-				end
-				local char = resolveEnemyCharacterFromArgs(...)
-				if not char or not char.Parent then
-					return
-				end
-				if not shouldParryGun(char, true, char) then
-					return
-				end
-				tryParry('packet_cue_' .. cue.label, char)
-			end)
-			connected = true
-		end
-	end
-	if connected then
-		parryCuePacketHooked = true
-	end
-	return parryCuePacketHooked
 end
 
 end)
@@ -2994,7 +2906,6 @@ bindPacketListeners = function()
 	end
 	if autoParryActive then
 		installGunParryPacketHook()
-		installParryCuePacketHooks()
 	end
 end
 
