@@ -1,0 +1,106 @@
+-- Decompiled from: Start.Client.Classes.Config
+-- Class: ModuleScript
+-- Place: Ugc (115875349872417)
+-- JobId: d21c1b0a-cbe1-4207-9199-12d11b3e8c58
+
+-- Decompiled with Potassium's decompiler.
+
+local u1 = {};
+u1.__index = u1;
+function u1.new() --[[ Line: 6 ]]
+    -- upvalues: u1 (copy)
+    local v2 = setmetatable({}, u1);
+    v2._x3455a69976478337 = 40;
+    v2._xd91acaf7c9a0a56d = 4.2;
+    v2._xa4b4bc9c060277a1 = v2._x3455a69976478337 * 2.75;
+    v2._xb8eadb2ffaaf2f8b = 30;
+    v2._xf7807269b46234d1 = 35;
+    v2._x80d230f937a3d131 = 4;
+    v2._xa95314831bb5c824 = 135;
+    v2._xb69f349397ab30dd = 0.4;
+    v2._x49f5ccb684832943 = 20;
+    v2._x7c43bf2294f9132c = -0.8;
+    v2._xa2fdfcc6f408e1e7 = 0.1;
+    v2._xc444013050a10961 = true;
+    v2._xbc090062870699fa = false;
+    v2._x25c1dc7878bafa51 = 0.02;
+    v2._xe416710bb5e5ac8f = 0.1;
+    v2._xcfd8790fdcd1b342 = 43;
+    v2._xee427fb96c83cfee = 0.1;
+    v2._x6349dade33883659 = 0.15;
+    v2._xec29ab0b3cc6aa54 = true;
+    v2._x8fb3371fbaf04a2f = false;
+    v2._xf52953a67b88942f = "Toggle";
+    v2._x16826131bd8eb55e = 3;
+    v2._x6da738dd30259095 = 0.5;
+    v2._x1761ac6fff7fe858 = -1.5;
+    v2._xc4f80c0de9ceed28 = -0.005;
+    v2._xf92be62e4311d49b = 135;
+    v2._x6b9ab7876653f248 = 0.5;
+    v2._xf644d648a6d05b55 = 0.65;
+    v2._x5513565fa93a42eb = 125;
+    v2._x3a61b97386ebcccc = 0.1;
+    v2._x9888d32d22a873b9 = 0.15;
+    v2._x1db7d1f0d9dc6c0d = 40;
+    v2._x1a30842b12d6de05 = 0.5;
+    v2._x227f5b982e46b39f = 0.1;
+    v2._xb3f5f6f85950be05 = 20;
+    v2._xae4bb992859adb21 = 40;
+    v2._x4762b1351cc75a88 = 20;
+    v2._x95b304d22f7dfa20 = 0;
+    v2._xb6b17cd13b4d46e4 = 0.3;
+    v2._x6fe8e059ceece2a6 = 130;
+    v2._x9dbfd9d6868d0cbe = 10;
+    v2._xe985c1c25aa2c3bf = 2;
+    v2._x962512845f2348d0 = 25;
+    v2._xed7112d65b053164 = 6;
+    v2._x2fe0eeafcbc38266 = 7;
+    v2._x561be6386cb9a281 = 1;
+    v2._x03ec0088b4c48b1a = 120;
+    v2._x9f7441af8e71122b = 0.2;
+    v2._x3abeb0d49d4247db = true;
+    v2._x30b37781c7cbf03b = 1;
+    v2._x2f8515c28aa290f0 = 0.9;
+    v2._x6b6051973ef6303d = 0.3;
+    v2._xe40e41f00002dd33 = 0.25;
+    v2._x72ea3ccee57f8db7 = 0.7;
+    v2._x44cdba0db82a69d8 = 5;
+    v2._x8b87a7340c3d55ea = -0.29;
+    v2._x79bcfa8ed622f54a = 0;
+    v2._x3da6be4be40ea636 = 135;
+    v2._x8265c7b3d13c4bcf = 1;
+    v2._xef44935e9c0e94d9 = 170;
+    v2._x2917855223da45b1 = -20;
+    v2._xfbcf542dcc5aa1cf = -1.8;
+    v2._x46e31c25b363aa24 = 0.15;
+    v2._x2fc94370e694ce70 = 0.82;
+    v2._x9aac53935e34bc79 = 0.25;
+    v2._x3523152d4be4102f = 90;
+    v2._x0a947e3c507fb9bb = 0.4;
+    v2._xc9fb81363f195bac = 39;
+    v2._xf19e760bd8fc7888 = 1.5;
+    v2._xc5c057c1909bbb16 = 110;
+    v2._xd7b7dccf69182373 = 10;
+    v2._x2d5729f4b6125544 = 80;
+    v2._xfe2449222dfb39e0 = 80;
+    v2._x70b09bb1e5124bdf = 25;
+    v2._x8a97c78743a293c7 = 1;
+    v2._xab3c72688f9e1105 = 1;
+    v2._x66658ffa594000a2 = false;
+    v2._x0101d6254846c5e6 = -35;
+    v2._xcfd6e0dd5ae61bd3 = true;
+    v2._x3dd9bda739039348 = 1;
+    v2._xf1a973e8093cce62 = 1.5 * v2._x3dd9bda739039348;
+    v2._x38c4e7218dcb087a = 0.8 / v2._x3dd9bda739039348;
+    v2._xe507e0afd61ff7d7 = 0.5 / v2._x3dd9bda739039348;
+    v2._x2b5ce4ee2f16900b = 3;
+    v2._xffd32064ba78eb18 = 0.25;
+    v2._xd868aa538cd20798 = 0.35;
+    v2._x23bd7f4b03c1eab5 = 15;
+    v2._xc2ff40006a19321d = 0.8;
+    return v2;
+end;
+function u1.Init(_) --[[ Line: 127 ]] end;
+u1._x90d4581ac99dd483 = u1.new;
+u1._xe53615d96cf36a6b = u1.Init;
+return u1;

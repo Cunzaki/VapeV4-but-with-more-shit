@@ -1,0 +1,35 @@
+# Instance tree: StarterPlayer
+
+StarterPlayer StarterPlayer
+  StarterPlayerScripts StarterPlayerScripts
+    ModuleScript PlayerModule
+      ModuleScript CameraModule
+        ModuleScript Poppercam
+        ModuleScript MouseLockController
+        ModuleScript OrbitalCamera
+        ModuleScript BaseCamera
+        ModuleScript TransparencyController
+        ModuleScript ClassicCamera
+        ModuleScript CameraToggleStateController
+        ModuleScript VehicleCamera
+          ModuleScript VehicleCameraCore
+          ModuleScript VehicleCameraConfig
+        ModuleScript CameraInput
+        ModuleScript BaseOcclusion
+        ModuleScript VRBaseCamera
+        ModuleScript ZoomController
+          ModuleScript Popper
+        ModuleScript LegacyCamera
+        ModuleScript Invisicam
+        ModuleScript CameraUtils
+        ModuleScript CameraUI
+      Folder CommonUtils
+        ModuleScript CharacterUtil
+        ModuleScript CameraWrapper
+        ModuleScript ConnectionUtil
+        ModuleScript FlagUtil
+    LocalScript PlayerScriptsLoader
+    LocalScript RbxCharacterSounds
+      ModuleScript AtomicBinding
+  StarterCharacterScripts StarterCharacterScripts
+    LocalScript Animate
