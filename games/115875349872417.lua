@@ -57,7 +57,7 @@ local ALWAYS_PARRY_DEFAULT_VELOCITY = 200
 local ALWAYS_PARRY_MIN_VELOCITY = 80
 local ALWAYS_PARRY_MAX_VELOCITY = 200
 local CLASH_VELOCITY_SERVER_CAP = 200
-local HURTBOX_SCAN_CACHE_TTL = 0.2
+local HURTBOX_SCAN_CACHE_TTL = 0.25
 local COMBAT_EVENT_PACKET = '_x6f165cf1c8a4a502'
 local BREAK_PACKET_NAME = '_x71a4ac7aba517193'
 local MELEE_DEFAULT_ACTION = 'SWING'
@@ -65,7 +65,8 @@ local MELEE_ACTION_FALLBACKS = {'SWING', 'SWING_HEAVY', 'wideslash', 'WIDESLASH'
 local DASH_VELOCITY_MIN = 20
 local AUTO_ATTACK_RANGE_DEFAULT = 14
 local AUTO_ATTACK_MIN_DELAY = 0.12
-local AUTO_ATTACK_SCAN_INTERVAL = 0.2
+local AUTO_ATTACK_SCAN_INTERVAL = 0.25
+local AUTO_ATTACK_MAX_HURTBOXES = 16
 
 local redlinerApi = {
 	resolved = false,
@@ -1859,13 +1860,10 @@ function isEnemyMeleeSwinging(charOrPlr, maxSwingTime)
 end
 
 shouldBlockMeleeAttack = function(attackRange)
-	if tick() < clashBlockUntil or tick() < parryBlockAttackUntil then
-		return true
-	end
 	for _, plr in playersService:GetPlayers() do
-		if plr ~= lplr and plr.Character and isPlayerVisible(plr) then
-			if getClosestEnemyDistance(plr) <= attackRange then
-				if isEnemyParrying(plr) or isEnemyMeleeSwinging(plr) then
+		if plr ~= lplr and plr.Character and plr.Character.Parent then
+			if getClosestEnemyDistance(plr.Character) <= attackRange then
+				if isEnemyParrying(plr) then
 					return true
 				end
 			end
@@ -2687,7 +2685,8 @@ getEnemyHurtboxesInRange = function(range, origin, requireVisible)
 		return a.Distance < b.Distance
 	end)
 	local results = {}
-	for i = 1, math.min(#sorted, 8) do
+	local maxResults = (autoAttackActive or reachActive) and AUTO_ATTACK_MAX_HURTBOXES or 8
+	for i = 1, math.min(#sorted, maxResults) do
 		table.insert(results, sorted[i].Part)
 	end
 	hurtboxScanCache.time = now
@@ -2973,20 +2972,21 @@ local function extendAttackHurtboxes(attack)
 		return 0
 	end
 	if type(attack.hit_hurtboxes) ~= 'table' then
-		return 0
+		attack.hit_hurtboxes = {}
 	end
 	local root = getLocalRoot()
 	if not root then
 		return 0
 	end
 	local before = #attack.hit_hurtboxes
-	local extended = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position, not autoAttackActive)
+	local extended = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position, false)
 	for _, part in extended do
 		if not table.find(attack.hit_hurtboxes, part) then
 			table.insert(attack.hit_hurtboxes, part)
 		end
 	end
-	attack.hit_hurtboxes = trimHurtboxList(attack.hit_hurtboxes, 8)
+	local maxCount = autoAttackActive and AUTO_ATTACK_MAX_HURTBOXES or 8
+	attack.hit_hurtboxes = trimHurtboxList(attack.hit_hurtboxes, maxCount)
 	return #attack.hit_hurtboxes - before
 end
 
@@ -3069,13 +3069,16 @@ local function getClientClasses()
 		local gcOk, gc = pcall(getgc, true)
 		if gcOk and type(gc) == 'table' then
 			for _, value in gc do
-				if type(value) == 'table' and type(value.Classes) == 'table' then
-					local cls = value.Classes
-					if type(cls._x3e046bec2684f59c) == 'table'
-						or type(cls._xd2c44c643b0c3fb4) == 'table'
-						or type(cls._xf1ad98d2d70b7408) == 'table'
-						or type(cls._x7058397dabccd000) == 'table'
-						or type(cls._xef0ffbcc2c92f7b4) == 'table' then
+				if type(value) ~= 'table' then
+					continue
+				end
+				local cls = rawget(value, 'Classes')
+				if type(cls) == 'table' then
+					if type(rawget(cls, '_x3e046bec2684f59c')) == 'table'
+						or type(rawget(cls, '_xd2c44c643b0c3fb4')) == 'table'
+						or type(rawget(cls, '_xf1ad98d2d70b7408')) == 'table'
+						or type(rawget(cls, '_x7058397dabccd000')) == 'table'
+						or type(rawget(cls, '_xef0ffbcc2c92f7b4')) == 'table' then
 						classes = cls
 						break
 					end
@@ -3096,10 +3099,10 @@ local function resolveMovementApi()
 		return
 	end
 	for _, classKey in MOVEMENT_CLASS_CANDIDATES do
-		local ctrl = classes[classKey]
+		local ctrl = rawget(classes, classKey)
 		if type(ctrl) == 'table' then
 			for _, field in VELOCITY_FIELD_CANDIDATES do
-				if typeof(ctrl[field]) == 'Vector3' then
+				if typeof(rawget(ctrl, field)) == 'Vector3' then
 					redlinerApi.movementClassKey = classKey
 					redlinerApi.velocityField = field
 					break
@@ -3112,12 +3115,19 @@ local function resolveMovementApi()
 	end
 	if #redlinerApi.inputHandlers == 0 then
 		for _, entry in INPUT_HANDLER_CANDIDATES do
-			local handler = classes[entry.class]
-			if type(handler) == 'table' and type(handler[entry.method]) == 'function' then
+			local handler = rawget(classes, entry.class)
+			if type(handler) == 'table' and type(rawget(handler, entry.method)) == 'function' then
 				table.insert(redlinerApi.inputHandlers, entry)
 			end
 		end
 	end
+end
+
+local function getClientClassesCached()
+	if clientClassesCache then
+		return clientClassesCache
+	end
+	return getClientClasses()
 end
 
 local function getMovementController()
@@ -3126,7 +3136,7 @@ local function getMovementController()
 	if not classes or not redlinerApi.movementClassKey then
 		return nil
 	end
-	return classes[redlinerApi.movementClassKey]
+	return rawget(classes, redlinerApi.movementClassKey)
 end
 
 local function getAlwaysParryVelocityMag(_current)
@@ -3285,11 +3295,16 @@ triggerGameMeleeAttack = function()
 	if alwaysParryActive then
 		applyClashVelocitySpoof()
 	end
-	resolveMovementApi()
-	local classes = getClientClasses()
+	local classes
+	if #redlinerApi.inputHandlers > 0 then
+		classes = clientClassesCache
+	else
+		resolveMovementApi()
+		classes = getClientClassesCached()
+	end
 	for _, entry in redlinerApi.inputHandlers do
-		local inputHandler = classes and classes[entry.class]
-		if inputHandler and type(inputHandler[entry.method]) == 'function' then
+		local inputHandler = classes and rawget(classes, entry.class)
+		if inputHandler and type(rawget(inputHandler, entry.method)) == 'function' then
 			local meleeAction = inputHandler[entry.method](inputHandler, 'MELEE')
 			if meleeAction and meleeAction.Pressed and type(meleeAction.Pressed.Fire) == 'function' then
 				meleeAction.Pressed:Fire()
@@ -3314,11 +3329,11 @@ augmentOutgoingMeleeHurtboxes = function(hurtboxes)
 	if not root then
 		return hurtboxes
 	end
-	local extended = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position, not autoAttackActive)
+	local extended = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position, false)
 	if type(hurtboxes) ~= 'table' then
 		hurtboxes = {}
 	end
-	return trimHurtboxList(mergeHurtboxLists(hurtboxes, extended), 8)
+	return trimHurtboxList(mergeHurtboxLists(hurtboxes, extended), autoAttackActive and AUTO_ATTACK_MAX_HURTBOXES or 8)
 end
 
 installMeleePacketReachHook = function()
@@ -3764,7 +3779,7 @@ end
 
 getNearestEnemyInAttackRange = function(attackRange)
 	local now = tick()
-	if autoAttackTargetCache.time + HURTBOX_SCAN_CACHE_TTL > now
+	if autoAttackTargetCache.time + AUTO_ATTACK_SCAN_INTERVAL > now
 		and autoAttackTargetCache.range == attackRange then
 		return autoAttackTargetCache.model
 	end
@@ -3775,29 +3790,28 @@ getNearestEnemyInAttackRange = function(attackRange)
 		autoAttackTargetCache.model = nil
 		return nil
 	end
-	local hurtboxes = getEnemyHurtboxesInRange(attackRange, root.Position, false)
-	if #hurtboxes > 0 then
-		local owner = hurtboxes[1]:FindFirstAncestorWhichIsA('Model')
-		if owner then
-			autoAttackTargetCache.time = now
-			autoAttackTargetCache.range = attackRange
-			autoAttackTargetCache.model = owner
-			return owner
-		end
-	end
 	local origin = root.Position
 	local nearestModel, nearestDist = nil, attackRange
-	for _, plr in playersService:GetPlayers() do
-		if plr ~= lplr then
-			for _, model in getEnemyModels(plr) do
-				if model and model.Parent then
-					local enemyRoot = model:FindFirstChild('HumanoidRootPart')
-					if enemyRoot then
-						local dist = (enemyRoot.Position - origin).Magnitude
-						if dist <= attackRange and dist < nearestDist then
-							nearestModel = model
-							nearestDist = dist
-						end
+	local hurtboxes = getEnemyHurtboxesInRange(attackRange, origin, false)
+	for _, part in hurtboxes do
+		local owner = part:FindFirstAncestorWhichIsA('Model')
+		if owner then
+			local dist = (part.Position - origin).Magnitude
+			if dist < nearestDist then
+				nearestModel = owner
+				nearestDist = dist
+			end
+		end
+	end
+	if not nearestModel then
+		for _, plr in playersService:GetPlayers() do
+			if plr ~= lplr and plr.Character and plr.Character.Parent then
+				local enemyRoot = plr.Character:FindFirstChild('HumanoidRootPart')
+				if enemyRoot then
+					local dist = (enemyRoot.Position - origin).Magnitude
+					if dist <= attackRange and dist < nearestDist then
+						nearestModel = plr.Character
+						nearestDist = dist
 					end
 				end
 			end
@@ -4935,24 +4949,25 @@ run(function()
 			autoAttackActive = callback
 			if callback then
 				resolveRedlinerRuntime(true)
+				resolveMovementApi()
 				installAttackReachHook()
 				rebuildMeleePacketFireChain()
 				bindAutoAttackLoop()
-				notif('Auto Attack', '360 melee — aims at nearby enemies in range.', 4)
+				notif('Auto Attack', '360 melee — hits all enemies in range via hurtbox merge.', 4)
 			else
 				rebuildMeleePacketFireChain()
 			end
 		end,
-		Tooltip = 'Swings when any valid enemy is within Attack Range (360). Aims the melee hitbox at the target and sends their hurtboxes even if they are behind you.',
+		Tooltip = 'Swings when any valid enemy is within Attack Range (360). Merges all enemy hurtboxes in range into the melee packet, including behind you and off-screen.',
 	})
 
 	AutoAttack:CreateToggle({
-		Name = 'Anti Parry / Clash',
+		Name = 'Anti Parry',
 		Default = true,
 		Function = function(callback)
 			hud.antiParryEnabled = callback
 		end,
-		Tooltip = 'Skips attacking when a nearby enemy is parrying or mid melee swing (clash risk). Also backs off briefly after you clash/parry.',
+		Tooltip = 'Skips attacking when any enemy in Attack Range is playing a parry animation (360, no LOS required).',
 	})
 
 	Reach = extras:CreateModule({
