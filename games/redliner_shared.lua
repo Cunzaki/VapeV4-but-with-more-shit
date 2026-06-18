@@ -282,15 +282,15 @@ local breakState = {
 	lastTriggeredAt = 0,
 }
 
-local function parryModeUsesAnimation()
+function parryModeUsesAnimation()
 	return parryModeSetting ~= 'Packet'
 end
 
-local function parryModeUsesPacket()
+function parryModeUsesPacket()
 	return parryModeSetting ~= 'Animation'
 end
 
-local function isPacketParryReason(reason)
+function isPacketParryReason(reason)
 	if type(reason) ~= 'string' then
 		return false
 	end
@@ -298,7 +298,7 @@ local function isPacketParryReason(reason)
 		or string.find(reason, 'packet_cue_', 1, true) ~= nil
 end
 
-local function isAnimationParryReason(reason)
+function isAnimationParryReason(reason)
 	if type(reason) ~= 'string' then
 		return false
 	end
@@ -308,7 +308,7 @@ local function isAnimationParryReason(reason)
 		or string.find(reason, 'glint', 1, true) ~= nil
 end
 
-local function spawnWorldTracer(fromPos, toPos, color, opts)
+function spawnWorldTracer(fromPos, toPos, color, opts)
 	opts = opts or {}
 	if typeof(fromPos) ~= 'Vector3' then
 		return nil
@@ -345,14 +345,14 @@ local function spawnWorldTracer(fromPos, toPos, color, opts)
 	return part
 end
 
-local function spawnBulletVizRay(origin, direction, color)
+function spawnBulletVizRay(origin, direction, color)
 	if not hud.hitboxVisualizerBulletEnabled then
 		return
 	end
 	spawnWorldTracer(origin, direction, color, {useDirection = true, length = 120})
 end
 
-local function isGameWindowFocused()
+function isGameWindowFocused()
 	if isrbxactive then
 		return isrbxactive()
 	end
@@ -362,19 +362,19 @@ local function isGameWindowFocused()
 	return true
 end
 
-local function reachDebugLog(...)
+function reachDebugLog(...)
 	if reachDebugEnabled then
 		print('[REDLINER][Reach]', ...)
 	end
 end
 
-local function reachDebugWarn(...)
+function reachDebugWarn(...)
 	if reachDebugEnabled then
 		warn('[REDLINER][Reach]', ...)
 	end
 end
 
-local function reachDebugSkip(key, ...)
+function reachDebugSkip(key, ...)
 	if not reachDebugEnabled then
 		return
 	end
@@ -386,11 +386,11 @@ local function reachDebugSkip(key, ...)
 	print('[REDLINER][Reach] skip:', key, ...)
 end
 
-local function notif(...)
+function notif(...)
 	return vape:CreateNotification(...)
 end
 
-local function postDiscord(payload)
+function postDiscord(payload)
 	local body = httpService:JSONEncode(payload)
 	local ok = pcall(function()
 		if request then
@@ -407,7 +407,7 @@ local function postDiscord(payload)
 	return ok
 end
 
-local function discordEmbed(title, description, color, fields, thumbnailUrl)
+function discordEmbed(title, description, color, fields, thumbnailUrl)
 	local embed = {
 		title = title,
 		description = description,
@@ -425,7 +425,7 @@ local function discordEmbed(title, description, color, fields, thumbnailUrl)
 	})
 end
 
-local function readFolderValue(folder, name)
+function readFolderValue(folder, name)
 	if not folder then
 		return nil
 	end
@@ -518,11 +518,11 @@ run(function()
 	end)
 end)
 
-local function getPlayerReadOnlyFolder(plr)
+function getPlayerReadOnlyFolder(plr)
 	return plr and plr:FindFirstChild('ReadOnly')
 end
 
-local function getPlayerReadOnlyNumber(plr, name)
+function getPlayerReadOnlyNumber(plr, name)
 	local ro = getPlayerReadOnlyFolder(plr)
 	local v = ro and ro:FindFirstChild(name)
 	if v and (v:IsA('NumberValue') or v:IsA('IntValue')) then
@@ -531,7 +531,7 @@ local function getPlayerReadOnlyNumber(plr, name)
 	return nil
 end
 
-local function getEntityHeadPart(plr)
+function getEntityHeadPart(plr)
 	if not plr then
 		return nil
 	end
@@ -551,7 +551,7 @@ local function getEntityHeadPart(plr)
 	return nil
 end
 
-local function isPlayerVisible(plr)
+function isPlayerVisible(plr)
 	local head = getEntityHeadPart(plr)
 	if not head or not head.Parent then
 		return false
@@ -595,20 +595,20 @@ local function isPlayerVisible(plr)
 	return false
 end
 
-local function withThread(func)
+function withThread(func)
 	if vape.ThreadFix and setthreadidentity then
 		setthreadidentity(8)
 	end
 	return func()
 end
 
-local function debugLog(...)
+function debugLog(...)
 	if debugEnabled then
 		print('[REDLINER]', ...)
 	end
 end
 
-local function debugSkip(...)
+function debugSkip(...)
 	if debugEnabled then
 		local key = table.concat({...}, '|')
 		local now = tick()
@@ -620,7 +620,7 @@ local function debugSkip(...)
 	end
 end
 
-local function threatDebugSkip(...)
+function threatDebugSkip(...)
 	if not threatDebugEnabled and not debugEnabled then
 		return
 	end
@@ -637,7 +637,7 @@ end
 -- Packets / reach
 -- ---------------------------------------------------------------------------
 
-local function initPackets()
+function initPackets()
 	if Packets then
 		return true
 	end
@@ -664,7 +664,7 @@ local function initPackets()
 	return true
 end
 
-local function getMeleeReach()
+function getMeleeReach()
 	return BASE_SWORD_REACH + (reachActive and reachExtend or 0)
 end
 
@@ -672,7 +672,7 @@ end
 -- Character helpers
 -- ---------------------------------------------------------------------------
 
-local function getLocalCharacter()
+function getLocalCharacter()
 	local char = lplr.Character
 	if char and char.Parent then
 		return char
@@ -686,7 +686,7 @@ local function getLocalCharacter()
 	return char
 end
 
-local function getLocalRoot()
+function getLocalRoot()
 	local char = getLocalCharacter()
 	if not char then
 		return nil
@@ -704,7 +704,7 @@ local function getLocalRoot()
 	return nil
 end
 
-local function isLocalAlive()
+function isLocalAlive()
 	local char = getLocalCharacter()
 	if not char or not char.Parent then
 		return false
@@ -730,7 +730,7 @@ canSafelyParry = function()
 	return root ~= nil and root.Parent ~= nil
 end
 
-local function isEnemyCharacter(model)
+function isEnemyCharacter(model)
 	if not model or model == lplr.Character then
 		return false
 	end
@@ -738,7 +738,7 @@ local function isEnemyCharacter(model)
 	return plr and plr ~= lplr
 end
 
-local function getPlayerFromModel(model)
+function getPlayerFromModel(model)
 	if not model then
 		return nil
 	end
@@ -754,7 +754,7 @@ local function getPlayerFromModel(model)
 	return nil
 end
 
-local function isEnemyCharVisible(char)
+function isEnemyCharVisible(char)
 	if not char then
 		return false
 	end
@@ -768,7 +768,7 @@ local function isEnemyCharVisible(char)
 	return isPlayerVisible(plr)
 end
 
-local function getEnemyModels(plr)
+function getEnemyModels(plr)
 	local models = {}
 	if plr.Character then
 		table.insert(models, plr.Character)
@@ -784,7 +784,7 @@ local function getEnemyModels(plr)
 	return models
 end
 
-local function getClosestEnemyDistance(charOrPlr)
+function getClosestEnemyDistance(charOrPlr)
 	local root = getLocalRoot()
 	if not root then
 		return math.huge
@@ -810,11 +810,11 @@ local function getClosestEnemyDistance(charOrPlr)
 	return best
 end
 
-local function getEnemyDistance(char)
+function getEnemyDistance(char)
 	return getClosestEnemyDistance(char)
 end
 
-local function getEnemyState(char)
+function getEnemyState(char)
 		if not enemyStates[char] then
 		enemyStates[char] = {
 			lastSwingId = '',
@@ -832,19 +832,19 @@ local function getEnemyState(char)
 	return enemyStates[char]
 end
 
-local function isEnemyInMeleeThreatRange(char)
+function isEnemyInMeleeThreatRange(char)
 	return isEnemyCharVisible(char)
 end
 
-local function isEnemyInGunThreatRange(char)
+function isEnemyInGunThreatRange(char)
 	return isEnemyCharVisible(char)
 end
 
-local function getEffectiveWatcherRange()
+function getEffectiveWatcherRange()
 	return math.huge
 end
 
-local function isInstUnderEnemyModels(char, inst)
+function isInstUnderEnemyModels(char, inst)
 	if not inst or not char then
 		return false
 	end
@@ -858,14 +858,14 @@ local function isInstUnderEnemyModels(char, inst)
 	return false
 end
 
-local function getTriggerDebounce(triggerKey)
+function getTriggerDebounce(triggerKey)
 	if string.find(triggerKey, ':melee:', 1, true) then
 		return meleeEnemyDebounceSetting
 	end
 	return gunEnemyDebounceSetting
 end
 
-local function canEnemyAnimTrigger(char, triggerKey)
+function canEnemyAnimTrigger(char, triggerKey)
 	local state = getEnemyState(char)
 	local now = tick()
 	local debounce = getTriggerDebounce(triggerKey)
@@ -876,7 +876,7 @@ local function canEnemyAnimTrigger(char, triggerKey)
 	return true
 end
 
-local function confirmEnemyAnimTrigger(char, triggerKey)
+function confirmEnemyAnimTrigger(char, triggerKey)
 	local state = getEnemyState(char)
 	state.lastAnimTriggerKey = triggerKey
 	state.lastAnimTriggerAt = tick()
@@ -890,7 +890,7 @@ end
 -- Parry animation IDs (strict whitelist only)
 -- ---------------------------------------------------------------------------
 
-local function normalizeAnimId(animId)
+function normalizeAnimId(animId)
 	if typeof(animId) ~= 'string' or animId == '' then
 		return ''
 	end
@@ -898,7 +898,7 @@ local function normalizeAnimId(animId)
 	return numeric or string.lower(animId)
 end
 
-local function getTrackAnimInfo(track)
+function getTrackAnimInfo(track)
 	local anim = track and track.Animation
 	if not anim then
 		return '', ''
@@ -906,7 +906,7 @@ local function getTrackAnimInfo(track)
 	return anim.Name or '', anim.AnimationId or ''
 end
 
-local function getParryAnimKind(animId)
+function getParryAnimKind(animId)
 	local normId = normalizeAnimId(animId)
 	if BLOCKED_ANIM_IDS[normId] then
 		return nil
@@ -923,11 +923,11 @@ local function getParryAnimKind(animId)
 	return nil
 end
 
-local function isParryMeleeAnim(animId)
+function isParryMeleeAnim(animId)
 	return getParryAnimKind(animId) == 'melee'
 end
 
-local function debugAnimLog(...)
+function debugAnimLog(...)
 	if not debugEnabled then
 		return
 	end
@@ -940,7 +940,7 @@ local function debugAnimLog(...)
 	print('[REDLINER] anim:', ...)
 end
 
-local function logParryAnimIds(force)
+function logParryAnimIds(force)
 	if parryIdsLogged and not force then
 		return
 	end
@@ -948,7 +948,7 @@ local function logParryAnimIds(force)
 	print('[REDLINER] parry ids | melee=105441036119013 | gun_draw+gun_shot from catalog | blocked walk=115078691506529')
 end
 
-local function getAllPlayingTracks(char)
+function getAllPlayingTracks(char)
 	if not char then
 		return {}
 	end
@@ -969,7 +969,7 @@ local function getAllPlayingTracks(char)
 	return tracks
 end
 
-local function getAllPlayingTracksForChar(char)
+function getAllPlayingTracksForChar(char)
 	local plr = playersService:GetPlayerFromCharacter(char)
 	local models = plr and getEnemyModels(plr) or {char}
 	local tracks = {}
@@ -983,7 +983,7 @@ local function getAllPlayingTracksForChar(char)
 	return tracks
 end
 
-local function charHasWhitelistAttackPlaying(char)
+function charHasWhitelistAttackPlaying(char)
 	for _, track in getAllPlayingTracksForChar(char) do
 		if not track.IsPlaying then
 			continue
@@ -1004,7 +1004,7 @@ end
 -- Aim checks
 -- ---------------------------------------------------------------------------
 
-local function getTrackOwnerModel(track)
+function getTrackOwnerModel(track)
 	if not track then
 		return nil
 	end
@@ -1018,7 +1018,7 @@ local function getTrackOwnerModel(track)
 	return nil
 end
 
-local function getAimDot3D(origin, lookVector, targetPos)
+function getAimDot3D(origin, lookVector, targetPos)
 	local offset = targetPos - origin
 	if offset.Magnitude < 0.05 then
 		return 1
@@ -1029,7 +1029,7 @@ local function getAimDot3D(origin, lookVector, targetPos)
 	return lookVector.Unit:Dot(offset.Unit)
 end
 
-local function rayClosestDistance(origin, dir, point, maxRange)
+function rayClosestDistance(origin, dir, point, maxRange)
 	dir = dir.Unit
 	local rel = point - origin
 	local t = math.clamp(rel:Dot(dir), 0, maxRange or GUN_RAY_MAX_RANGE)
@@ -1039,7 +1039,7 @@ end
 
 local refreshMyHurtboxes
 
-local function isGunRayThreatening(origin, direction, maxRange, maxRadius)
+function isGunRayThreatening(origin, direction, maxRange, maxRadius)
 	if direction.Magnitude < 0.05 then
 		return false
 	end
@@ -1060,7 +1060,7 @@ local function isGunRayThreatening(origin, direction, maxRange, maxRadius)
 	return false
 end
 
-local function isGunMuzzlePart(name)
+function isGunMuzzlePart(name)
 	local lower = string.lower(name)
 	for _, mName in GUN_MUZZLE_NAMES do
 		if string.find(lower, string.lower(mName), 1, true) then
@@ -1070,7 +1070,7 @@ local function isGunMuzzlePart(name)
 	return false
 end
 
-local function collectEnemyGunAimSources(char, aimModel)
+function collectEnemyGunAimSources(char, aimModel)
 	local rays = {}
 	local dots = {}
 	local myRoot = getLocalRoot()
@@ -1108,7 +1108,7 @@ local function collectEnemyGunAimSources(char, aimModel)
 	return rays, dots
 end
 
-local function getEnemyGunOrigin(char)
+function getEnemyGunOrigin(char)
 	if not char then
 		return nil
 	end
@@ -1121,7 +1121,7 @@ local function getEnemyGunOrigin(char)
 	return hrp and hrp.Position
 end
 
-local function findGunShooterFromShotPacket(shotOrigin, aimDir)
+function findGunShooterFromShotPacket(shotOrigin, aimDir)
 	if typeof(shotOrigin) ~= 'Vector3' or typeof(aimDir) ~= 'Vector3' or aimDir.Magnitude < 0.05 then
 		return nil
 	end
@@ -1151,7 +1151,7 @@ local function findGunShooterFromShotPacket(shotOrigin, aimDir)
 	return bestChar
 end
 
-local function isGunAimDirAtMe(originPos, aimDir, char)
+function isGunAimDirAtMe(originPos, aimDir, char)
 	if not originPos or typeof(aimDir) ~= 'Vector3' or aimDir.Magnitude < 0.05 then
 		return false
 	end
@@ -1170,7 +1170,7 @@ local function isGunAimDirAtMe(originPos, aimDir, char)
 	return true, aimDot, need
 end
 
-local function getGunAimDotFromModel(model)
+function getGunAimDotFromModel(model)
 	local root = getLocalRoot()
 	local enemyRoot = model and model:FindFirstChild('HumanoidRootPart')
 	if not root or not enemyRoot then
@@ -1179,7 +1179,7 @@ local function getGunAimDotFromModel(model)
 	return getAimDot3D(enemyRoot.Position, enemyRoot.CFrame.LookVector, root.Position)
 end
 
-local function getHeadAimDotFromModel(model)
+function getHeadAimDotFromModel(model)
 	local root = getLocalRoot()
 	local head = model and model:FindFirstChild('Head')
 	if not root or not head then
@@ -1188,21 +1188,21 @@ local function getHeadAimDotFromModel(model)
 	return getAimDot3D(head.Position, head.CFrame.LookVector, root.Position)
 end
 
-local function getEffectiveGunAimThreshold(_dist)
+function getEffectiveGunAimThreshold(_dist)
 	return math.min(gunAimDotSetting, 0.95)
 end
 
-local function getGunAimDot(char, aimModel)
+function getGunAimDot(char, aimModel)
 	return getGunAimDotFromModel(aimModel or char)
 end
 
-local function getAimDot(char)
+function getAimDot(char)
 	local hrpDot = getGunAimDotFromModel(char)
 	local headDot = getHeadAimDotFromModel(char)
 	return math.max(hrpDot, headDot)
 end
 
-local function isEnemyAimingAtMeForGun(char, aimModel)
+function isEnemyAimingAtMeForGun(char, aimModel)
 	local dist = getClosestEnemyDistance(char)
 	local need = getEffectiveGunAimThreshold(dist)
 	local rays, dotList = collectEnemyGunAimSources(char, aimModel)
@@ -1222,7 +1222,7 @@ local function isEnemyAimingAtMeForGun(char, aimModel)
 	return false, maxDot, need
 end
 
-local function isEnemyTargetingMe(char, minDot, confirmedAttack)
+function isEnemyTargetingMe(char, minDot, confirmedAttack)
 	local dist = getClosestEnemyDistance(char)
 	if not confirmedAttack and dist < closeRangeStudsSetting and not charHasWhitelistAttackPlaying(char) then
 		debugSkip('close_range_no_attack', char.Name, string.format('%.1f', dist))
@@ -1231,7 +1231,7 @@ local function isEnemyTargetingMe(char, minDot, confirmedAttack)
 	return getAimDot(char) >= minDot
 end
 
-local function shouldParryMelee(char, _confirmedAttack)
+function shouldParryMelee(char, _confirmedAttack)
 	if not parryMeleeEnabled then
 		return false
 	end
@@ -1242,7 +1242,7 @@ local function shouldParryMelee(char, _confirmedAttack)
 	return true
 end
 
-local function shouldParryGun(char, _confirmedAttack, aimModel, packetAimDir)
+function shouldParryGun(char, _confirmedAttack, aimModel, packetAimDir)
 	if not parryGunDrawEnabled and not parryGunShotEnabled then
 		return false
 	end
@@ -1272,7 +1272,7 @@ local function shouldParryGun(char, _confirmedAttack, aimModel, packetAimDir)
 	return false
 end
 
-local function isMeleeSwingTrackActive(track)
+function isMeleeSwingTrackActive(track)
 	return track.IsPlaying
 end
 
@@ -1280,7 +1280,7 @@ end
 -- Gun helpers
 -- ---------------------------------------------------------------------------
 
-local function detectEquippedGun(char)
+function detectEquippedGun(char)
 	local bestGun, bestScore = 'Castigate', 0
 	for _, desc in char:GetDescendants() do
 		local lower = string.lower(desc.Name)
@@ -1297,7 +1297,7 @@ local function detectEquippedGun(char)
 	return bestGun
 end
 
-local function charHasGunEquipped(char)
+function charHasGunEquipped(char)
 	for _, desc in char:GetDescendants() do
 		local lower = string.lower(desc.Name)
 		for _, entry in GUN_ITEM_PATTERNS do
@@ -1309,7 +1309,7 @@ local function charHasGunEquipped(char)
 	return false
 end
 
-local function isEnemyDashing(char)
+function isEnemyDashing(char)
 	local root = char:FindFirstChild('HumanoidRootPart')
 	if root then
 		local vel = root.AssemblyLinearVelocity
@@ -1321,11 +1321,11 @@ local function isEnemyDashing(char)
 	return false
 end
 
-local function isGlintInstance(inst)
+function isGlintInstance(inst)
 	return string.find(string.lower(inst.Name), 'glint', 1, true) ~= nil
 end
 
-local function getNetworkPing()
+function getNetworkPing()
 	local ping = 0
 	pcall(function()
 		if lplr.GetNetworkPing then
@@ -1338,34 +1338,34 @@ local function getNetworkPing()
 	return ping
 end
 
-local function getLocalImpactRatio()
+function getLocalImpactRatio()
 	local impact = getPlayerReadOnlyNumber(lplr, 'impact') or 0
 	local limit = getPlayerReadOnlyNumber(lplr, 'impact_limit') or 1
 	return math.clamp(impact / math.max(limit, 1), 0, 1)
 end
 
-local function getGunParryDelay(gunName)
+function getGunParryDelay(gunName)
 	return gunParryDelays[gunName] or gunParryDelays.Castigate
 end
 
-local function getParryLeadTime()
+function getParryLeadTime()
 	return math.clamp(getNetworkPing() * 0.5 + PARRY_INPUT_LATENCY, 0, PING_PARRY_MAX_OFFSET + PARRY_INPUT_LATENCY)
 end
 
-local function getPingParryOffset()
+function getPingParryOffset()
 	return getParryLeadTime()
 end
 
-local function getEffectiveGunParryDelay(gunName)
+function getEffectiveGunParryDelay(gunName)
 	return math.max(0, getGunParryDelay(gunName) - getParryLeadTime())
 end
 
-local function getAdjustedParryDelay(baseDelay, timePosition)
+function getAdjustedParryDelay(baseDelay, timePosition)
 	local impactShift = (1 - getLocalImpactRatio()) * 0.03
 	return math.max(0, (baseDelay or 0) - (timePosition or 0) - getParryLeadTime() - impactShift)
 end
 
-local function scheduleGunDrawParry(char, gunName, normId, timePosition, source, track, aimModel)
+function scheduleGunDrawParry(char, gunName, normId, timePosition, source, track, aimModel)
 	if not shouldParryGun(char, true, aimModel) then
 		debugSkip('gun_draw_aim_schedule', char.Name, gunName, normId, source)
 		return
@@ -1432,7 +1432,7 @@ end
 -- Parry input
 -- ---------------------------------------------------------------------------
 
-local function pressParryKey()
+function pressParryKey()
 	if not canSafelyParry() then
 		return false
 	end
@@ -1529,9 +1529,9 @@ tryParry = function(reason, char)
 end
 
 -- Enemy parry animations (built from Assets.Animations catalog at load).
-local ENEMY_PARRY_ANIM_IDS = {}
+ENEMY_PARRY_ANIM_IDS = {}
 
-local function buildEnemyParryAnimCatalog()
+function buildEnemyParryAnimCatalog()
 	table.clear(ENEMY_PARRY_ANIM_IDS)
 	local assets = replicatedStorage:FindFirstChild('Assets')
 	if not assets then
@@ -1553,7 +1553,7 @@ local function buildEnemyParryAnimCatalog()
 	return count
 end
 
-local function isEnemyParryAnim(animId, animName)
+function isEnemyParryAnim(animId, animName)
 	local normId = normalizeAnimId(animId)
 	if normId == '' then
 		return false
@@ -1568,7 +1568,7 @@ local function isEnemyParryAnim(animId, animName)
 	return string.find(upper, 'PARRY', 1, true) ~= nil
 end
 
-local function isEnemyParrying(charOrPlr)
+function isEnemyParrying(charOrPlr)
 	local plr, char
 	if charOrPlr and charOrPlr:IsA('Player') then
 		plr = charOrPlr
@@ -1596,10 +1596,10 @@ local function isEnemyParrying(charOrPlr)
 	return false
 end
 
-local MELEE_SWING_NAME_HINTS = {'SLASH', 'SWING', 'WIDE', 'STAB', 'CUT', 'HIT', 'CROUCH'}
-local MELEE_SWING_NAME_BLOCK = {'PARRY', 'DRAW', 'GUN', 'IDLE', 'WALK', 'RUN', 'JUMP', 'LAND', 'BLOCK', 'DASH', 'DEATH', 'HURT'}
+MELEE_SWING_NAME_HINTS = {'SLASH', 'SWING', 'WIDE', 'STAB', 'CUT', 'HIT', 'CROUCH'}
+MELEE_SWING_NAME_BLOCK = {'PARRY', 'DRAW', 'GUN', 'IDLE', 'WALK', 'RUN', 'JUMP', 'LAND', 'BLOCK', 'DASH', 'DEATH', 'HURT'}
 
-local function isMeleeSwingAnimName(animName)
+function isMeleeSwingAnimName(animName)
 	local upper = string.upper(animName or '')
 	for _, blocked in MELEE_SWING_NAME_BLOCK do
 		if string.find(upper, blocked, 1, true) then
@@ -1614,7 +1614,7 @@ local function isMeleeSwingAnimName(animName)
 	return false
 end
 
-local function isEnemyMeleeSwinging(charOrPlr, maxSwingTime)
+function isEnemyMeleeSwinging(charOrPlr, maxSwingTime)
 	maxSwingTime = maxSwingTime or 0.85
 	local plr, char
 	if charOrPlr and charOrPlr:IsA('Player') then
