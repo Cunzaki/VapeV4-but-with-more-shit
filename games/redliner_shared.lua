@@ -206,6 +206,7 @@ local autoAttackLoopBound = false
 local hurtboxScanCache = {time = 0, range = 0, visible = true, results = {}}
 local autoAttackTargetCache = {time = 0, range = 0, model = nil}
 local meleePacketGcMirrored = false
+local alwaysParryInputBound = false
 local localRespawnBound = false
 local lastParryScanAt = 0
 local lastWatcherRefreshAt = 0
@@ -2243,6 +2244,97 @@ run(function()
 
 local expandedHurtboxSizes = {}
 local redlinerHitboxViz = {}
+local hitboxExpansionBound = false
+local lastHitboxExpansionRefresh = 0
+local HITBOX_EXPANSION_REFRESH_INTERVAL = 0.4
+
+local function isLocalOwnedHurtbox(part)
+	if not part or not part.Parent then
+		return true
+	end
+	if lplr.Character and part:IsDescendantOf(lplr.Character) then
+		return true
+	end
+	local owner = part:FindFirstAncestorWhichIsA('Model')
+	if not owner then
+		return false
+	end
+	if lplr.Character and (owner == lplr.Character or owner:IsDescendantOf(lplr.Character)) then
+		return true
+	end
+	local plr = getPlayerFromModel(owner)
+	if plr == lplr then
+		return true
+	end
+	return false
+end
+
+local function shouldExpandRedlinerHurtbox(part)
+	if isLocalOwnedHurtbox(part) then
+		return false
+	end
+	local owner = part:FindFirstAncestorWhichIsA('Model')
+	if not owner or not isEnemyOwner(owner) then
+		return false
+	end
+	local plr = getPlayerFromModel(owner)
+	if redlinerHitboxPlayersOnly and not plr then
+		return false
+	end
+	return true
+end
+
+local function applyRedlinerHurtboxExpand(part)
+	if not shouldExpandRedlinerHurtbox(part) then
+		return false
+	end
+	if not expandedHurtboxSizes[part] then
+		expandedHurtboxSizes[part] = part.Size
+	end
+	local orig = expandedHurtboxSizes[part]
+	local target = orig + Vector3.new(redlinerHitboxExpand, redlinerHitboxExpand, redlinerHitboxExpand)
+	if (part.Size - target).Magnitude > 0.01 then
+		part.Size = target
+	end
+	if redlinerHitboxVisualize then
+		local adorn = redlinerHitboxViz[part]
+		if not adorn or not adorn.Parent then
+			adorn = Instance.new('BoxHandleAdornment')
+			adorn.Name = 'VapeRedlinerHitbox'
+			adorn.AlwaysOnTop = true
+			adorn.ZIndex = 5
+			adorn.Adornee = part
+			adorn.Parent = part
+			redlinerHitboxViz[part] = adorn
+		end
+		adorn.Size = part.Size
+		adorn.Color3 = Color3.fromRGB(255, 85, 85)
+		adorn.Transparency = 0.45
+	elseif redlinerHitboxViz[part] then
+		pcall(function()
+			redlinerHitboxViz[part]:Destroy()
+		end)
+		redlinerHitboxViz[part] = nil
+	end
+	return true
+end
+
+local function releaseRedlinerHurtboxExpand(part)
+	local origSize = expandedHurtboxSizes[part]
+	if origSize and typeof(part) == 'Instance' and part.Parent then
+		pcall(function()
+			part.Size = origSize
+		end)
+	end
+	local adorn = redlinerHitboxViz[part]
+	if adorn then
+		pcall(function()
+			adorn:Destroy()
+		end)
+	end
+	expandedHurtboxSizes[part] = nil
+	redlinerHitboxViz[part] = nil
+end
 
 local function isEnemyOwner(model)
 	local plr = getPlayerFromModel(model)
@@ -2322,19 +2414,8 @@ getEnemyHurtboxesInRange = function(range, origin, requireVisible)
 end
 
 local function clearRedlinerHitboxExpansion()
-	for part, origSize in expandedHurtboxSizes do
-		if typeof(part) == 'Instance' and part.Parent then
-			pcall(function()
-				part.Size = origSize
-			end)
-		end
-		local adorn = redlinerHitboxViz[part]
-		if adorn then
-			pcall(function()
-				adorn:Destroy()
-			end)
-			redlinerHitboxViz[part] = nil
-		end
+	for part in expandedHurtboxSizes do
+		releaseRedlinerHurtboxExpand(part)
 	end
 	table.clear(expandedHurtboxSizes)
 end
@@ -2344,67 +2425,69 @@ refreshRedlinerHitboxExpansion = function()
 		clearRedlinerHitboxExpansion()
 		return
 	end
+	lastHitboxExpansionRefresh = tick()
 	local keep = {}
 	for _, part in collectionService:GetTagged('Hurtbox') do
 		if not part.Parent then
 			continue
 		end
-		local owner = part:FindFirstAncestorWhichIsA('Model')
-		if not owner or not isEnemyOwner(owner) then
-			continue
-		end
-		local plr = getPlayerFromModel(owner)
-		if redlinerHitboxPlayersOnly and not plr then
-			continue
-		end
-		if plr and not isPlayerVisible(plr) then
-			continue
-		end
-		keep[part] = true
-		if not expandedHurtboxSizes[part] then
-			expandedHurtboxSizes[part] = part.Size
-		end
-		local orig = expandedHurtboxSizes[part]
-		local expand = redlinerHitboxExpand
-		part.Size = orig + Vector3.new(expand, expand, expand)
-		if redlinerHitboxVisualize then
-			local adorn = redlinerHitboxViz[part]
-			if not adorn or not adorn.Parent then
-				adorn = Instance.new('BoxHandleAdornment')
-				adorn.Name = 'VapeRedlinerHitbox'
-				adorn.AlwaysOnTop = true
-				adorn.ZIndex = 5
-				adorn.Adornee = part
-				adorn.Parent = part
-				redlinerHitboxViz[part] = adorn
-			end
-			adorn.Size = part.Size
-			adorn.Color3 = Color3.fromRGB(255, 85, 85)
-			adorn.Transparency = 0.45
-		elseif redlinerHitboxViz[part] then
-			pcall(function()
-				redlinerHitboxViz[part]:Destroy()
-			end)
-			redlinerHitboxViz[part] = nil
+		if shouldExpandRedlinerHurtbox(part) then
+			keep[part] = true
+			applyRedlinerHurtboxExpand(part)
 		end
 	end
-	for part, origSize in expandedHurtboxSizes do
+	for part in expandedHurtboxSizes do
 		if not keep[part] then
-			if part.Parent then
-				pcall(function()
-					part.Size = origSize
-				end)
-			end
-			local adorn = redlinerHitboxViz[part]
-			if adorn then
-				pcall(function()
-					adorn:Destroy()
-				end)
-			end
-			expandedHurtboxSizes[part] = nil
-			redlinerHitboxViz[part] = nil
+			releaseRedlinerHurtboxExpand(part)
 		end
 	end
+end
+
+bindRedlinerHitboxExpansion = function()
+	if hitboxExpansionBound then
+		return
+	end
+	hitboxExpansionBound = true
+
+	local function scheduleRefresh()
+		if not redlinerHitboxesActive or redlinerHitboxExpand <= 0 then
+			return
+		end
+		local now = tick()
+		if now - lastHitboxExpansionRefresh < HITBOX_EXPANSION_REFRESH_INTERVAL then
+			return
+		end
+		refreshRedlinerHitboxExpansion()
+	end
+
+	collectionService:GetInstanceAddedSignal('Hurtbox'):Connect(function(part)
+		if redlinerHitboxesActive and redlinerHitboxExpand > 0 then
+			task.defer(function()
+				if shouldExpandRedlinerHurtbox(part) then
+					applyRedlinerHurtboxExpand(part)
+				end
+			end)
+		end
+	end)
+	collectionService:GetInstanceRemovedSignal('Hurtbox'):Connect(function(part)
+		if expandedHurtboxSizes[part] then
+			releaseRedlinerHurtboxExpand(part)
+		end
+	end)
+	playersService.PlayerAdded:Connect(function()
+		task.defer(scheduleRefresh)
+	end)
+	playersService.PlayerRemoving:Connect(function()
+		task.defer(scheduleRefresh)
+	end)
+	runService.Heartbeat:Connect(function()
+		if not redlinerHitboxesActive or redlinerHitboxExpand <= 0 then
+			return
+		end
+		if tick() - lastHitboxExpansionRefresh >= HITBOX_EXPANSION_REFRESH_INTERVAL then
+			refreshRedlinerHitboxExpansion()
+		end
+	end)
 end
 
 local function getVisibleEnemyHurtboxes()
@@ -2560,9 +2643,6 @@ getActiveMeleeReach = function()
 	if autoAttackActive then
 		return math.max(autoAttackRangeSetting, BASE_SWORD_REACH)
 	end
-	if redlinerHitboxesActive and redlinerHitboxExpand > 0 then
-		return BASE_SWORD_REACH + redlinerHitboxExpand
-	end
 	return BASE_SWORD_REACH
 end
 
@@ -2570,14 +2650,11 @@ local function getHitboxCastExtend()
 	if reachActive then
 		return reachExtend
 	end
-	if redlinerHitboxesActive then
-		return redlinerHitboxExpand
-	end
 	return 0
 end
 
 local function shouldExtendMeleeCombat()
-	return reachActive or autoAttackActive or (redlinerHitboxesActive and redlinerHitboxExpand > 0)
+	return reachActive or autoAttackActive
 end
 
 safeAimDirection = function(origin, targetPos, fallback)
@@ -2767,17 +2844,58 @@ local function aimAutoAttackHitboxes(attack)
 	end
 end
 
-local function buildMeleePacketFireWrapper(oldFire)
-	return function(packet, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
-		if alwaysParryActive then
-			applyClashVelocitySpoof()
-			velocityMag = getAlwaysParryVelocityMag(velocityMag)
-		end
-		if shouldExtendMeleeCombat() then
-			hurtboxes = augmentOutgoingMeleeHurtboxes(hurtboxes)
-		end
-		return oldFire(packet, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
+local function getMeleePacketBaseFire()
+	if not initPackets() then
+		return nil
 	end
+	local packet = Packets[MELEE_PACKET_NAME]
+	if not packet or type(packet.Fire) ~= 'function' then
+		return nil
+	end
+	if not packet._vapeMeleeBaseFire then
+		packet._vapeMeleeBaseFire = packet.Fire
+	end
+	return packet._vapeMeleeBaseFire
+end
+
+rebuildMeleePacketFireChain = function()
+	if not initPackets() then
+		return false
+	end
+	local packet = Packets[MELEE_PACKET_NAME]
+	local baseFire = getMeleePacketBaseFire()
+	if not packet or not baseFire then
+		return false
+	end
+	local fire = baseFire
+	if alwaysParryActive then
+		local nextFire = fire
+		fire = function(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
+			applyClashVelocitySpoof()
+			return nextFire(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, getAlwaysParryVelocityMag(velocityMag), ...)
+		end
+	end
+	if shouldExtendMeleeCombat() then
+		local nextFire = fire
+		fire = function(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
+			return nextFire(packetSelf, sessionToken, weaponId, attackType, position, augmentOutgoingMeleeHurtboxes(hurtboxes), velocityMag, ...)
+		end
+	end
+	packet.Fire = fire
+	packet._meleeReachHooked = true
+	meleePacketReachHooked = true
+	if hookfunction and type(baseFire) == 'function' then
+		pcall(function()
+			local hooked = hookfunction(baseFire, fire)
+			if type(hooked) == 'function' then
+				packet._meleeReachOriginalFire = hooked
+			end
+		end)
+	end
+	if not meleePacketGcMirrored then
+		mirrorMeleePacketFireWrapper(fire, baseFire)
+	end
+	return true
 end
 
 local function mirrorMeleePacketFireWrapper(wrapper, oldFire)
@@ -2790,18 +2908,31 @@ local function mirrorMeleePacketFireWrapper(wrapper, oldFire)
 		return
 	end
 	for _, value in gc do
-		if type(value) == 'table' and value[MELEE_PACKET_NAME]
-			and value[MELEE_PACKET_NAME].Fire == oldFire then
+		if type(value) == 'table' and value[MELEE_PACKET_NAME] then
 			value[MELEE_PACKET_NAME].Fire = wrapper
 		end
 	end
 end
 
-installAlwaysParryHooks = function()
-	if not initPackets() then
-		return false
+installAlwaysParryHook = function()
+	return rebuildMeleePacketFireChain()
+end
+
+installAlwaysParryHooks = installAlwaysParryHook
+
+bindAlwaysParryInput = function()
+	if alwaysParryInputBound then
+		return
 	end
-	return installMeleePacketReachHook()
+	alwaysParryInputBound = true
+	inputService.InputBegan:Connect(function(input, processed)
+		if processed or not alwaysParryActive then
+			return
+		end
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			applyClashVelocitySpoof()
+		end
+	end)
 end
 
 triggerGameMeleeAttack = function()
@@ -2851,36 +2982,11 @@ augmentOutgoingMeleeHurtboxes = function(hurtboxes)
 end
 
 installMeleePacketReachHook = function()
-	if meleePacketReachHooked then
-		return true
+	local ok = rebuildMeleePacketFireChain()
+	if ok and reachDebugEnabled then
+		reachDebugLog('Melee packet Fire hook OK -', MELEE_PACKET_NAME)
 	end
-	if not initPackets() then
-		return false
-	end
-	local packet = Packets[MELEE_PACKET_NAME]
-	if not packet or type(packet.Fire) ~= 'function' then
-		return false
-	end
-	if packet._meleeReachHooked then
-		meleePacketReachHooked = true
-		return true
-	end
-	local oldFire = packet.Fire
-	packet._meleeReachHooked = true
-	meleePacketReachHooked = true
-	local wrapper = buildMeleePacketFireWrapper(oldFire)
-	packet.Fire = wrapper
-	mirrorMeleePacketFireWrapper(wrapper, oldFire)
-	if hookfunction and type(oldFire) == 'function' then
-		pcall(function()
-			local hooked = hookfunction(oldFire, wrapper)
-			if type(hooked) == 'function' then
-				packet._meleeReachOriginalFire = hooked
-			end
-		end)
-	end
-	reachDebugLog('Melee packet Fire hook OK -', MELEE_PACKET_NAME)
-	return true
+	return ok
 end
 
 installAttackReachHook = function()
@@ -3177,7 +3283,7 @@ bindPacketListeners = function()
 	elseif autoAttackActive and not attackReachHooked then
 		installAttackReachHook()
 	end
-	if (autoAttackActive or alwaysParryActive or reachActive) and not meleePacketReachHooked then
+	if (autoAttackActive or alwaysParryActive or reachActive) then
 		installMeleePacketReachHook()
 	end
 	installCombatEventHook()
@@ -3398,8 +3504,7 @@ end
 
 combatHeartbeat = function(meleeRange)
 	meleeRangeSetting = meleeRange
-	if reachActive or reachDebugEnabled or autoParryActive or autoAttackActive or alwaysParryActive or redlinerHitboxesActive
-		or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
+	if reachActive or reachDebugEnabled or autoParryActive or autoAttackActive then
 		bindPacketListeners()
 	end
 	if hud.hitboxVisualizerSwingEnabled and not hitboxReachHooked then
@@ -3468,10 +3573,6 @@ combatHeartbeat = function(meleeRange)
 
 	if hud.hudTickCallback then
 		pcall(hud.hudTickCallback)
-	end
-
-	if redlinerHitboxesActive then
-		refreshRedlinerHitboxExpansion()
 	end
 end
 
@@ -4439,12 +4540,13 @@ run(function()
 		Name = 'Always Parry',
 		Function = function(callback)
 			alwaysParryActive = callback
+			bindAlwaysParryInput()
+			installAlwaysParryHook()
 			if callback then
-				installMeleePacketReachHook()
-				notif('Always Parry', 'Clash boost — max velocity on melee swings to win clashes and stack enemy destabilization.', 5)
+				notif('Always Parry', 'Clash boost — max velocityMag on melee swings to win clashes and max destabilize.', 5)
 			end
 		end,
-		Tooltip = 'Spoofs max clash velocity (velocityMag) on every melee swing. Faster side wins clashes and adds more impact/destabilization to the loser. Not Auto Parry.',
+		Tooltip = 'Spoofs max clash velocity (velocityMag) on every melee swing. Faster side wins clashes and applies more impact to the loser. Not Auto Parry.',
 	})
 	AlwaysParry:CreateSlider({
 		Name = 'Clash Velocity',
@@ -4469,6 +4571,8 @@ run(function()
 				installMeleePacketReachHook()
 				bindAutoAttackLoop()
 				notif('Auto Attack', '360 melee — aims swing at nearby enemies and merges hurtboxes in range.', 4)
+			else
+				installMeleePacketReachHook()
 			end
 		end,
 		Tooltip = 'Swings when any valid enemy is within Attack Range (360). Aims the melee hitbox at the target and sends their hurtboxes even if they are behind you.',
@@ -4496,6 +4600,7 @@ run(function()
 				reachExtend = 0
 				reachDebugLog('Reach DISABLED')
 				logReachHookStatus('disabled')
+				installMeleePacketReachHook()
 			end
 		end,
 		Tooltip = 'Hooks Attack.Hitbox.cast and melee packet Fire (base ' .. BASE_SWORD_REACH .. ' studs + Extend slider).',
@@ -5239,14 +5344,14 @@ run(function()
 		Function = function(callback)
 			redlinerHitboxesActive = callback
 			if callback then
-				bindPacketListeners()
+				bindRedlinerHitboxExpansion()
 				refreshRedlinerHitboxExpansion()
-				notif('HitBoxes', 'Expands enemy Hurtbox parts for REDLINER melee detection.', 4)
+				notif('HitBoxes', 'Expands enemy Hurtbox parts (never yours) for REDLINER melee detection.', 4)
 			else
 				refreshRedlinerHitboxExpansion()
 			end
 		end,
-		Tooltip = 'Expands CollectionService Hurtbox parts on enemies (REDLINER uses tagged hurtboxes, not default Roblox hitboxes).',
+		Tooltip = 'Expands enemy Hurtbox parts only — your own hurtboxes are never modified. Updates on a timer, not every frame.',
 	})
 	HitBoxes:CreateToggle({
 		Name = 'Players Only',
