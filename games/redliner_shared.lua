@@ -79,7 +79,15 @@ local redlinerApi = {
 	movementClassKey = nil,
 	velocityField = nil,
 	inputHandlers = {},
+	parryCuePacketKey = nil,
 }
+
+local combatSession = {
+	token = nil,
+	weaponId = nil,
+}
+local sessionPacketHooked = false
+local parryCuePacketHooked = false
 
 local MELEE_PACKET_CANDIDATES = {'_xa20c1ad6e56c96e7', '_xf5e1e1983608ed25'}
 local PARRY_PACKET_CANDIDATES = {'_x0cdd43b25777bec6', '_xff9e8e66a100da8b'}
@@ -95,6 +103,8 @@ local INPUT_HANDLER_CANDIDATES = {
 	{class = '_xd2c44c643b0c3fb4', method = '_xdf0c107e49196810'},
 	{class = '_xf1ad98d2d70b7408', method = '_x93fd21adac562b5e'},
 }
+local PARRY_CUE_PACKET_CANDIDATES = {'_x65729782b2a34ba4'}
+local PARRY_ACTION = 'redliner_parry'
 
 local AUTO_PARRY_DEFAULTS = {
 	meleeRange = 20,
@@ -739,6 +749,7 @@ resolveRedlinerRuntime = function(force)
 	redlinerApi.breakPacketKey = pickPacket(BREAK_PACKET_CANDIDATES) or pickPacket({BREAK_PACKET_NAME})
 	redlinerApi.gunPacketKey = pickPacket(GUN_PACKET_CANDIDATES) or pickPacket({GUN_PACKET_NAME})
 	redlinerApi.gunShotPacketKey = pickPacket(GUN_SHOT_CANDIDATES) or pickPacket({GUN_SHOT_PACKET_NAME})
+	redlinerApi.parryCuePacketKey = pickPacket(PARRY_CUE_PACKET_CANDIDATES)
 
 	if prevMelee and redlinerApi.meleePacketKey and prevMelee ~= redlinerApi.meleePacketKey then
 		meleePacketReachHooked = false
@@ -1522,6 +1533,117 @@ end
 -- Parry input
 -- ---------------------------------------------------------------------------
 
+local function buildParryMetadata()
+	local cam = workspace.CurrentCamera
+	local meta = {
+		timestamp = tostring(workspace:GetServerTimeNow()),
+		direction_faced = cam and cam.CFrame.LookVector or Vector3.new(0, 0, -1),
+		cam_location = cam and cam.CFrame.Position or Vector3.zero,
+		faced_shooters = {},
+	}
+	local root = getLocalRoot()
+	if root then
+		for _, plr in playersService:GetPlayers() do
+			if plr ~= lplr and plr.Character and plr.Character.Parent then
+				local char = plr.Character
+				if shouldParryGun(char, false, char) or shouldParryMelee(char, false) then
+					meta.faced_shooters[char] = true
+				end
+			end
+		end
+	end
+	return meta
+end
+
+installSessionPacketHook = function()
+	if sessionPacketHooked or not resolveRedlinerRuntime() then
+		return
+	end
+	local sessionKey = redlinerApi.sessionPacketKey or MELEE_SESSION_PACKET
+	local packet = Packets and Packets[sessionKey]
+	if not packet or type(packet.Fire) ~= 'function' then
+		return
+	end
+	if not packet._vapeSessionBaseFire then
+		packet._vapeSessionBaseFire = packet.Fire
+	end
+	local baseFire = packet._vapeSessionBaseFire
+	packet.Fire = function(packetSelf, weaponId, ...)
+		local token = baseFire(packetSelf, weaponId, ...)
+		if type(token) == 'string' and type(weaponId) == 'string' then
+			combatSession.token = token
+			combatSession.weaponId = weaponId
+		end
+		return token
+	end
+	sessionPacketHooked = true
+end
+
+fireParryPacket = function()
+	if not resolveRedlinerRuntime() then
+		return false
+	end
+	installSessionPacketHook()
+	if not combatSession.token or not combatSession.weaponId then
+		local sessionKey = redlinerApi.sessionPacketKey or MELEE_SESSION_PACKET
+		local sessionPacket = Packets and Packets[sessionKey]
+		if sessionPacket and type(sessionPacket.Fire) == 'function' then
+			pcall(function()
+				sessionPacket:Fire('Redliner')
+			end)
+		end
+	end
+	local parryKey = redlinerApi.parryPacketKey or PARRY_PACKET_NAME
+	local packet = Packets and Packets[parryKey]
+	if not packet or type(packet.Fire) ~= 'function' then
+		return false
+	end
+	local token, weaponId = combatSession.token, combatSession.weaponId
+	if not token or not weaponId then
+		return false
+	end
+	local meta = buildParryMetadata()
+	local ok = pcall(function()
+		packet:Fire(token, weaponId, PARRY_ACTION, { meta })
+	end)
+	return ok
+end
+
+triggerGameParryInput = function()
+	resolveMovementApi()
+	local classes = getClientClasses and getClientClasses() or nil
+	for _, entry in redlinerApi.inputHandlers do
+		local inputHandler = classes and classes[entry.class]
+		if inputHandler and type(inputHandler[entry.method]) == 'function' then
+			local parryAction = inputHandler[entry.method](inputHandler, 'PARRY')
+			if parryAction and parryAction.Pressed and type(parryAction.Pressed.Fire) == 'function' then
+				parryAction.Pressed:Fire()
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function executeParryAction()
+	if parryModeSetting == 'Packet' then
+		if fireParryPacket() then
+			return true
+		end
+		return triggerGameParryInput()
+	end
+	if parryModeSetting == 'Hybrid' then
+		if fireParryPacket() then
+			return true
+		end
+		if triggerGameParryInput() then
+			return true
+		end
+		return pressParryKey()
+	end
+	return pressParryKey()
+end
+
 function pressParryKey()
 	if not canSafelyParry() then
 		return false
@@ -1585,7 +1707,7 @@ tryParry = function(reason, char)
 		end
 	end
 	debugLog('parry trigger', reason, char and char.Name or '-')
-	local pressed = pressParryKey()
+	local pressed = executeParryAction()
 	if not pressed then
 		return false
 	end
@@ -2180,7 +2302,11 @@ bindLocalRespawnHandler = function()
 				if invalidateClientClassesCache then
 					invalidateClientClassesCache()
 				end
+				combatSession.token = nil
+				combatSession.weaponId = nil
+				sessionPacketHooked = false
 				resolveRedlinerRuntime(true)
+				installSessionPacketHook()
 				rebuildMeleePacketFireChain()
 			end
 			if autoParryActive then
@@ -2278,6 +2404,66 @@ local function handleIncomingGunParryPacket(char, aimDir, gunName, sourceTag)
 	local label = typeof(gunName) == 'string' and gunName ~= '' and gunName or detectEquippedGun(char)
 	debugLog('trigger', sourceTag, label, 'dist=' .. string.format('%.1f', getClosestEnemyDistance(char)))
 	tryParry(sourceTag .. '_' .. label, char)
+end
+
+local function handleIncomingParryCuePacket(char, cueData)
+	if not autoParryActive or not parryModeUsesPacket() or not isLocalAlive() then
+		return
+	end
+	if typeof(char) ~= 'Instance' or not char:IsA('Model') then
+		return
+	end
+	local plr = getPlayerFromModel(char)
+	if not plr or plr == lplr then
+		return
+	end
+	local cueType = type(cueData) == 'table' and cueData.indicator_type or nil
+	if cueType == 'timing_only' then
+		if not parryMeleeEnabled then
+			return
+		end
+		if not shouldParryMelee(char, false) then
+			return
+		end
+		debugLog('trigger', 'packet_cue_melee', char.Name)
+		tryParry('packet_cue_melee', char)
+	elseif cueType == 'surefire_bullet' then
+		if not parryGunShotEnabled then
+			return
+		end
+		if not shouldParryGun(char, false, char) then
+			return
+		end
+		debugLog('trigger', 'packet_cue_gun', char.Name)
+		tryParry('packet_cue_gun', char)
+	end
+end
+
+installParryCuePacketHook = function()
+	if parryCuePacketHooked then
+		return true
+	end
+	if not resolveRedlinerRuntime() then
+		return false
+	end
+	local cueKey = redlinerApi.parryCuePacketKey
+	if not cueKey then
+		return false
+	end
+	local packet = Packets and Packets[cueKey]
+	if not packet or not packet.OnClientEvent or type(packet.OnClientEvent.Connect) ~= 'function' then
+		return false
+	end
+	if packet._vapeParryCueHooked then
+		parryCuePacketHooked = true
+		return true
+	end
+	packet._vapeParryCueHooked = true
+	packet.OnClientEvent:Connect(function(shooterChar, cueData)
+		handleIncomingParryCuePacket(shooterChar, cueData)
+	end)
+	parryCuePacketHooked = true
+	return true
 end
 
 installGunParryPacketHook = function()
@@ -3046,6 +3232,7 @@ rebuildMeleePacketFireChain = function()
 	if alwaysParryActive then
 		local nextFire = fire
 		fire = function(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
+			applyClashVelocitySpoof()
 			return nextFire(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, getAlwaysParryVelocityMag(velocityMag), ...)
 		end
 	end
@@ -3435,6 +3622,9 @@ bindPacketListeners = function()
 	if not resolveRedlinerRuntime() then
 		return
 	end
+	if autoParryActive or alwaysParryActive or autoAttackActive or reachActive then
+		installSessionPacketHook()
+	end
 	if reachActive or reachDebugEnabled or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
 		installCombatReachHooks()
 	elseif autoAttackActive and not attackReachHooked then
@@ -3466,6 +3656,8 @@ bindPacketListeners = function()
 		installGunBulletVizHook()
 	end
 	if autoParryActive then
+		installSessionPacketHook()
+		installParryCuePacketHook()
 		installGunParryPacketHook()
 	end
 end
@@ -4693,6 +4885,8 @@ run(function()
 		Function = function(callback)
 			autoParryActive = callback
 			if callback then
+				resolveRedlinerRuntime(true)
+				installSessionPacketHook()
 				logParryAnimIds()
 				bindLocalRespawnHandler()
 				startEnemyWatchers()
@@ -4711,9 +4905,12 @@ run(function()
 			alwaysParryActive = callback
 			bindAlwaysParryInput()
 			resolveRedlinerRuntime(true)
+			installSessionPacketHook()
 			rebuildMeleePacketFireChain()
 			if callback then
 				notif('Always Parry', 'Clash boost active — max velocityMag on melee packets.', 5)
+			else
+				rebuildMeleePacketFireChain()
 			end
 		end,
 		Tooltip = 'Spoofs max clash velocity (velocityMag) on every melee swing. Faster side wins clashes and applies more impact to the loser. Not Auto Parry.',

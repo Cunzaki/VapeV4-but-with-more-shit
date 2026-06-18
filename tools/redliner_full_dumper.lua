@@ -11,9 +11,10 @@
 
 	Output (executor workspace):
 		redliner_dumps/Ugc_<PlaceId>_<timestamp>/
-			scripts/     — decompiled Lua (Roblox hierarchy)
-			bytecode/    — hex bytecode when decompile fails
-			manifest/    — remotes, tags, animations, packets, trees, index
+			scripts/         — decompiled Lua (Roblox hierarchy)
+			scripts_deobf/   — deobfuscated copy (when DEOBFUSCATE_WRITE_COPY)
+			bytecode/        — hex bytecode when decompile fails
+			manifest/        — remotes, tags, animations, packets, trees, index
 		decompiled games/Ugc_<PlaceId>_<timestamp>/  — mirror of scripts/ (SYNC_TO_DECOMPILED)
 
 	Join a live match before dumping. Copy the mirror folder into this repo's decompiled games/.
@@ -35,6 +36,9 @@ local CONFIG = {
 	DECOMPILE_CONCURRENCY = 2, -- keep low; 40 parallel decompiles often OOM/crash executors
 	WRITE_EVERY_N = 1, -- write each script immediately after decompile
 	PROGRESS_EVERY_N = 5,
+	DEOBFUSCATE = true, -- post-process decompiled Lua for readability
+	DEOBFUSCATE_WRITE_COPY = true, -- also write scripts_deobf/ mirror
+	DUMP_ALL_SCRIPTS = false, -- true = skip Roblox noise filter (very large dump)
 	REQUIRE_PROBE = true, -- shallow require ModuleScripts under Assets (pcall)
 	REQUIRE_PROBE_MAX = 250,
 	TREE_MAX_DEPTH = 12,
@@ -240,6 +244,9 @@ local function waitForGameLoad()
 end
 
 local function isRobloxNoise(script)
+	if CONFIG.DUMP_ALL_SCRIPTS then
+		return false
+	end
 	local path = script:GetFullName():gsub('/', '.')
 	if path:find('CorePackages%.', 1, true) and not CONFIG.INCLUDE_CORE_PACKAGES then
 		return true
@@ -470,6 +477,52 @@ local function tryDecompile(script)
 	return true, src
 end
 
+-- REDLINER / LPH obfuscation cleanup (best-effort; not full devirtualization)
+local function deobfuscateLuau(source)
+	if type(source) ~= 'string' or source == '' then
+		return source
+	end
+	local out = source:gsub('\r\n', '\n'):gsub('\r', '\n')
+
+	-- Strip LPH executor stub block injected at top of obfuscated scripts
+	out = out:gsub('if not LPH_OBFUSCATED then.-end;\n', '')
+
+	-- Unwrap LPH passthrough wrappers (common in REDLINER ItemData / Classes)
+	local function unwrapLph(name, text)
+		local pattern = name .. '%(([%s%S]-)%)(%s*;?)'
+		local guard = 0
+		while guard < 500 do
+			guard += 1
+			local before = text
+			text = text:gsub('LPH_JIT_MAX%(function', 'function')
+			text = text:gsub('LPH_NO_VIRTUALIZE%(function', 'function')
+			text = text:gsub('LPH_JIT%(function', 'function')
+			text = text:gsub('LPH_NO_UPVALUES%(function', 'function')
+			-- Remove trailing ) that closed LPH_*(function(...) end)
+			text = text:gsub('end%)%s*;', 'end;')
+			text = text:gsub('end%)', 'end')
+			if text == before then
+				break
+			end
+		end
+		return text
+	end
+	out = unwrapLph('LPH', out)
+
+	-- Normalize require aliases: l__Packets__3 -> Packets (comment only, keeps line valid)
+	out = out:gsub('local (l__[%w_]+) = require%(game:GetService%("ReplicatedStorage"%)%.Assets%.ModuleScripts%.(Packets)%)', function(alias, mod)
+		return string.format('local %s = require(game:GetService("ReplicatedStorage").Assets.ModuleScripts.%s) -- %s', alias, mod, mod)
+	end)
+
+	-- Collapse excessive blank lines
+	out = out:gsub('\n\n\n+', '\n\n')
+
+	if not out:match('\n$') then
+		out ..= '\n'
+	end
+	return out
+end
+
 local function tryBytecode(script)
 	if type(getscriptbytecode) ~= 'function' then
 		return false, nil, 'getscriptbytecode unavailable'
@@ -505,6 +558,8 @@ local function dumpAllScripts(scripts)
 		table.insert(pendingWrites, { rel, text })
 		if mirrorRoot ~= '' and rel:sub(1, 8) == 'scripts/' then
 			table.insert(pendingWrites, { mirrorRoot .. '/' .. rel:sub(9), text })
+		elseif mirrorRoot ~= '' and rel:sub(1, 15) == 'scripts_deobf/' then
+			table.insert(pendingWrites, { mirrorRoot .. '/deobf/' .. rel:sub(16), text })
 		end
 	end
 
@@ -544,10 +599,17 @@ local function dumpAllScripts(scripts)
 			local decompOk, decompSrc = tryDecompile(script)
 			if decompOk then
 				local text = formatDecompiledHeader(script) .. decompSrc:gsub('\r\n', '\n'):gsub('\r', '\n')
+				if CONFIG.DEOBFUSCATE then
+					text = formatDecompiledHeader(script) .. deobfuscateLuau(decompSrc)
+				end
 				if not text:match('\n$') then
 					text ..= '\n'
 				end
 				queueWrite(job.rel, text)
+				if CONFIG.DEOBFUSCATE and CONFIG.DEOBFUSCATE_WRITE_COPY then
+					local deobfRel = job.rel:gsub('^scripts/', 'scripts_deobf/')
+					queueWrite(deobfRel, text)
+				end
 				entry.status = 'decompiled'
 				stats.decompiled += 1
 			else
@@ -1094,6 +1156,8 @@ local function runDump()
 		dumpInstanceTree(assets, 'ReplicatedStorage_Assets', CONFIG.TREE_MAX_DEPTH)
 	end
 	dumpInstanceTree(rs, 'ReplicatedStorage', math.min(6, CONFIG.TREE_MAX_DEPTH))
+	dumpInstanceTree(game:GetService('ServerScriptService'), 'ServerScriptService', CONFIG.TREE_MAX_DEPTH)
+	dumpInstanceTree(game:GetService('StarterPlayer'), 'StarterPlayer', CONFIG.TREE_MAX_DEPTH)
 	dumpInstanceTree(game:GetService('ServerStorage'), 'ServerStorage', CONFIG.TREE_MAX_DEPTH)
 	dumpInstanceTree(workspace, 'Workspace', math.min(8, CONFIG.TREE_MAX_DEPTH))
 
