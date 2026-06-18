@@ -36,11 +36,29 @@ if not vape then
 end
 
 local entitylib = vape.Libraries.entity
+local targetinfo = vape.Libraries and vape.Libraries.targetinfo
+local gameCamera = workspace.CurrentCamera
+local textChatService = cloneref(game:GetService('TextChatService'))
+
+local LOBBY_PLACE_ID = 94987506187454
+local MATCH_PLACE_ID = 126691165749976
+local INDICATOR_CLASS_KEY = '_xafc4950d7b094088'
+local INDICATOR_TABLE_FIELD = '_xe47bf301ff0f8f5e'
+local SHOOT_CLASS_KEY = '_x32ae459de0772e82'
+local SHOOT_METHOD_NAME = '_x76b38494ff05a56c'
+
+local vapeEvents = setmetatable({}, {
+	__index = function(self, index)
+		self[index] = Instance.new('BindableEvent')
+		return self[index]
+	end,
+})
 
 pcall(function()
 	vape:Remove('Reach')
 	vape:Remove('Auto Attack')
 	vape:Remove('HitBoxes')
+	vape:Remove('Always Parry')
 end)
 
 local BASE_SWORD_REACH = 22
@@ -54,10 +72,6 @@ local MELEE_SESSION_PACKET = '_x57c165550ede3092'
 local PARRY_PACKET_NAME = '_xff9e8e66a100da8b'
 local GUN_PACKET_NAME = '_x8458a1cfd21149ba'
 local GUN_SHOT_PACKET_NAME = '_x6f11420c13d0d5ee'
-local ALWAYS_PARRY_DEFAULT_VELOCITY = 200
-local ALWAYS_PARRY_MIN_VELOCITY = 80
-local ALWAYS_PARRY_MAX_VELOCITY = 200
-local CLASH_VELOCITY_SERVER_CAP = 200
 local HURTBOX_SCAN_CACHE_TTL = 0.25
 local COMBAT_EVENT_PACKET = '_x6f165cf1c8a4a502'
 local BREAK_PACKET_NAME = '_x71a4ac7aba517193'
@@ -68,6 +82,8 @@ local AUTO_ATTACK_RANGE_DEFAULT = 14
 local AUTO_ATTACK_MIN_DELAY = 0.12
 local AUTO_ATTACK_SCAN_INTERVAL = 0.25
 local AUTO_ATTACK_MAX_HURTBOXES = 16
+local STUN_SERVER_CAP = 200
+local STUN_DEFAULT_MAX = 195
 
 local redlinerApi = {
 	resolved = false,
@@ -82,7 +98,21 @@ local redlinerApi = {
 	velocityField = nil,
 	inputHandlers = {},
 	parryCuePacketKey = nil,
+	shootFunction = nil,
+	replicateFunction = nil,
+	packetMetatableCall = nil,
+	packetPrototype = nil,
 }
+
+local killAuraMaxAngleSetting = 360
+local killAuraDuelGateEnabled = true
+local killAuraLobbyDisableEnabled = true
+local killAuraShowTargetEnabled = false
+local indicatorParryEnabled = true
+local antiParryHitboxEnabled = false
+local meleeHitboxHooks = {}
+local TargetStrafeVector
+local scriptStartTime = tick()
 
 local combatSession = {
 	token = nil,
@@ -196,9 +226,14 @@ local PARRY_MODE_LIST = {'Hybrid', 'Animation', 'Packet'}
 
 local Packets
 local autoParryActive = false
-local alwaysParryActive = false
-local alwaysParryVelocitySetting = ALWAYS_PARRY_DEFAULT_VELOCITY
 local autoAttackActive = false
+local alwaysStunActive = false
+local alwaysStunMax = STUN_DEFAULT_MAX
+local alwaysStunSmart = true
+local alwaysStunClashOnly = true
+local alwaysStunMinOriginal = 35
+local alwaysStunJitter = 5
+local alwaysStunReplicate = true
 local reachExtend = 6
 local redlinerHitboxesActive = false
 local redlinerHitboxExpand = 0
@@ -251,7 +286,6 @@ local autoAttackLoopBound = false
 local hurtboxScanCache = {time = 0, range = 0, visible = true, results = {}}
 local autoAttackTargetCache = {time = 0, range = 0, model = nil}
 local meleePacketGcMirrored = false
-local alwaysParryInputBound = false
 local localRespawnBound = false
 local lastParryScanAt = 0
 local lastWatcherRefreshAt = 0
@@ -346,6 +380,7 @@ function isPacketParryReason(reason)
 	return string.find(reason, 'gun_packet_', 1, true) ~= nil
 		or string.find(reason, 'gun_shot_packet', 1, true) ~= nil
 		or string.find(reason, 'packet_cue_', 1, true) ~= nil
+		or string.find(reason, 'indicator_', 1, true) ~= nil
 end
 
 function resolveParryTargetChar(model)
@@ -2465,7 +2500,7 @@ bindLocalRespawnHandler = function()
 				return
 			end
 			refreshMyHurtboxes()
-			if autoAttackActive or alwaysParryActive then
+			if autoAttackActive then
 				if invalidateClientClassesCache then
 					invalidateClientClassesCache()
 				end
@@ -3268,6 +3303,7 @@ local function extendAttackHurtboxes(attack)
 	end
 	local maxCount = autoAttackActive and AUTO_ATTACK_MAX_HURTBOXES or 8
 	attack.hit_hurtboxes = trimHurtboxList(attack.hit_hurtboxes, maxCount)
+	attack.hit_hurtboxes = runMeleeHitboxHooks(attack.hit_hurtboxes)
 	return #attack.hit_hurtboxes - before
 end
 
@@ -3444,33 +3480,277 @@ local function getMovementController()
 	return rawget(classes, redlinerApi.movementClassKey)
 end
 
-local function getAlwaysParryVelocityMag(_current)
-	return math.min(alwaysParryVelocitySetting, CLASH_VELOCITY_SERVER_CAP)
+function getShotIndicators()
+	local classes = getClientClasses()
+	if not classes then
+		return {}
+	end
+	local indicatorCtrl = rawget(classes, INDICATOR_CLASS_KEY)
+	if not indicatorCtrl then
+		return {}
+	end
+	local indicators = rawget(indicatorCtrl, INDICATOR_TABLE_FIELD)
+	if type(indicators) ~= 'table' then
+		return {}
+	end
+	return indicators
 end
 
-applyClashVelocitySpoof = function()
-	resolveRedlinerRuntime()
-	resolveMovementApi()
-	local movement = getMovementController()
-	local velocityField = redlinerApi.velocityField
-	local root = getLocalRoot()
-	if not movement or not velocityField or not root then
+function shouldBlockKillAuraForIndicators()
+	if not killAuraDuelGateEnabled or playersService.NumPlayers > 2 then
+		return false
+	end
+	for _, indicator in getShotIndicators() do
+		if type(indicator) == 'table'
+			and (indicator.indicator_type == 'surefire_bullet' or indicator.indicator_type == 'timing_only') then
+			local timediff = (indicator.expected_shot_time or 0) - os.clock()
+			if timediff < 0.4 then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local indicatorParryCooldownUntil = 0
+
+function scanIndicatorsForParry()
+	if not autoParryActive or not isLocalAlive() or not indicatorParryEnabled then
 		return
 	end
-	local horiz = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
-	if horiz.Magnitude < 2 then
-		local cam = workspace.CurrentCamera
-		local look = cam and cam.CFrame.LookVector or Vector3.new(0, 0, -1)
-		horiz = look * Vector3.new(1, 0, 1)
-		if horiz.Magnitude < 0.05 then
-			horiz = Vector3.new(0, 0, -1)
-		else
-			horiz = horiz.Unit
-		end
-	else
-		horiz = horiz.Unit
+	if not parryModeUsesPacket() then
+		return
 	end
-	movement[velocityField] = horiz * getAlwaysParryVelocityMag()
+	if os.clock() < indicatorParryCooldownUntil then
+		return
+	end
+	local cam = workspace.CurrentCamera
+	if not cam then
+		return
+	end
+	local camFlat = (cam.CFrame.LookVector * Vector3.new(1, 0, 1)).Unit
+	local doParry, parryChar
+	for shooterModel, indicator in getShotIndicators() do
+		if typeof(shooterModel) ~= 'Instance' or not shooterModel:IsA('Model') then
+			continue
+		end
+		if type(indicator) ~= 'table' or not indicator.indicator_ui then
+			continue
+		end
+		local ui = indicator.indicator_ui
+		if not ui.Visible then
+			continue
+		end
+		local shooterPos = shooterModel:FindFirstChild('Head') and shooterModel.Head.Position
+			or (shooterModel.PrimaryPart and shooterModel.PrimaryPart.Position or shooterModel:GetPivot().Position)
+		local toShooter = ((shooterPos - cam.CFrame.Position) * Vector3.new(1, 0, 1))
+		if toShooter.Magnitude < 0.05 then
+			continue
+		end
+		local diff = 1 - camFlat:Dot(toShooter.Unit)
+		local timediff = (indicator.expected_shot_time or 0) - os.clock()
+		if indicator.indicator_type == 'surefire_bullet' and parryGunShotEnabled then
+			local parryRange = indicator.parry_range or 1
+			if math.abs(diff) <= parryRange and timediff < 0.2 and timediff > 0 then
+				doParry = true
+				parryChar = resolveParryTargetChar(shooterModel)
+			end
+		elseif indicator.indicator_type == 'timing_only' and playersService.NumPlayers <= 2 then
+			if indicator.first_parry_range ~= nil and parryGunDrawEnabled and charHasGunEquipped(shooterModel) then
+				if timediff < 0 and timediff > -0.2 then
+					doParry = true
+					parryChar = resolveParryTargetChar(shooterModel)
+				end
+			elseif parryMeleeEnabled and timediff < 0 and timediff > -0.2 then
+				doParry = true
+				parryChar = resolveParryTargetChar(shooterModel)
+			end
+		end
+	end
+	if doParry and parryChar then
+		indicatorParryCooldownUntil = os.clock() + 0.2
+		debugLog('trigger', 'indicator_table', parryChar.Name)
+		scheduleParryAction(parryChar, 0, 'indicator_surefire', function()
+			return isLocalAlive() and canSafelyParry() and isEnemyCharVisible(parryChar)
+		end)
+	end
+end
+
+function addMeleeHitboxHook(name, callback, priority)
+	priority = priority or 0
+	for i, entry in meleeHitboxHooks do
+		if entry[1] == name then
+			meleeHitboxHooks[i] = {name, callback, priority}
+			table.sort(meleeHitboxHooks, function(a, b)
+				return a[3] < b[3]
+			end)
+			return
+		end
+	end
+	table.insert(meleeHitboxHooks, {name, callback, priority})
+	table.sort(meleeHitboxHooks, function(a, b)
+		return a[3] < b[3]
+	end)
+end
+
+function removeMeleeHitboxHook(name)
+	for i, entry in meleeHitboxHooks do
+		if entry[1] == name then
+			table.remove(meleeHitboxHooks, i)
+			break
+		end
+	end
+end
+
+local function runMeleeHitboxHooks(hurtboxes)
+	if type(hurtboxes) ~= 'table' or #meleeHitboxHooks == 0 then
+		return hurtboxes
+	end
+	local packed = {hurtboxes}
+	for _, entry in meleeHitboxHooks do
+		entry[2](packed)
+	end
+	return packed[1]
+end
+
+resolveExtendedRuntime = function()
+	resolveMovementApi()
+	local classes = getClientClasses()
+	if not classes then
+		return false
+	end
+	if not redlinerApi.shootFunction then
+		local shootCtrl = rawget(classes, SHOOT_CLASS_KEY)
+		local shootFn = shootCtrl and rawget(shootCtrl, SHOOT_METHOD_NAME)
+		if type(shootFn) == 'function' then
+			redlinerApi.shootFunction = shootFn
+		end
+	end
+	if not redlinerApi.replicateFunction and getscriptclosure and debug and debug.getconstants then
+		for _, scriptInst in getscripts() do
+			if scriptInst:GetFullName():sub(1, 5) == 'Start' and scriptInst.Name == 'AEAD' then
+				local ok, mod = pcall(require, scriptInst)
+				if ok and type(mod) == 'table' then
+					for key, value in mod do
+						if type(value) == 'function' then
+							for _, const in debug.getconstants(value) do
+								if const == 'Message cannot be empty' then
+									redlinerApi.replicateFunction = value
+									break
+								end
+							end
+						end
+					end
+				end
+				break
+			end
+		end
+	end
+	if not redlinerApi.packetMetatableCall and initPackets() then
+		local packetModule = replicatedStorage:FindFirstChild('Assets')
+		packetModule = packetModule and packetModule:FindFirstChild('ModuleScripts')
+		packetModule = packetModule and packetModule:FindFirstChild('Packet')
+		if packetModule and getrawmetatable then
+			local mt = getrawmetatable(require(packetModule))
+			if mt and mt.__call then
+				local ok, upval = pcall(debug.getupvalue, mt.__call, 2)
+				if ok then
+					redlinerApi.packetMetatableCall = upval
+				end
+			end
+		end
+	end
+	return redlinerApi.shootFunction ~= nil or redlinerApi.movementClassKey ~= nil
+end
+
+local function getPacketPrototype()
+	if redlinerApi.packetPrototype then
+		return redlinerApi.packetPrototype
+	end
+	if not getrawmetatable or not debug or not debug.getupvalue then
+		return nil
+	end
+	local assets = replicatedStorage:FindFirstChild('Assets')
+	local modules = assets and assets:FindFirstChild('ModuleScripts')
+	local packetMod = modules and modules:FindFirstChild('Packet')
+	if not packetMod then
+		return nil
+	end
+	local ok, Packet = pcall(require, packetMod)
+	if not ok or type(Packet) ~= 'table' then
+		return nil
+	end
+	local mt = getrawmetatable(Packet)
+	if not mt or type(mt.__call) ~= 'function' then
+		return nil
+	end
+	local okUp, proto = pcall(debug.getupvalue, mt.__call, 2)
+	if okUp and type(proto) == 'table' then
+		redlinerApi.packetPrototype = proto
+		return proto
+	end
+	return nil
+end
+
+local function isAlwaysStunClashContext(hurtboxes)
+	if type(hurtboxes) == 'table' and #hurtboxes > 0 then
+		for _, part in hurtboxes do
+			if typeof(part) == 'Instance' and part:IsA('BasePart') then
+				local owner = part:FindFirstAncestorWhichIsA('Model')
+				if owner and isEnemyCharVisible(owner) then
+					return true
+				end
+			end
+		end
+	end
+	local range = BASE_SWORD_REACH + 2
+	for _, plr in playersService:GetPlayers() do
+		if plr ~= lplr and plr.Character and isEnemyCharVisible(plr.Character) then
+			if getClosestEnemyDistance(plr.Character) <= range and isEnemyParrying(plr) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+applyAlwaysStunVelocity = function(original, hurtboxes, _action)
+	if not alwaysStunActive or type(original) ~= 'number' or original ~= original then
+		return original
+	end
+	if original < alwaysStunMinOriginal then
+		return original
+	end
+	if alwaysStunClashOnly then
+		local clash = isAlwaysStunClashContext(hurtboxes)
+		if not clash and original < 55 then
+			return original
+		end
+	end
+	local cap = math.min(alwaysStunMax, STUN_SERVER_CAP)
+	if not alwaysStunSmart then
+		return math.min(cap, original + 1)
+	end
+	local margin = 6 + math.random() * alwaysStunJitter
+	local boosted = math.max(original + margin, original * 1.06)
+	boosted = math.min(boosted, cap)
+	boosted += (math.random() - 0.5) * 1.5
+	return math.clamp(boosted, original, cap)
+end
+
+local function patchMeleeFireArgs(args)
+	local velocityIndex
+	if type(args[7]) == 'number' then
+		velocityIndex = 7
+	elseif type(args[6]) == 'number' then
+		velocityIndex = 6
+	end
+	if not velocityIndex then
+		return
+	end
+	local hurtboxes = args[velocityIndex - 1]
+	local action = type(args[3]) == 'string' and args[3] or nil
+	args[velocityIndex] = applyAlwaysStunVelocity(args[velocityIndex], hurtboxes, action)
 end
 
 local function getMeleePacketBaseFire()
@@ -3518,10 +3798,7 @@ rebuildMeleePacketFireChain = function()
 		return false
 	end
 	local fire = function(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
-		if alwaysParryActive then
-			applyClashVelocitySpoof()
-		end
-		local mag = alwaysParryActive and getAlwaysParryVelocityMag(velocityMag) or velocityMag
+		velocityMag = applyAlwaysStunVelocity(velocityMag, hurtboxes, attackType)
 		if autoAttackActive then
 			local root = getLocalRoot()
 			if root then
@@ -3533,7 +3810,7 @@ rebuildMeleePacketFireChain = function()
 					for i = 1, limit do
 						local group = groups[i]
 						local strikePos = computeKillAuraStrikePosition(root, group.parts, position)
-						lastResult = baseFire(packetSelf, sessionToken, weaponId, attackType, strikePos, group.parts, mag, ...)
+						lastResult = baseFire(packetSelf, sessionToken, weaponId, attackType, strikePos, group.parts, velocityMag, ...)
 						if reachDebugEnabled then
 							reachDebugLog(
 								'kill aura packet',
@@ -3551,7 +3828,7 @@ rebuildMeleePacketFireChain = function()
 		if shouldExtendMeleeCombat() then
 			hurtboxes = augmentOutgoingMeleeHurtboxes(hurtboxes)
 		end
-		return baseFire(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, mag, ...)
+		return baseFire(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
 	end
 	packet.Fire = fire
 	packet._meleeReachHooked = true
@@ -3571,31 +3848,7 @@ rebuildMeleePacketFireChain = function()
 	return true
 end
 
-installAlwaysParryHook = function()
-	return rebuildMeleePacketFireChain()
-end
-
-installAlwaysParryHooks = installAlwaysParryHook
-
-bindAlwaysParryInput = function()
-	if alwaysParryInputBound then
-		return
-	end
-	alwaysParryInputBound = true
-	inputService.InputBegan:Connect(function(input, processed)
-		if processed or not alwaysParryActive then
-			return
-		end
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			applyClashVelocitySpoof()
-		end
-	end)
-end
-
 triggerGameMeleeAttack = function()
-	if alwaysParryActive then
-		applyClashVelocitySpoof()
-	end
 	local classes
 	if #redlinerApi.inputHandlers > 0 then
 		classes = clientClassesCache
@@ -3960,13 +4213,13 @@ bindPacketListeners = function()
 	if not resolveRedlinerRuntime() then
 		return
 	end
-	if autoParryActive or alwaysParryActive or autoAttackActive then
+	if autoParryActive or autoAttackActive then
 		installSessionPacketHook()
 	end
 	if autoAttackActive or reachDebugEnabled or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
 		installCombatReachHooks()
 	end
-	if autoAttackActive or alwaysParryActive then
+	if autoAttackActive then
 		rebuildMeleePacketFireChain()
 	end
 	installCombatEventHook()
@@ -4000,7 +4253,7 @@ end
 
 lplr.CharacterAdded:Connect(function()
 	task.defer(function()
-		if autoAttackActive or alwaysParryActive then
+		if autoAttackActive then
 			bindPacketListeners()
 		end
 	end)
@@ -4094,6 +4347,7 @@ bindParryScanLoop = function()
 		end
 		lastParryScanAt = now
 		scanMeleeWhitelistRealtime()
+		scanIndicatorsForParry()
 	end
 	runService.PreRender:Connect(scanStep)
 	runService.RenderStepped:Connect(scanStep)
@@ -4113,13 +4367,26 @@ getNearestEnemyInAttackRange = function(attackRange)
 		return nil
 	end
 	local origin = root.Position
+	local cam = workspace.CurrentCamera
+	local facing = cam and (cam.CFrame.LookVector * Vector3.new(1, 0, 1)).Unit or Vector3.new(0, 0, -1)
+	local halfAngle = killAuraMaxAngleSetting < 360 and math.rad(killAuraMaxAngleSetting / 2) or math.pi
+	local function passesAngle(targetPos)
+		if killAuraMaxAngleSetting >= 360 then
+			return true
+		end
+		local flat = (targetPos - origin) * Vector3.new(1, 0, 1)
+		if flat.Magnitude < 0.05 then
+			return true
+		end
+		return math.acos(math.clamp(facing:Dot(flat.Unit), -1, 1)) <= halfAngle
+	end
 	local nearestModel, nearestDist = nil, attackRange
 	local hurtboxes = getEnemyHurtboxesInRange(attackRange, origin, false)
 	for _, part in hurtboxes do
 		local owner = part:FindFirstAncestorWhichIsA('Model')
 		if owner then
 			local dist = (part.Position - origin).Magnitude
-			if dist < nearestDist then
+			if dist < nearestDist and passesAngle(part.Position) then
 				nearestModel = owner
 				nearestDist = dist
 			end
@@ -4131,7 +4398,7 @@ getNearestEnemyInAttackRange = function(attackRange)
 				local enemyRoot = plr.Character:FindFirstChild('HumanoidRootPart')
 				if enemyRoot then
 					local dist = (enemyRoot.Position - origin).Magnitude
-					if dist <= attackRange and dist < nearestDist then
+					if dist <= attackRange and dist < nearestDist and passesAngle(enemyRoot.Position) then
 						nearestModel = plr.Character
 						nearestDist = dist
 					end
@@ -4168,6 +4435,12 @@ local function tryAutoAttack(attackDelay)
 	end
 
 	if hud.antiParryEnabled and shouldBlockMeleeAttack(attackRange) then
+		return
+	end
+	if shouldBlockKillAuraForIndicators() then
+		return
+	end
+	if killAuraLobbyDisableEnabled and game.PlaceId == LOBBY_PLACE_ID then
 		return
 	end
 
@@ -4208,9 +4481,6 @@ combatHeartbeat = function(meleeRange)
 		if reachDebugEnabled then
 			logReachHookStatus('heartbeat retry')
 		end
-	elseif alwaysParryActive and not meleePacketReachHooked then
-		resolveRedlinerRuntime(true)
-		rebuildMeleePacketFireChain()
 	end
 
 	if reachDebugEnabled and tick() - lastReachDebugHeartbeat > 2 then
@@ -5192,6 +5462,593 @@ end)
 
 
 -- ---------------------------------------------------------------------------
+-- Reference-style modules (Silent Aim, movement, match utility, hitbox anti-parry)
+-- ---------------------------------------------------------------------------
+
+run(function()
+	vape:Clean(lplr.PlayerGui.ChildAdded:Connect(function(obj)
+		if obj.Name == 'MatchResultsScreen' then
+			local results = obj
+			local sub = obj:FindFirstChild('Subtext', true)
+			sub = sub and sub:FindFirstChildWhichIsA('TextLabel')
+			if sub then
+				sub:GetPropertyChangedSignal('Text'):Wait()
+				vapeEvents.MatchEnded:Fire(sub.Text:find('WON') and true or false, results)
+			end
+		end
+	end))
+
+	if game.PlaceId == MATCH_PLACE_ID then
+		task.delay(1, function()
+			local sessioninfo = vape.Libraries and vape.Libraries.sessioninfo
+			if sessioninfo then
+				sessioninfo:AddItem('Games'):Increment()
+			end
+		end)
+	end
+end)
+
+run(function()
+	local extrasRef = vape.Categories.Extras
+	if not extrasRef then
+		extrasRef = vape:CreateCategory({
+			Name = 'Extras',
+			Icon = 'vape/assets/new/inventoryicon.png',
+		})
+		vape.Categories.Inventory = extrasRef
+	end
+
+	local parryAnimId
+	pcall(function()
+		local anim = replicatedStorage.Assets.Animations:FindFirstChild('3P_Parry', true)
+		if anim then
+			parryAnimId = anim.AnimationId
+		end
+	end)
+
+	local SilentAim
+	local SilentTargets
+	local SilentRange
+	local silentOldShoot
+	local circleObject
+
+	local function silentAimHook(...)
+		if debug and debug.info then
+			local src = debug.info(4, 's')
+			if type(src) == 'string' and src:find('Gun') and entitylib and entitylib.EntityMouse then
+				local ent = entitylib.EntityMouse({
+					Range = SilentRange and SilentRange.Value or 150,
+					Part = 'RootPart',
+					Players = SilentTargets and SilentTargets.Players.Enabled,
+					NPCs = SilentTargets and SilentTargets.NPCs.Enabled,
+				})
+				if ent and ent.Head then
+					if targetinfo then
+						targetinfo.Targets[ent] = tick() + 1
+					end
+					local cam = workspace.CurrentCamera
+					return CFrame.lookAt(cam.CFrame.Position, ent.Head.Position).LookVector
+				end
+			end
+		end
+		return silentOldShoot(...)
+	end
+
+	SilentAim = extrasRef:CreateModule({
+		Name = 'Silent Aim',
+		Function = function(callback)
+			resolveExtendedRuntime()
+			if callback then
+				if redlinerApi.shootFunction and hookfunction then
+					silentOldShoot = hookfunction(redlinerApi.shootFunction, function(...)
+						return silentAimHook(...)
+					end)
+				else
+					notif('Silent Aim', 'Could not resolve gun aim function — reinject in a match.', 5, 'alert')
+					task.defer(function()
+						if SilentAim.Enabled then
+							SilentAim:Toggle()
+						end
+					end)
+					return
+				end
+				task.spawn(function()
+					repeat
+						if circleObject then
+							circleObject.Position = inputService:GetMouseLocation()
+						end
+						task.wait()
+					until not SilentAim.Enabled
+				end)
+			elseif silentOldShoot and redlinerApi.shootFunction then
+				if restorefunction then
+					restorefunction(redlinerApi.shootFunction)
+				else
+					hookfunction(redlinerApi.shootFunction, silentOldShoot)
+				end
+				silentOldShoot = nil
+			end
+			if circleObject then
+				pcall(function()
+					circleObject.Visible = false
+					circleObject:Remove()
+				end)
+				circleObject = nil
+			end
+		end,
+		Tooltip = 'Hooks REDLINER gun aim to snap toward mouse target within range.',
+	})
+	SilentTargets = SilentAim:CreateTargets({Players = true})
+	SilentRange = SilentAim:CreateSlider({
+		Name = 'Range',
+		Min = 1,
+		Max = 1000,
+		Default = 150,
+		Function = function(val)
+			if circleObject then
+				circleObject.Radius = val
+			end
+		end,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end,
+	})
+	SilentAim:CreateToggle({
+		Name = 'Range Circle',
+		Function = function(callback)
+			if callback and Drawing then
+				circleObject = Drawing.new('Circle')
+				circleObject.Filled = false
+				circleObject.Radius = SilentRange.Value
+				circleObject.NumSides = 64
+				circleObject.Transparency = 0.5
+				circleObject.Visible = SilentAim.Enabled
+			elseif circleObject then
+				pcall(function()
+					circleObject:Remove()
+				end)
+				circleObject = nil
+			end
+		end,
+	})
+
+	extrasRef:CreateModule({
+		Name = 'Anti Parry Hitbox',
+		Function = function(callback)
+			antiParryHitboxEnabled = callback
+			if callback then
+				addMeleeHitboxHook('AntiParry', function(results)
+					if not antiParryHitboxEnabled or type(results[1]) ~= 'table' then
+						return
+					end
+					for _, hit in table.clone(results[1]) do
+						local char = hit:FindFirstAncestorWhichIsA('Model')
+						if char then
+							local parrying = isEnemyParrying(char)
+							if not parrying and parryAnimId then
+								local animator = char:FindFirstChild('Animator', true)
+								if animator then
+									for _, track in animator:GetPlayingAnimationTracks() do
+										if track.IsPlaying and track.Animation and track.Animation.AnimationId == parryAnimId then
+											parrying = true
+											break
+										end
+									end
+								end
+							end
+							if parrying then
+								local index = table.find(results[1], hit)
+								if index then
+									table.remove(results[1], index)
+								end
+							end
+						end
+					end
+				end, 2)
+				installCombatReachHooks()
+			else
+				removeMeleeHitboxHook('AntiParry')
+			end
+		end,
+		Tooltip = 'Strips parrying enemies from melee hitbox results before hits register.',
+	})
+
+	local AlwaysStun
+	local oldPacketFire, oldReplicate, oldBufWrite, stunDumpIndex, stunDumpCaller
+
+	local function installAlwaysStunHooks()
+		resolveExtendedRuntime()
+		resolveRedlinerRuntime()
+		rebuildMeleePacketFireChain()
+		local meleePacket = getResolvedMeleePacket()
+		local meleePacketName = meleePacket and meleePacket.Name
+		local proto = getPacketPrototype()
+		if proto and type(proto.Fire) == 'function' and hookfunction and not oldPacketFire then
+			oldPacketFire = hookfunction(proto.Fire, function(firePacket, ...)
+				if type(firePacket) == 'table' and meleePacketName and rawget(firePacket, 'Name') == meleePacketName then
+					local args = table.pack(...)
+					patchMeleeFireArgs(args)
+					return oldPacketFire(firePacket, table.unpack(args, 1, args.n))
+				end
+				return oldPacketFire(...)
+			end)
+		end
+		if alwaysStunReplicate and redlinerApi.replicateFunction and hookfunction and not oldReplicate then
+			oldReplicate = hookfunction(redlinerApi.replicateFunction, function(...)
+				local msg = ...
+				if stunDumpIndex and type(msg) == 'buffer' and alwaysStunActive then
+					if debug.info(2, 's') == stunDumpCaller or debug.info(3, 's') == stunDumpCaller then
+						local current = buffer.readf32(msg, stunDumpIndex)
+						if current >= alwaysStunMinOriginal and current <= STUN_SERVER_CAP + 20 then
+							local patched = applyAlwaysStunVelocity(current, nil, nil)
+							if patched ~= current then
+								buffer.writef32(msg, stunDumpIndex, patched)
+							end
+						end
+					end
+				end
+				return oldReplicate(...)
+			end)
+		end
+		if alwaysStunReplicate and hookfunction and buffer and not oldBufWrite and not stunDumpIndex then
+			oldBufWrite = hookfunction(buffer.writef32, function(buf, ind, data)
+				if data == -2.25 then
+					stunDumpIndex = ind
+					stunDumpCaller = debug.info(3, 's')
+					task.defer(function()
+						if oldBufWrite and restorefunction then
+							restorefunction(buffer.writef32)
+							oldBufWrite = nil
+						end
+					end)
+				end
+				return oldBufWrite(buf, ind, data)
+			end)
+		end
+		return oldPacketFire ~= nil or alwaysStunActive
+	end
+
+	AlwaysStun = extrasRef:CreateModule({
+		Name = 'Always Stun',
+		Function = function(callback)
+			alwaysStunActive = callback
+			if callback then
+				local function enable()
+					if not installAlwaysStunHooks() then
+						notif('Always Stun', 'Hooks unavailable — need hookfunction + in-match ClientRoot.', 5, 'alert')
+					end
+				end
+				if tick() - scriptStartTime < 2 then
+					task.delay(2, enable)
+				else
+					enable()
+				end
+			else
+				rebuildMeleePacketFireChain()
+				if oldPacketFire and restorefunction then
+					local proto = getPacketPrototype()
+					if proto then
+						pcall(function() restorefunction(proto.Fire) end)
+					end
+					oldPacketFire = nil
+				end
+				if oldReplicate and restorefunction then
+					pcall(function() restorefunction(redlinerApi.replicateFunction) end)
+					oldReplicate = nil
+				end
+				if oldBufWrite and restorefunction then
+					pcall(function() restorefunction(buffer.writef32) end)
+					oldBufWrite = nil
+				end
+				stunDumpIndex = nil
+				stunDumpCaller = nil
+			end
+		end,
+		Tooltip = 'Boosts clash velocity only on contested swings — adaptive cap near server limit, not flat max every hit.',
+	})
+	AlwaysStun:CreateSlider({
+		Name = 'Max Velocity',
+		Min = 120,
+		Max = 200,
+		Default = STUN_DEFAULT_MAX,
+		Function = function(val)
+			alwaysStunMax = val
+		end,
+		Suffix = 'sps',
+		Tooltip = 'Hard cap kept near the believable server range (~200).',
+	})
+	AlwaysStun:CreateToggle({
+		Name = 'Smart Boost',
+		Default = true,
+		Function = function(val)
+			alwaysStunSmart = val
+		end,
+		Tooltip = 'Adds a small margin above your real swing speed with slight randomness instead of a fixed spoof value.',
+	})
+	AlwaysStun:CreateToggle({
+		Name = 'Clash Only',
+		Default = true,
+		Function = function(val)
+			alwaysStunClashOnly = val
+		end,
+		Tooltip = 'Only boost when hitting hurtboxes or an enemy nearby is parrying.',
+	})
+	AlwaysStun:CreateSlider({
+		Name = 'Min Swing Speed',
+		Min = 20,
+		Max = 80,
+		Default = 35,
+		Function = function(val)
+			alwaysStunMinOriginal = val
+		end,
+		Suffix = 'sps',
+		Tooltip = 'Ignore weak tap swings below this speed.',
+	})
+	AlwaysStun:CreateToggle({
+		Name = 'Replicate Boost',
+		Default = true,
+		Function = function(val)
+			alwaysStunReplicate = val
+		end,
+		Tooltip = 'Optional AEAD replicate-path patch (runs once to find buffer index, then unhooks buffer.writef32).',
+	})
+
+	local FlyMod, SpeedMod, LongJumpMod
+	local flySpeed, flyVertical = 50, 50
+	local flyUp, flyDown = 0, 0
+
+	FlyMod = extrasRef:CreateModule({
+		Name = 'Fly',
+		Function = function(callback)
+			resolveExtendedRuntime()
+			local movement = getMovementController()
+			local velocityField = redlinerApi.velocityField
+			if callback and movement and velocityField and typeof(movement[velocityField]) == 'Vector3' then
+				FlyMod:Clean(runService.PreSimulation:Connect(function()
+					local moveDir = TargetStrafeVector
+						or (type(movement.getMoveDirection) == 'function' and movement:getMoveDirection() or Vector3.zero)
+					movement[velocityField] = (moveDir * flySpeed) + Vector3.new(0, 3.5 + (flyUp + flyDown) * flyVertical, 0)
+				end))
+				flyUp, flyDown = 0, 0
+				for _, eventName in {'InputBegan', 'InputEnded'} do
+					FlyMod:Clean(inputService[eventName]:Connect(function(input)
+						if not inputService:GetFocusedTextBox() then
+							if input.KeyCode == Enum.KeyCode.Space then
+								flyUp = eventName == 'InputBegan' and 1 or 0
+							elseif input.KeyCode == Enum.KeyCode.LeftAlt then
+								flyDown = eventName == 'InputBegan' and -1 or 0
+							end
+						end
+					end))
+				end
+			end
+		end,
+		Tooltip = 'Movement-controller fly (Space up, LeftAlt down).',
+	})
+	FlyMod:CreateSlider({Name = 'Speed', Min = 1, Max = 150, Default = 50, Function = function(v) flySpeed = v end})
+	FlyMod:CreateSlider({Name = 'Vertical Speed', Min = 1, Max = 150, Default = 50, Function = function(v) flyVertical = v end})
+
+	local highJumpPower = 50
+	extrasRef:CreateModule({
+		Name = 'High Jump',
+		Function = function(callback)
+			if not callback then
+				return
+			end
+			resolveExtendedRuntime()
+			local movement = getMovementController()
+			local velocityField = redlinerApi.velocityField
+			if movement and velocityField and typeof(movement[velocityField]) == 'Vector3' then
+				movement[velocityField] += Vector3.new(0, highJumpPower, 0)
+			end
+		end,
+		Tooltip = 'One-shot vertical boost via movement velocity.',
+	}):CreateSlider({Name = 'Velocity', Min = 1, Max = 150, Default = 50, Function = function(v) highJumpPower = v end})
+
+	local longJumpSpeed = 50
+	local longJumpAutoDisable = true
+	LongJumpMod = extrasRef:CreateModule({
+		Name = 'Long Jump',
+		Function = function(callback)
+			resolveExtendedRuntime()
+			local movement = getMovementController()
+			local velocityField = redlinerApi.velocityField
+			if callback and movement and velocityField then
+				local exempt = tick() + 0.1
+				LongJumpMod:Clean(runService.PreSimulation:Connect(function()
+					if not entitylib.isAlive then
+						return
+					end
+					local dir = (type(movement.getMoveDirection) == 'function' and movement:getMoveDirection() or Vector3.zero) * longJumpSpeed
+					local oldvel = movement[velocityField]
+					if entitylib.character.Humanoid.FloorMaterial ~= Enum.Material.Air then
+						if exempt < tick() and longJumpAutoDisable and LongJumpMod.Enabled then
+							LongJumpMod:Toggle()
+						else
+							oldvel = Vector3.new(0, 40, 0)
+						end
+					end
+					movement[velocityField] = Vector3.new(dir.X, oldvel.Y, dir.Z)
+				end))
+			end
+		end,
+		Tooltip = 'Ground long jump with optional auto-disable.',
+	})
+	LongJumpMod:CreateSlider({Name = 'Speed', Min = 1, Max = 150, Default = 50, Function = function(v) longJumpSpeed = v end})
+	LongJumpMod:CreateToggle({Name = 'Auto Disable', Default = true, Function = function(v) longJumpAutoDisable = v end})
+
+	local speedValue = 100
+	local speedAutoJump, speedCustomJump, speedJumpPower = false, false, 30
+	SpeedMod = extrasRef:CreateModule({
+		Name = 'Speed',
+		Function = function(callback)
+			resolveExtendedRuntime()
+			local movement = getMovementController()
+			local velocityField = redlinerApi.velocityField
+			if callback and movement and velocityField then
+				SpeedMod:Clean(runService.PreSimulation:Connect(function()
+					if FlyMod.Enabled or LongJumpMod.Enabled then
+						return
+					end
+					local dir = TargetStrafeVector
+						or (type(movement.getMoveDirection) == 'function' and movement:getMoveDirection() or Vector3.zero)
+					local oldvel = movement[velocityField]
+					if speedAutoJump and entitylib.isAlive and entitylib.character.Humanoid.FloorMaterial ~= Enum.Material.Air and dir.Magnitude > 0.01 then
+						oldvel = Vector3.new(0, speedCustomJump and speedJumpPower or 40, 0)
+					end
+					movement[velocityField] = Vector3.new(dir.X, oldvel.Y, dir.Z)
+				end))
+			end
+		end,
+		Tooltip = 'Horizontal speed via movement controller.',
+	})
+	SpeedMod:CreateSlider({Name = 'Speed', Min = 1, Max = 150, Default = 100, Function = function(v) speedValue = v end})
+	SpeedMod:CreateToggle({Name = 'Auto Jump', Function = function(v) speedAutoJump = v end})
+	SpeedMod:CreateToggle({Name = 'Custom Jump Power', Default = false, Function = function(v) speedCustomJump = v end})
+	SpeedMod:CreateSlider({Name = 'Jump Power', Min = 1, Max = 50, Default = 30, Function = function(v) speedJumpPower = v end})
+
+	local strafeRay = RaycastParams.new()
+	pcall(function()
+		local map = workspace:FindFirstChild('Map')
+		if map then
+			strafeRay.FilterDescendantsInstances = {map}
+			strafeRay.FilterType = Enum.RaycastFilterType.Include
+		end
+	end)
+	local strafeSearch, strafeRange, strafeYFactor = 24, 18, 100
+	local TargetStrafeMod
+	TargetStrafeMod = extrasRef:CreateModule({
+		Name = 'Target Strafe',
+		Function = function(callback)
+			local ang, oldEnt
+			if callback then
+				TargetStrafeMod:Clean(runService.PreSimulation:Connect(function()
+					TargetStrafeVector = nil
+					local ent = entitylib.EntityPosition({
+						Range = strafeSearch,
+						Part = 'RootPart',
+						Players = true,
+					})
+					if ent and entitylib.isAlive then
+						local root = entitylib.character.RootPart
+						local targetPos = ent.RootPart.Position
+						if FlyMod.Enabled or workspace:Raycast(targetPos, Vector3.new(0, -70, 0), strafeRay) then
+							local localPos = root.Position
+							if ent ~= oldEnt then
+								ang = math.deg(select(2, CFrame.lookAt(targetPos, localPos):ToEulerAnglesYXZ()))
+							end
+							local yFactor = math.abs(localPos.Y - targetPos.Y) * (strafeYFactor / 100)
+							local entityPos = Vector3.new(targetPos.X, localPos.Y, targetPos.Z)
+							local newPos = entityPos + (CFrame.Angles(0, math.rad(ang), 0).LookVector * (strafeRange - yFactor))
+							local vec = ((newPos - localPos) * Vector3.new(1, 0, 1)).Unit
+							if vec ~= vec then
+								vec = Vector3.zero
+							end
+							ang = (ang + 8) % 360
+							TargetStrafeVector = vec
+							oldEnt = ent
+							return
+						end
+					end
+					oldEnt = nil
+				end))
+			else
+				TargetStrafeVector = nil
+			end
+		end,
+		Tooltip = 'Orbits nearest enemy; feeds Fly/Speed direction.',
+	})
+	TargetStrafeMod:CreateSlider({Name = 'Search Range', Min = 1, Max = 30, Default = 24, Function = function(v) strafeSearch = v end})
+	TargetStrafeMod:CreateSlider({Name = 'Strafe Range', Min = 1, Max = 30, Default = 18, Function = function(v) strafeRange = v end})
+	TargetStrafeMod:CreateSlider({Name = 'Y Factor', Min = 0, Max = 100, Default = 100, Function = function(v) strafeYFactor = v end, Suffix = '%'})
+
+	local gravityValue = 192
+	local GravityMod
+	GravityMod = extrasRef:CreateModule({
+		Name = 'Gravity',
+		Function = function(callback)
+			resolveExtendedRuntime()
+			local movement = getMovementController()
+			local velocityField = redlinerApi.velocityField
+			if callback and movement and velocityField then
+				GravityMod:Clean(runService.PreSimulation:Connect(function(dt)
+					if entitylib.isAlive and entitylib.character.Humanoid.FloorMaterial == Enum.Material.Air then
+						movement[velocityField] += Vector3.new(0, dt * (workspace.Gravity - gravityValue), 0)
+					end
+				end))
+			end
+		end,
+		Tooltip = 'Custom gravity while airborne.',
+	})
+	GravityMod:CreateSlider({Name = 'Gravity', Min = 0, Max = 192, Default = 192, Function = function(v) gravityValue = v end})
+
+	local autoLeaveDelay = 1
+	local AutoLeaveMod
+	AutoLeaveMod = extrasRef:CreateModule({
+		Name = 'Auto Leave',
+		Function = function(callback)
+			if callback then
+				AutoLeaveMod:Clean(vapeEvents.MatchEnded.Event:Connect(function(_, results)
+					task.delay(autoLeaveDelay, function()
+						local btn = results and results:FindFirstChild('Main', true)
+						btn = btn and btn:FindFirstChild('Actions', true)
+						btn = btn and btn:FindFirstChild('returnbutton')
+						if btn and firesignal then
+							firesignal(btn.MouseButton1Click)
+						end
+					end)
+				end))
+			end
+		end,
+		Tooltip = 'Clicks return after match ends.',
+	})
+	AutoLeaveMod:CreateSlider({Name = 'Delay', Min = 0, Max = 2, Default = 1, Decimal = 10, Function = function(v) autoLeaveDelay = v end, Suffix = 's'})
+
+	local autoGgEnabled, autoWinEnabled = true, false
+	local winMessages, lastWinMsg = {}, nil
+	local function sendToxicMessage(defaultMsg, list)
+		local tab = list or {}
+		local msg = #tab > 0 and tab[math.random(1, #tab)] or defaultMsg
+		if not msg then
+			return
+		end
+		if #tab > 1 and msg == lastWinMsg then
+			repeat
+				msg = tab[math.random(1, #tab)]
+			until msg ~= lastWinMsg
+		end
+		lastWinMsg = msg
+		pcall(function()
+			if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+				textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(msg)
+			else
+				replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(msg, 'All')
+			end
+		end)
+	end
+	local AutoToxicMod
+	AutoToxicMod = extrasRef:CreateModule({
+		Name = 'Auto Toxic',
+		Function = function(callback)
+			if callback then
+				AutoToxicMod:Clean(vapeEvents.MatchEnded.Event:Connect(function(won)
+					if autoGgEnabled then
+						sendToxicMessage('gg', {'gg'})
+					end
+					if won and autoWinEnabled then
+						sendToxicMessage('yall garbage', winMessages)
+					end
+				end))
+			end
+		end,
+		Tooltip = 'Auto gg / win messages after matches.',
+	})
+	AutoToxicMod:CreateToggle({Name = 'Auto GG', Default = true, Function = function(v) autoGgEnabled = v end})
+	AutoToxicMod:CreateToggle({Name = 'Win Message', Function = function(v) autoWinEnabled = v end})
+end)
+
+
+-- ---------------------------------------------------------------------------
 -- UI modules
 -- ---------------------------------------------------------------------------
 
@@ -5217,6 +6074,7 @@ run(function()
 			autoParryActive = callback
 			if callback then
 				resolveRedlinerRuntime(true)
+				resolveExtendedRuntime()
 				installSessionPacketHook()
 				warmCombatSessionToken()
 				logParryAnimIds()
@@ -5228,37 +6086,6 @@ run(function()
 			end
 		end,
 		Tooltip = 'Parries nearby enemy melee swings and gun draw/shot animations (360 within Melee/Threat range).',
-	})
-
-	local AlwaysParry
-	AlwaysParry = extras:CreateModule({
-		Name = 'Always Parry',
-		Function = function(callback)
-			alwaysParryActive = callback
-			bindAlwaysParryInput()
-			resolveRedlinerRuntime(true)
-			installSessionPacketHook()
-			rebuildMeleePacketFireChain()
-			if callback then
-				notif('Always Parry', 'Clash boost active — max velocityMag on melee packets.', 5)
-			else
-				rebuildMeleePacketFireChain()
-			end
-		end,
-		Tooltip = 'Spoofs max clash velocity (velocityMag) on every melee swing. Faster side wins clashes and applies more impact to the loser. Not Auto Parry.',
-	})
-	AlwaysParry:CreateSlider({
-		Name = 'Clash Velocity',
-		Min = ALWAYS_PARRY_MIN_VELOCITY,
-		Max = ALWAYS_PARRY_MAX_VELOCITY,
-		Default = ALWAYS_PARRY_DEFAULT_VELOCITY,
-		Function = function(val)
-			alwaysParryVelocitySetting = val
-		end,
-		Suffix = function(val)
-			return math.floor(val * 10) / 10 .. ' u/s'
-		end,
-		Tooltip = 'Outgoing velocityMag on melee packets. Tutorial dummy is 50 u/s; default 200 wins clashes and applies max destabilization pressure.',
 	})
 
 	KillAura = extras:CreateModule({
@@ -5352,6 +6179,35 @@ run(function()
 			end
 		end,
 		Tooltip = 'Prints [REDLINER][Reach] hook install, hitbox cast, and heartbeat logs to console.',
+	})
+
+	KillAura:CreateSlider({
+		Name = 'Max Angle',
+		Min = 1,
+		Max = 360,
+		Default = 360,
+		Function = function(val)
+			killAuraMaxAngleSetting = val
+		end,
+		Tooltip = 'Forward cone for kill aura targeting. 360 = full surround (default).',
+	})
+
+	KillAura:CreateToggle({
+		Name = 'Duel Shot Gate',
+		Default = true,
+		Function = function(callback)
+			killAuraDuelGateEnabled = callback
+		end,
+		Tooltip = 'In 1v1/duel, pause kill aura when enemy shot indicators are imminent (<0.4s).',
+	})
+
+	KillAura:CreateToggle({
+		Name = 'Lobby Disable',
+		Default = true,
+		Function = function(callback)
+			killAuraLobbyDisableEnabled = callback
+		end,
+		Tooltip = 'Disable kill aura swings in the main lobby place.',
 	})
 
 	MeleeRange = AutoParry:CreateSlider({
@@ -5730,6 +6586,15 @@ run(function()
 		Tooltip = 'Log skip reasons: out_of_range, not_aiming, wrong_enemy, cooldown.',
 	})
 
+	AutoParry:CreateToggle({
+		Name = 'Indicator Table',
+		Default = true,
+		Function = function(callback)
+			indicatorParryEnabled = callback
+		end,
+		Tooltip = 'Use game native shot indicators (reference-style) alongside packet/animation parry.',
+	})
+
 	TestParry = AutoParry:CreateToggle({
 		Name = 'Test Parry',
 		Function = function(callback)
@@ -6086,7 +6951,7 @@ run(function()
 		bindLocalRespawnHandler()
 
 		runService.Heartbeat:Connect(function()
-			if not AutoParry.Enabled and not AlwaysParry.Enabled and not KillAura.Enabled
+			if not AutoParry.Enabled and not KillAura.Enabled
 				and not HitBoxes.Enabled and not hud.drawTimerEnabled
 				and not hud.bulletWarningsEnabled and not hud.impactEspEnabled
 				and not hud.healthEspEnabled and not hud.aimlockDetectorEnabled
@@ -6128,6 +6993,6 @@ run(function()
 		repeat
 			task.wait(0.25)
 		until vape.Loaded or tick() - start > 20
-		notif('REDLINER', 'Extras loaded: kill aura, hitboxes, ESP, and aimlock ready. Use Combat tab for Silent Aim.', 6)
+		notif('REDLINER', 'Extras loaded: combat, movement, silent aim, ESP, and reference modules ready.', 6)
 	end)
 end)
