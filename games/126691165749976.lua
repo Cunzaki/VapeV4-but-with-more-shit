@@ -3022,9 +3022,13 @@ local function mirrorMeleePacketFireWrapper(wrapper, oldFire)
 		return
 	end
 	for _, value in gc do
+		if type(value) ~= 'table' then
+			continue
+		end
 		local key = redlinerApi.meleePacketKey or MELEE_PACKET_NAME
-		if type(value) == 'table' and value[key] then
-			value[key].Fire = wrapper
+		local packet = rawget(value, key)
+		if type(packet) == 'table' and type(rawget(packet, 'Fire')) == 'function' then
+			packet.Fire = wrapper
 		end
 	end
 end
