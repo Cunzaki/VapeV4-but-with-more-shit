@@ -800,6 +800,7 @@ components = {
 		knob.Parent = knobholder
 		addCorner(knob, UDim.new(1, 0))
 		optionsettings.Function = optionsettings.Function or function() end
+		optionapi.Function = optionsettings.Function
 		local satSlider = createSlider('Saturation', ColorSequence.new({
 			ColorSequenceKeypoint.new(0, Color3.fromHSV(0, 0, optionapi.Value)),
 			ColorSequenceKeypoint.new(1, Color3.fromHSV(optionapi.Hue, 1, optionapi.Value))
@@ -1051,6 +1052,7 @@ components = {
 		arrow.Rotation = 90
 		arrow.Parent = button
 		optionsettings.Function = optionsettings.Function or function() end
+		optionapi.Function = optionsettings.Function
 		local dropdownchildren
 		
 		function optionapi:Save(tab)
@@ -1283,6 +1285,7 @@ components = {
 		knob.Parent = knobholder
 		addCorner(knob, UDim.new(1, 0))
 		optionsettings.Function = optionsettings.Function or function() end
+		optionapi.Function = optionsettings.Function
 		optionsettings.Decimal = optionsettings.Decimal or 1
 		
 		function optionapi:Save(tab)
@@ -1470,6 +1473,7 @@ components = {
 		title.Parent = window
 		local close = addCloseButton(window)
 		optionsettings.Function = optionsettings.Function or function() end
+		optionapi.Function = optionsettings.Function
 		
 		function optionapi:Save(tab)
 			tab.Targets = {
@@ -1764,6 +1768,7 @@ components = {
 		box.ClearTextOnFocus = false
 		box.Parent = bkg
 		optionsettings.Function = optionsettings.Function or function() end
+		optionapi.Function = optionsettings.Function
 		
 		function optionapi:Save(tab)
 			tab[optionsettings.Name] = {Value = self.Value}
@@ -1931,6 +1936,7 @@ components = {
 		addbutton.ImageTransparency = 0.3
 		addbutton.Parent = addbkg
 		optionsettings.Function = optionsettings.Function or function() end
+		optionapi.Function = optionsettings.Function
 		
 		function optionapi:Save(tab)
 			tab[optionsettings.Name] = {
@@ -2184,6 +2190,7 @@ components = {
 		knob.Parent = knobholder
 		local hovered = false
 		optionsettings.Function = optionsettings.Function or function() end
+		optionapi.Function = optionsettings.Function
 		
 		function optionapi:Save(tab)
 			tab[optionsettings.Name] = {Enabled = self.Enabled}
@@ -2347,6 +2354,7 @@ components = {
 		arrow.ImageColor3 = color.Light(uipallet.Main, 0.14)
 		arrow.Parent = slider
 		optionsettings.Function = optionsettings.Function or function() end
+		optionapi.Function = optionsettings.Function
 		optionsettings.Decimal = optionsettings.Decimal or 1
 		local random = Random.new()
 		
@@ -5734,7 +5742,7 @@ function mainapi:Load(skipgui, profile)
 				object:SetBind(v.Bind)
 				object.Object.Bind.Visible = #v.Bind > 0
 			end
-			if object.Options and v.Options then
+			if object.Options then
 				self:SyncModuleOptions(object)
 			end
 		end
@@ -5803,17 +5811,41 @@ function mainapi:SyncModuleOptions(module)
 		return
 	end
 	for _, opt in module.Options do
-		if opt.Type == 'Toggle' then
-			opt.Function(opt.Enabled)
-		elseif opt.Type == 'Slider' or opt.Type == 'TwoSlider' then
-			opt.Function(opt.Value, true)
-		elseif opt.Type == 'Dropdown' then
-			opt.Function(opt.Value)
-		elseif opt.Type == 'TextBox' then
-			opt.Function(opt.Value, true)
-		elseif opt.Type == 'ColorSlider' then
-			opt:SetValue(opt.Hue, opt.Sat, opt.Value, opt.Opacity)
-		end
+		pcall(function()
+			if opt.Type == 'Toggle' then
+				if opt.Function then
+					opt.Function(opt.Enabled)
+				end
+			elseif opt.Type == 'Slider' then
+				if opt.SetValue then
+					opt:SetValue(opt.Value, nil, true)
+				elseif opt.Function then
+					opt.Function(opt.Value, true)
+				end
+			elseif opt.Type == 'TwoSlider' then
+				if opt.Function then
+					opt.Function(opt.ValueMin, opt.ValueMax)
+				end
+			elseif opt.Type == 'Dropdown' then
+				if opt.SetValue then
+					opt:SetValue(opt.Value)
+				elseif opt.Function then
+					opt.Function(opt.Value)
+				end
+			elseif opt.Type == 'TextBox' then
+				if opt.SetValue then
+					opt:SetValue(opt.Value, true)
+				elseif opt.Function then
+					opt.Function(opt.Value, true)
+				end
+			elseif opt.Type == 'ColorSlider' then
+				if opt.SetValue then
+					opt:SetValue(opt.Hue, opt.Sat, opt.Value, opt.Opacity)
+				elseif opt.Function then
+					opt.Function(opt.Hue, opt.Sat, opt.Value, opt.Opacity)
+				end
+			end
+		end)
 	end
 end
 
