@@ -210,8 +210,6 @@ local gunParryPacketHooked = false
 local breakPacketHooked = false
 local attackReachHooked = false
 local meleePacketReachHooked = false
-local parryPacketAlwaysParryHooked = false
-local alwaysParryLoopBound = false
 local reachHitboxHookSource = nil
 local reachAttackHookSource = nil
 local reachDebugEnabled = false
@@ -2619,7 +2617,7 @@ local function getAlwaysParryVelocityMag(current)
 	return spoof
 end
 
-spoofMovementVelocityForClash = function()
+local function syncClashVelocityForMeleePacket()
 	local movement = getMovementController()
 	local root = getLocalRoot()
 	if not movement or not root then
@@ -2634,53 +2632,11 @@ spoofMovementVelocityForClash = function()
 	movement._xed86f944048d8fdc = horiz * alwaysParryVelocitySetting
 end
 
-bindAlwaysParryVelocityLoop = function()
-	if alwaysParryLoopBound then
-		return
-	end
-	alwaysParryLoopBound = true
-	runService.Heartbeat:Connect(function()
-		if not alwaysParryActive or not isLocalAlive() then
-			return
-		end
-		spoofMovementVelocityForClash()
-	end)
-end
-
-installParryPacketAlwaysParryHook = function()
-	if parryPacketAlwaysParryHooked then
-		return true
-	end
-	if not initPackets() then
-		return false
-	end
-	local packet = Packets[PARRY_PACKET_NAME]
-	if not packet or type(packet.Fire) ~= 'function' then
-		return false
-	end
-	if packet._alwaysParryHooked then
-		parryPacketAlwaysParryHooked = true
-		return true
-	end
-	local oldFire = packet.Fire
-	packet._alwaysParryHooked = true
-	parryPacketAlwaysParryHooked = true
-	packet.Fire = function(firePacket, ...)
-		if alwaysParryActive then
-			spoofMovementVelocityForClash()
-		end
-		return oldFire(firePacket, ...)
-	end
-	return true
-end
-
 installAlwaysParryHooks = function()
 	if not initPackets() then
 		return false
 	end
-	installMeleePacketReachHook()
-	installParryPacketAlwaysParryHook()
-	return meleePacketReachHooked
+	return installMeleePacketReachHook()
 end
 
 triggerGameMeleeAttack = function()
@@ -2747,7 +2703,7 @@ installMeleePacketReachHook = function()
 	packet.Fire = function(firePacket, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
 		local merged = augmentOutgoingMeleeHurtboxes(hurtboxes)
 		if alwaysParryActive then
-			spoofMovementVelocityForClash()
+			syncClashVelocityForMeleePacket()
 			velocityMag = getAlwaysParryVelocityMag(velocityMag)
 		end
 		return oldFire(firePacket, sessionToken, weaponId, attackType, position, merged, velocityMag, ...)
@@ -3032,7 +2988,13 @@ bindPacketListeners = function()
 	if not initPackets() then
 		return
 	end
-	installCombatReachHooks()
+	if reachActive or reachDebugEnabled or hud.killAuraActive
+		or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
+		installCombatReachHooks()
+	end
+	if alwaysParryActive and not meleePacketReachHooked then
+		installAlwaysParryHooks()
+	end
 	installCombatEventHook()
 	if not breakPacketHooked then
 		local breakPacket = Packets and Packets._xdb2548bded1dd8e3
@@ -3224,7 +3186,7 @@ end
 
 combatHeartbeat = function(meleeRange)
 	meleeRangeSetting = meleeRange
-	if reachActive or reachDebugEnabled or autoParryActive or alwaysParryActive or hud.killAuraActive
+	if reachActive or reachDebugEnabled or autoParryActive or hud.killAuraActive
 		or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
 		bindPacketListeners()
 	end
@@ -3235,13 +3197,9 @@ combatHeartbeat = function(meleeRange)
 		installHitboxReachHook()
 	end
 
-	if (reachActive or hud.killAuraActive or alwaysParryActive)
+	if (reachActive or hud.killAuraActive)
 		and (not hitboxReachHooked or not attackReachHooked or not meleePacketReachHooked) then
-		if alwaysParryActive and not reachActive and not hud.killAuraActive then
-			installAlwaysParryHooks()
-		else
-			installCombatReachHooks()
-		end
+		installCombatReachHooks()
 		if reachDebugEnabled then
 			logReachHookStatus('heartbeat retry')
 		end
@@ -4306,13 +4264,11 @@ run(function()
 		Function = function(callback)
 			alwaysParryActive = callback
 			if callback then
-				bindPacketListeners()
 				installAlwaysParryHooks()
-				bindAlwaysParryVelocityLoop()
-				notif('Always Parry', 'High clash velocity — win melee clashes and destabilize opponents.', 5)
+				notif('Always Parry', 'High clash velocity on melee swings — win clashes when attacking.', 5)
 			end
 		end,
-		Tooltip = 'Spoofs high horizontal speed on outgoing melee/parry packets so you win clashes. Not Auto Parry.',
+		Tooltip = 'Spoofs high horizontal speed on outgoing melee swings so you win clashes. Not Auto Parry.',
 	})
 	AlwaysParry:CreateSlider({
 		Name = 'Clash Velocity',
