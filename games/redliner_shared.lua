@@ -282,6 +282,9 @@ local lastDebugAnimAt = {}
 local parryIdsLogged = false
 local parryScanBound = false
 local autoAttackLoopBound = false
+local combatBootstrapInFlight = false
+local lastCombatBootstrapAt = 0
+local COMBAT_BOOTSTRAP_INTERVAL = 0.35
 local hurtboxScanCache = {time = 0, range = 0, visible = true, results = {}}
 local autoAttackTargetCache = {time = 0, range = 0, model = nil}
 local meleePacketGcMirrored = false
@@ -707,11 +710,29 @@ function threatDebugSkip(...)
 end
 
 -- ---------------------------------------------------------------------------
--- Packets / reach
+-- Packets
 -- ---------------------------------------------------------------------------
 
-function initPackets()
+local function tryInitPackets()
 	if Packets then
+		return true
+	end
+	local assets = replicatedStorage:FindFirstChild('Assets')
+	local modules = assets and assets:FindFirstChild('ModuleScripts')
+	local packetsModule = modules and modules:FindFirstChild('Packets')
+	if not packetsModule then
+		return false
+	end
+	local ok, loaded = pcall(require, packetsModule)
+	if not ok then
+		return false
+	end
+	Packets = loaded
+	return true
+end
+
+function initPackets()
+	if tryInitPackets() then
 		return true
 	end
 	local assets = replicatedStorage:FindFirstChild('Assets')
@@ -767,7 +788,7 @@ resolveRedlinerRuntime = function(force)
 	if redlinerApi.resolved and not force then
 		return redlinerApi.meleePacketKey ~= nil
 	end
-	if not Packets and not initPackets() then
+	if not Packets and not tryInitPackets() then
 		return false
 	end
 	local prevMelee = redlinerApi.meleePacketKey
@@ -2455,37 +2476,40 @@ bindLocalRespawnHandler = function()
 			return
 		end
 		refreshMyHurtboxes()
-		local hum = char:FindFirstChildWhichIsA('Humanoid') or char:WaitForChild('Humanoid', 8)
+		local hum = char:FindFirstChildWhichIsA('Humanoid')
 		if hum then
 			hum.Died:Connect(function()
 				blockLocalParry()
+			end)
+		else
+			task.spawn(function()
+				local waitedHum = char:WaitForChild('Humanoid', 8)
+				if waitedHum then
+					waitedHum.Died:Connect(function()
+						blockLocalParry()
+					end)
+				end
 			end)
 		end
 	end
 
 	local function onLocalRespawn(char)
 		resetLocalParryState()
+		lastAttackAt = 0
 		task.defer(function()
 			if not char or not char.Parent then
 				return
 			end
 			refreshMyHurtboxes()
-			if invalidateClientClassesCache then
-				invalidateClientClassesCache()
-			end
+			invalidateClientClassesCache()
 			combatSession.token = nil
 			combatSession.weaponId = nil
 			sessionPacketHooked = false
-			resolveRedlinerRuntime(true)
-			if autoAttackActive then
-				hitboxReachHooked = false
-				attackReachHooked = false
-				meleePacketReachHooked = false
-				installSessionPacketHook()
-				rebuildMeleePacketFireChain()
-				bindPacketListeners()
-			elseif autoParryActive then
-				bindPacketListeners()
+			hitboxReachHooked = false
+			attackReachHooked = false
+			meleePacketReachHooked = false
+			if autoAttackActive or autoParryActive then
+				bootstrapCombatAsync(true)
 			end
 			if autoParryActive then
 				purgeOrphanWatchers()
@@ -3350,15 +3374,6 @@ getClientClasses = function()
 		return clientClassesCache
 	end
 	local classes = tryRequireClientClasses(replicatedStorage:FindFirstChild('Start'))
-	if not classes then
-		local start = replicatedStorage:FindFirstChild('Start')
-		if not start then
-			pcall(function()
-				start = replicatedStorage:WaitForChild('Start', 8)
-			end)
-		end
-		classes = tryRequireClientClasses(start)
-	end
 	if not classes and getloadedmodules then
 		local modsOk, mods = pcall(getloadedmodules)
 		if modsOk and type(mods) == 'table' then
@@ -3809,12 +3824,11 @@ rebuildMeleePacketFireChain = function()
 end
 
 triggerGameMeleeAttack = function()
-	local classes
-	if #redlinerApi.inputHandlers > 0 then
-		classes = clientClassesCache
+	local classes = clientClassesCache
+	if not classes and #redlinerApi.inputHandlers == 0 then
+		bootstrapCombatAsync(false)
 	else
-		resolveMovementApi()
-		classes = getClientClassesCached()
+		classes = classes or getClientClassesCached()
 	end
 	for _, entry in redlinerApi.inputHandlers do
 		local inputHandler = classes and rawget(classes, entry.class)
@@ -3998,6 +4012,37 @@ installCombatReachHooks = function()
 		rebuildMeleePacketFireChain()
 	end
 end
+
+bootstrapCombatAsync = function(force)
+	if combatBootstrapInFlight then
+		return
+	end
+	local now = tick()
+	if not force and now - lastCombatBootstrapAt < COMBAT_BOOTSTRAP_INTERVAL then
+		return
+	end
+	combatBootstrapInFlight = true
+	lastCombatBootstrapAt = now
+	task.spawn(function()
+		pcall(function()
+			initPackets()
+			resolveRedlinerRuntime(true)
+			resolveMovementApi()
+			if autoAttackActive or autoParryActive then
+				installSessionPacketHook()
+				installCombatReachHooks()
+				bindPacketListeners()
+			end
+		end)
+		combatBootstrapInFlight = false
+	end)
+end
+
+task.spawn(function()
+	initPackets()
+	resolveRedlinerRuntime(true)
+	resolveMovementApi()
+end)
 
 local combatEventHooked = false
 
@@ -4301,7 +4346,7 @@ combatHeartbeat = function(meleeRange)
 	end
 
 	if autoAttackActive and (not hitboxReachHooked or not attackReachHooked or not meleePacketReachHooked) then
-		installCombatReachHooks()
+		bootstrapCombatAsync(false)
 	end
 
 	if not isLocalAlive() then
@@ -5887,15 +5932,8 @@ run(function()
 		Function = function(callback)
 			autoAttackActive = callback
 			if callback then
-				resolveRedlinerRuntime(true)
-				installSessionPacketHook()
-				if resolveMovementApi then
-					resolveMovementApi()
-				end
-				bindPacketListeners()
-				installCombatReachHooks()
-				rebuildMeleePacketFireChain()
 				bindAutoAttackLoop()
+				bootstrapCombatAsync(true)
 				notif('Kill aura', '360 melee — validated packet per enemy within Attack Range.', 4)
 			else
 				rebuildMeleePacketFireChain()
@@ -6710,6 +6748,7 @@ run(function()
 		end
 		combatBound = true
 		bindLocalRespawnHandler()
+		bootstrapCombatAsync(true)
 
 		runService.Heartbeat:Connect(function()
 			if not AutoParry.Enabled and not KillAura.Enabled
@@ -6739,13 +6778,6 @@ run(function()
 	end)
 
 	task.defer(bindCombatLoop)
-	task.defer(function()
-		local start = tick()
-		repeat
-			task.wait(0.25)
-		until vape.Loaded or tick() - start > 8
-		bindCombatLoop()
-	end)
 end)
 
 run(function()
