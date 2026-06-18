@@ -3837,7 +3837,9 @@ function mainapi:CreateCategory(categorysettings)
 		modulechildren.BackgroundColor3 = color.Dark(uipallet.Main, 0.02)
 		modulechildren.BorderSizePixel = 0
 		modulechildren.Visible = false
+		modulechildren.LayoutOrder = 2
 		modulechildren.Parent = children
+		modulebutton.LayoutOrder = 1
 		local moduleExpanded = false
 		local moduleExpandAnim = 0
 		moduleapi.Children = modulechildren
@@ -3911,11 +3913,7 @@ function mainapi:CreateCategory(categorysettings)
 
 		for i, v in components do
 			moduleapi['Create'..i] = function(_, optionsettings)
-				local option = v(optionsettings, modulechildren, moduleapi)
-				if mainapi.Loaded then
-					mainapi:ScheduleModuleProfileApply(modulesettings.Name)
-				end
-				return option
+				return v(optionsettings, modulechildren, moduleapi)
 			end
 		end
 
@@ -4044,9 +4042,6 @@ function mainapi:CreateCategory(categorysettings)
 
 		moduleapi.Object = modulebutton
 		mainapi.Modules[modulesettings.Name] = moduleapi
-		if mainapi.Loaded then
-			mainapi:ScheduleModuleProfileApply(modulesettings.Name)
-		end
 
 		local sorting = {}
 		for _, v in mainapi.Modules do
@@ -4058,9 +4053,15 @@ function mainapi:CreateCategory(categorysettings)
 			table.sort(sort)
 			for i, v in sort do
 				mainapi.Modules[v].Index = i
-				mainapi.Modules[v].Object.LayoutOrder = i
-				mainapi.Modules[v].Children.LayoutOrder = i
+				mainapi.Modules[v].Object.LayoutOrder = i * 2 - 1
+				mainapi.Modules[v].Children.LayoutOrder = i * 2
 			end
+		end
+
+		if mainapi.Loaded then
+			task.defer(function()
+				mainapi:ScheduleModuleProfileApply(modulesettings.Name)
+			end)
 		end
 
 		return moduleapi
