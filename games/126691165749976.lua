@@ -49,8 +49,11 @@ local PARRY_VK = 0x46
 local MELEE_PACKET_NAME = '_xf5e1e1983608ed25'
 local MELEE_PACKET_REMOTE = '_xf6afcf3c8b6be378'
 local MELEE_SESSION_PACKET = '_x57c165550ede3092'
+local PARRY_PACKET_NAME = '_xff9e8e66a100da8b'
 local GUN_PACKET_NAME = '_x8458a1cfd21149ba'
 local GUN_SHOT_PACKET_NAME = '_x6f11420c13d0d5ee'
+local ALWAYS_PARRY_DEFAULT_VELOCITY = 150
+local ALWAYS_PARRY_MIN_VELOCITY = 50
 local MELEE_DEFAULT_ACTION = 'SWING'
 local MELEE_ACTION_FALLBACKS = {'SWING', 'SWING_HEAVY', 'wideslash', 'WIDESLASH', 'SLASH'}
 local DASH_VELOCITY_MIN = 20
@@ -141,6 +144,8 @@ local PARRY_MODE_LIST = {'Hybrid', 'Animation', 'Packet'}
 
 local Packets
 local autoParryActive = false
+local alwaysParryActive = false
+local alwaysParryVelocitySetting = ALWAYS_PARRY_DEFAULT_VELOCITY
 local autoAttackActive = false
 local reachActive = false
 local reachExtend = 0
@@ -205,6 +210,8 @@ local gunParryPacketHooked = false
 local breakPacketHooked = false
 local attackReachHooked = false
 local meleePacketReachHooked = false
+local parryPacketAlwaysParryHooked = false
+local alwaysParryLoopBound = false
 local reachHitboxHookSource = nil
 local reachAttackHookSource = nil
 local reachDebugEnabled = false
@@ -2599,6 +2606,83 @@ local function getClientClasses()
 	return classes
 end
 
+local function getMovementController()
+	local classes = getClientClasses()
+	return classes and classes._xef0ffbcc2c92f7b4
+end
+
+local function getAlwaysParryVelocityMag(current)
+	local spoof = alwaysParryVelocitySetting
+	if typeof(current) == 'number' and current > spoof then
+		return current
+	end
+	return spoof
+end
+
+spoofMovementVelocityForClash = function()
+	local movement = getMovementController()
+	local root = getLocalRoot()
+	if not movement or not root then
+		return
+	end
+	local horiz = root.CFrame.LookVector * Vector3.new(1, 0, 1)
+	if horiz.Magnitude < 0.05 then
+		horiz = Vector3.new(0, 0, -1)
+	else
+		horiz = horiz.Unit
+	end
+	movement._xed86f944048d8fdc = horiz * alwaysParryVelocitySetting
+end
+
+bindAlwaysParryVelocityLoop = function()
+	if alwaysParryLoopBound then
+		return
+	end
+	alwaysParryLoopBound = true
+	runService.Heartbeat:Connect(function()
+		if not alwaysParryActive or not isLocalAlive() then
+			return
+		end
+		spoofMovementVelocityForClash()
+	end)
+end
+
+installParryPacketAlwaysParryHook = function()
+	if parryPacketAlwaysParryHooked then
+		return true
+	end
+	if not initPackets() then
+		return false
+	end
+	local packet = Packets[PARRY_PACKET_NAME]
+	if not packet or type(packet.Fire) ~= 'function' then
+		return false
+	end
+	if packet._alwaysParryHooked then
+		parryPacketAlwaysParryHooked = true
+		return true
+	end
+	local oldFire = packet.Fire
+	packet._alwaysParryHooked = true
+	parryPacketAlwaysParryHooked = true
+	packet.Fire = function(firePacket, ...)
+		if alwaysParryActive then
+			spoofMovementVelocityForClash()
+		end
+		return oldFire(firePacket, ...)
+	end
+	return true
+end
+
+installAlwaysParryHooks = function()
+	if not initPackets() then
+		return false
+	end
+	installMeleePacketReachHook()
+	installParryPacketAlwaysParryHook()
+	return meleePacketReachHooked
+end
+
 triggerGameMeleeAttack = function()
 	local classes = getClientClasses()
 	local inputHandler = classes and classes._xd2c44c643b0c3fb4
@@ -2662,6 +2746,10 @@ installMeleePacketReachHook = function()
 	meleePacketReachHooked = true
 	packet.Fire = function(firePacket, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
 		local merged = augmentOutgoingMeleeHurtboxes(hurtboxes)
+		if alwaysParryActive then
+			spoofMovementVelocityForClash()
+			velocityMag = getAlwaysParryVelocityMag(velocityMag)
+		end
 		return oldFire(firePacket, sessionToken, weaponId, attackType, position, merged, velocityMag, ...)
 	end
 	reachDebugLog('Melee packet Fire hook OK -', MELEE_PACKET_NAME)
@@ -3136,17 +3224,24 @@ end
 
 combatHeartbeat = function(meleeRange)
 	meleeRangeSetting = meleeRange
-	if reachActive or reachDebugEnabled or autoParryActive or hud.killAuraActive
+	if reachActive or reachDebugEnabled or autoParryActive or alwaysParryActive or hud.killAuraActive
 		or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
 		bindPacketListeners()
+	end
+	if alwaysParryActive and not meleePacketReachHooked then
+		installAlwaysParryHooks()
 	end
 	if hud.hitboxVisualizerSwingEnabled and not hitboxReachHooked then
 		installHitboxReachHook()
 	end
 
-	if (reachActive or hud.killAuraActive)
+	if (reachActive or hud.killAuraActive or alwaysParryActive)
 		and (not hitboxReachHooked or not attackReachHooked or not meleePacketReachHooked) then
-		installCombatReachHooks()
+		if alwaysParryActive and not reachActive and not hud.killAuraActive then
+			installAlwaysParryHooks()
+		else
+			installCombatReachHooks()
+		end
 		if reachDebugEnabled then
 			logReachHookStatus('heartbeat retry')
 		end
@@ -4205,6 +4300,34 @@ run(function()
 		Tooltip = 'Parries nearby enemy melee swings and gun draw/shot animations (360 within Melee/Threat range).',
 	})
 
+	local AlwaysParry
+	AlwaysParry = extras:CreateModule({
+		Name = 'Always Parry',
+		Function = function(callback)
+			alwaysParryActive = callback
+			if callback then
+				bindPacketListeners()
+				installAlwaysParryHooks()
+				bindAlwaysParryVelocityLoop()
+				notif('Always Parry', 'High clash velocity — win melee clashes and destabilize opponents.', 5)
+			end
+		end,
+		Tooltip = 'Spoofs high horizontal speed on outgoing melee/parry packets so you win clashes. Not Auto Parry.',
+	})
+	AlwaysParry:CreateSlider({
+		Name = 'Clash Velocity',
+		Min = ALWAYS_PARRY_MIN_VELOCITY,
+		Max = ALWAYS_PARRY_DEFAULT_VELOCITY,
+		Default = ALWAYS_PARRY_DEFAULT_VELOCITY,
+		Function = function(val)
+			alwaysParryVelocitySetting = val
+		end,
+		Suffix = function(val)
+			return math.floor(val * 10) / 10 .. ' u/s'
+		end,
+		Tooltip = 'Horizontal speed sent with melee swings (tutorial dummy is 50 u/s; HUD caps around 150).',
+	})
+
 	AutoAttack = extras:CreateModule({
 		Name = 'Auto Attack',
 		Function = function(callback)
@@ -5047,7 +5170,7 @@ run(function()
 		bindAutoAttackLoop()
 
 		runService.Heartbeat:Connect(function()
-			if not AutoParry.Enabled and not AutoAttack.Enabled and not Reach.Enabled
+			if not AutoParry.Enabled and not AlwaysParry.Enabled and not AutoAttack.Enabled and not Reach.Enabled
 				and not KillAura.Enabled and not hud.drawTimerEnabled
 				and not hud.bulletWarningsEnabled and not hud.impactEspEnabled
 				and not hud.healthEspEnabled and not hud.aimlockDetectorEnabled
@@ -5065,7 +5188,7 @@ run(function()
 	end
 
 	local REDLINER_PROFILE_MODULES = {
-		'Auto Parry', 'Auto Attack', 'Reach',
+		'Auto Parry', 'Always Parry', 'Auto Attack', 'Reach',
 		'Draw Timer', 'Bullet Warnings', 'Impact ESP', 'Health ESP', 'Aimlock Detector',
 		'Hitbox Visualizer', 'Kill Aura',
 	}
