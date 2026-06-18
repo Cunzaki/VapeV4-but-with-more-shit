@@ -112,20 +112,20 @@ local AUTO_PARRY_DEFAULTS = {
 	meleeRange = 20,
 	threatRange = 100,
 	watcherThreatRange = 120,
-	meleeEnemyDebounce = 0.08,
-	gunEnemyDebounce = 0.3,
+	meleeEnemyDebounce = 0.05,
+	gunEnemyDebounce = 0.18,
 	meleeAimDot = 0.32,
 	gunAimDot = 0.65,
 	meleeParryCooldown = 0,
-	parryCooldown = 0.05,
+	parryCooldown = 0.03,
 	meleeSwingWindow = 0.7,
 	gunDrawWindow = 0.45,
 	gunShotWindow = 0.15,
 	closeRangeStuds = 3,
-	castigateDelay = 0.675,
-	phoenixDelay = 0.72,
-	siegeDelay = 0.99,
-	monarchDelay = 1.665,
+	castigateDelay = 0.62,
+	phoenixDelay = 0.66,
+	siegeDelay = 0.91,
+	monarchDelay = 1.54,
 	parryMelee = true,
 	parryGunDraw = true,
 	parryGunShot = true,
@@ -187,7 +187,10 @@ local GUN_DRAW_TIMES = {
 	Siege = 1.1,
 	Monarch = 1.85,
 }
-local PARRY_INPUT_LATENCY = 0.04
+local PARRY_INPUT_LATENCY = 0.05
+local PARRY_EARLY_BIAS = 0.085
+local MELEE_PARRY_HIT_OFFSET = 0.27
+local GUN_SHOT_PARRY_OFFSET = 0.03
 local PARRY_MODE_LIST = {'Hybrid', 'Animation', 'Packet'}
 
 local Packets
@@ -251,13 +254,13 @@ local alwaysParryInputBound = false
 local localRespawnBound = false
 local lastParryScanAt = 0
 local lastWatcherRefreshAt = 0
-local PARRY_SCAN_INTERVAL = 0.02
+local PARRY_SCAN_INTERVAL = 0.008
 local WATCHER_REFRESH_INTERVAL = 0.25
 local GUN_AIM_RANGE_BONUS = 0.12
 local GUN_MUZZLE_NAMES = {'Muzzle', 'Barrel', 'FirePoint', 'Gun', 'Handle', 'Tip', 'ShootPoint', 'Ray', 'Flash', 'Emitter', 'Glint'}
 local GUN_RAY_HIT_RADIUS = 5
 local GUN_RAY_MAX_RANGE = 100000
-local PING_PARRY_MAX_OFFSET = 0.35
+local PING_PARRY_MAX_OFFSET = 0.55
 local tryParry
 local canSafelyParry
 local hitboxReachHooked = false
@@ -1454,7 +1457,8 @@ function getGunParryDelay(gunName)
 end
 
 function getParryLeadTime()
-	return math.clamp(getNetworkPing() * 0.5 + PARRY_INPUT_LATENCY, 0, PING_PARRY_MAX_OFFSET + PARRY_INPUT_LATENCY)
+	local ping = getNetworkPing()
+	return math.clamp(ping * 0.85 + PARRY_INPUT_LATENCY + PARRY_EARLY_BIAS, PARRY_EARLY_BIAS, PING_PARRY_MAX_OFFSET + PARRY_EARLY_BIAS)
 end
 
 function getPingParryOffset()
@@ -1466,8 +1470,55 @@ function getEffectiveGunParryDelay(gunName)
 end
 
 function getAdjustedParryDelay(baseDelay, timePosition)
-	local impactShift = (1 - getLocalImpactRatio()) * 0.03
+	local impactShift = (1 - getLocalImpactRatio()) * 0.04
 	return math.max(0, (baseDelay or 0) - (timePosition or 0) - getParryLeadTime() - impactShift)
+end
+
+warmCombatSessionToken = function()
+	if not resolveRedlinerRuntime() then
+		return
+	end
+	installSessionPacketHook()
+	if combatSession.token and combatSession.weaponId then
+		return
+	end
+	local sessionKey = redlinerApi.sessionPacketKey or MELEE_SESSION_PACKET
+	local sessionPacket = Packets and Packets[sessionKey]
+	if sessionPacket and type(sessionPacket.Fire) == 'function' then
+		pcall(function()
+			sessionPacket:Fire('Redliner')
+		end)
+	end
+end
+
+scheduleParryAction = function(char, delay, reason, validateFn)
+	if not char then
+		if (delay or 0) <= 0.012 then
+			tryParry(reason, nil)
+		end
+		return
+	end
+	local state = getEnemyState(char)
+	state.scheduledMeleeToken = (state.scheduledMeleeToken or 0) + 1
+	local token = state.scheduledMeleeToken
+	if (delay or 0) <= 0.012 then
+		if not validateFn or validateFn() then
+			tryParry(reason, char)
+		end
+		return
+	end
+	task.delay(delay, function()
+		if token ~= state.scheduledMeleeToken then
+			return
+		end
+		if not canSafelyParry() then
+			return
+		end
+		if validateFn and not validateFn() then
+			return
+		end
+		tryParry(reason, char)
+	end)
 end
 
 function scheduleGunDrawParry(char, gunName, normId, timePosition, source, track, aimModel)
@@ -1630,20 +1681,20 @@ triggerGameParryInput = function()
 end
 
 local function executeParryAction()
+	local inputOk = triggerGameParryInput()
 	if parryModeSetting == 'Packet' then
-		if fireParryPacket() then
-			return true
-		end
-		return triggerGameParryInput()
+		local packetOk = fireParryPacket()
+		return packetOk or inputOk
 	end
 	if parryModeSetting == 'Hybrid' then
-		if fireParryPacket() then
-			return true
-		end
-		if triggerGameParryInput() then
+		fireParryPacket()
+		if inputOk then
 			return true
 		end
 		return pressParryKey()
+	end
+	if inputOk then
+		return true
 	end
 	return pressParryKey()
 end
@@ -1653,15 +1704,17 @@ function pressParryKey()
 		return false
 	end
 	parryBlockAttackUntil = tick() + PARRY_ATTACK_BLOCK_SEC
-	task.spawn(function()
+	withThread(function()
+		pcall(function()
+			virtualInputManager:SendKeyEvent(true, PARRY_KEY, false, game)
+		end)
+		if keypress then
+			pcall(keypress, PARRY_VK)
+		end
+	end)
+	task.defer(function()
 		withThread(function()
-			pcall(function()
-				virtualInputManager:SendKeyEvent(true, PARRY_KEY, false, game)
-			end)
-			if keypress then
-				pcall(keypress, PARRY_VK)
-			end
-			task.wait(0.08)
+			task.wait(0.04)
 			pcall(function()
 				virtualInputManager:SendKeyEvent(false, PARRY_KEY, false, game)
 			end)
@@ -1919,7 +1972,10 @@ handleMeleeAnimation = function(char, track, source, aimModel)
 	end
 
 	debugLog('trigger', 'melee_' .. normId, 'dist=' .. string.format('%.1f', getClosestEnemyDistance(char)), source)
-	tryParry('melee_' .. normId, char)
+	local delay = math.max(0, MELEE_PARRY_HIT_OFFSET - track.TimePosition - getParryLeadTime())
+	scheduleParryAction(char, delay, 'melee_' .. normId, function()
+		return shouldParryMelee(char, true) and track.IsPlaying and track.TimePosition <= meleeSwingWindowSetting
+	end)
 end
 
 local function handleGunDrawAnimation(char, track, source, aimModel)
@@ -2014,7 +2070,10 @@ local function handleGunShotAnimation(char, track, source, aimModel)
 			end
 		end)
 	end
-	tryParry('gun_shot_' .. gunName .. '_' .. normId, char)
+	local delay = math.max(0, GUN_SHOT_PARRY_OFFSET - track.TimePosition - getParryLeadTime())
+	scheduleParryAction(char, delay, 'gun_shot_' .. gunName .. '_' .. normId, function()
+		return shouldParryGun(char, true, aimModel) and track.IsPlaying and charHasGunEquipped(char)
+	end)
 end
 
 local function handleGlintSpawn(char, inst)
@@ -2404,7 +2463,9 @@ local function handleIncomingGunParryPacket(char, aimDir, gunName, sourceTag)
 	end
 	local label = typeof(gunName) == 'string' and gunName ~= '' and gunName or detectEquippedGun(char)
 	debugLog('trigger', sourceTag, label, 'dist=' .. string.format('%.1f', getClosestEnemyDistance(char)))
-	tryParry(sourceTag .. '_' .. label, char)
+	scheduleParryAction(char, 0, sourceTag .. '_' .. label, function()
+		return shouldParryGun(char, false, char, aimDir)
+	end)
 end
 
 local function handleIncomingParryCuePacket(char, cueData)
@@ -2426,8 +2487,12 @@ local function handleIncomingParryCuePacket(char, cueData)
 		if not shouldParryMelee(char, false) then
 			return
 		end
-		debugLog('trigger', 'packet_cue_melee', char.Name)
-		tryParry('packet_cue_melee', char)
+		local drawTime = tonumber(type(cueData) == 'table' and cueData.draw_time) or 0
+		local delay = math.max(0, drawTime - getParryLeadTime())
+		debugLog('trigger', 'packet_cue_melee', char.Name, 'draw=' .. string.format('%.2f', drawTime), 'delay=' .. string.format('%.2f', delay))
+		scheduleParryAction(char, delay, 'packet_cue_melee', function()
+			return shouldParryMelee(char, false)
+		end)
 	elseif cueType == 'surefire_bullet' then
 		if not parryGunShotEnabled then
 			return
@@ -2436,7 +2501,9 @@ local function handleIncomingParryCuePacket(char, cueData)
 			return
 		end
 		debugLog('trigger', 'packet_cue_gun', char.Name)
-		tryParry('packet_cue_gun', char)
+		scheduleParryAction(char, 0, 'packet_cue_gun', function()
+			return shouldParryGun(char, false, char)
+		end)
 	end
 end
 
@@ -2642,6 +2709,71 @@ local function mergeHurtboxLists(...)
 		end
 	end
 	return merged
+end
+
+groupEnemyHurtboxesByOwner = function(parts)
+	local groups = {}
+	local indexByOwner = {}
+	if type(parts) ~= 'table' then
+		return groups
+	end
+	for _, part in parts do
+		if typeof(part) == 'Instance' and part:IsA('BasePart') and part.Parent then
+			local owner = part:FindFirstAncestorWhichIsA('Model')
+			if owner and isEnemyOwner(owner) then
+				local key = owner:GetFullName()
+				local entry = indexByOwner[key]
+				if not entry then
+					entry = {owner = owner, parts = {}}
+					indexByOwner[key] = entry
+					table.insert(groups, entry)
+				end
+				if not table.find(entry.parts, part) then
+					table.insert(entry.parts, part)
+				end
+			end
+		end
+	end
+	table.sort(groups, function(a, b)
+		local root = getLocalRoot()
+		if not root then
+			return false
+		end
+		local function nearestDist(entry)
+			local best = math.huge
+			for _, part in entry.parts do
+				local dist = (part.Position - root.Position).Magnitude
+				if dist < best then
+					best = dist
+				end
+			end
+			return best
+		end
+		return nearestDist(a) < nearestDist(b)
+	end)
+	return groups
+end
+
+computeKillAuraStrikePosition = function(root, hurtboxParts, fallbackPosition)
+	if not root or type(hurtboxParts) ~= 'table' or #hurtboxParts == 0 then
+		return fallbackPosition
+	end
+	local closestPart, closestDist = nil, math.huge
+	for _, part in hurtboxParts do
+		if part and part.Parent then
+			local dist = (part.Position - root.Position).Magnitude
+			if dist < closestDist then
+				closestDist = dist
+				closestPart = part
+			end
+		end
+	end
+	if not closestPart or closestDist < 0.05 then
+		return fallbackPosition
+	end
+	local toTarget = closestPart.Position - root.Position
+	local strikeDist = math.clamp(closestDist - 2, 2.5, 18)
+	return root.Position + toTarget.Unit * strikeDist
 end
 
 getEnemyHurtboxesInRange = function(range, origin, requireVisible)
@@ -2980,6 +3112,10 @@ local function extendAttackHurtboxes(attack)
 	end
 	local before = #attack.hit_hurtboxes
 	local extended = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position, false)
+	if autoAttackActive then
+		attack.hit_hurtboxes = trimHurtboxList(extended, AUTO_ATTACK_MAX_HURTBOXES)
+		return #attack.hit_hurtboxes
+	end
 	for _, part in extended do
 		if not table.find(attack.hit_hurtboxes, part) then
 			table.insert(attack.hit_hurtboxes, part)
@@ -3236,19 +3372,41 @@ rebuildMeleePacketFireChain = function()
 	if not packet or not baseFire then
 		return false
 	end
-	local fire = baseFire
-	if alwaysParryActive then
-		local nextFire = fire
-		fire = function(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
+	local fire = function(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
+		if alwaysParryActive then
 			applyClashVelocitySpoof()
-			return nextFire(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, getAlwaysParryVelocityMag(velocityMag), ...)
 		end
-	end
-	if shouldExtendMeleeCombat() then
-		local nextFire = fire
-		fire = function(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
-			return nextFire(packetSelf, sessionToken, weaponId, attackType, position, augmentOutgoingMeleeHurtboxes(hurtboxes), velocityMag, ...)
+		local mag = alwaysParryActive and getAlwaysParryVelocityMag(velocityMag) or velocityMag
+		if autoAttackActive then
+			local root = getLocalRoot()
+			if root then
+				local allHurtboxes = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position, false)
+				local groups = groupEnemyHurtboxesByOwner(allHurtboxes)
+				if #groups > 0 then
+					local lastResult
+					local limit = math.min(#groups, AUTO_ATTACK_MAX_HURTBOXES)
+					for i = 1, limit do
+						local group = groups[i]
+						local strikePos = computeKillAuraStrikePosition(root, group.parts, position)
+						lastResult = baseFire(packetSelf, sessionToken, weaponId, attackType, strikePos, group.parts, mag, ...)
+						if reachDebugEnabled then
+							reachDebugLog(
+								'kill aura packet',
+								'enemy=', group.owner and group.owner.Name or '?',
+								'parts=', #group.parts,
+								'strikePos=', strikePos,
+								'range=', getActiveMeleeReach()
+							)
+						end
+					end
+					return lastResult
+				end
+			end
 		end
+		if shouldExtendMeleeCombat() then
+			hurtboxes = augmentOutgoingMeleeHurtboxes(hurtboxes)
+		end
+		return baseFire(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, mag, ...)
 	end
 	packet.Fire = fire
 	packet._meleeReachHooked = true
@@ -3407,6 +3565,24 @@ local function buildHitboxCastWrapper(oldCast)
 		local origVisible = self.visible
 		if hud.hitboxVisualizerSwingEnabled then
 			self.visible = true
+		end
+		if autoAttackActive then
+			local root = getLocalRoot()
+			if root then
+				local parts = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position, false)
+				if reachDebugEnabled then
+					reachDebugLog(
+						'360 cast',
+						'shape=', shape,
+						'radius=', getActiveMeleeReach(),
+						'partsHit=', #parts
+					)
+				end
+				if hud.hitboxVisualizerSwingEnabled then
+					self.visible = origVisible
+				end
+				return parts
+			end
 		end
 		local taggedHurtboxes = #collectionService:GetTagged('Hurtbox')
 		local extended = false
@@ -4891,6 +5067,7 @@ run(function()
 			if callback then
 				resolveRedlinerRuntime(true)
 				installSessionPacketHook()
+				warmCombatSessionToken()
 				logParryAnimIds()
 				bindLocalRespawnHandler()
 				startEnemyWatchers()
@@ -4939,6 +5116,7 @@ run(function()
 			autoAttackActive = callback
 			if callback then
 				resolveRedlinerRuntime(true)
+				installSessionPacketHook()
 				if resolveMovementApi then
 					resolveMovementApi()
 				end
@@ -4952,7 +5130,7 @@ run(function()
 				rebuildMeleePacketFireChain()
 			end
 		end,
-		Tooltip = 'Swings when any valid enemy is within range (360). Hooks Attack.Hitbox.cast, Attack.cast*, and melee packets so reach is equal in every direction.',
+		Tooltip = 'Swings when any valid enemy is within range (360). Sends one validated melee packet per enemy with strike position aimed at them, not camera-forward.',
 	})
 
 	KillAura:CreateToggle({
