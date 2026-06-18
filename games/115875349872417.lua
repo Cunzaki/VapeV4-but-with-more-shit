@@ -2120,7 +2120,7 @@ handleMeleeAnimation = function(char, track, source, aimModel)
 	end)
 end
 
-local function handleGunDrawAnimation(char, track, source, aimModel)
+handleGunDrawAnimation = function(char, track, source, aimModel)
 	if not parryModeUsesAnimation() then
 		return
 	end

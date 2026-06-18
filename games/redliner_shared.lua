@@ -2120,7 +2120,7 @@ handleMeleeAnimation = function(char, track, source, aimModel)
 	end)
 end
 
-local function handleGunDrawAnimation(char, track, source, aimModel)
+handleGunDrawAnimation = function(char, track, source, aimModel)
 	if not parryModeUsesAnimation() then
 		return
 	end
@@ -2155,7 +2155,7 @@ local function handleGunDrawAnimation(char, track, source, aimModel)
 	scheduleGunDrawParry(char, gunName, normId, track.TimePosition, source, track, aimModel)
 end
 
-local function handleGunShotAnimation(char, track, source, aimModel)
+handleGunShotAnimation = function(char, track, source, aimModel)
 	if not parryModeUsesAnimation() then
 		return
 	end
