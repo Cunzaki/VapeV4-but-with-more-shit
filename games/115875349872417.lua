@@ -2125,7 +2125,7 @@ handleGunDrawAnimation = function(char, track, source, aimModel)
 	scheduleGunDrawParry(char, gunName, normId, track.TimePosition, source, track, aimModel)
 end
 
-local function handleGunShotAnimation(char, track, source, aimModel)
+handleGunShotAnimation = function(char, track, source, aimModel)
 	if not parryModeUsesAnimation() then
 		return
 	end
@@ -2470,16 +2470,22 @@ bindLocalRespawnHandler = function()
 				return
 			end
 			refreshMyHurtboxes()
+			if invalidateClientClassesCache then
+				invalidateClientClassesCache()
+			end
+			combatSession.token = nil
+			combatSession.weaponId = nil
+			sessionPacketHooked = false
+			resolveRedlinerRuntime(true)
 			if autoAttackActive then
-				if invalidateClientClassesCache then
-					invalidateClientClassesCache()
-				end
-				combatSession.token = nil
-				combatSession.weaponId = nil
-				sessionPacketHooked = false
-				resolveRedlinerRuntime(true)
+				hitboxReachHooked = false
+				attackReachHooked = false
+				meleePacketReachHooked = false
 				installSessionPacketHook()
 				rebuildMeleePacketFireChain()
+				bindPacketListeners()
+			elseif autoParryActive then
+				bindPacketListeners()
 			end
 			if autoParryActive then
 				purgeOrphanWatchers()
@@ -4071,7 +4077,7 @@ end
 
 lplr.CharacterAdded:Connect(function()
 	task.defer(function()
-		if autoAttackActive then
+		if autoAttackActive or autoParryActive then
 			bindPacketListeners()
 		end
 	end)
