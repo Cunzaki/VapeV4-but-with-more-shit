@@ -72,8 +72,13 @@ local function finishLoading()
 		if vape.CreateNotification then
 			vape:CreateNotification('Vape', 'Load failed: '..tostring(loadErr), 15, 'alert')
 		end
+	else
+		vape._profileReady = vape._profileReady or false
 	end
 	task.spawn(function()
+		repeat
+			task.wait(0.1)
+		until vape._profileReady or not vape.Loaded
 		repeat
 			vape:Save()
 			task.wait(10)

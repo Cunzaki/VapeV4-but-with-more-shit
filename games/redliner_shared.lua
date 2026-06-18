@@ -2261,11 +2261,14 @@ local function mergeHurtboxLists(...)
 	return merged
 end
 
-getEnemyHurtboxesInRange = function(range, origin)
+getEnemyHurtboxesInRange = function(range, origin, requireVisible)
 	local root = getLocalRoot()
 	origin = origin or (root and root.Position)
 	if not origin then
 		return {}
+	end
+	if requireVisible == nil then
+		requireVisible = true
 	end
 	local bestPerEnemy = {}
 	for _, part in collectionService:GetTagged('Hurtbox') do
@@ -2273,10 +2276,10 @@ getEnemyHurtboxesInRange = function(range, origin)
 			local owner = part:FindFirstAncestorWhichIsA('Model')
 			if owner and isEnemyOwner(owner) then
 				local plr = getPlayerFromModel(owner)
-				if plr and isPlayerVisible(plr) then
+				if not plr or (not requireVisible or isPlayerVisible(plr)) then
 					local dist = (part.Position - origin).Magnitude
 					if not range or dist <= range then
-						local key = plr.UserId
+						local key = plr and plr.UserId or owner:GetFullName()
 						local entry = bestPerEnemy[key]
 						if not entry or dist < entry.Distance then
 							bestPerEnemy[key] = {Part = part, Distance = dist}
@@ -2536,6 +2539,9 @@ getActiveMeleeReach = function()
 	if reachActive then
 		return getMeleeReach()
 	end
+	if autoAttackActive then
+		return math.max(autoAttackRangeSetting, BASE_SWORD_REACH)
+	end
 	if redlinerHitboxesActive and redlinerHitboxExpand > 0 then
 		return BASE_SWORD_REACH + redlinerHitboxExpand
 	end
@@ -2553,7 +2559,7 @@ local function getHitboxCastExtend()
 end
 
 local function shouldExtendMeleeCombat()
-	return reachActive or (redlinerHitboxesActive and redlinerHitboxExpand > 0)
+	return reachActive or autoAttackActive or (redlinerHitboxesActive and redlinerHitboxExpand > 0)
 end
 
 safeAimDirection = function(origin, targetPos, fallback)
@@ -2591,7 +2597,7 @@ local function extendAttackHurtboxes(attack)
 		return 0
 	end
 	local before = #attack.hit_hurtboxes
-	local extended = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position)
+	local extended = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position, not autoAttackActive)
 	for _, part in extended do
 		if not table.find(attack.hit_hurtboxes, part) then
 			table.insert(attack.hit_hurtboxes, part)
@@ -2781,7 +2787,7 @@ augmentOutgoingMeleeHurtboxes = function(hurtboxes)
 	if not root then
 		return hurtboxes
 	end
-	local extended = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position)
+	local extended = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position, not autoAttackActive)
 	if type(hurtboxes) ~= 'table' then
 		hurtboxes = {}
 	end
@@ -3097,12 +3103,11 @@ bindPacketListeners = function()
 	if not initPackets() then
 		return
 	end
-	if reachActive or reachDebugEnabled or redlinerHitboxesActive
-		or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
+	if reachActive or reachDebugEnabled or autoAttackActive or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
 		installCombatReachHooks()
 	end
-	if alwaysParryActive and not meleePacketReachHooked then
-		installAlwaysParryHooks()
+	if (autoAttackActive or alwaysParryActive) and not meleePacketReachHooked then
+		installMeleePacketReachHook()
 	end
 	installCombatEventHook()
 	if not breakPacketHooked then
@@ -3232,6 +3237,13 @@ getNearestEnemyInAttackRange = function(attackRange)
 	if not root then
 		return nil
 	end
+	local hurtboxes = getEnemyHurtboxesInRange(attackRange, root.Position, false)
+	if #hurtboxes > 0 then
+		local owner = hurtboxes[1]:FindFirstAncestorWhichIsA('Model')
+		if owner then
+			return owner
+		end
+	end
 	local origin = root.Position
 	local nearestModel, nearestDist = nil, attackRange
 	for _, plr in playersService:GetPlayers() do
@@ -3269,7 +3281,8 @@ local function tryAutoAttack(attackDelay)
 		return
 	end
 
-	if not getNearestEnemyInAttackRange(autoAttackRangeSetting) then
+	local target = getNearestEnemyInAttackRange(autoAttackRangeSetting)
+	if not target then
 		return
 	end
 
@@ -3277,7 +3290,12 @@ local function tryAutoAttack(attackDelay)
 		return
 	end
 
-	pressAttackClick()
+	if not meleePacketReachHooked then
+		installMeleePacketReachHook()
+	end
+	if triggerGameMeleeAttack() then
+		lastAttackAt = tick()
+	end
 end
 
 bindAutoAttackLoop = function()
@@ -3295,7 +3313,7 @@ end
 
 combatHeartbeat = function(meleeRange)
 	meleeRangeSetting = meleeRange
-	if reachActive or reachDebugEnabled or autoParryActive or redlinerHitboxesActive
+	if reachActive or reachDebugEnabled or autoParryActive or autoAttackActive or redlinerHitboxesActive
 		or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
 		bindPacketListeners()
 	end
@@ -4366,11 +4384,13 @@ run(function()
 		Function = function(callback)
 			autoAttackActive = callback
 			if callback then
+				bindPacketListeners()
+				installMeleePacketReachHook()
 				bindAutoAttackLoop()
-				notif('Auto Attack', 'Active - LMB when enemies are in range (game window must be focused).', 4)
+				notif('Auto Attack', '360 melee — hits valid enemies in range via game attack pipeline.', 4)
 			end
 		end,
-		Tooltip = 'Left clicks when an enemy is within Attack Range. Only fires while Roblox is focused. Pauses while parrying.',
+		Tooltip = 'Swings when any valid enemy is within Attack Range (360). Uses melee packet hurtbox merge so targets behind you can still be hit.',
 	})
 
 	AutoAttack:CreateToggle({
@@ -5212,6 +5232,9 @@ run(function()
 	end
 
 	task.defer(function()
+		repeat
+			task.wait()
+		until vape._profileReady or not vape.Loaded
 		if vape.Loaded and vape.ApplyAllModuleProfiles then
 			vape:ApplyAllModuleProfiles()
 		end

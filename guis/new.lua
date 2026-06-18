@@ -4062,6 +4062,9 @@ function mainapi:CreateCategory(categorysettings)
 			task.defer(function()
 				mainapi:ScheduleModuleProfileApply(modulesettings.Name)
 			end)
+		else
+			mainapi._pendingProfileModules = mainapi._pendingProfileModules or {}
+			mainapi._pendingProfileModules[modulesettings.Name] = true
 		end
 
 		return moduleapi
@@ -5463,8 +5466,12 @@ function mainapi:MigrateSharedConfig(profile, placeId)
 	placeId = placeId or self.Place
 	local configPlace = self:GetConfigPlaceId(placeId)
 	local canonPath = self:GetProfileConfigPath(profile, configPlace)
-	if isfile(canonPath) then
-		return
+	local canonData = isfile(canonPath) and loadJson(canonPath) or nil
+	local canonModuleCount = 0
+	if canonData and canonData.Modules then
+		for _ in canonData.Modules do
+			canonModuleCount += 1
+		end
 	end
 	local shared = PLACE_TO_SHARED[placeId]
 	if not shared then
@@ -5476,12 +5483,26 @@ function mainapi:MigrateSharedConfig(profile, placeId)
 			table.insert(tryOrder, extraPlace)
 		end
 	end
+	local bestPath, bestCount = nil, 0
 	for _, tryPlace in tryOrder do
 		local legacyPath = 'newvape/profiles/'..profile..tryPlace..'.txt'
-		if isfile(legacyPath) then
-			writefile(canonPath, readfile(legacyPath))
-			return
+		if not isfile(legacyPath) or legacyPath == canonPath then
+			continue
 		end
+		local legacyData = loadJson(legacyPath)
+		local legacyCount = 0
+		if legacyData and legacyData.Modules then
+			for _ in legacyData.Modules do
+				legacyCount += 1
+			end
+		end
+		if legacyCount > bestCount then
+			bestPath = legacyPath
+			bestCount = legacyCount
+		end
+	end
+	if bestCount > 0 and (not isfile(canonPath) or canonModuleCount < bestCount) then
+		writefile(canonPath, readfile(bestPath))
 	end
 end
 
@@ -5641,6 +5662,8 @@ function mainapi:Load(skipgui, profile)
 			self.GUIColor:SetValue(nil, nil, nil, 4)
 		end)
 	end
+	self._profileLoading = true
+	self._profileReady = false
 	local guidata = {}
 	local savecheck = true
 
@@ -5701,6 +5724,9 @@ function mainapi:Load(skipgui, profile)
 			self:CreateNotification('Vape', 'Failed to load '..self.Profile..' profile.', 10, 'alert')
 			savecheck = false
 		end
+		savedata.Categories = savedata.Categories or {}
+		savedata.Modules = savedata.Modules or {}
+		savedata.Legit = savedata.Legit or {}
 
 		for i, v in savedata.Categories do
 			local object = self.Categories[i]
@@ -5722,7 +5748,9 @@ function mainapi:Load(skipgui, profile)
 				object.ListEnabled = v.ListEnabled or {}
 				object:ChangeValue()
 			end
-			object.Object.Position = UDim2.fromOffset(v.Position.X, v.Position.Y)
+			if v.Position then
+				object.Object.Position = UDim2.fromOffset(v.Position.X, v.Position.Y)
+			end
 		end
 
 		for i, v in savedata.Modules do
@@ -5763,16 +5791,27 @@ function mainapi:Load(skipgui, profile)
 		end
 
 		self:UpdateTextGUI(true)
-	else
-		self:Save()
 	end
 
 	if self.Downloader then
 		self.Downloader:Destroy()
 		self.Downloader = nil
 	end
+	self._profileLoading = false
 	self.Loaded = savecheck
 	self.Categories.Main.Options.Bind:SetBind(self.Keybind)
+	task.defer(function()
+		if self.ApplyAllModuleProfiles then
+			self:ApplyAllModuleProfiles()
+		end
+		if self._pendingProfileModules then
+			for name in self._pendingProfileModules do
+				self:ApplyModuleProfile(name)
+			end
+			self._pendingProfileModules = {}
+		end
+		self._profileReady = true
+	end)
 
 	if inputService.TouchEnabled and #self.Keybind == 1 and self.Keybind[1] == 'RightShift' then
 		local label = Instance.new('TextLabel')
@@ -5851,7 +5890,7 @@ function mainapi:SyncModuleOptions(module)
 end
 
 function mainapi:ScheduleModuleProfileApply(name)
-	if not self.Loaded or not name then
+	if not name then
 		return
 	end
 	self._pendingProfileModules = self._pendingProfileModules or {}
@@ -5862,6 +5901,9 @@ function mainapi:ScheduleModuleProfileApply(name)
 	self._profileApplyScheduled = true
 	task.defer(function()
 		self._profileApplyScheduled = false
+		while self._profileLoading do
+			task.wait()
+		end
 		local pending = self._pendingProfileModules
 		self._pendingProfileModules = {}
 		for moduleName in pending do
@@ -5945,7 +5987,11 @@ function mainapi:Remove(obj)
 end
 
 function mainapi:Save(newprofile)
-	if not self.Loaded then return end
+	if not self.Loaded or self._profileLoading or not self._profileReady then
+		return
+	end
+	local profilePath = self:GetProfileConfigPath(newprofile or self.Profile, self.Place)
+	local existing = isfile(profilePath) and loadJson(profilePath) or nil
 	local guidata = {
 		Categories = {},
 		Profile = newprofile or self.Profile,
@@ -5953,9 +5999,9 @@ function mainapi:Save(newprofile)
 		Keybind = self.Keybind
 	}
 	local savedata = {
-		Modules = {},
-		Categories = {},
-		Legit = {}
+		Modules = existing and existing.Modules or {},
+		Categories = existing and existing.Categories or {},
+		Legit = existing and existing.Legit or {}
 	}
 
 	for i, v in self.Categories do
@@ -5987,7 +6033,7 @@ function mainapi:Save(newprofile)
 	end
 
 	writefile('newvape/profiles/'..game.GameId..'.gui.txt', httpService:JSONEncode(guidata))
-	writefile(self:GetProfileConfigPath(newprofile or self.Profile, self.Place), httpService:JSONEncode(savedata))
+	writefile(profilePath, httpService:JSONEncode(savedata))
 end
 
 function mainapi:SaveOptions(object, savedoptions)
