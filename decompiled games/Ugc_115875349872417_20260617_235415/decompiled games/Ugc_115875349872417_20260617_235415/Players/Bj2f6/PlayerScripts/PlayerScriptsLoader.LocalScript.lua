@@ -1,8 +1,0 @@
--- Decompiled from: Players.Bj2f6.PlayerScripts.PlayerScriptsLoader
--- Class: LocalScript
--- Place: Ugc (115875349872417)
--- JobId: eb997104-f05b-4f40-8972-25defa1faf45
-
--- Decompiled with Potassium's decompiler.
-
-require(script.Parent:WaitForChild("PlayerModule"));

@@ -57,14 +57,44 @@ local ALWAYS_PARRY_DEFAULT_VELOCITY = 200
 local ALWAYS_PARRY_MIN_VELOCITY = 80
 local ALWAYS_PARRY_MAX_VELOCITY = 200
 local CLASH_VELOCITY_SERVER_CAP = 200
-local HURTBOX_SCAN_CACHE_TTL = 0.1
+local HURTBOX_SCAN_CACHE_TTL = 0.2
 local COMBAT_EVENT_PACKET = '_x6f165cf1c8a4a502'
 local BREAK_PACKET_NAME = '_x71a4ac7aba517193'
 local MELEE_DEFAULT_ACTION = 'SWING'
 local MELEE_ACTION_FALLBACKS = {'SWING', 'SWING_HEAVY', 'wideslash', 'WIDESLASH', 'SLASH'}
 local DASH_VELOCITY_MIN = 20
 local AUTO_ATTACK_RANGE_DEFAULT = 14
-local AUTO_ATTACK_MIN_DELAY = 1 / 60
+local AUTO_ATTACK_MIN_DELAY = 0.12
+local AUTO_ATTACK_SCAN_INTERVAL = 0.2
+
+local redlinerApi = {
+	resolved = false,
+	meleePacketKey = nil,
+	parryPacketKey = nil,
+	sessionPacketKey = nil,
+	combatEventKey = nil,
+	breakPacketKey = nil,
+	gunPacketKey = nil,
+	gunShotPacketKey = nil,
+	movementClassKey = nil,
+	velocityField = nil,
+	inputHandlers = {},
+}
+
+local MELEE_PACKET_CANDIDATES = {'_xa20c1ad6e56c96e7', '_xf5e1e1983608ed25'}
+local PARRY_PACKET_CANDIDATES = {'_x0cdd43b25777bec6', '_xff9e8e66a100da8b'}
+local SESSION_PACKET_CANDIDATES = {'_xbfaa5820a4100b86', '_x57c165550ede3092'}
+local COMBAT_EVENT_CANDIDATES = {'_xeaae65f9581e0520', '_x6f165cf1c8a4a502'}
+local BREAK_PACKET_CANDIDATES = {'_xc9c4207c75682687', '_x71a4ac7aba517193'}
+local GUN_PACKET_CANDIDATES = {'_x67790e3a4ae7698a', '_x8458a1cfd21149ba'}
+local GUN_SHOT_CANDIDATES = {'_x909c506c0531ca26', '_x6f11420c13d0d5ee'}
+local MOVEMENT_CLASS_CANDIDATES = {'_x7058397dabccd000', '_xef0ffbcc2c92f7b4'}
+local VELOCITY_FIELD_CANDIDATES = {'_x1d287c838240a901', '_xed86f944048d8fdc'}
+local INPUT_HANDLER_CANDIDATES = {
+	{class = '_x3e046bec2684f59c', method = '_xc9966245cd0a44a8'},
+	{class = '_xd2c44c643b0c3fb4', method = '_xdf0c107e49196810'},
+	{class = '_xf1ad98d2d70b7408', method = '_x93fd21adac562b5e'},
+}
 
 local AUTO_PARRY_DEFAULTS = {
 	meleeRange = 20,
@@ -666,6 +696,62 @@ function initPackets()
 	end
 	Packets = loaded
 	return true
+end
+
+local function pickPacket(candidates)
+	if not Packets then
+		return nil
+	end
+	for _, key in candidates do
+		local packet = Packets[key]
+		if type(packet) == 'table' and type(packet.Fire) == 'function' then
+			return key
+		end
+	end
+	return nil
+end
+
+local function pickUnreliablePacket(candidates)
+	if not Packets or not Packets.unreliablePackets then
+		return nil
+	end
+	for _, key in candidates do
+		local packet = Packets.unreliablePackets[key]
+		if type(packet) == 'table' and packet.OnClientEvent then
+			return key
+		end
+	end
+	return nil
+end
+
+resolveRedlinerRuntime = function(force)
+	if redlinerApi.resolved and not force then
+		return redlinerApi.meleePacketKey ~= nil
+	end
+	if not Packets and not initPackets() then
+		return false
+	end
+	local prevMelee = redlinerApi.meleePacketKey
+	redlinerApi.meleePacketKey = pickPacket(MELEE_PACKET_CANDIDATES) or pickPacket({MELEE_PACKET_NAME})
+	redlinerApi.parryPacketKey = pickPacket(PARRY_PACKET_CANDIDATES) or pickPacket({PARRY_PACKET_NAME})
+	redlinerApi.sessionPacketKey = pickPacket(SESSION_PACKET_CANDIDATES) or pickPacket({MELEE_SESSION_PACKET})
+	redlinerApi.combatEventKey = pickUnreliablePacket(COMBAT_EVENT_CANDIDATES) or pickUnreliablePacket({COMBAT_EVENT_PACKET})
+	redlinerApi.breakPacketKey = pickPacket(BREAK_PACKET_CANDIDATES) or pickPacket({BREAK_PACKET_NAME})
+	redlinerApi.gunPacketKey = pickPacket(GUN_PACKET_CANDIDATES) or pickPacket({GUN_PACKET_NAME})
+	redlinerApi.gunShotPacketKey = pickPacket(GUN_SHOT_CANDIDATES) or pickPacket({GUN_SHOT_PACKET_NAME})
+
+	if prevMelee and redlinerApi.meleePacketKey and prevMelee ~= redlinerApi.meleePacketKey then
+		meleePacketReachHooked = false
+		meleePacketGcMirrored = false
+	end
+
+	redlinerApi.resolved = redlinerApi.meleePacketKey ~= nil
+	return redlinerApi.resolved
+end
+
+getResolvedMeleePacket = function()
+	resolveRedlinerRuntime()
+	return redlinerApi.meleePacketKey and Packets and Packets[redlinerApi.meleePacketKey] or nil
 end
 
 function getMeleeReach()
@@ -2090,6 +2176,13 @@ bindLocalRespawnHandler = function()
 				return
 			end
 			refreshMyHurtboxes()
+			if autoAttackActive or alwaysParryActive or reachActive then
+				if invalidateClientClassesCache then
+					invalidateClientClassesCache()
+				end
+				resolveRedlinerRuntime(true)
+				rebuildMeleePacketFireChain()
+			end
 			if autoParryActive then
 				purgeOrphanWatchers()
 				refreshEnemyWatchers()
@@ -2194,7 +2287,10 @@ installGunParryPacketHook = function()
 	if not initPackets() then
 		return false
 	end
-	local legacyPacket = Packets[GUN_PACKET_NAME]
+	resolveRedlinerRuntime()
+	local gunKey = redlinerApi.gunPacketKey or GUN_PACKET_NAME
+	local shotKey = redlinerApi.gunShotPacketKey or GUN_SHOT_PACKET_NAME
+	local legacyPacket = Packets[gunKey]
 	if legacyPacket and legacyPacket.OnClientEvent and type(legacyPacket.OnClientEvent.Connect) == 'function'
 		and not legacyPacket._gunParryHooked then
 		legacyPacket._gunParryHooked = true
@@ -2204,7 +2300,7 @@ installGunParryPacketHook = function()
 		end)
 		gunParryPacketHooked = true
 	end
-	local shotPacket = Packets[GUN_SHOT_PACKET_NAME]
+	local shotPacket = Packets[shotKey]
 	if shotPacket and shotPacket.OnClientEvent and type(shotPacket.OnClientEvent.Connect) == 'function'
 		and not shotPacket._gunParryHooked then
 		shotPacket._gunParryHooked = true
@@ -2274,10 +2370,13 @@ local function shouldExpandRedlinerHurtbox(part)
 		return false
 	end
 	local owner = part:FindFirstAncestorWhichIsA('Model')
-	if not owner or not isEnemyOwner(owner) then
+	if not owner then
 		return false
 	end
 	local plr = getPlayerFromModel(owner)
+	if not plr or plr == lplr then
+		return false
+	end
 	if redlinerHitboxPlayersOnly and not plr then
 		return false
 	end
@@ -2539,9 +2638,12 @@ describeNearestEnemy = function(range, origin)
 end
 
 local function looksLikeHitboxModule(mod)
-	return type(mod) == 'table'
-		and type(mod.new) == 'function'
-		and type(mod.cast) == 'function'
+	if type(mod) ~= 'table' then
+		return false
+	end
+	-- rawget avoids chrono Signal/Connection __index errors on unrelated getgc tables
+	return type(rawget(mod, 'new')) == 'function'
+		and type(rawget(mod, 'cast')) == 'function'
 end
 
 local function tryRequireHitboxModule(moduleScript, label)
@@ -2703,10 +2805,12 @@ local function extendAttackHurtboxes(attack)
 end
 
 local function looksLikeAttackModule(mod)
-	return type(mod) == 'table'
-		and type(mod.new) == 'function'
-		and type(mod.castOnce) == 'function'
-		and type(mod.addHitbox) == 'function'
+	if type(mod) ~= 'table' then
+		return false
+	end
+	return type(rawget(mod, 'new')) == 'function'
+		and type(rawget(mod, 'castOnce')) == 'function'
+		and type(rawget(mod, 'addHitbox')) == 'function'
 end
 
 local function discoverAttackModule()
@@ -2733,6 +2837,13 @@ local function discoverAttackModule()
 end
 
 local clientClassesCache = nil
+
+invalidateClientClassesCache = function()
+	clientClassesCache = nil
+	table.clear(redlinerApi.inputHandlers)
+	redlinerApi.movementClassKey = nil
+	redlinerApi.velocityField = nil
+end
 
 local function tryRequireClientClasses(startInst)
 	if not startInst then
@@ -2772,13 +2883,16 @@ local function getClientClasses()
 		local gcOk, gc = pcall(getgc, true)
 		if gcOk and type(gc) == 'table' then
 			for _, value in gc do
-				if type(value) == 'table' and type(value.Classes) == 'table'
-					and (
-						type(value.Classes._xd2c44c643b0c3fb4) == 'table'
-						or type(value.Classes._xf1ad98d2d70b7408) == 'table'
-					) then
-					classes = value.Classes
-					break
+				if type(value) == 'table' and type(value.Classes) == 'table' then
+					local cls = value.Classes
+					if type(cls._x3e046bec2684f59c) == 'table'
+						or type(cls._xd2c44c643b0c3fb4) == 'table'
+						or type(cls._xf1ad98d2d70b7408) == 'table'
+						or type(cls._x7058397dabccd000) == 'table'
+						or type(cls._xef0ffbcc2c92f7b4) == 'table' then
+						classes = cls
+						break
+					end
 				end
 			end
 		end
@@ -2787,9 +2901,46 @@ local function getClientClasses()
 	return classes
 end
 
-local function getMovementController()
+local function resolveMovementApi()
+	if redlinerApi.movementClassKey and redlinerApi.velocityField and #redlinerApi.inputHandlers > 0 then
+		return
+	end
 	local classes = getClientClasses()
-	return classes and classes._xef0ffbcc2c92f7b4
+	if not classes then
+		return
+	end
+	for _, classKey in MOVEMENT_CLASS_CANDIDATES do
+		local ctrl = classes[classKey]
+		if type(ctrl) == 'table' then
+			for _, field in VELOCITY_FIELD_CANDIDATES do
+				if typeof(ctrl[field]) == 'Vector3' then
+					redlinerApi.movementClassKey = classKey
+					redlinerApi.velocityField = field
+					break
+				end
+			end
+		end
+		if redlinerApi.velocityField then
+			break
+		end
+	end
+	if #redlinerApi.inputHandlers == 0 then
+		for _, entry in INPUT_HANDLER_CANDIDATES do
+			local handler = classes[entry.class]
+			if type(handler) == 'table' and type(handler[entry.method]) == 'function' then
+				table.insert(redlinerApi.inputHandlers, entry)
+			end
+		end
+	end
+end
+
+local function getMovementController()
+	resolveMovementApi()
+	local classes = getClientClasses()
+	if not classes or not redlinerApi.movementClassKey then
+		return nil
+	end
+	return classes[redlinerApi.movementClassKey]
 end
 
 local function getAlwaysParryVelocityMag(_current)
@@ -2797,9 +2948,12 @@ local function getAlwaysParryVelocityMag(_current)
 end
 
 applyClashVelocitySpoof = function()
+	resolveRedlinerRuntime()
+	resolveMovementApi()
 	local movement = getMovementController()
+	local velocityField = redlinerApi.velocityField
 	local root = getLocalRoot()
-	if not movement or not root then
+	if not movement or not velocityField or not root then
 		return
 	end
 	local horiz = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
@@ -2815,7 +2969,7 @@ applyClashVelocitySpoof = function()
 	else
 		horiz = horiz.Unit
 	end
-	movement._xed86f944048d8fdc = horiz * getAlwaysParryVelocityMag()
+	movement[velocityField] = horiz * getAlwaysParryVelocityMag()
 end
 
 local function aimAutoAttackHitboxes(attack)
@@ -2845,10 +2999,10 @@ local function aimAutoAttackHitboxes(attack)
 end
 
 local function getMeleePacketBaseFire()
-	if not initPackets() then
+	if not resolveRedlinerRuntime() then
 		return nil
 	end
-	local packet = Packets[MELEE_PACKET_NAME]
+	local packet = getResolvedMeleePacket()
 	if not packet or type(packet.Fire) ~= 'function' then
 		return nil
 	end
@@ -2859,10 +3013,10 @@ local function getMeleePacketBaseFire()
 end
 
 rebuildMeleePacketFireChain = function()
-	if not initPackets() then
+	if not resolveRedlinerRuntime() then
 		return false
 	end
-	local packet = Packets[MELEE_PACKET_NAME]
+	local packet = getResolvedMeleePacket()
 	local baseFire = getMeleePacketBaseFire()
 	if not packet or not baseFire then
 		return false
@@ -2871,7 +3025,6 @@ rebuildMeleePacketFireChain = function()
 	if alwaysParryActive then
 		local nextFire = fire
 		fire = function(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
-			applyClashVelocitySpoof()
 			return nextFire(packetSelf, sessionToken, weaponId, attackType, position, hurtboxes, getAlwaysParryVelocityMag(velocityMag), ...)
 		end
 	end
@@ -2884,12 +3037,13 @@ rebuildMeleePacketFireChain = function()
 	packet.Fire = fire
 	packet._meleeReachHooked = true
 	meleePacketReachHooked = true
-	if hookfunction and type(baseFire) == 'function' then
+	if hookfunction and type(baseFire) == 'function' and not packet._vapeHookfunctionApplied then
 		pcall(function()
 			local hooked = hookfunction(baseFire, fire)
 			if type(hooked) == 'function' then
 				packet._meleeReachOriginalFire = hooked
 			end
+			packet._vapeHookfunctionApplied = true
 		end)
 	end
 	if not meleePacketGcMirrored then
@@ -2908,8 +3062,9 @@ local function mirrorMeleePacketFireWrapper(wrapper, oldFire)
 		return
 	end
 	for _, value in gc do
-		if type(value) == 'table' and value[MELEE_PACKET_NAME] then
-			value[MELEE_PACKET_NAME].Fire = wrapper
+		local key = redlinerApi.meleePacketKey or MELEE_PACKET_NAME
+		if type(value) == 'table' and value[key] then
+			value[key].Fire = wrapper
 		end
 	end
 end
@@ -2939,28 +3094,22 @@ triggerGameMeleeAttack = function()
 	if alwaysParryActive then
 		applyClashVelocitySpoof()
 	end
+	resolveMovementApi()
 	local classes = getClientClasses()
-	local inputHandler = classes and classes._xd2c44c643b0c3fb4
-	if inputHandler and type(inputHandler._xdf0c107e49196810) == 'function' then
-		local meleeAction = inputHandler:_xdf0c107e49196810('MELEE')
-		if meleeAction and meleeAction.Pressed and type(meleeAction.Pressed.Fire) == 'function' then
-			meleeAction.Pressed:Fire()
-			lastAttackAt = tick()
-			return true
-		end
-	end
-	inputHandler = classes and classes._xf1ad98d2d70b7408
-	if inputHandler and type(inputHandler._x93fd21adac562b5e) == 'function' then
-		local meleeAction = inputHandler:_x93fd21adac562b5e('MELEE')
-		if meleeAction and meleeAction.Pressed and type(meleeAction.Pressed.Fire) == 'function' then
-			meleeAction.Pressed:Fire()
-			if meleeAction.Released and type(meleeAction.Released.Fire) == 'function' then
-				task.defer(function()
-					meleeAction.Released:Fire()
-				end)
+	for _, entry in redlinerApi.inputHandlers do
+		local inputHandler = classes and classes[entry.class]
+		if inputHandler and type(inputHandler[entry.method]) == 'function' then
+			local meleeAction = inputHandler[entry.method](inputHandler, 'MELEE')
+			if meleeAction and meleeAction.Pressed and type(meleeAction.Pressed.Fire) == 'function' then
+				meleeAction.Pressed:Fire()
+				if meleeAction.Released and type(meleeAction.Released.Fire) == 'function' then
+					task.defer(function()
+						meleeAction.Released:Fire()
+					end)
+				end
+				lastAttackAt = tick()
+				return true
 			end
-			lastAttackAt = tick()
-			return true
 		end
 	end
 	return pressAttackClick()
@@ -2984,7 +3133,7 @@ end
 installMeleePacketReachHook = function()
 	local ok = rebuildMeleePacketFireChain()
 	if ok and reachDebugEnabled then
-		reachDebugLog('Melee packet Fire hook OK -', MELEE_PACKET_NAME)
+		reachDebugLog('Melee packet Fire hook OK -', redlinerApi.meleePacketKey or MELEE_PACKET_NAME)
 	end
 	return ok
 end
@@ -3162,7 +3311,7 @@ installHitboxReachHook = function()
 		if gcOk and type(gc) == 'table' then
 			local extraHits = 0
 			for _, value in gc do
-				if value ~= Hitbox and looksLikeHitboxModule(value) and value.cast == oldCast then
+				if value ~= Hitbox and looksLikeHitboxModule(value) and rawget(value, 'cast') == oldCast then
 					value.cast = wrapper
 					extraHits += 1
 				end
@@ -3247,10 +3396,14 @@ end
 local combatEventHooked = false
 
 local function installCombatEventHook()
-	if combatEventHooked or not initPackets() then
+	if combatEventHooked then
 		return
 	end
-	local packet = Packets and Packets.unreliablePackets and Packets.unreliablePackets[COMBAT_EVENT_PACKET]
+	if not resolveRedlinerRuntime() then
+		return
+	end
+	local eventKey = redlinerApi.combatEventKey or COMBAT_EVENT_PACKET
+	local packet = Packets and Packets.unreliablePackets and Packets.unreliablePackets[eventKey]
 	if not packet or not packet.OnClientEvent or type(packet.OnClientEvent.Connect) ~= 'function' then
 		return
 	end
@@ -3275,7 +3428,7 @@ local function installCombatEventHook()
 end
 
 bindPacketListeners = function()
-	if not initPackets() then
+	if not resolveRedlinerRuntime() then
 		return
 	end
 	if reachActive or reachDebugEnabled or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
@@ -3284,11 +3437,12 @@ bindPacketListeners = function()
 		installAttackReachHook()
 	end
 	if (autoAttackActive or alwaysParryActive or reachActive) then
-		installMeleePacketReachHook()
+		rebuildMeleePacketFireChain()
 	end
 	installCombatEventHook()
 	if not breakPacketHooked then
-		local breakPacket = Packets and Packets[BREAK_PACKET_NAME]
+		local breakKey = redlinerApi.breakPacketKey or BREAK_PACKET_NAME
+		local breakPacket = Packets and Packets[breakKey]
 		if breakPacket and breakPacket.OnClientEvent and type(breakPacket.OnClientEvent.Connect) == 'function' then
 			breakPacket.OnClientEvent:Connect(function(duration)
 				updateBreakState(duration)
@@ -3494,17 +3648,22 @@ bindAutoAttackLoop = function()
 		return
 	end
 	autoAttackLoopBound = true
-	runService.Heartbeat:Connect(function()
-		if not autoAttackActive then
-			return
+	task.spawn(function()
+		while true do
+			if autoAttackActive then
+				tryAutoAttack(attackDelaySetting)
+				local interval = attackDelaySetting > 0 and attackDelaySetting or AUTO_ATTACK_MIN_DELAY
+				task.wait(math.max(interval, AUTO_ATTACK_SCAN_INTERVAL))
+			else
+				task.wait(0.25)
+			end
 		end
-		tryAutoAttack(attackDelaySetting)
 	end)
 end
 
 combatHeartbeat = function(meleeRange)
 	meleeRangeSetting = meleeRange
-	if reachActive or reachDebugEnabled or autoParryActive or autoAttackActive then
+	if reachActive or reachDebugEnabled or autoParryActive then
 		bindPacketListeners()
 	end
 	if hud.hitboxVisualizerSwingEnabled and not hitboxReachHooked then
@@ -3515,6 +3674,12 @@ combatHeartbeat = function(meleeRange)
 		installCombatReachHooks()
 		if reachDebugEnabled then
 			logReachHookStatus('heartbeat retry')
+		end
+	elseif (autoAttackActive or alwaysParryActive) and not meleePacketReachHooked then
+		resolveRedlinerRuntime(true)
+		rebuildMeleePacketFireChain()
+		if autoAttackActive and not attackReachHooked then
+			installAttackReachHook()
 		end
 	end
 
@@ -4541,9 +4706,10 @@ run(function()
 		Function = function(callback)
 			alwaysParryActive = callback
 			bindAlwaysParryInput()
-			installAlwaysParryHook()
+			resolveRedlinerRuntime(true)
+			rebuildMeleePacketFireChain()
 			if callback then
-				notif('Always Parry', 'Clash boost — max velocityMag on melee swings to win clashes and max destabilize.', 5)
+				notif('Always Parry', 'Clash boost active — max velocityMag on melee packets.', 5)
 			end
 		end,
 		Tooltip = 'Spoofs max clash velocity (velocityMag) on every melee swing. Faster side wins clashes and applies more impact to the loser. Not Auto Parry.',
@@ -4567,12 +4733,13 @@ run(function()
 		Function = function(callback)
 			autoAttackActive = callback
 			if callback then
+				resolveRedlinerRuntime(true)
 				installAttackReachHook()
-				installMeleePacketReachHook()
+				rebuildMeleePacketFireChain()
 				bindAutoAttackLoop()
-				notif('Auto Attack', '360 melee — aims swing at nearby enemies and merges hurtboxes in range.', 4)
+				notif('Auto Attack', '360 melee — aims at nearby enemies in range.', 4)
 			else
-				installMeleePacketReachHook()
+				rebuildMeleePacketFireChain()
 			end
 		end,
 		Tooltip = 'Swings when any valid enemy is within Attack Range (360). Aims the melee hitbox at the target and sends their hurtboxes even if they are behind you.',
@@ -5397,7 +5564,6 @@ run(function()
 		end
 		combatBound = true
 		bindLocalRespawnHandler()
-		bindAutoAttackLoop()
 
 		runService.Heartbeat:Connect(function()
 			if not AutoParry.Enabled and not AlwaysParry.Enabled and not AutoAttack.Enabled and not Reach.Enabled
