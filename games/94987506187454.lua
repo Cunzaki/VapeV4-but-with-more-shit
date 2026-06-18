@@ -1,4 +1,4 @@
-﻿--[[
+--[[
 	REDLINER shared game script (MAIN + FFA + MATCH place IDs).
 	Place IDs: 94987506187454 (main), 115875349872417 (FFA), 126691165749976 (match).
 	All three places share one Vape profile config (FFA place ID 115875349872417).
