@@ -41,14 +41,16 @@ pcall(function()
 	vape:Remove('Reach')
 end)
 
-local BASE_SWORD_REACH = 10
+local BASE_SWORD_REACH = 22
 
 local PARRY_KEY = Enum.KeyCode.F
 local PARRY_VK = 0x46
 
-local MELEE_PACKET_NAME = '_x2e2c62e0acfc88ae'
-local MELEE_PACKET_REMOTE = '_xe6cbd0bf2a4cf278'
-local GUN_PACKET_NAME = '_x77a8b8d28b943359'
+local MELEE_PACKET_NAME = '_xf5e1e1983608ed25'
+local MELEE_PACKET_REMOTE = '_xf6afcf3c8b6be378'
+local MELEE_SESSION_PACKET = '_x57c165550ede3092'
+local GUN_PACKET_NAME = '_x8458a1cfd21149ba'
+local GUN_SHOT_PACKET_NAME = '_x6f11420c13d0d5ee'
 local MELEE_DEFAULT_ACTION = 'SWING'
 local MELEE_ACTION_FALLBACKS = {'SWING', 'SWING_HEAVY', 'wideslash', 'WIDESLASH', 'SLASH'}
 local DASH_VELOCITY_MIN = 20
@@ -1112,6 +1114,36 @@ local function getEnemyGunOrigin(char)
 	return hrp and hrp.Position
 end
 
+local function findGunShooterFromShotPacket(shotOrigin, aimDir)
+	if typeof(shotOrigin) ~= 'Vector3' or typeof(aimDir) ~= 'Vector3' or aimDir.Magnitude < 0.05 then
+		return nil
+	end
+	local bestChar, bestDist = nil, 30
+	for _, plr in playersService:GetPlayers() do
+		if plr == lplr then
+			continue
+		end
+		local char = plr.Character
+		if not char or not char.Parent or not isEnemyInGunThreatRange(char) then
+			continue
+		end
+		local gunOrigin = getEnemyGunOrigin(char)
+		if not gunOrigin then
+			continue
+		end
+		local dist = (gunOrigin - shotOrigin).Magnitude
+		if dist >= bestDist then
+			continue
+		end
+		local aiming = isGunAimDirAtMe(shotOrigin, aimDir, char)
+		if aiming or dist < 10 then
+			bestDist = dist
+			bestChar = char
+		end
+	end
+	return bestChar
+end
+
 local function isGunAimDirAtMe(originPos, aimDir, char)
 	if not originPos or typeof(aimDir) ~= 'Vector3' or aimDir.Magnitude < 0.05 then
 		return false
@@ -2095,6 +2127,55 @@ startEnemyWatchers = function()
 	end
 end
 
+local function resolveGunParryShooter(arg1, arg9, arg10)
+	local char
+	if typeof(arg1) == 'string' and arg1 ~= '' then
+		local plr = playersService:FindFirstChild(arg1)
+		if plr and plr ~= lplr then
+			char = plr.Character
+		end
+	end
+	if char then
+		return char
+	end
+	local uid
+	if typeof(arg10) == 'number' and arg10 > 0 then
+		uid = arg10
+	elseif typeof(arg9) == 'number' and arg9 > 0 then
+		uid = arg9
+	elseif typeof(arg1) == 'number' and arg1 > 0 then
+		uid = arg1
+	end
+	if uid then
+		local plr = playersService:GetPlayerByUserId(uid)
+		if plr and plr ~= lplr then
+			return plr.Character
+		end
+	end
+	return nil
+end
+
+local function handleIncomingGunParryPacket(char, aimDir, gunName, sourceTag)
+	if not autoParryActive or not parryGunShotEnabled or not parryModeUsesPacket() or not isLocalAlive() then
+		return
+	end
+	if typeof(aimDir) ~= 'Vector3' or aimDir.Magnitude < 0.05 then
+		return
+	end
+	if not char or not char.Parent then
+		return
+	end
+	if not isEnemyInGunThreatRange(char) then
+		return
+	end
+	if not shouldParryGun(char, false, char, aimDir) then
+		return
+	end
+	local label = typeof(gunName) == 'string' and gunName ~= '' and gunName or detectEquippedGun(char)
+	debugLog('trigger', sourceTag, label, 'dist=' .. string.format('%.1f', getClosestEnemyDistance(char)))
+	tryParry(sourceTag .. '_' .. label, char)
+end
+
 installGunParryPacketHook = function()
 	if gunParryPacketHooked then
 		return true
@@ -2102,60 +2183,27 @@ installGunParryPacketHook = function()
 	if not initPackets() then
 		return false
 	end
-	local packet = Packets[GUN_PACKET_NAME]
-	if not packet or not packet.OnClientEvent or type(packet.OnClientEvent.Connect) ~= 'function' then
-		return false
-	end
-	if packet._gunParryHooked then
+	local legacyPacket = Packets[GUN_PACKET_NAME]
+	if legacyPacket and legacyPacket.OnClientEvent and type(legacyPacket.OnClientEvent.Connect) == 'function'
+		and not legacyPacket._gunParryHooked then
+		legacyPacket._gunParryHooked = true
+		legacyPacket.OnClientEvent:Connect(function(arg1, _arg2, _arg3, _arg4, _arg5, _arg6, aimDir, gunName, arg9, arg10)
+			local char = resolveGunParryShooter(arg1, arg9, arg10)
+			handleIncomingGunParryPacket(char, aimDir, gunName, 'gun_packet')
+		end)
 		gunParryPacketHooked = true
-		return true
 	end
-	packet._gunParryHooked = true
-	gunParryPacketHooked = true
-	packet.OnClientEvent:Connect(function(arg1, _arg2, _arg3, _arg4, _arg5, aimDir, gunName, arg8, arg9)
-		if not autoParryActive or not parryGunShotEnabled or not parryModeUsesPacket() or not isLocalAlive() then
-			return
-		end
-		if typeof(aimDir) ~= 'Vector3' or aimDir.Magnitude < 0.05 then
-			return
-		end
-		local char
-		if typeof(arg1) == 'string' and arg1 ~= '' then
-			local plr = playersService:FindFirstChild(arg1)
-			if plr and plr ~= lplr then
-				char = plr.Character
-			end
-		end
-		if not char then
-			local uid
-			if typeof(arg8) == 'number' and arg8 > 0 then
-				uid = arg8
-			elseif typeof(arg9) == 'number' and arg9 > 0 then
-				uid = arg9
-			elseif typeof(arg1) == 'number' and arg1 > 0 then
-				uid = arg1
-			end
-			if uid then
-				local plr = playersService:GetPlayerByUserId(uid)
-				if plr and plr ~= lplr then
-					char = plr.Character
-				end
-			end
-		end
-		if not char or not char.Parent then
-			return
-		end
-		if not isEnemyInGunThreatRange(char) then
-			return
-		end
-		if not shouldParryGun(char, false, char, aimDir) then
-			return
-		end
-		local label = typeof(gunName) == 'string' and gunName ~= '' and gunName or detectEquippedGun(char)
-		debugLog('trigger', 'gun_packet', label, 'dist=' .. string.format('%.1f', getClosestEnemyDistance(char)))
-		tryParry('gun_packet_' .. label, char)
-	end)
-	return true
+	local shotPacket = Packets[GUN_SHOT_PACKET_NAME]
+	if shotPacket and shotPacket.OnClientEvent and type(shotPacket.OnClientEvent.Connect) == 'function'
+		and not shotPacket._gunParryHooked then
+		shotPacket._gunParryHooked = true
+		shotPacket.OnClientEvent:Connect(function(_sessionToken, aimDir, shotOrigin, _hurtboxes, _timestamp)
+			local char = findGunShooterFromShotPacket(shotOrigin, aimDir)
+			handleIncomingGunParryPacket(char, aimDir, nil, 'gun_shot_packet')
+		end)
+		gunParryPacketHooked = true
+	end
+	return gunParryPacketHooked
 end
 
 updateBreakState = function(duration)
@@ -2537,8 +2585,10 @@ local function getClientClasses()
 		if gcOk and type(gc) == 'table' then
 			for _, value in gc do
 				if type(value) == 'table' and type(value.Classes) == 'table'
-					and type(value.Classes._x8613500a592ecb35) == 'table'
-					and type(value.Classes._xf1ad98d2d70b7408) == 'table' then
+					and (
+						type(value.Classes._xd2c44c643b0c3fb4) == 'table'
+						or type(value.Classes._xf1ad98d2d70b7408) == 'table'
+					) then
 					classes = value.Classes
 					break
 				end
@@ -2551,7 +2601,16 @@ end
 
 triggerGameMeleeAttack = function()
 	local classes = getClientClasses()
-	local inputHandler = classes and classes._xf1ad98d2d70b7408
+	local inputHandler = classes and classes._xd2c44c643b0c3fb4
+	if inputHandler and type(inputHandler._xdf0c107e49196810) == 'function' then
+		local meleeAction = inputHandler:_xdf0c107e49196810('MELEE')
+		if meleeAction and meleeAction.Pressed and type(meleeAction.Pressed.Fire) == 'function' then
+			meleeAction.Pressed:Fire()
+			lastAttackAt = tick()
+			return true
+		end
+	end
+	inputHandler = classes and classes._xf1ad98d2d70b7408
 	if inputHandler and type(inputHandler._x93fd21adac562b5e) == 'function' then
 		local meleeAction = inputHandler:_x93fd21adac562b5e('MELEE')
 		if meleeAction and meleeAction.Pressed and type(meleeAction.Pressed.Fire) == 'function' then
@@ -2601,15 +2660,9 @@ installMeleePacketReachHook = function()
 	local oldFire = packet.Fire
 	packet._meleeReachHooked = true
 	meleePacketReachHooked = true
-	packet.Fire = function(firePacket, itemId, action, field3, aimDir, hurtboxes, meta, ...)
+	packet.Fire = function(firePacket, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
 		local merged = augmentOutgoingMeleeHurtboxes(hurtboxes)
-		if typeof(aimDir) ~= 'Vector3' or aimDir.Magnitude < 0.05 then
-			local root = getLocalRoot()
-			if root and type(merged) == 'table' and merged[1] then
-				aimDir = safeAimDirection(root.Position, merged[1].Position, root.CFrame.LookVector)
-			end
-		end
-		return oldFire(firePacket, itemId, action, field3, aimDir, merged, meta, ...)
+		return oldFire(firePacket, sessionToken, weaponId, attackType, position, merged, velocityMag, ...)
 	end
 	reachDebugLog('Melee packet Fire hook OK -', MELEE_PACKET_NAME)
 	return true
@@ -2788,6 +2841,33 @@ installHitboxReachHook = function()
 	return true
 end
 
+local function hookGunBulletVizFire(packet, aimIndex, originIndex)
+	if not packet or type(packet.Fire) ~= 'function' or packet._bulletVizHooked then
+		return false
+	end
+	local oldFire = packet.Fire
+	packet._bulletVizHooked = true
+	packet.Fire = function(firePacket, ...)
+		local packed = table.pack(...)
+		local aimDir = packed[aimIndex]
+		local origin = packed[originIndex]
+		if typeof(aimDir) == 'Vector3' then
+			task.defer(function()
+				local startPos = typeof(origin) == 'Vector3' and origin or nil
+				if not startPos then
+					local root = getLocalRoot()
+					startPos = root and root.Position
+				end
+				if startPos then
+					spawnBulletVizRay(startPos, aimDir, hud.hitboxVisualizerColorSetting)
+				end
+			end)
+		end
+		return oldFire(firePacket, ...)
+	end
+	return true
+end
+
 installGunBulletVizHook = function()
 	if hud.gunBulletVizHooked or not hud.hitboxVisualizerBulletEnabled then
 		return true
@@ -2795,31 +2875,14 @@ installGunBulletVizHook = function()
 	if not initPackets() then
 		return false
 	end
-	local packet = Packets[GUN_PACKET_NAME]
-	if not packet or type(packet.Fire) ~= 'function' then
-		return false
+	local hooked = hookGunBulletVizFire(Packets[GUN_SHOT_PACKET_NAME], 2, 3)
+	if hookGunBulletVizFire(Packets[GUN_PACKET_NAME], 7, nil) then
+		hooked = true
 	end
-	if packet._bulletVizHooked then
+	if hooked then
 		hud.gunBulletVizHooked = true
-		return true
 	end
-	local oldFire = packet.Fire
-	packet._bulletVizHooked = true
-	hud.gunBulletVizHooked = true
-	packet.Fire = function(firePacket, ...)
-		local packed = table.pack(...)
-		local aimDir = packed[6]
-		if typeof(aimDir) == 'Vector3' then
-			task.defer(function()
-				local root = getLocalRoot()
-				if root then
-					spawnBulletVizRay(root.Position, aimDir, hud.hitboxVisualizerColorSetting)
-				end
-			end)
-		end
-		return oldFire(firePacket, ...)
-	end
-	return true
+	return hooked
 end
 
 installCombatReachHooks = function()

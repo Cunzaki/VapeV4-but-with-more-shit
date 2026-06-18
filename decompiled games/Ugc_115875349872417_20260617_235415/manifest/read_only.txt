@@ -1,0 +1,91 @@
+# ReadOnly snapshots
+
+## ReplicatedStorage.ReadOnly
+  ServerRegion (StringValue) = "America/Los_Angeles"
+  DuelRequests (Folder) = ReplicatedStorage.ReadOnly.DuelRequests
+  Lobbies (Folder) = ReplicatedStorage.ReadOnly.Lobbies
+  Match (Folder) = ReplicatedStorage.ReadOnly.Match
+  TotalSeconds (IntValue) = 2099
+  DuelPresence (Folder) = ReplicatedStorage.ReadOnly.DuelPresence
+  Players (Folder) = ReplicatedStorage.ReadOnly.Players
+
+## Player Bj2f6 (11041300289)
+  console_roles (StringValue) = "member"
+  impact (NumberValue) = 0
+  impact_limit (NumberValue) = 100
+  heat (IntValue) = 0
+  heat_max (IntValue) = 280
+  heat_per_bullet (IntValue) = 140
+  health (IntValue) = 150
+  health_max (IntValue) = 150
+
+## Player FRXSTY_am (4243423438)
+  health_max (IntValue) = 150
+  health (IntValue) = 90
+  heat_per_bullet (IntValue) = 140
+  heat_max (IntValue) = 280
+  heat (IntValue) = 69
+  impact_limit (NumberValue) = 100
+  impact (NumberValue) = 0
+  console_roles (StringValue) = "member"
+
+## Player WhyisAaron (140748470)
+  impact (NumberValue) = 0
+  health (IntValue) = 150
+  heat (IntValue) = 54
+  health_max (IntValue) = 150
+  heat_per_bullet (IntValue) = 140
+  heat_max (IntValue) = 280
+  impact_limit (NumberValue) = 100
+  console_roles (StringValue) = "member"
+
+## Player pizziowo (854882397)
+  heat (IntValue) = 160
+  health (IntValue) = 150
+  impact (NumberValue) = 0
+  health_max (IntValue) = 150
+  heat_per_bullet (IntValue) = 170
+  heat_max (IntValue) = 170
+  impact_limit (NumberValue) = 100
+  console_roles (StringValue) = "member"
+
+## Player elijahdylanbro (270870614)
+  impact (NumberValue) = 0
+  heat (IntValue) = 40
+  health (IntValue) = 150
+  health_max (IntValue) = 150
+  heat_per_bullet (IntValue) = 200
+  heat_max (IntValue) = 200
+  impact_limit (NumberValue) = 100
+  console_roles (StringValue) = "member"
+
+## Player Mulcible (444838217)
+  impact (NumberValue) = 14.49999999999995
+  health (IntValue) = 130
+  heat (IntValue) = 40
+  console_roles (StringValue) = "member"
+  impact_limit (NumberValue) = 100
+  heat_max (IntValue) = 300
+  heat_per_bullet (IntValue) = 100
+  health_max (IntValue) = 150
+
+## Player RIPDXRIEL (4652079668)
+  impact (NumberValue) = 26.199999999999797
+  health (IntValue) = 50
+  heat (IntValue) = 80
+  console_roles (StringValue) = "member"
+  impact_limit (NumberValue) = 100
+  heat_max (IntValue) = 170
+  heat_per_bullet (IntValue) = 170
+  health_max (IntValue) = 150
+
+## Player deathalex3 (101552459)
+  console_roles (StringValue) = "member"
+  impact (NumberValue) = 0
+  impact_limit (NumberValue) = 100
+  heat (IntValue) = 136
+  heat_max (IntValue) = 300
+  heat_per_bullet (IntValue) = 100
+  health (IntValue) = 110
+  health_max (IntValue) = 150
+

@@ -289,11 +289,7 @@ local function isRobloxNoise(script)
 	if path:find('Chat%.', 1, true) and not path:find('Chat%.CustomChat', 1, true) then
 		return true
 	end
-	if not CONFIG.INCLUDE_PLAYER_MODULE and (
-		path:find('PlayerScripts%.PlayerModule%.', 1, true)
-		or path:find('StarterPlayer%.StarterPlayerScripts%.PlayerModule%.', 1, true)
-		or path:find('ReplicatedStorage%.Assets%.Models%.PlayerModule%.', 1, true)
-	) then
+	if not CONFIG.INCLUDE_PLAYER_MODULE and path:find('PlayerModule', 1, true) then
 		return true
 	end
 	if not CONFIG.INCLUDE_CHARACTER_SCRIPTS and path:find('Players%.[^%.]+%.Character%.', 1, true) then
@@ -426,6 +422,19 @@ local function buildScriptRelPath(script, subfolder, usedPaths)
 	return rel
 end
 
+local function getScriptEnabled(script)
+	if script.ClassName == 'ModuleScript' then
+		return nil
+	end
+	local ok, enabled = pcall(function()
+		return script.Enabled
+	end)
+	if ok then
+		return enabled
+	end
+	return nil
+end
+
 local function formatDecompiledHeader(script)
 	return string.format(
 		'-- Decompiled from: %s\n-- Class: %s\n-- Place: %s (%s)\n-- JobId: %s\n\n',
@@ -515,55 +524,69 @@ local function dumpAllScripts(scripts)
 	end
 
 	local function processJob(job)
-		local script = job.script
-		local entry = {
-			fullName = script:GetFullName(),
-			className = script.ClassName,
-			output = job.rel,
-			status = 'failed',
-			enabled = script.Enabled,
-		}
+		local ok, err = pcall(function()
+			local script = job.script
+			local entry = {
+				fullName = script:GetFullName(),
+				className = script.ClassName,
+				output = job.rel,
+				status = 'failed',
+				enabled = getScriptEnabled(script),
+			}
 
-		if type(gethiddenproperty) == 'function' then
-			local ok, hiddenEnabled = pcall(gethiddenproperty, script, 'Enabled')
-			if ok then
-				entry.hiddenEnabled = hiddenEnabled
+			if type(gethiddenproperty) == 'function' and script.ClassName ~= 'ModuleScript' then
+				local hiddenOk, hiddenEnabled = pcall(gethiddenproperty, script, 'Enabled')
+				if hiddenOk then
+					entry.hiddenEnabled = hiddenEnabled
+				end
 			end
-		end
 
-		local decompOk, decompSrc = tryDecompile(script)
-		if decompOk then
-			local text = formatDecompiledHeader(script) .. decompSrc:gsub('\r\n', '\n'):gsub('\r', '\n')
-			if not text:match('\n$') then
-				text ..= '\n'
-			end
-			queueWrite(job.rel, text)
-			entry.status = 'decompiled'
-			stats.decompiled += 1
-		else
-			entry.decompileError = decompSrc
-			local bcOk, bc, bcErr = tryBytecode(script)
-			if bcOk then
-				local hexPath = job.rel:gsub('^scripts/', 'bytecode/'):gsub('.lua$', '.hex.txt')
-				local header = string.format(
-					'-- Bytecode dump (decompile failed)\n-- Script: %s\n-- Size: %d bytes\n-- Error: %s\n\n',
-					script:GetFullName(),
-					#bc,
-					tostring(decompSrc):gsub('\n', ' ')
-				)
-				queueWrite(hexPath, header .. bytecodeToHex(bc))
-				entry.bytecode = hexPath
-				entry.status = 'bytecode'
-				stats.bytecode += 1
+			local decompOk, decompSrc = tryDecompile(script)
+			if decompOk then
+				local text = formatDecompiledHeader(script) .. decompSrc:gsub('\r\n', '\n'):gsub('\r', '\n')
+				if not text:match('\n$') then
+					text ..= '\n'
+				end
+				queueWrite(job.rel, text)
+				entry.status = 'decompiled'
+				stats.decompiled += 1
 			else
-				entry.bytecodeError = bcErr
-				entry.status = 'failed'
-				stats.failed += 1
+				entry.decompileError = decompSrc
+				local bcOk, bc, bcErr = tryBytecode(script)
+				if bcOk then
+					local hexPath = job.rel:gsub('^scripts/', 'bytecode/'):gsub('.lua$', '.hex.txt')
+					local header = string.format(
+						'-- Bytecode dump (decompile failed)\n-- Script: %s\n-- Size: %d bytes\n-- Error: %s\n\n',
+						script:GetFullName(),
+						#bc,
+						tostring(decompSrc):gsub('\n', ' ')
+					)
+					queueWrite(hexPath, header .. bytecodeToHex(bc))
+					entry.bytecode = hexPath
+					entry.status = 'bytecode'
+					stats.bytecode += 1
+				else
+					entry.bytecodeError = bcErr
+					entry.status = 'failed'
+					stats.failed += 1
+				end
 			end
-		end
 
-		table.insert(manifest.scripts, entry)
-		flushWrites(false)
+			table.insert(manifest.scripts, entry)
+			flushWrites(false)
+		end)
+		if not ok then
+			stats.failed += 1
+			table.insert(manifest.scripts, {
+				fullName = job.script:GetFullName(),
+				className = job.script.ClassName,
+				output = job.rel,
+				status = 'failed',
+				processError = tostring(err),
+			})
+			table.insert(manifest.errors, 'processJob: ' .. job.script:GetFullName() .. ' -> ' .. tostring(err))
+			flushWrites(false)
+		end
 	end
 
 	local concurrency = math.max(1, CONFIG.DECOMPILE_CONCURRENCY or 1)
