@@ -53,9 +53,11 @@ local MELEE_SESSION_PACKET = '_x57c165550ede3092'
 local PARRY_PACKET_NAME = '_xff9e8e66a100da8b'
 local GUN_PACKET_NAME = '_x8458a1cfd21149ba'
 local GUN_SHOT_PACKET_NAME = '_x6f11420c13d0d5ee'
-local ALWAYS_PARRY_DEFAULT_VELOCITY = 150
-local ALWAYS_PARRY_MIN_VELOCITY = 75
+local ALWAYS_PARRY_DEFAULT_VELOCITY = 200
+local ALWAYS_PARRY_MIN_VELOCITY = 80
 local ALWAYS_PARRY_MAX_VELOCITY = 200
+local CLASH_VELOCITY_SERVER_CAP = 200
+local HURTBOX_SCAN_CACHE_TTL = 0.1
 local COMBAT_EVENT_PACKET = '_x6f165cf1c8a4a502'
 local BREAK_PACKET_NAME = '_x71a4ac7aba517193'
 local MELEE_DEFAULT_ACTION = 'SWING'
@@ -201,6 +203,9 @@ local lastDebugAnimAt = {}
 local parryIdsLogged = false
 local parryScanBound = false
 local autoAttackLoopBound = false
+local hurtboxScanCache = {time = 0, range = 0, visible = true, results = {}}
+local autoAttackTargetCache = {time = 0, range = 0, model = nil}
+local meleePacketGcMirrored = false
 local localRespawnBound = false
 local lastParryScanAt = 0
 local lastWatcherRefreshAt = 0
@@ -2270,6 +2275,14 @@ getEnemyHurtboxesInRange = function(range, origin, requireVisible)
 	if requireVisible == nil then
 		requireVisible = true
 	end
+	local now = tick()
+	if hurtboxScanCache.time + HURTBOX_SCAN_CACHE_TTL > now
+		and hurtboxScanCache.range == (range or 0)
+		and hurtboxScanCache.visible == requireVisible
+		and hurtboxScanCache.origin
+		and (hurtboxScanCache.origin - origin).Magnitude < 2 then
+		return hurtboxScanCache.results
+	end
 	local bestPerEnemy = {}
 	for _, part in collectionService:GetTagged('Hurtbox') do
 		if part.Parent then
@@ -2300,6 +2313,11 @@ getEnemyHurtboxesInRange = function(range, origin, requireVisible)
 	for i = 1, math.min(#sorted, 8) do
 		table.insert(results, sorted[i].Part)
 	end
+	hurtboxScanCache.time = now
+	hurtboxScanCache.range = range or 0
+	hurtboxScanCache.visible = requireVisible
+	hurtboxScanCache.origin = origin
+	hurtboxScanCache.results = results
 	return results
 end
 
@@ -2698,40 +2716,75 @@ local function getMovementController()
 end
 
 local function getAlwaysParryVelocityMag(_current)
-	return alwaysParryVelocitySetting
+	return math.min(alwaysParryVelocitySetting, CLASH_VELOCITY_SERVER_CAP)
 end
 
-local function syncClashVelocityForMeleePacket()
+applyClashVelocitySpoof = function()
 	local movement = getMovementController()
-	local cam = workspace.CurrentCamera
-	if not movement or not cam then
+	local root = getLocalRoot()
+	if not movement or not root then
 		return
 	end
-	local look = cam.CFrame.LookVector
-	local horiz = look * Vector3.new(1, 0, 1)
-	if horiz.Magnitude < 0.05 then
-		horiz = Vector3.new(0, 0, -1)
+	local horiz = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
+	if horiz.Magnitude < 2 then
+		local cam = workspace.CurrentCamera
+		local look = cam and cam.CFrame.LookVector or Vector3.new(0, 0, -1)
+		horiz = look * Vector3.new(1, 0, 1)
+		if horiz.Magnitude < 0.05 then
+			horiz = Vector3.new(0, 0, -1)
+		else
+			horiz = horiz.Unit
+		end
 	else
 		horiz = horiz.Unit
 	end
-	movement._xed86f944048d8fdc = horiz * alwaysParryVelocitySetting
+	movement._xed86f944048d8fdc = horiz * getAlwaysParryVelocityMag()
+end
+
+local function aimAutoAttackHitboxes(attack)
+	if not autoAttackActive or type(attack) ~= 'table' or type(attack.hitboxes) ~= 'table' then
+		return
+	end
+	local root = getLocalRoot()
+	if not root then
+		return
+	end
+	local target = getNearestEnemyInAttackRange(autoAttackRangeSetting)
+	if not target then
+		return
+	end
+	local targetPart = target:FindFirstChild('HumanoidRootPart')
+		or target:FindFirstChild('Head_Hurtbox')
+		or target:FindFirstChild('Head')
+	if not targetPart then
+		return
+	end
+	local origin = CFrame.lookAt(root.Position, targetPart.Position)
+	for _, hb in attack.hitboxes do
+		if type(hb) == 'table' then
+			hb.origin = origin
+		end
+	end
 end
 
 local function buildMeleePacketFireWrapper(oldFire)
-	return function(firePacket, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
-		local merged = augmentOutgoingMeleeHurtboxes(hurtboxes)
+	return function(packet, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
 		if alwaysParryActive then
-			syncClashVelocityForMeleePacket()
+			applyClashVelocitySpoof()
 			velocityMag = getAlwaysParryVelocityMag(velocityMag)
 		end
-		return oldFire(firePacket, sessionToken, weaponId, attackType, position, merged, velocityMag, ...)
+		if shouldExtendMeleeCombat() then
+			hurtboxes = augmentOutgoingMeleeHurtboxes(hurtboxes)
+		end
+		return oldFire(packet, sessionToken, weaponId, attackType, position, hurtboxes, velocityMag, ...)
 	end
 end
 
 local function mirrorMeleePacketFireWrapper(wrapper, oldFire)
-	if not getgc then
+	if not getgc or meleePacketGcMirrored then
 		return
 	end
+	meleePacketGcMirrored = true
 	local gcOk, gc = pcall(getgc, true)
 	if not gcOk or type(gc) ~= 'table' then
 		return
@@ -2752,6 +2805,9 @@ installAlwaysParryHooks = function()
 end
 
 triggerGameMeleeAttack = function()
+	if alwaysParryActive then
+		applyClashVelocitySpoof()
+	end
 	local classes = getClientClasses()
 	local inputHandler = classes and classes._xd2c44c643b0c3fb4
 	if inputHandler and type(inputHandler._xdf0c107e49196810) == 'function' then
@@ -2827,7 +2883,7 @@ installMeleePacketReachHook = function()
 	return true
 end
 
-local function installAttackReachHook()
+installAttackReachHook = function()
 	if attackReachHooked then
 		reachDebugSkip('attack_already', 'Attack.castOnce hook already installed at', reachAttackHookSource or '?')
 		return true
@@ -2844,8 +2900,21 @@ local function installAttackReachHook()
 		end
 		local function makeWrapper(oldFn)
 			return function(attack, ...)
+				aimAutoAttackHitboxes(attack)
 				local results = oldFn(attack, ...)
 				local added = extendAttackHurtboxes(attack)
+				if shouldExtendMeleeCombat() and type(attack.hit_hurtboxes) == 'table' and #attack.hit_hurtboxes > 0 then
+					if reachDebugEnabled or (reachActive and reachExtend > 0) then
+						reachDebugLog(
+							methodName,
+							'extend=', reachExtend,
+							'totalReach=', getMeleeReach(),
+							'added=', added,
+							'hurtboxes=', #attack.hit_hurtboxes
+						)
+					end
+					return attack.hit_hurtboxes
+				end
 				if reachDebugEnabled or (reachActive and reachExtend > 0) then
 					reachDebugLog(
 						methodName,
@@ -3103,10 +3172,12 @@ bindPacketListeners = function()
 	if not initPackets() then
 		return
 	end
-	if reachActive or reachDebugEnabled or autoAttackActive or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
+	if reachActive or reachDebugEnabled or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
 		installCombatReachHooks()
+	elseif autoAttackActive and not attackReachHooked then
+		installAttackReachHook()
 	end
-	if (autoAttackActive or alwaysParryActive) and not meleePacketReachHooked then
+	if (autoAttackActive or alwaysParryActive or reachActive) and not meleePacketReachHooked then
 		installMeleePacketReachHook()
 	end
 	installCombatEventHook()
@@ -3135,9 +3206,12 @@ bindPacketListeners = function()
 	end
 end
 
-task.defer(installCombatReachHooks)
 lplr.CharacterAdded:Connect(function()
-	task.defer(installCombatReachHooks)
+	task.defer(function()
+		if reachActive or autoAttackActive or alwaysParryActive then
+			bindPacketListeners()
+		end
+	end)
 end)
 
 end)
@@ -3233,14 +3307,25 @@ bindParryScanLoop = function()
 end
 
 getNearestEnemyInAttackRange = function(attackRange)
+	local now = tick()
+	if autoAttackTargetCache.time + HURTBOX_SCAN_CACHE_TTL > now
+		and autoAttackTargetCache.range == attackRange then
+		return autoAttackTargetCache.model
+	end
 	local root = getLocalRoot()
 	if not root then
+		autoAttackTargetCache.time = now
+		autoAttackTargetCache.range = attackRange
+		autoAttackTargetCache.model = nil
 		return nil
 	end
 	local hurtboxes = getEnemyHurtboxesInRange(attackRange, root.Position, false)
 	if #hurtboxes > 0 then
 		local owner = hurtboxes[1]:FindFirstAncestorWhichIsA('Model')
 		if owner then
+			autoAttackTargetCache.time = now
+			autoAttackTargetCache.range = attackRange
+			autoAttackTargetCache.model = owner
 			return owner
 		end
 	end
@@ -3262,6 +3347,9 @@ getNearestEnemyInAttackRange = function(attackRange)
 			end
 		end
 	end
+	autoAttackTargetCache.time = now
+	autoAttackTargetCache.range = attackRange
+	autoAttackTargetCache.model = nearestModel
 	return nearestModel
 end
 
@@ -3290,9 +3378,6 @@ local function tryAutoAttack(attackDelay)
 		return
 	end
 
-	if not meleePacketReachHooked then
-		installMeleePacketReachHook()
-	end
 	if triggerGameMeleeAttack() then
 		lastAttackAt = tick()
 	end
@@ -3303,7 +3388,7 @@ bindAutoAttackLoop = function()
 		return
 	end
 	autoAttackLoopBound = true
-	runService.RenderStepped:Connect(function()
+	runService.Heartbeat:Connect(function()
 		if not autoAttackActive then
 			return
 		end
@@ -3313,12 +3398,9 @@ end
 
 combatHeartbeat = function(meleeRange)
 	meleeRangeSetting = meleeRange
-	if reachActive or reachDebugEnabled or autoParryActive or autoAttackActive or redlinerHitboxesActive
+	if reachActive or reachDebugEnabled or autoParryActive or autoAttackActive or alwaysParryActive or redlinerHitboxesActive
 		or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
 		bindPacketListeners()
-	end
-	if alwaysParryActive and not meleePacketReachHooked then
-		installAlwaysParryHooks()
 	end
 	if hud.hitboxVisualizerSwingEnabled and not hitboxReachHooked then
 		installHitboxReachHook()
@@ -4358,12 +4440,11 @@ run(function()
 		Function = function(callback)
 			alwaysParryActive = callback
 			if callback then
-				installAlwaysParryHooks()
-				bindPacketListeners()
-				notif('Always Parry', 'Spoofs max clash velocity on melee swings — win clashes and stack instability.', 5)
+				installMeleePacketReachHook()
+				notif('Always Parry', 'Clash boost — max velocity on melee swings to win clashes and stack enemy destabilization.', 5)
 			end
 		end,
-		Tooltip = 'Forces high movement speed on outgoing melee packets so you win clashes and destabilize opponents faster. Not Auto Parry.',
+		Tooltip = 'Spoofs max clash velocity (velocityMag) on every melee swing. Faster side wins clashes and adds more impact/destabilization to the loser. Not Auto Parry.',
 	})
 	AlwaysParry:CreateSlider({
 		Name = 'Clash Velocity',
@@ -4376,7 +4457,7 @@ run(function()
 		Suffix = function(val)
 			return math.floor(val * 10) / 10 .. ' u/s'
 		end,
-		Tooltip = 'Speed sent as velocityMag on melee swings (tutorial dummy 50 u/s; HUD caps ~150). Higher = win more clashes.',
+		Tooltip = 'Outgoing velocityMag on melee packets. Tutorial dummy is 50 u/s; default 200 wins clashes and applies max destabilization pressure.',
 	})
 
 	AutoAttack = extras:CreateModule({
@@ -4384,13 +4465,13 @@ run(function()
 		Function = function(callback)
 			autoAttackActive = callback
 			if callback then
-				bindPacketListeners()
+				installAttackReachHook()
 				installMeleePacketReachHook()
 				bindAutoAttackLoop()
-				notif('Auto Attack', '360 melee — hits valid enemies in range via game attack pipeline.', 4)
+				notif('Auto Attack', '360 melee — aims swing at nearby enemies and merges hurtboxes in range.', 4)
 			end
 		end,
-		Tooltip = 'Swings when any valid enemy is within Attack Range (360). Uses melee packet hurtbox merge so targets behind you can still be hit.',
+		Tooltip = 'Swings when any valid enemy is within Attack Range (360). Aims the melee hitbox at the target and sends their hurtboxes even if they are behind you.',
 	})
 
 	AutoAttack:CreateToggle({
