@@ -3903,7 +3903,11 @@ function mainapi:CreateCategory(categorysettings)
 
 		for i, v in components do
 			moduleapi['Create'..i] = function(_, optionsettings)
-				return v(optionsettings, modulechildren, moduleapi)
+				local option = v(optionsettings, modulechildren, moduleapi)
+				if mainapi.Loaded then
+					mainapi:ScheduleModuleProfileApply(modulesettings.Name)
+				end
+				return option
 			end
 		end
 
@@ -4032,6 +4036,9 @@ function mainapi:CreateCategory(categorysettings)
 
 		moduleapi.Object = modulebutton
 		mainapi.Modules[modulesettings.Name] = moduleapi
+		if mainapi.Loaded then
+			mainapi:ScheduleModuleProfileApply(modulesettings.Name)
+		end
 
 		local sorting = {}
 		for _, v in mainapi.Modules do
@@ -5723,8 +5730,13 @@ function mainapi:Load(skipgui, profile)
 					object:Toggle(true)
 				end)
 			end
-			object:SetBind(v.Bind)
-			object.Object.Bind.Visible = #v.Bind > 0
+			if v.Bind then
+				object:SetBind(v.Bind)
+				object.Object.Bind.Visible = #v.Bind > 0
+			end
+			if object.Options and v.Options then
+				self:SyncModuleOptions(object)
+			end
 		end
 
 		for i, v in savedata.Legit do
@@ -5805,6 +5817,26 @@ function mainapi:SyncModuleOptions(module)
 	end
 end
 
+function mainapi:ScheduleModuleProfileApply(name)
+	if not self.Loaded or not name then
+		return
+	end
+	self._pendingProfileModules = self._pendingProfileModules or {}
+	self._pendingProfileModules[name] = true
+	if self._profileApplyScheduled then
+		return
+	end
+	self._profileApplyScheduled = true
+	task.defer(function()
+		self._profileApplyScheduled = false
+		local pending = self._pendingProfileModules
+		self._pendingProfileModules = {}
+		for moduleName in pending do
+			self:ApplyModuleProfile(moduleName)
+		end
+	end)
+end
+
 function mainapi:ApplyModuleProfile(name)
 	local module = self.Modules[name]
 	if not module then
@@ -5832,6 +5864,22 @@ function mainapi:ApplyModuleProfile(name)
 		module:Toggle(true)
 	end
 	self:SyncModuleOptions(module)
+end
+
+function mainapi:ApplyAllModuleProfiles()
+	local profilePath = self:GetProfileConfigPath(self.Profile, self.Place)
+	if not isfile(profilePath) then
+		return
+	end
+	local savedata = loadJson(profilePath)
+	if not savedata or not savedata.Modules then
+		return
+	end
+	for name in savedata.Modules do
+		if self.Modules[name] then
+			self:ApplyModuleProfile(name)
+		end
+	end
 end
 
 function mainapi:LoadOptions(object, savedoptions)
