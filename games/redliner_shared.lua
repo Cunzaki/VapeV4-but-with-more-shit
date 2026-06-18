@@ -3041,17 +3041,54 @@ local function tryRequireClientClasses(startInst)
 		return nil
 	end
 	local ok, root = pcall(require, clientRoot)
-	if ok and type(root) == 'table' and type(root.Classes) == 'table' then
-		return root.Classes
+	if ok and type(root) == 'table' then
+		local classes = rawget(root, 'Classes')
+		if type(classes) == 'table' then
+			return classes
+		end
 	end
 	return nil
 end
 
-local function getClientClasses()
+local function looksLikeRedlinerClassesTable(cls)
+	if type(cls) ~= 'table' then
+		return false
+	end
+	return type(rawget(cls, '_x3e046bec2684f59c')) == 'table'
+		or type(rawget(cls, '_x7058397dabccd000')) == 'table'
+		or type(rawget(cls, '_xd2c44c643b0c3fb4')) == 'table'
+end
+
+getClientClasses = function()
 	if clientClassesCache then
 		return clientClassesCache
 	end
 	local classes = tryRequireClientClasses(replicatedStorage:FindFirstChild('Start'))
+	if not classes then
+		local start = replicatedStorage:FindFirstChild('Start')
+		if not start then
+			pcall(function()
+				start = replicatedStorage:WaitForChild('Start', 8)
+			end)
+		end
+		classes = tryRequireClientClasses(start)
+	end
+	if not classes and getloadedmodules then
+		local modsOk, mods = pcall(getloadedmodules)
+		if modsOk and type(mods) == 'table' then
+			for _, mod in mods do
+				if typeof(mod) == 'Instance' and mod.Name == 'ClientRoot' then
+					local ok, root = pcall(require, mod)
+					if ok and type(root) == 'table' then
+						classes = rawget(root, 'Classes')
+						if type(classes) == 'table' then
+							break
+						end
+					end
+				end
+			end
+		end
+	end
 	if not classes and getnilinstances then
 		local nilOk, nilInsts = pcall(getnilinstances)
 		if nilOk and type(nilInsts) == 'table' then
@@ -3069,19 +3106,9 @@ local function getClientClasses()
 		local gcOk, gc = pcall(getgc, true)
 		if gcOk and type(gc) == 'table' then
 			for _, value in gc do
-				if type(value) ~= 'table' then
-					continue
-				end
-				local cls = rawget(value, 'Classes')
-				if type(cls) == 'table' then
-					if type(rawget(cls, '_x3e046bec2684f59c')) == 'table'
-						or type(rawget(cls, '_xd2c44c643b0c3fb4')) == 'table'
-						or type(rawget(cls, '_xf1ad98d2d70b7408')) == 'table'
-						or type(rawget(cls, '_x7058397dabccd000')) == 'table'
-						or type(rawget(cls, '_xef0ffbcc2c92f7b4')) == 'table' then
-						classes = cls
-						break
-					end
+				if looksLikeRedlinerClassesTable(value) then
+					classes = value
+					break
 				end
 			end
 		end
@@ -3090,7 +3117,7 @@ local function getClientClasses()
 	return classes
 end
 
-local function resolveMovementApi()
+resolveMovementApi = function()
 	if redlinerApi.movementClassKey and redlinerApi.velocityField and #redlinerApi.inputHandlers > 0 then
 		return
 	end
@@ -3123,10 +3150,7 @@ local function resolveMovementApi()
 	end
 end
 
-local function getClientClassesCached()
-	if clientClassesCache then
-		return clientClassesCache
-	end
+getClientClassesCached = function()
 	return getClientClasses()
 end
 
@@ -4949,7 +4973,9 @@ run(function()
 			autoAttackActive = callback
 			if callback then
 				resolveRedlinerRuntime(true)
-				resolveMovementApi()
+				if resolveMovementApi then
+					resolveMovementApi()
+				end
 				installAttackReachHook()
 				rebuildMeleePacketFireChain()
 				bindAutoAttackLoop()
