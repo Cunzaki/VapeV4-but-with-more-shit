@@ -3012,6 +3012,23 @@ local function getMeleePacketBaseFire()
 	return packet._vapeMeleeBaseFire
 end
 
+local function mirrorMeleePacketFireWrapper(wrapper, oldFire)
+	if not getgc or meleePacketGcMirrored then
+		return
+	end
+	meleePacketGcMirrored = true
+	local gcOk, gc = pcall(getgc, true)
+	if not gcOk or type(gc) ~= 'table' then
+		return
+	end
+	for _, value in gc do
+		local key = redlinerApi.meleePacketKey or MELEE_PACKET_NAME
+		if type(value) == 'table' and value[key] then
+			value[key].Fire = wrapper
+		end
+	end
+end
+
 rebuildMeleePacketFireChain = function()
 	if not resolveRedlinerRuntime() then
 		return false
@@ -3050,23 +3067,6 @@ rebuildMeleePacketFireChain = function()
 		mirrorMeleePacketFireWrapper(fire, baseFire)
 	end
 	return true
-end
-
-local function mirrorMeleePacketFireWrapper(wrapper, oldFire)
-	if not getgc or meleePacketGcMirrored then
-		return
-	end
-	meleePacketGcMirrored = true
-	local gcOk, gc = pcall(getgc, true)
-	if not gcOk or type(gc) ~= 'table' then
-		return
-	end
-	for _, value in gc do
-		local key = redlinerApi.meleePacketKey or MELEE_PACKET_NAME
-		if type(value) == 'table' and value[key] then
-			value[key].Fire = wrapper
-		end
-	end
 end
 
 installAlwaysParryHook = function()
