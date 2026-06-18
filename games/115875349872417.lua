@@ -97,7 +97,8 @@ local SESSION_PACKET_CANDIDATES = {'_xbfaa5820a4100b86', '_x57c165550ede3092'}
 local COMBAT_EVENT_CANDIDATES = {'_xeaae65f9581e0520', '_x6f165cf1c8a4a502'}
 local BREAK_PACKET_CANDIDATES = {'_xc9c4207c75682687', '_x71a4ac7aba517193'}
 local GUN_PACKET_CANDIDATES = {'_x67790e3a4ae7698a', '_x8458a1cfd21149ba'}
-local GUN_SHOT_CANDIDATES = {'_x909c506c0531ca26', '_x6f11420c13d0d5ee'}
+local GUN_SHOT_CANDIDATES = {'_x909c506c0531ca26', '_x055d17c7b310ad24', '_x6f11420c13d0d5ee'}
+local GUN_SHOT_ALT_PACKET = '_x055d17c7b310ad24'
 local MOVEMENT_CLASS_CANDIDATES = {'_x7058397dabccd000', '_xef0ffbcc2c92f7b4'}
 local VELOCITY_FIELD_CANDIDATES = {'_x1d287c838240a901', '_xed86f944048d8fdc'}
 local INPUT_HANDLER_CANDIDATES = {
@@ -113,7 +114,7 @@ local AUTO_PARRY_DEFAULTS = {
 	threatRange = 100,
 	watcherThreatRange = 120,
 	meleeEnemyDebounce = 0.05,
-	gunEnemyDebounce = 0.18,
+	gunEnemyDebounce = 0.1,
 	meleeAimDot = 0.32,
 	gunAimDot = 0.65,
 	meleeParryCooldown = 0,
@@ -122,10 +123,10 @@ local AUTO_PARRY_DEFAULTS = {
 	gunDrawWindow = 0.45,
 	gunShotWindow = 0.15,
 	closeRangeStuds = 3,
-	castigateDelay = 0.62,
-	phoenixDelay = 0.66,
-	siegeDelay = 0.91,
-	monarchDelay = 1.54,
+	castigateDelay = 0.615,
+	phoenixDelay = 0.656,
+	siegeDelay = 0.902,
+	monarchDelay = 1.517,
 	parryMelee = true,
 	parryGunDraw = true,
 	parryGunShot = true,
@@ -258,7 +259,7 @@ local PARRY_SCAN_INTERVAL = 0.008
 local WATCHER_REFRESH_INTERVAL = 0.25
 local GUN_AIM_RANGE_BONUS = 0.12
 local GUN_MUZZLE_NAMES = {'Muzzle', 'Barrel', 'FirePoint', 'Gun', 'Handle', 'Tip', 'ShootPoint', 'Ray', 'Flash', 'Emitter', 'Glint'}
-local GUN_RAY_HIT_RADIUS = 5
+local GUN_RAY_HIT_RADIUS = 6.5
 local GUN_RAY_MAX_RANGE = 100000
 local PING_PARRY_MAX_OFFSET = 0.55
 local tryParry
@@ -343,7 +344,26 @@ function isPacketParryReason(reason)
 		return false
 	end
 	return string.find(reason, 'gun_packet_', 1, true) ~= nil
+		or string.find(reason, 'gun_shot_packet', 1, true) ~= nil
 		or string.find(reason, 'packet_cue_', 1, true) ~= nil
+end
+
+function resolveParryTargetChar(model)
+	if not model then
+		return nil
+	end
+	local plr = getPlayerFromModel(model)
+	if plr and plr.Character and plr.Character.Parent then
+		return plr.Character
+	end
+	return model
+end
+
+function isGunParryCueData(cueData, char)
+	if type(cueData) == 'table' and cueData.first_parry_range ~= nil then
+		return true
+	end
+	return charHasGunEquipped(char)
 end
 
 function isAnimationParryReason(reason)
@@ -1048,12 +1068,62 @@ function debugAnimLog(...)
 	print('[REDLINER] anim:', ...)
 end
 
+function buildGunAnimCatalog()
+	local assets = replicatedStorage:FindFirstChild('Assets')
+	local animsRoot = assets and assets:FindFirstChild('Animations')
+	if not animsRoot then
+		return 0
+	end
+	local drawCount, shotCount = 0, 0
+	for _, inst in animsRoot:GetDescendants() do
+		if not inst:IsA('Animation') then
+			continue
+		end
+		local gunFolder = inst.Parent
+		local gunName = gunFolder and gunFolder.Name
+		if not gunName or not GUN_DRAW_TIMES[gunName] then
+			continue
+		end
+		local normId = normalizeAnimId(inst.AnimationId)
+		if normId == '' then
+			continue
+		end
+		local upper = string.upper(inst.Name)
+		if upper == 'DRAW' or string.find(upper, 'GUNDRAW', 1, true) then
+			if not GUN_DRAW_ANIM_IDS[normId] then
+				GUN_DRAW_ANIM_IDS[normId] = gunName
+				drawCount += 1
+			end
+		elseif upper == 'FIRE' or string.find(upper, 'GUNSHOT', 1, true) or string.find(upper, 'BONUSFIRE', 1, true) or string.find(upper, 'BONUSSHOT', 1, true) then
+			if not GUN_SHOT_ANIM_IDS[normId] then
+				GUN_SHOT_ANIM_IDS[normId] = gunName
+				shotCount += 1
+			end
+		end
+	end
+	return drawCount + shotCount
+end
+
 function logParryAnimIds(force)
 	if parryIdsLogged and not force then
 		return
 	end
 	parryIdsLogged = true
-	print('[REDLINER] parry ids | melee=105441036119013 | gun_draw+gun_shot from catalog | blocked walk=115078691506529')
+	local catalogCount = buildGunAnimCatalog()
+	print('[REDLINER] parry ids | melee=105441036119013 | gun catalog+=', catalogCount, '| blocked walk=115078691506529')
+end
+
+function getEnemyGunOriginFromModel(model)
+	if not model then
+		return nil
+	end
+	for _, desc in model:GetDescendants() do
+		if desc:IsA('BasePart') and isGunMuzzlePart(desc.Name) then
+			return desc.Position
+		end
+	end
+	local hrp = model:FindFirstChild('HumanoidRootPart')
+	return hrp and hrp.Position
 end
 
 function getAllPlayingTracks(char)
@@ -1233,27 +1303,40 @@ function findGunShooterFromShotPacket(shotOrigin, aimDir)
 	if typeof(shotOrigin) ~= 'Vector3' or typeof(aimDir) ~= 'Vector3' or aimDir.Magnitude < 0.05 then
 		return nil
 	end
-	local bestChar, bestDist = nil, 30
+	if not getLocalRoot() then
+		return nil
+	end
+	local bestChar, bestScore = nil, math.huge
 	for _, plr in playersService:GetPlayers() do
 		if plr == lplr then
 			continue
 		end
-		local char = plr.Character
-		if not char or not char.Parent or not isEnemyInGunThreatRange(char) then
+		local ownerChar = plr.Character
+		if not ownerChar or not ownerChar.Parent or not isPlayerVisible(plr) then
 			continue
 		end
-		local gunOrigin = getEnemyGunOrigin(char)
-		if not gunOrigin then
-			continue
-		end
-		local dist = (gunOrigin - shotOrigin).Magnitude
-		if dist >= bestDist then
-			continue
-		end
-		local aiming = isGunAimDirAtMe(shotOrigin, aimDir, char)
-		if aiming or dist < 10 then
-			bestDist = dist
-			bestChar = char
+		for _, model in getEnemyModels(plr) do
+			if not model or not model.Parent then
+				continue
+			end
+			local refPos = getEnemyGunOriginFromModel(model)
+			if not refPos then
+				continue
+			end
+			local originDist = (refPos - shotOrigin).Magnitude
+			if originDist > 50 then
+				continue
+			end
+			local playerDist = getClosestEnemyDistance(ownerChar)
+			local rayOk = isGunRayThreatening(shotOrigin, aimDir, GUN_RAY_MAX_RANGE, GUN_RAY_HIT_RADIUS + 4)
+			local aimOk = isGunAimDirAtMe(shotOrigin, aimDir, ownerChar)
+			if rayOk or aimOk or originDist < 16 or playerDist <= 45 then
+				local score = originDist + playerDist * 0.05
+				if score < bestScore then
+					bestScore = score
+					bestChar = ownerChar
+				end
+			end
 		end
 	end
 	return bestChar
@@ -1350,7 +1433,7 @@ function shouldParryMelee(char, _confirmedAttack)
 	return true
 end
 
-function shouldParryGun(char, _confirmedAttack, aimModel, packetAimDir)
+function shouldParryGun(char, confirmedAttack, aimModel, packetAimDir, shotOrigin)
 	if not parryGunDrawEnabled and not parryGunShotEnabled then
 		return false
 	end
@@ -1362,14 +1445,33 @@ function shouldParryGun(char, _confirmedAttack, aimModel, packetAimDir)
 		return false
 	end
 	if typeof(packetAimDir) == 'Vector3' and packetAimDir.Magnitude > 0.05 then
-		local origin = getEnemyGunOrigin(char)
+		local origin = typeof(shotOrigin) == 'Vector3' and shotOrigin or getEnemyGunOrigin(char)
 		if origin then
+			if isGunRayThreatening(origin, packetAimDir, GUN_RAY_MAX_RANGE, GUN_RAY_HIT_RADIUS + 4) then
+				return true
+			end
 			local aiming, dot, need = isGunAimDirAtMe(origin, packetAimDir, char)
 			if aiming then
 				return true
 			end
-			threatDebugSkip('not_aiming', char.Name, 'gun_packet', string.format('dot=%.3f need=%.2f', dot, need))
-			return false
+			local myRoot = getLocalRoot()
+			if myRoot then
+				local packetDot = packetAimDir.Unit:Dot((myRoot.Position - origin).Unit)
+				if packetDot >= 0.12 and getClosestEnemyDistance(char) <= 80 then
+					return true
+				end
+			end
+			threatDebugSkip('not_aiming', char.Name, 'gun_packet', string.format('dot=%.3f need=%.2f', dot or 0, need or gunAimDotSetting))
+		end
+		return false
+	end
+	if confirmedAttack and charHasGunEquipped(char) then
+		local dist = getClosestEnemyDistance(char)
+		if dist <= 40 then
+			local maxDot = math.max(getGunAimDot(char, aimModel), getHeadAimDotFromModel(aimModel or char))
+			if maxDot >= math.min(gunAimDotSetting, 0.3) then
+				return true
+			end
 		end
 	end
 	local aiming, dot, need = isEnemyAimingAtMeForGun(char, aimModel)
@@ -1453,7 +1555,12 @@ function getLocalImpactRatio()
 end
 
 function getGunParryDelay(gunName)
-	return gunParryDelays[gunName] or gunParryDelays.Castigate
+	local base = gunParryDelays[gunName] or gunParryDelays.Castigate
+	local itemDraw = GUN_DRAW_TIMES[gunName]
+	if itemDraw and base > itemDraw then
+		base = itemDraw * 0.82
+	end
+	return base
 end
 
 function getParryLeadTime()
@@ -2445,26 +2552,30 @@ local function resolveGunParryShooter(arg1, arg9, arg10)
 	return nil
 end
 
-local function handleIncomingGunParryPacket(char, aimDir, gunName, sourceTag)
+local function handleIncomingGunParryPacket(char, aimDir, gunName, sourceTag, shotOrigin)
 	if not autoParryActive or not parryGunShotEnabled or not parryModeUsesPacket() or not isLocalAlive() then
 		return
 	end
 	if typeof(aimDir) ~= 'Vector3' or aimDir.Magnitude < 0.05 then
 		return
 	end
+	if (not char or not char.Parent) and typeof(shotOrigin) == 'Vector3' then
+		char = findGunShooterFromShotPacket(shotOrigin, aimDir)
+	end
 	if not char or not char.Parent then
 		return
 	end
+	char = resolveParryTargetChar(char)
 	if not isEnemyInGunThreatRange(char) then
 		return
 	end
-	if not shouldParryGun(char, false, char, aimDir) then
+	if not shouldParryGun(char, true, char, aimDir, shotOrigin) then
 		return
 	end
 	local label = typeof(gunName) == 'string' and gunName ~= '' and gunName or detectEquippedGun(char)
 	debugLog('trigger', sourceTag, label, 'dist=' .. string.format('%.1f', getClosestEnemyDistance(char)))
 	scheduleParryAction(char, 0, sourceTag .. '_' .. label, function()
-		return shouldParryGun(char, false, char, aimDir)
+		return shouldParryGun(char, true, char, aimDir, shotOrigin)
 	end)
 end
 
@@ -2479,30 +2590,54 @@ local function handleIncomingParryCuePacket(char, cueData)
 	if not plr or plr == lplr then
 		return
 	end
+	char = resolveParryTargetChar(char)
+	if not char or not char.Parent or not isEnemyCharVisible(char) then
+		return
+	end
 	local cueType = type(cueData) == 'table' and cueData.indicator_type or nil
 	if cueType == 'timing_only' then
-		if not parryMeleeEnabled then
-			return
-		end
-		if not shouldParryMelee(char, false) then
-			return
-		end
 		local drawTime = tonumber(type(cueData) == 'table' and cueData.draw_time) or 0
-		local delay = math.max(0, drawTime - getParryLeadTime())
-		debugLog('trigger', 'packet_cue_melee', char.Name, 'draw=' .. string.format('%.2f', drawTime), 'delay=' .. string.format('%.2f', delay))
-		scheduleParryAction(char, delay, 'packet_cue_melee', function()
-			return shouldParryMelee(char, false)
-		end)
+		if isGunParryCueData(cueData, char) then
+			if not parryGunDrawEnabled then
+				return
+			end
+			local gunName = detectEquippedGun(char)
+			local delay = math.max(0, drawTime - getParryLeadTime())
+			debugLog(
+				'trigger',
+				'packet_cue_gun_draw',
+				char.Name,
+				gunName,
+				'draw=' .. string.format('%.2f', drawTime),
+				'delay=' .. string.format('%.2f', delay)
+			)
+			scheduleParryAction(char, delay, 'packet_cue_gun_draw_' .. gunName, function()
+				return isEnemyCharVisible(char)
+			end)
+		else
+			if not parryMeleeEnabled then
+				return
+			end
+			if not shouldParryMelee(char, false) then
+				return
+			end
+			local delay = math.max(0, drawTime - getParryLeadTime())
+			debugLog('trigger', 'packet_cue_melee', char.Name, 'draw=' .. string.format('%.2f', drawTime), 'delay=' .. string.format('%.2f', delay))
+			scheduleParryAction(char, delay, 'packet_cue_melee', function()
+				return shouldParryMelee(char, false)
+			end)
+		end
 	elseif cueType == 'surefire_bullet' then
 		if not parryGunShotEnabled then
 			return
 		end
-		if not shouldParryGun(char, false, char) then
+		if not isEnemyInGunThreatRange(char) then
 			return
 		end
-		debugLog('trigger', 'packet_cue_gun', char.Name)
-		scheduleParryAction(char, 0, 'packet_cue_gun', function()
-			return shouldParryGun(char, false, char)
+		local gunName = detectEquippedGun(char)
+		debugLog('trigger', 'packet_cue_gun', char.Name, gunName)
+		scheduleParryAction(char, 0, 'packet_cue_gun_' .. gunName, function()
+			return isLocalAlive() and canSafelyParry() and isEnemyCharVisible(char)
 		end)
 	end
 end
@@ -2542,27 +2677,37 @@ installGunParryPacketHook = function()
 		return false
 	end
 	resolveRedlinerRuntime()
-	local gunKey = redlinerApi.gunPacketKey or GUN_PACKET_NAME
-	local shotKey = redlinerApi.gunShotPacketKey or GUN_SHOT_PACKET_NAME
-	local legacyPacket = Packets[gunKey]
-	if legacyPacket and legacyPacket.OnClientEvent and type(legacyPacket.OnClientEvent.Connect) == 'function'
-		and not legacyPacket._gunParryHooked then
-		legacyPacket._gunParryHooked = true
-		legacyPacket.OnClientEvent:Connect(function(arg1, _arg2, _arg3, _arg4, _arg5, _arg6, aimDir, gunName, arg9, arg10)
-			local char = resolveGunParryShooter(arg1, arg9, arg10)
-			handleIncomingGunParryPacket(char, aimDir, gunName, 'gun_packet')
+	local function hookShotPacket(packet, tag)
+		if not packet or packet._gunParryHooked then
+			return
+		end
+		if not packet.OnClientEvent or type(packet.OnClientEvent.Connect) ~= 'function' then
+			return
+		end
+		packet._gunParryHooked = true
+		packet.OnClientEvent:Connect(function(_sessionToken, aimDir, shotOrigin)
+			local char = findGunShooterFromShotPacket(shotOrigin, aimDir)
+			handleIncomingGunParryPacket(char, aimDir, nil, tag, shotOrigin)
 		end)
 		gunParryPacketHooked = true
 	end
-	local shotPacket = Packets[shotKey]
-	if shotPacket and shotPacket.OnClientEvent and type(shotPacket.OnClientEvent.Connect) == 'function'
-		and not shotPacket._gunParryHooked then
-		shotPacket._gunParryHooked = true
-		shotPacket.OnClientEvent:Connect(function(_sessionToken, aimDir, shotOrigin, _hurtboxes, _timestamp)
-			local char = findGunShooterFromShotPacket(shotOrigin, aimDir)
-			handleIncomingGunParryPacket(char, aimDir, nil, 'gun_shot_packet')
-		end)
-		gunParryPacketHooked = true
+	local shotKeys = {
+		redlinerApi.gunShotPacketKey,
+		GUN_SHOT_ALT_PACKET,
+		GUN_SHOT_PACKET_NAME,
+	}
+	local seen = {}
+	for _, key in shotKeys do
+		if key and not seen[key] then
+			seen[key] = true
+			hookShotPacket(Packets and Packets[key], 'gun_shot_packet')
+		end
+	end
+	for _, key in GUN_SHOT_CANDIDATES do
+		if not seen[key] then
+			seen[key] = true
+			hookShotPacket(Packets and Packets[key], 'gun_shot_packet')
+		end
 	end
 	return gunParryPacketHooked
 end
@@ -3737,7 +3882,12 @@ installGunBulletVizHook = function()
 	if not initPackets() then
 		return false
 	end
-	local hooked = hookGunBulletVizFire(Packets[GUN_SHOT_PACKET_NAME], 2, 3)
+	local hooked = false
+	for _, key in GUN_SHOT_CANDIDATES do
+		if hookGunBulletVizFire(Packets[key], 2, 3) then
+			hooked = true
+		end
+	end
 	if hookGunBulletVizFire(Packets[GUN_PACKET_NAME], 7, nil) then
 		hooked = true
 	end
@@ -3911,17 +4061,18 @@ local function scanMeleeWhitelistRealtime()
 			if not model or not model.Parent then
 				continue
 			end
-			local enemyRoot = model:FindFirstChild('HumanoidRootPart')
-			if not enemyRoot then
-				continue
-			end
 			for _, track in getAllPlayingTracks(model) do
-				if not track.IsPlaying then
+				if not track.IsPlaying or track.WeightCurrent < 0.08 then
 					continue
 				end
 				local _, animId = getTrackAnimInfo(track)
-				if getParryAnimKind(animId) == 'melee' and track.TimePosition <= meleeSwingWindowSetting then
+				local kind = getParryAnimKind(animId)
+				if kind == 'melee' and track.TimePosition <= meleeSwingWindowSetting then
 					handleMeleeAnimation(ownerChar, track, 'scan', model)
+				elseif kind == 'gun_draw' and parryGunDrawEnabled and track.TimePosition <= gunDrawWindowSetting then
+					handleGunDrawAnimation(ownerChar, track, 'scan', model)
+				elseif kind == 'gun_shot' and parryGunShotEnabled and track.TimePosition <= gunShotWindowSetting then
+					handleGunShotAnimation(ownerChar, track, 'scan', model)
 				end
 			end
 		end
