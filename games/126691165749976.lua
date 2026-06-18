@@ -1,4 +1,4 @@
---[[
+﻿--[[
 	REDLINER shared game script (MAIN + FFA + MATCH place IDs).
 	Place IDs: 94987506187454 (main), 115875349872417 (FFA), 126691165749976 (match).
 	All three places share one Vape profile config (FFA place ID 115875349872417).
@@ -69,10 +69,10 @@ local AUTO_PARRY_DEFAULTS = {
 	gunDrawWindow = 0.45,
 	gunShotWindow = 0.15,
 	closeRangeStuds = 3,
-	castigateDelay = 0.36,
-	phoenixDelay = 0.66,
-	siegeDelay = 0.96,
-	monarchDelay = 1.71,
+	castigateDelay = 0.675,
+	phoenixDelay = 0.72,
+	siegeDelay = 0.99,
+	monarchDelay = 1.665,
 	parryMelee = true,
 	parryGunDraw = true,
 	parryGunShot = true,
@@ -127,6 +127,14 @@ local GUN_ITEM_PATTERNS = {
 	{pattern = 'monarch', gun = 'Monarch'},
 	{pattern = 'awp', gun = 'Monarch'},
 }
+-- ItemDef draw_time (ReplicatedStorage.Assets.ModuleScripts.ItemDef).
+local GUN_DRAW_TIMES = {
+	Castigate = 0.75,
+	Phoenix = 0.8,
+	Siege = 1.1,
+	Monarch = 1.85,
+}
+local PARRY_INPUT_LATENCY = 0.04
 local PARRY_MODE_LIST = {'Hybrid', 'Animation', 'Packet'}
 
 local Packets
@@ -187,14 +195,14 @@ local GUN_AIM_RANGE_BONUS = 0.12
 local GUN_MUZZLE_NAMES = {'Muzzle', 'Barrel', 'FirePoint', 'Gun', 'Handle', 'Tip', 'ShootPoint', 'Ray', 'Flash', 'Emitter', 'Glint'}
 local GUN_RAY_HIT_RADIUS = 5
 local GUN_RAY_MAX_RANGE = 100000
-local PING_PARRY_MULTIPLIER = 0.9
-local PING_PARRY_MAX_OFFSET = 0.5
+local PING_PARRY_MAX_OFFSET = 0.35
 local tryParry
 local canSafelyParry
 local hitboxReachHooked = false
 local gunParryPacketHooked = false
 local breakPacketHooked = false
 local attackReachHooked = false
+local meleePacketReachHooked = false
 local reachHitboxHookSource = nil
 local reachAttackHookSource = nil
 local reachDebugEnabled = false
@@ -222,7 +230,7 @@ local hud = {
 	killAuraActive = false,
 	killAuraRangeSetting = 18,
 	killAuraExtendSetting = 10,
-	killAuraDelaySetting = 0,
+	killAuraDelaySetting = 0.38,
 	killAuraItemIdSetting = 'Auto',
 	killAuraBound = false,
 	lastKillAuraAt = 0,
@@ -1067,33 +1075,60 @@ local function collectEnemyGunAimSources(char, aimModel)
 		if not model or not model.Parent then
 			continue
 		end
-		local hrp = model:FindFirstChild('HumanoidRootPart')
-		local head = model:FindFirstChild('Head')
-		if hrp then
-			table.insert(rays, {origin = hrp.Position, direction = hrp.CFrame.LookVector})
-			table.insert(dots, getAimDot3D(hrp.Position, hrp.CFrame.LookVector, targetPos))
-		end
-		if head then
-			table.insert(rays, {origin = head.Position, direction = head.CFrame.LookVector})
-			table.insert(dots, getAimDot3D(head.Position, head.CFrame.LookVector, targetPos))
-		end
+		local hasMuzzle = false
 		for _, desc in model:GetDescendants() do
 			if desc:IsA('BasePart') and isGunMuzzlePart(desc.Name) then
-				local toMe = targetPos - desc.Position
-				if toMe.Magnitude > 0.05 then
-					table.insert(rays, {origin = desc.Position, direction = toMe.Unit})
-				end
+				hasMuzzle = true
+				table.insert(rays, {origin = desc.Position, direction = desc.CFrame.LookVector})
 				table.insert(dots, getAimDot3D(desc.Position, desc.CFrame.LookVector, targetPos))
 			end
 		end
-	end
-	if aimModel and aimModel:IsA('BasePart') and string.find(string.lower(aimModel.Name), 'glint', 1, true) then
-		local toMe = targetPos - aimModel.Position
-		if toMe.Magnitude > 0.05 then
-			table.insert(rays, {origin = aimModel.Position, direction = toMe.Unit})
+		if not hasMuzzle then
+			local hrp = model:FindFirstChild('HumanoidRootPart')
+			local head = model:FindFirstChild('Head')
+			if hrp then
+				table.insert(rays, {origin = hrp.Position, direction = hrp.CFrame.LookVector})
+				table.insert(dots, getAimDot3D(hrp.Position, hrp.CFrame.LookVector, targetPos))
+			end
+			if head then
+				table.insert(rays, {origin = head.Position, direction = head.CFrame.LookVector})
+				table.insert(dots, getAimDot3D(head.Position, head.CFrame.LookVector, targetPos))
+			end
 		end
 	end
 	return rays, dots
+end
+
+local function getEnemyGunOrigin(char)
+	if not char then
+		return nil
+	end
+	for _, desc in char:GetDescendants() do
+		if desc:IsA('BasePart') and isGunMuzzlePart(desc.Name) then
+			return desc.Position
+		end
+	end
+	local hrp = char:FindFirstChild('HumanoidRootPart')
+	return hrp and hrp.Position
+end
+
+local function isGunAimDirAtMe(originPos, aimDir, char)
+	if not originPos or typeof(aimDir) ~= 'Vector3' or aimDir.Magnitude < 0.05 then
+		return false
+	end
+	local myRoot = getLocalRoot()
+	if not myRoot then
+		return false
+	end
+	local need = getEffectiveGunAimThreshold(getClosestEnemyDistance(char))
+	local aimDot = aimDir.Unit:Dot((myRoot.Position - originPos).Unit)
+	if aimDot < need then
+		return false, aimDot, need
+	end
+	if not isGunRayThreatening(originPos, aimDir, GUN_RAY_MAX_RANGE, GUN_RAY_HIT_RADIUS) then
+		return false, aimDot, need
+	end
+	return true, aimDot, need
 end
 
 local function getGunAimDotFromModel(model)
@@ -1132,11 +1167,6 @@ local function isEnemyAimingAtMeForGun(char, aimModel)
 	local dist = getClosestEnemyDistance(char)
 	local need = getEffectiveGunAimThreshold(dist)
 	local rays, dotList = collectEnemyGunAimSources(char, aimModel)
-	for _, ray in rays do
-		if isGunRayThreatening(ray.origin, ray.direction, GUN_RAY_MAX_RANGE, GUN_RAY_HIT_RADIUS) then
-			return true, 1, need
-		end
-	end
 	local maxDot = getGunAimDotFromModel(aimModel or char)
 	maxDot = math.max(maxDot, getHeadAimDotFromModel(aimModel or char))
 	for _, d in dotList do
@@ -1145,7 +1175,12 @@ local function isEnemyAimingAtMeForGun(char, aimModel)
 	if maxDot < need then
 		return false, maxDot, need
 	end
-	return true, maxDot, need
+	for _, ray in rays do
+		if isGunRayThreatening(ray.origin, ray.direction, GUN_RAY_MAX_RANGE, GUN_RAY_HIT_RADIUS) then
+			return true, maxDot, need
+		end
+	end
+	return false, maxDot, need
 end
 
 local function isEnemyTargetingMe(char, minDot, confirmedAttack)
@@ -1168,7 +1203,7 @@ local function shouldParryMelee(char, _confirmedAttack)
 	return true
 end
 
-local function shouldParryGun(char, confirmedAttack, aimModel)
+local function shouldParryGun(char, _confirmedAttack, aimModel, packetAimDir)
 	if not parryGunDrawEnabled and not parryGunShotEnabled then
 		return false
 	end
@@ -1179,35 +1214,20 @@ local function shouldParryGun(char, confirmedAttack, aimModel)
 		threatDebugSkip('not_visible', char.Name, 'gun')
 		return false
 	end
+	if typeof(packetAimDir) == 'Vector3' and packetAimDir.Magnitude > 0.05 then
+		local origin = getEnemyGunOrigin(char)
+		if origin then
+			local aiming, dot, need = isGunAimDirAtMe(origin, packetAimDir, char)
+			if aiming then
+				return true
+			end
+			threatDebugSkip('not_aiming', char.Name, 'gun_packet', string.format('dot=%.3f need=%.2f', dot, need))
+			return false
+		end
+	end
 	local aiming, dot, need = isEnemyAimingAtMeForGun(char, aimModel)
 	if aiming then
 		return true
-	end
-	if confirmedAttack then
-		local myRoot = getLocalRoot()
-		if myRoot then
-			local permissiveRange = GUN_RAY_MAX_RANGE
-			local permissiveRadius = 8
-			local rays = collectEnemyGunAimSources(char, aimModel)
-			for _, ray in rays do
-				if isGunRayThreatening(ray.origin, ray.direction, permissiveRange, permissiveRadius) then
-					return true
-				end
-			end
-			local hrp = char:FindFirstChild('HumanoidRootPart')
-			if hrp then
-				local toMe = myRoot.Position - hrp.Position
-				if toMe.Magnitude > 0.05 and isGunRayThreatening(hrp.Position, toMe, permissiveRange, permissiveRadius) then
-					return true
-				end
-			end
-			if aimModel and aimModel:IsA('BasePart') and string.find(string.lower(aimModel.Name), 'glint', 1, true) then
-				local toMe = myRoot.Position - aimModel.Position
-				if toMe.Magnitude > 0.05 and isGunRayThreatening(aimModel.Position, toMe, permissiveRange, permissiveRadius) then
-					return true
-				end
-			end
-		end
 	end
 	threatDebugSkip('not_aiming', char.Name, 'gun', string.format('dot=%.3f need=%.2f', dot, need))
 	return false
@@ -1266,11 +1286,7 @@ local function isGlintInstance(inst)
 	return string.find(string.lower(inst.Name), 'glint', 1, true) ~= nil
 end
 
-local function getGunParryDelay(gunName)
-	return gunParryDelays[gunName] or gunParryDelays.Castigate
-end
-
-local function getPingParryOffset()
+local function getNetworkPing()
 	local ping = 0
 	pcall(function()
 		if lplr.GetNetworkPing then
@@ -1280,15 +1296,34 @@ local function getPingParryOffset()
 	if typeof(ping) ~= 'number' or ping ~= ping or ping < 0 then
 		return 0
 	end
-	return math.clamp(ping * PING_PARRY_MULTIPLIER, 0, PING_PARRY_MAX_OFFSET)
+	return ping
+end
+
+local function getLocalImpactRatio()
+	local impact = getPlayerReadOnlyNumber(lplr, 'impact') or 0
+	local limit = getPlayerReadOnlyNumber(lplr, 'impact_limit') or 1
+	return math.clamp(impact / math.max(limit, 1), 0, 1)
+end
+
+local function getGunParryDelay(gunName)
+	return gunParryDelays[gunName] or gunParryDelays.Castigate
+end
+
+local function getParryLeadTime()
+	return math.clamp(getNetworkPing() * 0.5 + PARRY_INPUT_LATENCY, 0, PING_PARRY_MAX_OFFSET + PARRY_INPUT_LATENCY)
+end
+
+local function getPingParryOffset()
+	return getParryLeadTime()
 end
 
 local function getEffectiveGunParryDelay(gunName)
-	return math.max(0, getGunParryDelay(gunName) - getPingParryOffset())
+	return math.max(0, getGunParryDelay(gunName) - getParryLeadTime())
 end
 
 local function getAdjustedParryDelay(baseDelay, timePosition)
-	return math.max(0, (baseDelay or 0) - (timePosition or 0) - getPingParryOffset())
+	local impactShift = (1 - getLocalImpactRatio()) * 0.03
+	return math.max(0, (baseDelay or 0) - (timePosition or 0) - getParryLeadTime() - impactShift)
 end
 
 local function scheduleGunDrawParry(char, gunName, normId, timePosition, source, track, aimModel)
@@ -2113,21 +2148,7 @@ installGunParryPacketHook = function()
 		if not isEnemyInGunThreatRange(char) then
 			return
 		end
-		local originPos
-		local hrp = char:FindFirstChild('HumanoidRootPart')
-		if hrp then
-			originPos = hrp.Position
-		end
-		for _, desc in char:GetDescendants() do
-			if desc:IsA('BasePart') and isGunMuzzlePart(desc.Name) then
-				originPos = desc.Position
-				break
-			end
-		end
-		if not originPos then
-			return
-		end
-		if not isGunRayThreatening(originPos, aimDir, GUN_RAY_MAX_RANGE, GUN_RAY_HIT_RADIUS) then
+		if not shouldParryGun(char, false, char, aimDir) then
 			return
 		end
 		local label = typeof(gunName) == 'string' and gunName ~= '' and gunName or detectEquippedGun(char)
@@ -2279,14 +2300,9 @@ describeNearestEnemy = function(range, origin)
 end
 
 local function looksLikeHitboxModule(mod)
-	if type(mod) ~= 'table' or type(mod.new) ~= 'function' or type(mod.cast) ~= 'function' then
-		return false
-	end
-	local ok, instance = pcall(mod.new, {shape = 'Box', size = Vector3.new(1, 1, 1)})
-	if not ok or type(instance) ~= 'table' then
-		return false
-	end
-	return instance.shape == 'Box' and typeof(instance.size) == 'Vector3'
+	return type(mod) == 'table'
+		and type(mod.new) == 'function'
+		and type(mod.cast) == 'function'
 end
 
 local function tryRequireHitboxModule(moduleScript, label)
@@ -2552,61 +2568,51 @@ triggerGameMeleeAttack = function()
 	return pressAttackClick()
 end
 
-local function castMeleeCombatHitboxes()
-	local char = getLocalCharacter()
+augmentOutgoingMeleeHurtboxes = function(hurtboxes)
+	if not shouldExtendMeleeCombat() then
+		return hurtboxes
+	end
 	local root = getLocalRoot()
-	if not char or not root then
-		return {}
+	if not root then
+		return hurtboxes
 	end
-	local Attack = select(1, discoverAttackModule())
-	if not Attack then
-		return getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position)
+	local extended = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position)
+	if type(hurtboxes) ~= 'table' then
+		hurtboxes = {}
 	end
-	local attack = Attack.new(char, detectLocalMeleeItemId())
-	local reach = getActiveMeleeReach()
-	Attack.addHitbox(attack, {
-		shape = 'Cone',
-		size = reach,
-		angle = 90,
-		origin = root.CFrame,
-		offset = CFrame.new(0, 0, -reach * 0.25),
-	})
-	local ok = pcall(function()
-		attack:castOnce()
-	end)
-	if not ok then
-		return getEnemyHurtboxesInRange(reach, root.Position)
-	end
-	extendAttackHurtboxes(attack)
-	local hurtboxes = type(attack.hit_hurtboxes) == 'table' and attack.hit_hurtboxes or {}
-	return trimHurtboxList(mergeHurtboxLists(hurtboxes, getEnemyHurtboxesInRange(reach, root.Position)), 8)
+	return trimHurtboxList(mergeHurtboxLists(hurtboxes, extended), 8)
 end
 
-fireMeleeCombatHit = function()
+installMeleePacketReachHook = function()
+	if meleePacketReachHooked then
+		return true
+	end
 	if not initPackets() then
-		return false
-	end
-	local root = getLocalRoot()
-	if not root or not isLocalAlive() then
-		return false
-	end
-	local hurtboxes = getEnemyHurtboxesInRange(getActiveMeleeReach(), root.Position)
-	if #hurtboxes == 0 then
 		return false
 	end
 	local packet = Packets[MELEE_PACKET_NAME]
 	if not packet or type(packet.Fire) ~= 'function' then
 		return false
 	end
-	local itemId = detectLocalMeleeItemId()
-	local aimDir = safeAimDirection(root.Position, hurtboxes[1].Position, root.CFrame.LookVector)
-	local ok = pcall(function()
-		packet:Fire(itemId, MELEE_DEFAULT_ACTION, '', aimDir, hurtboxes, nil)
-	end)
-	if ok then
-		lastAttackAt = tick()
+	if packet._meleeReachHooked then
+		meleePacketReachHooked = true
+		return true
 	end
-	return ok
+	local oldFire = packet.Fire
+	packet._meleeReachHooked = true
+	meleePacketReachHooked = true
+	packet.Fire = function(firePacket, itemId, action, field3, aimDir, hurtboxes, meta, ...)
+		local merged = augmentOutgoingMeleeHurtboxes(hurtboxes)
+		if typeof(aimDir) ~= 'Vector3' or aimDir.Magnitude < 0.05 then
+			local root = getLocalRoot()
+			if root and type(merged) == 'table' and merged[1] then
+				aimDir = safeAimDirection(root.Position, merged[1].Position, root.CFrame.LookVector)
+			end
+		end
+		return oldFire(firePacket, itemId, action, field3, aimDir, merged, meta, ...)
+	end
+	reachDebugLog('Melee packet Fire hook OK -', MELEE_PACKET_NAME)
+	return true
 end
 
 local function installAttackReachHook()
@@ -2819,6 +2825,7 @@ end
 installCombatReachHooks = function()
 	installHitboxReachHook()
 	installAttackReachHook()
+	installMeleePacketReachHook()
 end
 
 logReachHookStatus = function(context)
@@ -2834,6 +2841,7 @@ logReachHookStatus = function(context)
 		'hitboxSource=', reachHitboxHookSource or 'none',
 		'attackHook=', attackReachHooked,
 		'attackSource=', reachAttackHookSource or 'none',
+		'meleePacketHook=', meleePacketReachHooked,
 		'packetsLoaded=', Packets ~= nil,
 		'hookfunction=', hookfunction ~= nil
 	)
@@ -3073,6 +3081,14 @@ combatHeartbeat = function(meleeRange)
 		installHitboxReachHook()
 	end
 
+	if (reachActive or hud.killAuraActive)
+		and (not hitboxReachHooked or not attackReachHooked or not meleePacketReachHooked) then
+		installCombatReachHooks()
+		if reachDebugEnabled then
+			logReachHookStatus('heartbeat retry')
+		end
+	end
+
 	if reachDebugEnabled and tick() - lastReachDebugHeartbeat > 2 then
 		lastReachDebugHeartbeat = tick()
 		local root = getLocalRoot()
@@ -3098,11 +3114,6 @@ combatHeartbeat = function(meleeRange)
 			'nearestDist=', nearestDist and string.format('%.2f', nearestDist) or 'n/a',
 			'taggedHurtboxes=', #collectionService:GetTagged('Hurtbox')
 		)
-		if (reachActive or reachDebugEnabled or hud.killAuraActive)
-			and (not hitboxReachHooked or not attackReachHooked) then
-			installCombatReachHooks()
-			logReachHookStatus('heartbeat retry')
-		end
 	end
 
 	if not isLocalAlive() then
@@ -3133,6 +3144,10 @@ combatHeartbeat = function(meleeRange)
 
 	if hud.hudTickCallback then
 		pcall(hud.hudTickCallback)
+	end
+
+	if hud.killAuraActive and tryKillAura then
+		tryKillAura()
 	end
 end
 
@@ -4053,46 +4068,38 @@ run(function()
 		end
 	end)
 
-	local function tryKillAura()
+	tryKillAura = function()
 		if not hud.killAuraActive or not isLocalAlive() then
-			return
+			return false
 		end
-		if not initPackets() then
-			return
+		if tick() < parryBlockAttackUntil then
+			return false
 		end
-		local range = getActiveMeleeReach()
 		local root = getLocalRoot()
 		if not root then
-			return
+			return false
 		end
+		local range = getActiveMeleeReach()
 		if #getEnemyHurtboxesInRange(range, root.Position) == 0 then
-			return
+			return false
 		end
-		if hud.antiParryEnabled and shouldBlockMeleeAttack(hud.killAuraRangeSetting) then
-			return
+		if hud.antiParryEnabled and shouldBlockMeleeAttack(range) then
+			return false
 		end
-		fireMeleeCombatHit()
-	end
-
-	local function bindKillAuraLoop()
-		if hud.killAuraBound then
-			return
+		local delay = math.max(hud.killAuraDelaySetting, 0.12)
+		if tick() - hud.lastKillAuraAt < delay then
+			return false
 		end
-		hud.killAuraBound = true
-		runService.Heartbeat:Connect(function()
-			if not hud.killAuraActive or not isLocalAlive() then
-				return
-			end
-			local delay = hud.killAuraDelaySetting
-			if delay > 0 and tick() - hud.lastKillAuraAt < delay then
-				return
-			end
+		if tick() - lastAttackAt < delay then
+			return false
+		end
+		installCombatReachHooks()
+		local swung = triggerGameMeleeAttack()
+		if swung then
 			hud.lastKillAuraAt = tick()
-			tryKillAura()
-		end)
+		end
+		return swung
 	end
-
-	task.defer(bindKillAuraLoop)
 end)
 
 
@@ -4164,14 +4171,14 @@ run(function()
 				bindPacketListeners()
 				logReachHookStatus('enabled')
 				reachDebugLog('Reach ENABLED — extend=', reachExtend, 'totalReach=', getMeleeReach())
-				notif('Reach', 'Extends Attack.Hitbox.cast + Attack.castOnce hit detection.', 5)
+				notif('Reach', 'Extends Attack.Hitbox.cast + outgoing melee packet hurtboxes.', 5)
 			else
 				reachExtend = 0
 				reachDebugLog('Reach DISABLED')
 				logReachHookStatus('disabled')
 			end
 		end,
-		Tooltip = 'Hooks ReplicatedStorage.Assets.ModuleScripts.Attack + Attack.Hitbox (base ' .. BASE_SWORD_REACH .. ' studs + Extend slider).',
+		Tooltip = 'Hooks Attack.Hitbox.cast and melee packet Fire (base ' .. BASE_SWORD_REACH .. ' studs + Extend slider).',
 	})
 
 	MeleeRange = AutoParry:CreateSlider({
@@ -4422,7 +4429,7 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'second' or 'seconds'
 		end,
-		Tooltip = 'Seconds after revolver draw starts to press parry.',
+		Tooltip = 'Seconds after draw starts to press parry (~90% of ItemDef draw_time).',
 	})
 
 	PhoenixDelay = AutoParry:CreateSlider({
@@ -4913,10 +4920,11 @@ run(function()
 			hud.killAuraActive = callback
 			if callback then
 				bindPacketListeners()
-				notif('Kill Aura', 'Spamming melee hurtbox packets to enemies in range.', 5)
+				installCombatReachHooks()
+				notif('Kill Aura', 'Auto-swings through game melee pipeline when enemies are in range.', 5)
 			end
 		end,
-		Tooltip = 'Fires melee damage packets every frame (delay slider). Uses hurtboxes in radius.',
+		Tooltip = 'Triggers real melee swings when enemies are in range. Reach hooks extend hit detection + outgoing packet hurtboxes.',
 	})
 	KillAura:CreateSlider({
 		Name = 'Range',
@@ -4947,14 +4955,14 @@ run(function()
 		Min = 0,
 		Max = 0.5,
 		Decimal = 100,
-		Default = 0,
+		Default = 0.38,
 		Function = function(val)
-			hud.killAuraDelaySetting = val
+			hud.killAuraDelaySetting = math.max(val, 0.12)
 		end,
 		Suffix = function(val)
 			return val == 1 and 'second' or 'seconds'
 		end,
-		Tooltip = '0 = every Heartbeat frame. Higher values slow packet spam.',
+		Tooltip = 'Minimum time between kill aura swings (matches Redliner swing cadence).',
 	})
 	KillAura:CreateDropdown({
 		Name = 'Item ID',

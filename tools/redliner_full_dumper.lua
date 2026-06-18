@@ -10,10 +10,13 @@
 	Or paste this entire file into your executor and run.
 
 	Output (executor workspace):
-		redliner_dumps/<PlaceName>_<PlaceId>_<timestamp>/
+		redliner_dumps/Ugc_<PlaceId>_<timestamp>/
 			scripts/     — decompiled Lua (Roblox hierarchy)
 			bytecode/    — hex bytecode when decompile fails
 			manifest/    — remotes, tags, animations, packets, trees, index
+		decompiled games/Ugc_<PlaceId>_<timestamp>/  — mirror of scripts/ (SYNC_TO_DECOMPILED)
+
+	Join a live match before dumping. Copy the mirror folder into this repo's decompiled games/.
 
 	Requires: writefile, makefolder, isfolder
 	Optional: decompile, getscriptbytecode, getnilinstances, getscripts,
@@ -23,17 +26,20 @@
 
 local CONFIG = {
 	OUTPUT_ROOT = 'redliner_dumps',
-	SYNC_TO_DECOMPILED = false, -- also mirror scripts into decompiled games/Ugc_<placeId>/
+	SYNC_TO_DECOMPILED = true, -- mirror scripts/ into decompiled games/Ugc_<placeId>_<timestamp>/
 	INCLUDE_CORE_PACKAGES = false,
 	INCLUDE_CORE_GUI = false,
-	INCLUDE_PLAYER_MODULE = true, -- Roblox default PlayerModule (large)
+	INCLUDE_PLAYER_MODULE = false, -- Roblox default PlayerModule (large duplicate noise)
 	INCLUDE_CHARACTER_SCRIPTS = false,
 	INCLUDE_BACKPACK = false,
-	DECOMPILE_BATCH = 40,
-	WRITE_BATCH_YIELD = 25,
+	DECOMPILE_CONCURRENCY = 2, -- keep low; 40 parallel decompiles often OOM/crash executors
+	WRITE_EVERY_N = 1, -- write each script immediately after decompile
+	PROGRESS_EVERY_N = 5,
 	REQUIRE_PROBE = true, -- shallow require ModuleScripts under Assets (pcall)
 	REQUIRE_PROBE_MAX = 250,
 	TREE_MAX_DEPTH = 12,
+	WAIT_FOR_GAME_LOAD = true,
+	GAME_LOAD_TIMEOUT = 60,
 	LOG_PREFIX = '[REDLINER Dumper]',
 }
 
@@ -177,12 +183,60 @@ local function valuePreview(value, depth)
 	return t
 end
 
+local mirrorRoot = ''
+
 local function buildDumpRoot()
 	local stamp = os.date('%Y%m%d_%H%M%S')
 	local placeName = sanitizeName(game.Name)
-	local root = string.format('%s/%s_%s_%s', CONFIG.OUTPUT_ROOT, placeName, tostring(game.PlaceId), stamp)
+	local root = string.format('%s/Ugc_%s_%s', CONFIG.OUTPUT_ROOT, tostring(game.PlaceId), stamp)
+	if CONFIG.SYNC_TO_DECOMPILED then
+		mirrorRoot = string.format('decompiled games/Ugc_%s_%s', tostring(game.PlaceId), stamp)
+	else
+		mirrorRoot = ''
+	end
 	ensureFolder(root)
+	if mirrorRoot ~= '' then
+		ensureFolder(mirrorRoot)
+	end
 	return root
+end
+
+local function isPriorityScript(script)
+	local full = script:GetFullName()
+	if full:find('ReplicatedStorage%.Assets', 1, true) then
+		return true
+	end
+	if full:find('ReplicatedStorage%.Start', 1, true) then
+		return true
+	end
+	if full:find('ServerStorage', 1, true) then
+		return true
+	end
+	if full:find('ServerScriptService', 1, true) then
+		return true
+	end
+	return false
+end
+
+local function waitForGameLoad()
+	if not CONFIG.WAIT_FOR_GAME_LOAD then
+		return true
+	end
+	local rs = game:GetService('ReplicatedStorage')
+	local deadline = tick() + CONFIG.GAME_LOAD_TIMEOUT
+	while tick() < deadline do
+		local assets = rs:FindFirstChild('Assets')
+		local startFolder = rs:FindFirstChild('Start')
+		local modules = assets and assets:FindFirstChild('ModuleScripts')
+		local packets = modules and modules:FindFirstChild('Packets')
+		if assets and startFolder and packets then
+			log('Game load ready (Assets + Start + Packets)')
+			return true
+		end
+		task.wait(0.5)
+	end
+	warnLog('Timed out waiting for Assets/Start/Packets - dumping anyway')
+	return false
 end
 
 local function isRobloxNoise(script)
@@ -235,7 +289,11 @@ local function isRobloxNoise(script)
 	if path:find('Chat%.', 1, true) and not path:find('Chat%.CustomChat', 1, true) then
 		return true
 	end
-	if not CONFIG.INCLUDE_PLAYER_MODULE and path:find('PlayerScripts%.PlayerModule%.', 1, true) then
+	if not CONFIG.INCLUDE_PLAYER_MODULE and (
+		path:find('PlayerScripts%.PlayerModule%.', 1, true)
+		or path:find('StarterPlayer%.StarterPlayerScripts%.PlayerModule%.', 1, true)
+		or path:find('ReplicatedStorage%.Assets%.Models%.PlayerModule%.', 1, true)
+	) then
 		return true
 	end
 	if not CONFIG.INCLUDE_CHARACTER_SCRIPTS and path:find('Players%.[^%.]+%.Character%.', 1, true) then
@@ -337,6 +395,10 @@ local function gatherScripts()
 	end
 
 	table.sort(scripts, function(a, b)
+		local pa, pb = isPriorityScript(a), isPriorityScript(b)
+		if pa ~= pb then
+			return pa
+		end
 		return a:GetFullName() < b:GetFullName()
 	end)
 
@@ -432,92 +494,127 @@ local function dumpAllScripts(scripts)
 
 	local function queueWrite(rel, text)
 		table.insert(pendingWrites, { rel, text })
-		if CONFIG.SYNC_TO_DECOMPILED and rel:sub(1, 8) == 'scripts/' then
-			local mirror = 'decompiled games/Ugc_' .. tostring(game.PlaceId) .. '/' .. rel:sub(9)
-			table.insert(pendingWrites, { mirror, text })
+		if mirrorRoot ~= '' and rel:sub(1, 8) == 'scripts/' then
+			table.insert(pendingWrites, { mirrorRoot .. '/' .. rel:sub(9), text })
 		end
 	end
 
-	for _, job in jobs do
-		idx += 1
-		if idx % 50 == 0 or idx == #jobs then
-			log(string.format('Processing scripts %d/%d (decompiled=%d bytecode=%d failed=%d)',
-				idx, #jobs, stats.decompiled, stats.bytecode, stats.failed))
+	local function flushWrites(forceAll)
+		local limit = forceAll and #pendingWrites or CONFIG.WRITE_EVERY_N
+		while #pendingWrites > 0 and (forceAll or #pendingWrites >= limit) do
+			local pair = table.remove(pendingWrites, 1)
+			writeText(pair[1], pair[2])
 		end
+	end
 
-		while active >= CONFIG.DECOMPILE_BATCH do
-			task.wait()
-		end
-		active += 1
+	local function writeProgress()
+		writeText('manifest/decompile_progress.txt', string.format(
+			'processed=%d/%d decompiled=%d bytecode=%d failed=%d pendingWrites=%d\n',
+			idx, #jobs, stats.decompiled, stats.bytecode, stats.failed, #pendingWrites
+		))
+	end
 
-		task.spawn(function()
-			local script = job.script
-			local entry = {
-				fullName = script:GetFullName(),
-				className = script.ClassName,
-				output = job.rel,
-				status = 'failed',
-				enabled = script.Enabled,
-			}
+	local function processJob(job)
+		local script = job.script
+		local entry = {
+			fullName = script:GetFullName(),
+			className = script.ClassName,
+			output = job.rel,
+			status = 'failed',
+			enabled = script.Enabled,
+		}
 
-			if type(gethiddenproperty) == 'function' then
-				local ok, hiddenEnabled = pcall(gethiddenproperty, script, 'Enabled')
-				if ok then
-					entry.hiddenEnabled = hiddenEnabled
-				end
+		if type(gethiddenproperty) == 'function' then
+			local ok, hiddenEnabled = pcall(gethiddenproperty, script, 'Enabled')
+			if ok then
+				entry.hiddenEnabled = hiddenEnabled
 			end
+		end
 
-			local decompOk, decompSrc = tryDecompile(script)
-			if decompOk then
-				local text = formatDecompiledHeader(script) .. decompSrc:gsub('\r\n', '\n'):gsub('\r', '\n')
-				if not text:match('\n$') then
-					text ..= '\n'
-				end
-				queueWrite(job.rel, text)
-				entry.status = 'decompiled'
-				stats.decompiled += 1
+		local decompOk, decompSrc = tryDecompile(script)
+		if decompOk then
+			local text = formatDecompiledHeader(script) .. decompSrc:gsub('\r\n', '\n'):gsub('\r', '\n')
+			if not text:match('\n$') then
+				text ..= '\n'
+			end
+			queueWrite(job.rel, text)
+			entry.status = 'decompiled'
+			stats.decompiled += 1
+		else
+			entry.decompileError = decompSrc
+			local bcOk, bc, bcErr = tryBytecode(script)
+			if bcOk then
+				local hexPath = job.rel:gsub('^scripts/', 'bytecode/'):gsub('.lua$', '.hex.txt')
+				local header = string.format(
+					'-- Bytecode dump (decompile failed)\n-- Script: %s\n-- Size: %d bytes\n-- Error: %s\n\n',
+					script:GetFullName(),
+					#bc,
+					tostring(decompSrc):gsub('\n', ' ')
+				)
+				queueWrite(hexPath, header .. bytecodeToHex(bc))
+				entry.bytecode = hexPath
+				entry.status = 'bytecode'
+				stats.bytecode += 1
 			else
-				entry.decompileError = decompSrc
-				local bcOk, bc, bcErr = tryBytecode(script)
-				if bcOk then
-					local hexPath = job.rel:gsub('^scripts/', 'bytecode/'):gsub('.lua$', '.hex.txt')
-					local header = string.format(
-						'-- Bytecode dump (decompile failed)\n-- Script: %s\n-- Size: %d bytes\n-- Error: %s\n\n',
-						script:GetFullName(),
-						#bc,
-						tostring(decompSrc):gsub('\n', ' ')
-					)
-					queueWrite(hexPath, header .. bytecodeToHex(bc))
-					entry.bytecode = hexPath
-					entry.status = 'bytecode'
-					stats.bytecode += 1
-				else
-					entry.bytecodeError = bcErr
-					entry.status = 'failed'
-					stats.failed += 1
+				entry.bytecodeError = bcErr
+				entry.status = 'failed'
+				stats.failed += 1
+			end
+		end
+
+		table.insert(manifest.scripts, entry)
+		flushWrites(false)
+	end
+
+	local concurrency = math.max(1, CONFIG.DECOMPILE_CONCURRENCY or 1)
+	if concurrency <= 1 then
+		for _, job in jobs do
+			idx += 1
+			processJob(job)
+			if idx % CONFIG.PROGRESS_EVERY_N == 0 or idx == #jobs then
+				writeProgress()
+				log(string.format('Processing scripts %d/%d (decompiled=%d bytecode=%d failed=%d)',
+					idx, #jobs, stats.decompiled, stats.bytecode, stats.failed))
+				task.wait()
+			end
+		end
+	else
+		local jobIndex = 0
+		local function worker()
+			while true do
+				jobIndex += 1
+				local job = jobs[jobIndex]
+				if not job then
+					break
+				end
+				idx += 1
+				processJob(job)
+				if idx % CONFIG.PROGRESS_EVERY_N == 0 or idx == #jobs then
+					writeProgress()
 				end
 			end
-
-			table.insert(manifest.scripts, entry)
-			active -= 1
-		end)
-	end
-
-	while active > 0 do
-		task.wait()
-	end
-
-	log(string.format('Writing %d files...', #pendingWrites))
-	local writeIdx = 0
-	for _, pair in pendingWrites do
-		writeIdx += 1
-		if writeIdx % CONFIG.WRITE_BATCH_YIELD == 0 then
+		end
+		for _ = 1, concurrency do
+			active += 1
+			task.spawn(function()
+				worker()
+				active -= 1
+			end)
+		end
+		while active > 0 do
+			if idx % CONFIG.PROGRESS_EVERY_N == 0 or idx == #jobs then
+				log(string.format('Processing scripts %d/%d (decompiled=%d bytecode=%d failed=%d)',
+					idx, #jobs, stats.decompiled, stats.bytecode, stats.failed))
+			end
 			task.wait()
 		end
-		writeText(pair[1], pair[2])
 	end
 
+	flushWrites(true)
 	manifest.stats.scripts = stats
+	if mirrorRoot ~= '' then
+		manifest.stats.mirrorRoot = mirrorRoot
+	end
 	return stats
 end
 
@@ -915,7 +1012,14 @@ local function writeManifest()
 		'only appear if your executor exposes them via getscripts/getgc.',
 		'Use bytecode/*.hex.txt + Potassium decompiler for failed scripts.',
 		'',
+		'Copy mirror to repo:',
+		'  decompiled games/Ugc_<placeId>_<timestamp>/scripts/...',
+		'Join a live match (not just menu) before dumping for Start.Client + ItemData.',
+		'',
 	}
+	if mirrorRoot ~= '' then
+		summary[#summary + 1] = 'mirrorRoot=' .. mirrorRoot
+	end
 	for k, v in manifest.stats do
 		if type(v) == 'table' then
 			summary[#summary + 1] = k .. ':'
@@ -939,9 +1043,13 @@ local function runDump()
 
 	dumpRoot = buildDumpRoot()
 	log('Output:', dumpRoot)
+	if mirrorRoot ~= '' then
+		log('Mirror:', mirrorRoot)
+	end
+	waitForGameLoad()
 	log('Gathering scripts...')
 	local scripts = gatherScripts()
-	log('Found', #scripts, 'scripts')
+	log('Found', #scripts, 'scripts (priority scripts sorted first)')
 
 	local pathLines = { '# All discovered script paths', '' }
 	for _, script in scripts do
@@ -966,10 +1074,10 @@ local function runDump()
 	dumpInstanceTree(game:GetService('ServerStorage'), 'ServerStorage', CONFIG.TREE_MAX_DEPTH)
 	dumpInstanceTree(workspace, 'Workspace', math.min(8, CONFIG.TREE_MAX_DEPTH))
 
+	local scriptStats = dumpAllScripts(scripts)
+
 	dumpModuleProbes()
 	dumpGcStrings()
-
-	local scriptStats = dumpAllScripts(scripts)
 	writeManifest()
 
 	log('Done.')

@@ -1,0 +1,116 @@
+# Packet registry (client-visible)
+
+_xa1b346ef877bc52a -> remote=_xed3989fa2e113ac9 id=2 type=table
+_x7a2ae673a30543e6 -> remote=_x9e96bfc4e2de93d2 id=46 type=table
+_x7f93448307b05ecf -> remote=_x4908bce40368966f id=12 type=table
+_xc2cd69c902ae68f8 -> remote=_xb62037a63953e4ef id=75 type=table
+_x16343f5702c10d0e -> remote=_x9aedc19de1cd5892 id=29 type=table
+_x46607a58775a7f10 -> remote=_x2267e83ac6b5c9d4 id=19 type=table
+_x851f9a3ff98bf94f -> remote=_xea2547d0242221ce id=14 type=table
+_xb5bc17d25fad4165 -> remote=_xc5ae4953da5e0a60 id=48 type=table
+_xd1d1ed4c2ff2e856 -> remote=_xfc9586b94ab7a64a id=17 type=table
+_x02ac3521dbed3d9d -> remote=_x65b6503cc4cf62fa id=40 type=table
+_x56d68a6b15750fcf -> remote=_x57c09d3dd635dcdc id=27 type=table
+_xe543f884b99a8f87 -> remote=_xad4d587a17bfd36a id=25 type=table
+_xc5a43c7f94f9f910 -> remote=_x89c91615694b5497 id=22 type=table
+_x19083cea6d9c3cec -> remote=_x42b9925971b0c052 id=24 type=table
+_x0e45f811eb4ba377 -> remote=_x222f9b83c4d304d5 id=47 type=table
+_x57c165550ede3092 -> remote=_xd329079298ae11be id=51 type=table
+_x2abba096e4373872 -> remote=_x1857c9b9e9d01933 id=78 type=table
+_xfcd03f970df1d778 -> remote=_x054b49776cce69fe id=60 type=table
+_xb091fe04e773fa7b -> remote=_x673923c9b9b4f17f id=30 type=table
+_xbe7dde9a4c999d70 -> remote=_x713eb5ed6cfd244c id=1 type=table
+_x4dc83f2504cf2f57 -> remote=_xb9e155b6976c5b3f id=84 type=table
+_xb0f023e4d9d34617 -> remote=_x675210b1016c35c7 id=21 type=table
+_xe3bfd4393906a1b6 -> remote=_x96acd07e020ffa89 id=66 type=table
+_x37821f9f8b2dd72c -> remote=_x282148f3d6dcb6a2 id=3 type=table
+_x95a7dcd2ba19667f -> remote=_x68d200d9b333583e id=53 type=table
+_x71a4ac7aba517193 -> remote=_xae93b0718fb79a13 id=71 type=table
+_x27cb9fed7e43d530 -> remote=_xddd1f3e11b31b1fc id=23 type=table
+_x0ccfe7515ba66c63 -> remote=_xf73246190bcd051b id=11 type=table
+_xcfd25ad2550161be -> remote=_x5b2d6fe7c17fcfc7 id=16 type=table
+_x3d559977708a04d1 -> remote=_x6ade6018d93f63b8 id=65 type=table
+_xb25cbf8ed4ab781d -> remote=_xb6d0f27b650533d3 id=4 type=table
+_x38ed1f49b70152bd -> remote=_x52bab5e6a906de3d id=5 type=table
+_xfb6e8daf30b26df5 -> remote=_xd60be9b9d7f96400 id=76 type=table
+_x97a14f34b8ed4a3f -> remote=_x1831273b3451ed9d id=43 type=table
+_x44ecb119ed705f12 -> remote=_xdc031e0f5728dbd2 id=36 type=table
+_x13adfdc69dfdf777 -> remote=_x0083dc438a027d48 id=73 type=table
+_xce117dc071f0657f -> remote=_x836649ac17174f74 id=82 type=table
+_x2cc339cff5a4e1eb -> remote=_x97485362c7da4a0a id=28 type=table
+_xe671a0aa8a52fedd -> remote=_xd94ee4d7b0f89710 id=59 type=table
+_xbd05509855a2a927 -> remote=_x29779f16469314c1 id=6 type=table
+_x27f295938e2db2f2 -> remote=_x702d89f1b150b631 id=56 type=table
+_x03bd34ec23e0dfa7 -> remote=_x3fe9996453a64623 id=61 type=table
+_x0801b594706a3943 -> remote=_xa978e1f280c2e77a id=55 type=table
+_xf5e1e1983608ed25 -> remote=_xf6afcf3c8b6be378 id=15 type=table
+_x54e801d0c00ece13 -> remote=_x0f8f22a7c450ee5d id=13 type=table
+_x27f7514677f64b93 -> remote=_x1b471f5bd215233e id=67 type=table
+_xe61783d51fe09499 -> remote=_x4bbf014334919d9c id=85 type=table
+_x3129728123d8b7b9 -> remote=_x1d460d9a23f8e5ae id=58 type=table
+_x30fe2fdd1023f141 -> remote=_x7bcd70b3b0ca8910 id=83 type=table
+_x1111971a4ba469c5 -> remote=_x6fc2f58ce3fbc0ea id=35 type=table
+_xf6572b5f33c564ab -> remote=_xdd04825d772bbdb3 id=81 type=table
+_x5f8c156db21e404c -> remote=_xf3e726210b7ecb50 id=80 type=table
+_x88051fb7128eb54b -> remote=_x5ce538cf221e6f3f id=45 type=table
+_x7ffd0a407efb61ef -> remote=_x65b283a5a702bec9 id=68 type=table
+_xff9e8e66a100da8b -> remote=_xa454b2d0eac516e2 id=50 type=table
+_xe3f2932c4e467d66 -> remote=_x1e6ea11558c37157 id=18 type=table
+_xf83bd5b1e5c00bd6 -> remote=_x212ccc82cb2df5e9 id=69 type=table
+_x5b73d7c52eb7333c -> remote=_xaf063ff9da279ba5 id=38 type=table
+_x48db504631e9f96b -> remote=_x89518238d189a081 id=74 type=table
+_x8b76331abaa56758 -> remote=_x77644879721c2efd id=49 type=table
+_x7385f04acbd3d15f -> remote=_x1ad07969543d1bef id=72 type=table
+_xf0d64c6a69399585 -> remote=_x5df6cdaac6464408 id=70 type=table
+_x62371b6ac34c03a2 -> remote=_xd2756a5b16054b0d id=77 type=table
+_xbdcb7a090a5c3d5a -> remote=_xd896134e293ece52 id=39 type=table
+_xbbc61c8e01527b7c -> remote=_x27acb6414def676b id=64 type=table
+_xbe3951814b64e389 -> remote=_x170497601f92e1b1 id=8 type=table
+_x40d842b9563b38e9 -> remote=_xb3ad89c35aedc2ed id=31 type=table
+_x2789e1e99395ef5d -> remote=_xcdee55d488ec5154 id=63 type=table
+_xb107e17a2a93fbac -> remote=_x33f91cef3a311d30 id=26 type=table
+_x3a51da27a23b5652 -> remote=_x4e8da03c8572bbd8 id=62 type=table
+_x5e5bc1afecb1e60f -> remote=_xb41fbc5552fb7b3b id=52 type=table
+_x8458a1cfd21149ba -> remote=_x002c19ae4b5a1c3c id=86 type=table
+_x95c5751a8734f30a -> remote=_x435569acf0428016 id=57 type=table
+_xd23343573495bac5 -> remote=_xc6629d7c5578c126 id=54 type=table
+_x972e4673467ce2e8 -> remote=_x4934c9398933577d id=79 type=table
+_x2925dacc9725d2ce -> remote=_x8c3b362cd85e9a58 id=44 type=table
+_x9a2160c1e6226f77 -> remote=_x42c0780b814ce9b7 id=33 type=table
+_x3d8fafaf89950026 -> remote=_x96ca84dcd21584a7 id=42 type=table
+_xe7f8171a9d1134f8 -> remote=_xadff6a5efdaa3764 id=37 type=table
+_xf1028078c3d0db09 -> remote=_x7a2cf177dcc4cc31 id=41 type=table
+_x8d8e8ab8b399dc7b -> remote=_x818262e8c82bfe1a id=34 type=table
+_x7a8eb03e390ff2a8 -> remote=_x04514ae45f6082a1 id=32 type=table
+_x6f11420c13d0d5ee -> remote=_xc4325acde1be82fe id=20 type=table
+_x8558823a46f1bd44 -> remote=_x35945ad86509e33c id=10 type=table
+_x1a960b7277e0f42d -> remote=_x82586791b07205ae id=9 type=table
+_xe4e49c228dd6efef -> remote=_xea2b8089ff87216e id=7 type=table
+
+# unreliablePackets
+_x9e6c7370a3b25bd0 -> remote=_x8f79315dd18acfa6
+_x5b55b35800d88aa6 -> remote=_x5a980501d2754995
+_xa2a67982acc88b27 -> remote=_xfba9aa478a3292c7
+_x7ad20ae11b77256d -> remote=_x8371d86140cae339
+_x0b71847ea26b42a0 -> remote=_xcbe4709deb4284c7
+_xc5c849e156666c7d -> remote=_xbc58c214c4b2b09b
+_x03b97699d899b5d1 -> remote=_x4417cf43d8d21071
+_xdf1db5767df9f29a -> remote=_x8821d111ee209c26
+_xedf0e52fe5242c34 -> remote=_x393baa013c7a6148
+_x2f1f30453b260ca6 -> remote=_x595c2f427f967cb7
+_x1d1745d6dbcc3ee7 -> remote=_xd585f3d7037d31b4
+_x4fd12adee42ecc3e -> remote=_xffddc221dd51b7ea
+_x6f165cf1c8a4a502 -> remote=_x387751ff780111fc
+child_remote UnreliableRemoteEvent _x8f79315dd18acfa6
+child_remote UnreliableRemoteEvent _x5a980501d2754995
+child_remote UnreliableRemoteEvent _xfba9aa478a3292c7
+child_remote UnreliableRemoteEvent _x8371d86140cae339
+child_remote UnreliableRemoteEvent _xcbe4709deb4284c7
+child_remote UnreliableRemoteEvent _xbc58c214c4b2b09b
+child_remote UnreliableRemoteEvent _x4417cf43d8d21071
+child_remote UnreliableRemoteEvent _x8821d111ee209c26
+child_remote UnreliableRemoteEvent _x393baa013c7a6148
+child_remote UnreliableRemoteEvent _x595c2f427f967cb7
+child_remote UnreliableRemoteEvent _xd585f3d7037d31b4
+child_remote UnreliableRemoteEvent _xffddc221dd51b7ea
+child_remote UnreliableRemoteEvent _x387751ff780111fc

@@ -1,0 +1,5363 @@
+# Instance tree: Workspace
+
+Workspace Workspace
+  Camera Camera
+    AudioListener AudioListener
+      Wire Wire
+    Part Speedlines
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind attrs=1
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+      Attachment Attachment
+        ParticleEmitter Wind
+    Part SlideSparks
+      Attachment Attachment
+        ParticleEmitter Sparks
+      Attachment Attachment
+        ParticleEmitter Sparks
+        ParticleEmitter Glow
+        ParticleEmitter MajorSpark
+        ParticleEmitter MajorSpark2
+        ParticleEmitter MajorSpark3
+    Part GrapplePoint
+      Attachment Atc
+    Part GrappleMarker
+    Part GrappleOpening
+      Attachment Atc
+      RopeConstraint RopeConstraint
+      SpringConstraint SpringConstraint
+    Model Grappler
+      MeshPart Left Arm
+        Attachment GrapplerOpening
+        Weld Handle
+        Weld Right Arm
+      Part Head
+        StringValue CamPart Value=""
+      AnimationController AnimationController
+        Animator Animator attrs=9
+      Part RootPart
+        Decal face
+        Motor6D Head
+        Motor6D ShoulderAxisL
+      Part ShoulderAxisL
+        Motor6D Left Arm
+      Model SleeveHumanoid
+        Humanoid Humanoid
+        Part Right Arm
+          Weld Fade
+        Part Fade
+          SurfaceGui Front
+            Frame Frame
+              UIGradient UIGradient
+          SurfaceGui Back
+            Frame Frame
+              UIGradient UIGradient
+          SurfaceGui Left
+            Frame Frame
+              UIGradient UIGradient
+          SurfaceGui Right
+            Frame Frame
+              UIGradient UIGradient
+      Model GrapplerNew
+        Model Parts
+          Model Glove
+            MeshPart Left Arm
+            MeshPart Right Arm
+            MeshPart Left Arm3
+            MeshPart Left Arm4
+            MeshPart Left Arm1
+            MeshPart Cube.009
+            MeshPart Cube.008
+            MeshPart Cube.007
+            MeshPart Cube.005
+            MeshPart Left Arm2
+            MeshPart Right Arm1
+          Model Mechanism
+            MeshPart Battery
+            MeshPart Bolt
+            MeshPart Connector
+            MeshPart Interface
+            MeshPart InterfaceScreen
+            MeshPart Main
+            MeshPart Motor
+            MeshPart MotorPlate
+            MeshPart PipeLock
+            MeshPart Pipes
+            MeshPart Shooter
+            MeshPart Switch
+        Part Handle
+          Weld Switch
+          Weld Shooter
+          Weld Pipes
+          Weld PipeLock
+          Weld MotorPlate
+          Weld Motor
+          Weld Main
+          Weld InterfaceScreen
+          Weld Interface
+          Weld Connector
+          Weld Bolt
+          Weld Battery
+          Weld Right Arm1
+          Weld Right Arm
+          Weld Left Arm4
+          Weld Left Arm3
+          Weld Left Arm2
+          Weld Left Arm1
+          Weld Left Arm
+          Weld Cube.009
+          Weld Cube.008
+          Weld Cube.007
+          Weld Cube.005
+    Model Darkness1P
+      AnimationController AnimationController
+        Animator Animator attrs=34
+      Model Glove
+      Model SleeveHumanoid
+        Humanoid Humanoid
+        Part Fade
+          SurfaceGui Back
+            Frame Frame
+              UIGradient UIGradient
+          SurfaceGui Front
+            Frame Frame
+              UIGradient UIGradient
+          SurfaceGui Left
+            Frame Frame
+              UIGradient UIGradient
+          SurfaceGui Right
+            Frame Frame
+              UIGradient UIGradient
+        Part Right Arm
+          Weld Fade
+      Model SleeveR
+      Model Weapon
+        Model Parts attrs=1
+          MeshPart HandleGlow
+          MeshPart Handle
+            SurfaceAppearance SurfaceAppearance
+            Attachment at1ds
+              Attachment at2ds
+              Beam glow
+              Beam glow
+              Beam glow
+          MeshPart BladeAlpha
+            SurfaceAppearance SurfaceAppearance
+          MeshPart BladeGlow
+        Part Handle
+          Attachment To
+          Attachment From
+          Weld HandleGlow
+          Weld Handle
+          Weld BladeGlow
+          Weld BladeAlpha
+        Highlight Highlight
+      Part RootPart
+        Decal face
+        Motor6D ShoulderAxisL
+        Motor6D Head
+        Motor6D ShoulderAxisR
+      Part ShoulderAxisR
+        Motor6D Right Arm
+      MeshPart Right Arm
+        Weld Right Arm
+        Motor6D Handle
+      Part Head
+        StringValue CamPart Value=""
+    Model AfterburnSIE1P
+      AnimationController AnimationController
+        Animator Animator attrs=4
+      Model SleeveHumanoid
+        Humanoid Humanoid
+        Part Right Arm
+          Weld Fade
+        Part Fade
+          SurfaceGui Front
+            Frame Frame
+              UIGradient UIGradient
+          SurfaceGui Back
+            Frame Frame
+              UIGradient UIGradient
+          SurfaceGui Left
+            Frame Frame
+              UIGradient UIGradient
+          SurfaceGui Right
+            UIGradient UIGradient
+      Model SleeveHumanoid
+        Humanoid Humanoid
+        Part Right Arm
+          Weld Fade
+        Part Fade
+          SurfaceGui Front
+            Frame Frame
+              UIGradient UIGradient
+          SurfaceGui Back
+            Frame Frame
+              UIGradient UIGradient
+          SurfaceGui Left
+            Frame Frame
+              UIGradient UIGradient
+          SurfaceGui Right
+            Frame Frame
+              UIGradient UIGradient
+      Model Gun
+        Model Parts attrs=1
+          Model shells
+            MeshPart Shells
+              Weld Cylinder4
+              Weld Cylinder3
+              Weld Cylinder2
+              Weld Cylinder1
+              Weld Cylinder.001
+            MeshPart Cylinder.001
+            MeshPart Cylinder1
+            MeshPart Cylinder2
+            MeshPart Cylinder3
+            MeshPart Cylinder4
+          MeshPart Rails
+            SurfaceAppearance SurfaceAppearance
+          MeshPart Rails.001
+            SurfaceAppearance SurfaceAppearance
+            Motor6D Shells
+            Attachment Gunpoint
+          MeshPart Hinge
+            Motor6D Shells
+            Weld Rails.001
+        Part Handle
+          Motor6D Hinge
+          Weld Rails
+      Part Head
+        StringValue CamPart Value=""
+      MeshPart Right Arm
+        Weld Right Arm
+        Motor6D Handle
+      Part RootPart
+        Decal face
+        Motor6D Head
+        Motor6D ShoulderAxisR
+        Motor6D ShoulderAxisL
+      Part ShoulderAxisR
+        Motor6D Right Arm
+      Part ShoulderAxisL
+        Motor6D Left Arm
+      MeshPart Left Arm
+        Attachment GrapplerOpening
+        Weld Right Arm
+  Folder Effects
+    Part Part
+    Part Part
+    Part CastigateFlash
+      Attachment Attachment
+        ParticleEmitter LensFlare attrs=2
+        ParticleEmitter FrontMuzzleFlash attrs=2
+        ParticleEmitter SideMuzzleFlash attrs=2
+        ParticleEmitter SideExtension attrs=2
+        ParticleEmitter SideBurst attrs=2
+      Attachment Attachment1
+        ParticleEmitter Shards attrs=2
+    Part Part
+    Part SiegeFlashOutsider
+      Attachment Attachment
+        ParticleEmitter Shards1 attrs=2
+        ParticleEmitter Rainbow attrs=2
+        ParticleEmitter Flash attrs=2
+        ParticleEmitter DarkShards attrs=2
+        ParticleEmitter FrontalSparks attrs=2
+        ParticleEmitter FrontMuzzleFlash attrs=2
+        ParticleEmitter Shards attrs=2
+        ParticleEmitter FrontMuzzleFlash1 attrs=2
+        ParticleEmitter SiegeTracer attrs=2
+      ParticleEmitter Wind attrs=2
+      ParticleEmitter Wind1 attrs=2
+      ParticleEmitter Wind2 attrs=2
+      ParticleEmitter Smoke attrs=2
+    Part Part
+      Sound SIEGE_BONUS_SHOT SoundId=rbxassetid://119857823564316 attrs=1
+    Part GlitchAura
+      ParticleEmitter ParticleEmitter attrs=1
+      Weld Weld
+    Part ParryIndicator
+      Attachment Attachment
+        ParticleEmitter 45 attrs=2
+        ParticleEmitter 135 attrs=2
+        ParticleEmitter 315 attrs=2
+        ParticleEmitter 225 attrs=2
+      Weld Weld
+  Folder Showcase
+    Folder Deco
+      Model A
+        Model Gate
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+        Model Store Sign
+          Part Part
+      Model Model
+        MeshPart LightBeam
+      Part Part
+        SurfaceLight SpotLight
+      Part Part
+      Part Part
+      Part Part
+      Part SodiumLight
+      Part Part
+      Part Part
+        SurfaceLight SpotLight
+      Part Part
+      Part Part
+      Part Part
+        ParticleEmitter ParticleEmitter attrs=1
+      Part Part
+      Part Part
+      Part Part
+    Part ViewOrigin
+    Part ShowcaseOrigin
+  Folder Map
+    Folder Zone
+    Folder Spawnpoints
+      Part Part1
+      Part Part4
+    Folder Main
+      Folder duped
+        Model circular thing idk
+          UnionOperation Union
+          UnionOperation Union
+          UnionOperation Union
+        Folder building1
+          Folder random cubes
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+          Model building1
+            Model ramp for wallrunning
+              UnionOperation Union
+            Model ramp for wallrunning
+              UnionOperation Union
+            Model smth like floor tiles idk honestly
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model stair
+              UnionOperation Union
+              Part smooth
+            Model stairs
+              Part smooth
+              UnionOperation Union
+            Model upper floor
+              Part Part
+              UnionOperation Union
+            Part invis bump
+            UnionOperation floor
+            Part Part
+            Part path to building2
+            Part path to building2 but outside
+          Folder Folder
+            Model walls
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              UnionOperation Union
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part2
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              UnionOperation Union
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              UnionOperation Union
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part1
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part3
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+        Folder building2
+          Folder random cubes
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+          Model building2
+            Model floor
+              UnionOperation Union
+            Model spiral staircase
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model outer wall
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model outline for spiral staircase
+              UnionOperation Union
+            Model stairs
+              UnionOperation stairs
+              Part smooth
+            Model wallrun from building 1 to 2
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model wallrun
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model prevent overlapping
+              UnionOperation Union
+            Model wall lol
+              Part wall lol
+                Part Part
+            Part cylinder type
+            Part ramp to building3
+            UnionOperation upperfloor
+        Folder building3
+          Model stair
+            Part smooth
+            UnionOperation stairs inside
+          Model roof
+            UnionOperation Union
+          Folder random cubes lol
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+          Folder wall
+            Model wall on connected building
+              Part Part
+              Part Part
+            Model outer wall on connected building
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model wall stairscase to lower ground
+              Model prevent z-fighting
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model wallrun to other side
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model wall staircase to lower ground
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model inside wall
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model outer wall
+              Model building3
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model inside wall
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model wallrun from building 2
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model wallrun from building2
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model prevent z-fighting on wallrun
+              WedgePart Wedge
+              WedgePart Wedge
+              WedgePart Wedge
+              WedgePart Wedge
+            Model prevent z-fighting on wallruns
+              WedgePart Wedge
+              WedgePart Wedge
+          Model stairs outside
+            UnionOperation Union
+          Folder floor
+            Model floor outside
+              UnionOperation Union
+                Texture TextMaterial
+                Texture TextMaterial
+                Texture TextMaterial
+                Texture TextMaterial
+                Texture TextMaterial
+                Texture TextMaterial
+            Model outline floor outside
+              UnionOperation Union
+                Texture TextMaterial
+                Texture TextMaterial
+                Texture TextMaterial
+                Texture TextMaterial
+                Texture TextMaterial
+                Texture TextMaterial
+            Model downfloor outline
+            Model upper floor
+              Part Part
+              Part Part
+              Part Part
+            UnionOperation downfloor
+            Part floor inside
+            Part floor
+          Model pillar3
+            UnionOperation pillar3
+          Model ceiling to lower ground
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+          Model pillar3
+            UnionOperation pillar3
+          Part pillar
+          Part roof/ceiling
+            Part Part
+          Part pillar on connected building
+          UnionOperation stairs to lowest ground
+            Part smooth
+          Part roof
+          Part connection between buildings
+          Part pillar
+          Part pillar on connected building
+          UnionOperation ramp
+          Part wedge for smoothing, its connected to building1
+      Folder misc
+        Model wallting
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+        Folder border
+          Model border
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            WedgePart Wedge
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            WedgePart Wedge
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            WedgePart Wedge
+              SpecialMesh Mesh
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            WedgePart Wedge
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+              SpecialMesh Mesh
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            WedgePart Wedge
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            WedgePart Wedge
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            WedgePart Wedge
+            Part Part
+            WedgePart Wedge
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            WedgePart Wedge
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            WedgePart Wedge
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            WedgePart Wedge
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            WedgePart Wedge
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+        Model wallting
+          Part Part
+          Part Part
+          Part Part
+          Part Part
+        Part Part
+      Folder original
+        Model circular thing idk
+          UnionOperation Union
+          UnionOperation Union
+          UnionOperation Union
+        Folder rocks lol
+          Model Rock
+            Part Part
+            Part Part
+          Model Rock
+            Part Part
+            Part Part
+            Part Part
+          Model Rock
+            Part Part
+            Part Part
+          Model Rock
+            Part Part
+            Part Part
+          Model Rock
+            Part Part
+            Part Part
+            Part Part
+          Model Rock
+            Part Part
+            Part Part
+            Part Part
+          Model Rock
+            Part Part
+            Part Part
+          Model Rock
+            Part Part
+            Part Part
+          Model Rock
+            Part Part
+            Part Part
+            Part Part
+          Model Rock
+            Part Part
+            Part Part
+            Part Part
+          Model Rock
+            Part Part
+            Part Part
+          Model Rock
+            Part Part
+            Part Part
+            Part Part
+          Model rock
+            Part Part
+            Part Part
+            Part Part
+          Model Model
+            Part Part
+            Part Part
+            Part Part
+          Model Rock
+            Part Part
+            Part Part
+            Part Part
+          Model Rock
+            Part Part
+            Part Part
+            Part Part
+        Folder building1
+          Folder random cubes
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+          Model building1
+            Model ramp for wallrunning
+              UnionOperation Union
+            Model ramp for wallrunning
+              UnionOperation Union
+            Model smth like floor tiles idk honestly
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model stair
+              UnionOperation Union
+              Part smooth
+            Model stairs
+              UnionOperation Union
+              Part smooth
+            Model walls on first building
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              UnionOperation Union
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              UnionOperation Union
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              UnionOperation Union
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              UnionOperation Union
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model upper floor
+              UnionOperation Union
+            Part path to building2
+            Part Part
+            Part invis bump
+            Part path to building2 but outside
+            UnionOperation floor
+        Folder building3
+          Model stair
+            Part smooth
+            UnionOperation stairs inside
+          Model roof
+            UnionOperation Union
+          Folder random cubes lol
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+          Folder wall
+            Model wall on connected building
+              Part Part
+              Part Part
+            Model outer wall on connected building
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model wall stairscase to lower ground
+              Model prevent z-fighting
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+                WedgePart Wedge
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model wall staircase to lower ground
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model inside wall
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model outer wall
+              Model building3
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+                Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model inside wall
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model wallrun from building 2
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model wallrun from building2
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model prevent z-fighting on wallruns
+              WedgePart Wedge
+              WedgePart Wedge
+            Model wallrun to other side
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model prevent z-fighting on wallrun
+              WedgePart Wedge
+              WedgePart Wedge
+              WedgePart Wedge
+              WedgePart Wedge
+          Folder floor
+            Model floor outside
+              UnionOperation Union
+            Model outline floor outside
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+              Part Part
+            Model downfloor outline
+            Model upper floor
+              Part Part
+              Part Part
+              Part Part
+            Part floor
+            Part floor inside
+          Model pillar3
+            UnionOperation pillar3
+          Model ceiling to lower ground
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+          Model pillar3
+            UnionOperation pillar3
+          Part wedge for smoothing, its connected to building1
+          Part connection between buildings
+          Part pillar
+          Part roof
+          Part pillar on connected building
+          Part pillar on connected building
+          Part pillar
+          Part roof/ceiling
+            Part Part
+          UnionOperation stairs outside
+          UnionOperation stairs to lowest ground
+            Part smooth
+          UnionOperation ramp
+        Folder building2
+          Model floor
+            UnionOperation Union
+          Model spiral staircase
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+          Model outer wall
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+          Model outline for spiral staircase
+            UnionOperation Union
+          Model stairs
+            UnionOperation stairs
+            Part smooth
+          Model wallrun from building1 to 2
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+          Folder random cubes
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+          Model wallrun
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+            Part Part
+          Model prevent overlapping
+            UnionOperation Union
+          Model wall lol
+            Part wall lol
+              Part Part
+          Model downfloor outline
+          Part ramp to building3
+          Part cylinder type
+          UnionOperation upperfloor
+      Part Floor
+        Texture Texture4
+        Texture Texture5
+        Texture Texture2
+        Texture Texture3
+        Texture Texture7
+        Texture Texture6
+        Texture Texture1
+      Part Floor
+        Texture Texture5
+        Texture Texture7
+        Texture Texture3
+        Texture Texture6
+        Texture Texture4
+        Texture Texture1
+        Texture Texture2
+      Part Floor
+        Texture Texture1
+        Texture Texture4
+        Texture Texture3
+        Texture Texture6
+        Texture Texture5
+        Texture Texture7
+        Texture Texture2
+      Part Floor
+        Texture Texture4
+        Texture Texture2
+        Texture Texture6
+        Texture Texture7
+        Texture Texture3
+        Texture Texture5
+        Texture Texture1
+      Part Floor
+        Texture Texture5
+        Texture Texture2
+        Texture Texture4
+        Texture Texture6
+        Texture Texture1
+        Texture Texture3
+        Texture Texture7
+      Part Floor
+        Texture Texture3
+        Texture Texture5
+        Texture Texture2
+        Texture Texture4
+        Texture Texture1
+        Texture Texture7
+        Texture Texture6
+      Part Floor
+        Texture Texture5
+        Texture Texture6
+        Texture Texture3
+        Texture Texture7
+        Texture Texture4
+        Texture Texture2
+        Texture Texture1
+    Folder Kill
+      Part Part
+    Folder InverseKill
+      Part Part
+    Folder InteractiveEntities
+      Model Launchpad attrs=1
+        AnimationController AnimationController
+          Animator Animator
+        Animation LaunchAnimation AnimationId=rbxassetid://91724750311438
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part3
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        UnionOperation Union
+          Weld Part5
+          Weld Part4
+          Weld Union2
+          Weld Pillar
+          Weld Union
+          Weld Union1
+          Weld Part1
+        Part Origin
+          Motor6D Union
+        MeshPart MeshPart2
+          Weld Weld
+        UnionOperation Union
+        UnionOperation Union
+        Part Part3
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        UnionOperation Union1
+        Part Part3
+        Part Part5
+          Decal Decal
+        Part LaunchGoal
+        UnionOperation Union2
+        Part Part3
+        Part Part3
+        Part Pillar
+        MeshPart MeshPart2
+          Weld Weld
+        Part Part4
+          Decal Decal
+        MeshPart MeshPart2
+          Weld Weld
+        Part Part1
+          Decal Decal
+        Part Part3
+        Part Part3
+      Model Launchpad2 attrs=1
+        AnimationController AnimationController
+          Animator Animator
+        Animation LaunchAnimation AnimationId=rbxassetid://91724750311438
+        MeshPart MeshPart2
+          Weld Weld
+        UnionOperation Union2
+        UnionOperation Union
+          Weld Union1
+          Weld Pillar
+          Weld Part4
+          Weld Union2
+          Weld Union
+          Weld Part5
+          Weld Part1
+        Part Part3
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        UnionOperation Union1
+        MeshPart MeshPart1
+          Weld Weld
+        Part Origin
+          Motor6D Union
+        Part Part3
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        UnionOperation Union
+        Part Part3
+        Part Part3
+        Part Part1
+          Decal Decal
+        Part Part3
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        Part Pillar
+        Part Part4
+          Decal Decal
+        Part LaunchGoal
+        MeshPart MeshPart2
+          Weld Weld
+        Part Part3
+        UnionOperation Union
+        Part Part5
+          Decal Decal
+      Model Launchpad1 attrs=1
+        AnimationController AnimationController
+          Animator Animator
+        Animation LaunchAnimation AnimationId=rbxassetid://91724750311438
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        MeshPart MeshPart1
+          Weld Weld
+        UnionOperation Union
+          Weld Union2
+          Weld Part5
+          Weld Part4
+          Weld Union
+          Weld Union1
+          Weld Pillar
+          Weld Part1
+        Part Part4
+          Decal Decal
+        UnionOperation Union2
+        Part Part5
+          Decal Decal
+        MeshPart MeshPart1
+          Weld Weld
+        Part Origin
+          Motor6D Union
+        MeshPart MeshPart2
+          Weld Weld
+        MeshPart MeshPart2
+          Weld Weld
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        UnionOperation Union
+        UnionOperation Union1
+        UnionOperation Union
+        Part Part3
+        Part Part3
+        Part Part3
+        Part Pillar
+        Part Part1
+          Decal Decal
+        Part Part3
+        Part Part3
+        Part Part3
+        Part Part3
+        Part LaunchGoal
+      Model Launchpad3 attrs=1
+        AnimationController AnimationController
+          Animator Animator
+        Animation LaunchAnimation AnimationId=rbxassetid://91724750311438
+        Part Part3
+        Part Part3
+        UnionOperation Union
+          Weld Union1
+          Weld Part1
+          Weld Part5
+          Weld Union
+          Weld Union2
+          Weld Part4
+          Weld Pillar
+        MeshPart MeshPart2
+          Weld Weld
+        Part Part4
+          Decal Decal
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        MeshPart MeshPart1
+          Weld Weld
+        MeshPart MeshPart1
+          Weld Weld
+        Part Pillar
+        Part Origin
+          Motor6D Union
+        Part Part3
+        UnionOperation Union1
+        Part Part3
+        UnionOperation Union
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part1
+          Decal Decal
+        MeshPart MeshPart2
+          Weld Weld
+        Part LaunchGoal
+        Part Part5
+          Decal Decal
+        Part Part3
+        UnionOperation Union2
+        UnionOperation Union
+        Part Part3
+        Part Part3
+        Part Part3
+      Model Launchpad4 attrs=1
+        AnimationController AnimationController
+          Animator Animator
+        Animation LaunchAnimation AnimationId=rbxassetid://91724750311438
+        MeshPart MeshPart1
+          Weld Weld
+        UnionOperation Union
+          Weld Union2
+          Weld Union
+          Weld Part5
+          Weld Part1
+          Weld Union1
+          Weld Pillar
+          Weld Part4
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        Part Part3
+        Part Part3
+        UnionOperation Union
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part1
+          Decal Decal
+        Part Origin
+          Motor6D Union
+        Part Part3
+        UnionOperation Union2
+        Part LaunchGoal
+        Part Part5
+          Decal Decal
+        MeshPart MeshPart1
+          Weld Weld
+        MeshPart MeshPart2
+          Weld Weld
+        Part Part3
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        Part Part3
+        Part Part3
+        Part Part3
+        Part Pillar
+        UnionOperation Union1
+        UnionOperation Union
+        Part Part4
+          Decal Decal
+      Model Launchpad5 attrs=1
+        AnimationController AnimationController
+          Animator Animator
+        Animation LaunchAnimation AnimationId=rbxassetid://91724750311438
+        UnionOperation Union
+          Weld Pillar
+          Weld Part5
+          Weld Part1
+          Weld Union1
+          Weld Part4
+          Weld Union
+          Weld Union2
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part3
+        UnionOperation Union
+        Part Part3
+        Part Part3
+        Part Part3
+        Part LaunchGoal
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part3
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        MeshPart MeshPart2
+          Weld Weld
+        Part Origin
+          Motor6D Union
+        Part Part5
+          Decal Decal
+        UnionOperation Union2
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part3
+        Part Pillar
+        Part Part4
+          Decal Decal
+        UnionOperation Union1
+        UnionOperation Union
+        Part Part1
+          Decal Decal
+      Model Zipline1 attrs=1
+        Part Handle1
+        Part Last
+        Part First
+        Part Handle2
+        MeshPart ZiplineShaft
+          Texture Back
+          Texture Left
+          Texture Front
+          Texture Right
+      Model Zipline2 attrs=1
+        Part Handle1
+        Part First
+        Part Last
+        MeshPart ZiplineShaft
+          Texture Back
+          Texture Left
+          Texture Front
+          Texture Right
+      Model Zipline3 attrs=1
+        Part Last
+        Part First
+        MeshPart ZiplineShaft
+          Texture Back
+          Texture Left
+          Texture Front
+          Texture Right
+      Model Launchpad10 attrs=1
+        AnimationController AnimationController
+          Animator Animator
+        Animation LaunchAnimation AnimationId=rbxassetid://91724750311438
+        MeshPart MeshPart2
+          Weld Weld
+        Part Part3
+        UnionOperation Union
+          Weld Union2
+          Weld Part4
+          Weld Pillar
+          Weld Union1
+          Weld Part1
+          Weld Part5
+          Weld Union
+        Part Part3
+        Part Part1
+          Decal Decal
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part3
+        Part Part3
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        UnionOperation Union
+        Part Origin
+          Motor6D Union
+        Part Pillar
+        Part Part5
+          Decal Decal
+        MeshPart MeshPart2
+          Weld Weld
+        Part LaunchGoal
+        Part Part3
+        Part Part4
+          Decal Decal
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part3
+        Part Part3
+        UnionOperation Union2
+        UnionOperation Union
+        UnionOperation Union1
+      Model Zipline5 attrs=1
+        Part Last
+        Part Handle1
+        Part Handle2
+        Part First
+        MeshPart ZiplineShaft
+          Texture Back
+          Texture Left
+          Texture Front
+          Texture Right
+      Model Zipline6 attrs=1
+        Part Last
+        Part First
+        Part Handle1
+        MeshPart ZiplineShaft
+          Texture Back
+          Texture Left
+          Texture Front
+          Texture Right
+      Model Zipline7 attrs=1
+        Part Last
+        Part First
+        MeshPart ZiplineShaft
+          Texture Back
+          Texture Left
+          Texture Front
+          Texture Right
+      Model Launchpad6 attrs=1
+        AnimationController AnimationController
+          Animator Animator
+        Animation LaunchAnimation AnimationId=rbxassetid://91724750311438
+        MeshPart MeshPart1
+          Weld Weld
+        UnionOperation Union
+          Weld Part1
+          Weld Union1
+          Weld Part4
+          Weld Pillar
+          Weld Union2
+          Weld Union
+          Weld Part5
+        UnionOperation Union2
+        Part Part5
+          Decal Decal
+        Part Part4
+          Decal Decal
+        Part Part3
+        UnionOperation Union
+        Part Part3
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        UnionOperation Union
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        Part Origin
+          Motor6D Union
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        MeshPart MeshPart2
+          Weld Weld
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part1
+          Decal Decal
+        Part LaunchGoal
+        UnionOperation Union1
+        Part Part3
+        Part Part3
+        Part Pillar
+        Part Part3
+        Part Part3
+      Model Launchpad7 attrs=1
+        AnimationController AnimationController
+          Animator Animator
+        Animation LaunchAnimation AnimationId=rbxassetid://91724750311438
+        Part Part3
+        UnionOperation Union
+        Part Pillar
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        MeshPart MeshPart2
+          Weld Weld
+        UnionOperation Union
+          Weld Union2
+          Weld Union
+          Weld Pillar
+          Weld Part4
+          Weld Union1
+          Weld Part5
+          Weld Part1
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part4
+          Decal Decal
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        Part Origin
+          Motor6D Union
+        UnionOperation Union1
+        MeshPart MeshPart2
+          Weld Weld
+        Part Part3
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part3
+        Part LaunchGoal
+        UnionOperation Union2
+        UnionOperation Union
+        Part Part1
+          Decal Decal
+        Part Part3
+        Part Part5
+          Decal Decal
+        Part Part3
+      Model Launchpad8 attrs=1
+        AnimationController AnimationController
+          Animator Animator
+        Animation LaunchAnimation AnimationId=rbxassetid://91724750311438
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part5
+          Decal Decal
+        MeshPart MeshPart1
+          Weld Weld
+        UnionOperation Union1
+        Part Part3
+        UnionOperation Union
+          Weld Part1
+          Weld Pillar
+          Weld Union
+          Weld Union2
+          Weld Part4
+          Weld Part5
+          Weld Union1
+        Part Part4
+          Decal Decal
+        MeshPart MeshPart1
+          Weld Weld
+        MeshPart MeshPart2
+          Weld Weld
+        Part Origin
+          Motor6D Union
+        Part LaunchGoal
+        Part Part3
+        UnionOperation Union
+        Part Part3
+        UnionOperation Union
+        Part Part3
+        Part Part3
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        Part Part3
+        Part Part3
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        Part Pillar
+        UnionOperation Union2
+        Part Part1
+          Decal Decal
+      Model Launchpad9 attrs=1
+        AnimationController AnimationController
+          Animator Animator
+        Animation LaunchAnimation AnimationId=rbxassetid://91724750311438
+        Part Part3
+        Part Part1
+          Decal Decal
+        MeshPart MeshPart2
+          Weld Weld
+        UnionOperation Union2
+        Part Part3
+        UnionOperation Union
+          Weld Union2
+          Weld Part4
+          Weld Union
+          Weld Part5
+          Weld Union1
+          Weld Part1
+          Weld Pillar
+        Part Pillar
+        UnionOperation Union1
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        Part LaunchGoal
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part4
+          Decal Decal
+        Part Part5
+          Decal Decal
+        Part Part3
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        UnionOperation Union
+        Part Part3
+        UnionOperation Union
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        MeshPart MeshPart1
+          Weld Weld
+        Part Origin
+          Motor6D Union
+          Sound RELEASE SoundId=rbxassetid://128856783608079 attrs=1
+        Part Part3
+        Part Part3
+      Model Zipline8 attrs=1
+        Part First
+        Part Handle1
+        Part Last
+        MeshPart ZiplineShaft
+          Texture Back
+          Texture Left
+          Texture Front
+          Texture Right
+      Model Zipline9 attrs=1
+        Part First
+        Part Handle1
+        Part Last
+        MeshPart ZiplineShaft
+          Texture Back
+          Texture Left
+          Texture Front
+          Texture Right
+      Model Zipline10 attrs=1
+        Part First
+        Part Last
+        MeshPart ZiplineShaft
+          Texture Back
+          Texture Left
+          Texture Front
+          Texture Right
+      Model Launchpad7 attrs=1
+        AnimationController AnimationController
+          Animator Animator
+        Animation LaunchAnimation AnimationId=rbxassetid://91724750311438
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        MeshPart MeshPart2
+          Weld Weld
+        Part Pillar
+        UnionOperation Union1
+        Part Part3
+        Part Part3
+        Part Part3
+        Part Part3
+        Part Part4
+          Decal Decal
+        Part Part3
+        UnionOperation Union
+          Weld Part1
+          Weld Union1
+          Weld Part5
+          Weld Union2
+          Weld Union
+          Weld Part4
+          Weld Pillar
+        MeshPart MeshPart2
+          Weld Weld
+        Part Origin
+          Motor6D Union
+        UnionOperation Union
+        Part Part5
+          Decal Decal
+        Part LaunchGoal
+        MeshPart MeshPart1
+          Weld Weld
+        UnionOperation Union2
+        Part Part1
+          Decal Decal
+        UnionOperation Union
+        MeshPart MeshPart2
+          Weld Weld
+        Part Part3
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part3
+      Model Launchpad7 attrs=1
+        AnimationController AnimationController
+          Animator Animator
+        Animation LaunchAnimation AnimationId=rbxassetid://91724750311438
+        Part Part1
+          Decal Decal
+        Part LaunchGoal
+        UnionOperation Union1
+        Part Part4
+          Decal Decal
+        Part Part3
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        Part Part3
+        Part Part3
+        Part Part3
+        Part Part3
+        MeshPart MeshPart1
+          Weld Weld
+        MeshPart MeshPart2
+          Weld Weld
+        Part Part3
+        Part Origin
+          Motor6D Union
+        UnionOperation Union
+        MeshPart MeshPart1
+          Weld Weld
+        UnionOperation Union
+        UnionOperation Union
+          Weld Part4
+          Weld Union2
+          Weld Union1
+          Weld Part5
+          Weld Part1
+          Weld Union
+          Weld Pillar
+        UnionOperation Union2
+        Part Part5
+          Decal Decal
+        MeshPart MeshPart1
+          Weld Weld
+        Part Part3
+        Part Part3
+        MeshPart MeshPart2
+          Weld Weld
+        Part Pillar
+    Folder Hunt
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+      Part Part
+    Folder CameraAngles
+      Model Angle1
+        Part Position
+        Part LookAt
+    Part Centerpoint
+  Folder Entities
+    Model EmptyDummy
+      Part Head
+    Model EmptyDummy
+      Part Head
+    Model EmptyDummy
+      Part Head
+    Model EmptyDummy
+      Part Head
+    Model elijahdylanbro attrs=1
+      Part Head attrs=1
+        Decal face attrs=1
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+        SpecialMesh Mesh
+          Vector3Value FaceFrontAttachment Value=Vector3(-0.000, -0.014, -0.595)
+          Vector3Value HatAttachment Value=Vector3(-0.000, 0.607, -0.000)
+          Vector3Value HairAttachment Value=Vector3(-0.000, 0.607, -0.000)
+          Vector3Value FaceCenterAttachment Value=Vector3(-0.000, -0.094, -0.000)
+          Vector3Value NeckRigAttachment Value=Vector3(-0.000, -0.586, -0.000)
+          StringValue AvatarPartScaleType Value="Classic"
+        Attachment Attachment
+        Trail AfterTrail
+      Part Torso attrs=1
+        Decal roblox attrs=1
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm attrs=1
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+        Attachment Attachment
+        Trail AfterTrail
+      Part Right Arm attrs=1
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+        Attachment Attachment
+        Trail AfterTrail
+      Part Left Leg attrs=1
+        Attachment LeftFootAttachment
+        Attachment Attachment
+        Trail AfterTrail
+      Part Right Leg attrs=1
+        Attachment RightFootAttachment
+        Attachment Attachment
+        Trail AfterTrail
+      Humanoid Humanoid
+        Status Status
+        Animator Animator
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+      Part HumanoidRootPart attrs=1
+        Attachment RootAttachment
+        Motor6D RootJoint
+        Sound Climbing SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+        Sound Died SoundId=rbxasset://sounds/uuhhh.mp3
+        Sound GettingUp SoundId=rbxasset://sounds/action_get_up.mp3
+        Sound Swimming SoundId=rbxasset://sounds/action_swim.mp3
+        Sound Jumping SoundId=rbxasset://sounds/action_jump.mp3
+        Sound Landing SoundId=rbxasset://sounds/action_jump_land.mp3
+        Sound Splash SoundId=rbxasset://sounds/impact_water.mp3
+        Sound FreeFalling SoundId=rbxasset://sounds/action_falling.ogg
+        Sound Running SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+        Sound 2 SoundId=rbxassetid://111030763454870 attrs=1
+          EqualizerSoundEffect EqualizerSoundEffect
+        Sound DASH SoundId=rbxassetid://15252498172 attrs=1
+      Model Redliner attrs=1
+        Model Parts
+          UnionOperation Union attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part NeonPart1 attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Decal attrs=1
+            Decal Decal attrs=1
+          Part Decal attrs=1
+            Decal Decal attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Decal Decal attrs=1
+            Decal Decal attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+            Texture Texture attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+        Folder CharacterMotor6D
+          Motor6D Unequipped attrs=1
+          Motor6D Equipped attrs=1
+          Motor6D In_Matchmaking attrs=1
+        Part Handle attrs=1
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld NeonPart1
+          Weld Decal
+          Weld Decal
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+      CharacterMesh CharacterMesh
+      CharacterMesh CharacterMesh
+      CharacterMesh CharacterMesh
+      CharacterMesh CharacterMesh
+      Shirt Shirt
+      CharacterMesh CharacterMesh
+      Pants Pants
+      ShirtGraphic Shirt Graphic
+      Accessory KittyEars
+        Part Handle attrs=2
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.000, -0.177, -0.062)
+          SpecialMesh Mesh
+          Vector3Value OriginalSize Value=Vector3(1.049, 0.516, 0.110)
+          Weld AccessoryWeld
+      Accessory Necklace
+        Part Handle attrs=2
+          SpecialMesh Mesh
+          Attachment BodyFrontAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, -1.020, -0.500)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 2.000)
+          Weld AccessoryWeld
+      Accessory JackMonkey
+        Part Handle attrs=2
+          SpecialMesh Mesh
+          Attachment LeftCollarAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.050, -0.450, -0.250)
+          Vector3Value OriginalSize Value=Vector3(1.600, 0.800, 1.600)
+          Weld AccessoryWeld
+      Accessory MaiBackpack
+        Part Handle attrs=2
+          SpecialMesh Mesh
+          Attachment BodyBackAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, -0.200, 0.250)
+          Vector3Value OriginalSize Value=Vector3(1.600, 0.800, 1.600)
+          Weld AccessoryWeld
+      Accessory MeshPartAccessory
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment FaceFrontAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.004, -0.241, -0.396)
+          Vector3Value OriginalSize Value=Vector3(1.100, 1.100, 1.100)
+          Weld AccessoryWeld
+      Accessory CoolBoyHair
+        Part Handle attrs=2
+          SpecialMesh Mesh
+          Attachment HairAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.150, -0.000)
+          Vector3Value OriginalSize Value=Vector3(1.340, 1.350, 0.780)
+          Weld AccessoryWeld
+      BodyColors Body Colors
+      Folder Hurtboxes
+        Part Head_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.elijahdylanbro
+        Part Torso_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.elijahdylanbro
+        Part Left Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.elijahdylanbro
+        Part Right Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.elijahdylanbro
+        Part Left Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.elijahdylanbro
+        Part Right Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.elijahdylanbro
+        Part Parry_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.elijahdylanbro
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.elijahdylanbro
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.elijahdylanbro
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.elijahdylanbro
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.elijahdylanbro
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.elijahdylanbro
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.elijahdylanbro
+      Model WinterMON3P attrs=1
+        Folder CharacterMotor6D
+          Motor6D Unequipped attrs=1
+          Motor6D Equipped attrs=1
+        Model Parts attrs=1
+          MeshPart main.002 attrs=1
+            SurfaceAppearance SurfaceAppearance
+            Attachment Gunpoint
+          Part Part attrs=1
+          Part Part attrs=1
+          MeshPart main.003 attrs=1
+            SurfaceAppearance SurfaceAppearance
+        Part Handle attrs=1
+          Weld Part
+          Weld Part
+          Weld main.003
+          Weld main.002
+          Attachment Attachment
+      Part VapeExpandedHitbox
+        Weld Weld
+    Model WitherLand7 attrs=1
+      Part Head attrs=1
+        SpecialMesh Mesh
+        Decal face attrs=1
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+        Sound SMOOTH_RISER SoundId=rbxassetid://138232244624745 attrs=1
+      Part Torso attrs=1
+        Decal roblox attrs=1
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm attrs=1
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm attrs=1
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg attrs=1
+        Attachment LeftFootAttachment
+      Part Right Leg attrs=1
+        Attachment RightFootAttachment
+      Humanoid Humanoid
+        Status Status
+        Animator Animator
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+      Part HumanoidRootPart attrs=1
+        Attachment RootAttachment
+        Motor6D RootJoint
+        Sound Climbing SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+        Sound Died SoundId=rbxasset://sounds/uuhhh.mp3
+        Sound GettingUp SoundId=rbxasset://sounds/action_get_up.mp3
+        Sound Swimming SoundId=rbxasset://sounds/action_swim.mp3
+        Sound Jumping SoundId=rbxasset://sounds/action_jump.mp3
+        Sound Landing SoundId=rbxasset://sounds/action_jump_land.mp3
+        Sound Splash SoundId=rbxasset://sounds/impact_water.mp3
+        Sound FreeFalling SoundId=rbxasset://sounds/action_falling.ogg
+        Sound Running SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+      Accessory Memorial Day 2009 Army Helmet
+        Part Handle attrs=2
+          SpecialMesh Mesh
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, -0.050, -0.005)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      BodyColors Body Colors
+      Model Castigate attrs=1
+        Model Parts
+          MeshPart Cylinder7s attrs=1
+          MeshPart Hammer attrs=1
+          MeshPart Grip attrs=1
+            SurfaceAppearance SurfaceAppearance
+          MeshPart MainBarrel attrs=1
+            Attachment Gunpoint
+          MeshPart Muzzle attrs=1
+            SurfaceAppearance SurfaceAppearance
+          MeshPart MuzzleBase attrs=1
+            SurfaceAppearance SurfaceAppearance
+          MeshPart Rail attrs=1
+          MeshPart TopStrap attrs=1
+          MeshPart Trigger attrs=1
+          MeshPart UnderBarrel attrs=1
+          Part Engraving attrs=1
+            Decal Decal attrs=1
+        Folder CharacterMotor6D
+          Motor6D Unequipped attrs=1
+          Motor6D Equipped attrs=1
+          Motor6D In_Matchmaking attrs=1
+        ObjectValue Gunpoint Value=Workspace.Entities.WitherLand7.Castigate.Parts.MainBarrel.Gunpoint
+        Part Handle attrs=1
+          Weld Cylinder7s
+          Weld Hammer
+          Weld Grip
+          Weld MainBarrel
+          Weld Muzzle
+          Weld MuzzleBase
+          Weld Rail
+          Weld TopStrap
+          Weld Trigger
+          Weld UnderBarrel
+          Weld Engraving
+      Model Redliner attrs=1
+        Model Parts
+          UnionOperation Union attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part NeonPart1 attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Decal attrs=1
+            Decal Decal attrs=1
+          Part Decal attrs=1
+            Decal Decal attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Decal Decal attrs=1
+            Decal Decal attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+            Texture Texture attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+        Folder CharacterMotor6D
+          Motor6D Unequipped attrs=1
+          Motor6D Equipped attrs=1
+          Motor6D In_Matchmaking attrs=1
+        Part Handle attrs=1
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld NeonPart1
+          Weld Decal
+          Weld Decal
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+      Folder Hurtboxes
+        Part Head_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Torso_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Left Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Right Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Left Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Right Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Engraving_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part NeonPart1_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Decal_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Decal_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+        Part Parry_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WitherLand7
+      Part VapeExpandedHitbox
+        Weld Weld
+    Model Mulcible attrs=1
+      Part Head attrs=1
+        Decal face attrs=1
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+        SpecialMesh Mesh
+        Attachment Attachment
+        Trail AfterTrail
+      Part Torso attrs=1
+        Decal roblox attrs=1
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm attrs=1
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+        Attachment Attachment
+        Trail AfterTrail
+      Part Right Arm attrs=1
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+        Attachment Attachment
+        Trail AfterTrail
+      Part Left Leg attrs=1
+        Attachment LeftFootAttachment
+        Attachment Attachment
+        Trail AfterTrail
+      Part Right Leg attrs=1
+        Attachment RightFootAttachment
+        Attachment Attachment
+        Trail AfterTrail
+      Humanoid Humanoid
+        Status Status
+        Animator Animator
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+      Part HumanoidRootPart attrs=1
+        Attachment RootAttachment
+        Motor6D RootJoint
+        Sound Climbing SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+        Sound Died SoundId=rbxasset://sounds/uuhhh.mp3
+        Sound GettingUp SoundId=rbxasset://sounds/action_get_up.mp3
+        Sound Swimming SoundId=rbxasset://sounds/action_swim.mp3
+        Sound Jumping SoundId=rbxasset://sounds/action_jump.mp3
+        Sound Landing SoundId=rbxasset://sounds/action_jump_land.mp3
+        Sound Splash SoundId=rbxasset://sounds/impact_water.mp3
+        Sound FreeFalling SoundId=rbxasset://sounds/action_falling.ogg
+        Sound Running SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+      Shirt Shirt
+      Pants Pants
+      Accessory Accessory (black front hat)
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.029, -0.062, 0.196)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      Accessory Accessory (default)
+        Part Handle attrs=2
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.349, -0.135)
+          StringValue AvatarPartScaleType Value="Classic"
+          SpecialMesh SpecialMesh
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      Accessory Accessory (Hair 2)
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HairAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.420, 0.043)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      BodyColors Body Colors
+      Model Monarch attrs=1
+        Model Parts
+          MeshPart Rail attrs=1
+          MeshPart Scope attrs=1
+          MeshPart Body attrs=1
+          MeshPart MagazineHolder attrs=1
+          MeshPart Magazine attrs=1
+          MeshPart ScopeHolder attrs=1
+          MeshPart Trigger attrs=1
+          MeshPart Holder2 attrs=1
+          MeshPart TripodGrip attrs=1
+          MeshPart Holder1 attrs=1
+          MeshPart Barrel attrs=1
+            Attachment GunPoint
+          MeshPart Bolt attrs=1
+          MeshPart Muzzle attrs=1
+          MeshPart Grip attrs=1
+        Folder CharacterMotor6D
+          Motor6D Unequipped attrs=1
+          Motor6D Equipped attrs=1
+        Part Handle attrs=1
+          Motor6D TripodGrip
+          Motor6D Trigger
+          Motor6D ScopeHolder
+          Motor6D Scope
+          Motor6D Rail
+          Motor6D Muzzle
+          Motor6D MagazineHolder
+          Motor6D Magazine
+          Motor6D Holder2
+          Motor6D Holder1
+          Motor6D Grip
+          Motor6D Bolt
+          Motor6D Body
+          Motor6D Barrel
+      Model Darkness3P attrs=1
+        Folder CharacterMotor6D
+          Motor6D Unequipped attrs=1
+          Motor6D Equipped attrs=1
+          Motor6D In_Matchmaking attrs=1
+        Model Parts attrs=1
+          MeshPart HandleGlow attrs=1
+          MeshPart Handle attrs=1
+            SurfaceAppearance SurfaceAppearance
+            Attachment at1ds
+              Attachment at2ds
+              Beam glow
+              Beam glow
+              Beam glow
+          MeshPart BladeGlow attrs=1
+          MeshPart BladeAlpha attrs=1
+            SurfaceAppearance SurfaceAppearance
+        Part Handle attrs=1
+          Weld HandleGlow
+          Weld Handle
+          Weld BladeGlow
+          Weld BladeAlpha
+      Folder Hurtboxes
+        Part Head_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.Mulcible
+        Part Torso_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.Mulcible
+        Part Left Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.Mulcible
+        Part Right Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.Mulcible
+        Part Left Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.Mulcible
+        Part Right Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.Mulcible
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.Mulcible
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.Mulcible
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.Mulcible
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.Mulcible
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.Mulcible
+        Part Parry_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.Mulcible
+      Part VapeExpandedHitbox
+        Weld Weld
+    Model bombey132 attrs=1
+      Part Head attrs=1
+        Decal face attrs=1
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+        SpecialMesh Mesh
+          Vector3Value FaceCenterAttachment Value=Vector3(0.000, 0.000, 0.000)
+          Vector3Value FaceFrontAttachment Value=Vector3(0.000, 0.000, -0.600)
+          Vector3Value HairAttachment Value=Vector3(0.000, 0.600, 0.000)
+          Vector3Value HatAttachment Value=Vector3(0.000, 0.600, 0.000)
+          Vector3Value NeckRigAttachment Value=Vector3(0.000, -0.500, 0.000)
+      Part Torso attrs=1
+        Decal roblox attrs=1
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm attrs=1
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm attrs=1
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg attrs=1
+        Attachment LeftFootAttachment
+      Part Right Leg attrs=1
+        Attachment RightFootAttachment
+      Humanoid Humanoid
+        Status Status
+        Animator Animator
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+      Part HumanoidRootPart attrs=1
+        Attachment RootAttachment
+        Motor6D RootJoint
+        Sound Climbing SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+        Sound Died SoundId=rbxasset://sounds/uuhhh.mp3
+        Sound GettingUp SoundId=rbxasset://sounds/action_get_up.mp3
+        Sound Swimming SoundId=rbxasset://sounds/action_swim.mp3
+        Sound Jumping SoundId=rbxasset://sounds/action_jump.mp3
+        Sound Landing SoundId=rbxasset://sounds/action_jump_land.mp3
+        Sound Splash SoundId=rbxasset://sounds/impact_water.mp3
+        Sound FreeFalling SoundId=rbxasset://sounds/action_falling.ogg
+        Sound Running SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+      Model Redliner attrs=1
+        Model Parts
+          UnionOperation Union attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part NeonPart1 attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Decal attrs=1
+            Decal Decal attrs=1
+          Part Decal attrs=1
+            Decal Decal attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Decal Decal attrs=1
+            Decal Decal attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+            Texture Texture attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+        Folder CharacterMotor6D
+          Motor6D Unequipped attrs=1
+          Motor6D Equipped attrs=1
+          Motor6D In_Matchmaking attrs=1
+        Part Handle attrs=1
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld NeonPart1
+          Weld Decal
+          Weld Decal
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+      CharacterMesh CharacterMesh
+      Shirt Shirt
+      Pants Pants
+      Accessory cape - black
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment BodyBackAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.764, 0.362)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      Accessory Shortcape
+        Part Handle attrs=2
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment BodyBackAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, -0.474, -0.491)
+          SpecialMesh Mesh
+          Vector3Value OriginalSize Value=Vector3(2.164, 1.328, 1.293)
+          Weld AccessoryWeld
+      Accessory Left Shortcape Sleeve
+        Part Handle attrs=2
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment LeftShoulderAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.014, 0.484, -0.022)
+          SpecialMesh Mesh
+          Vector3Value OriginalSize Value=Vector3(1.090, 1.034, 1.166)
+          Weld AccessoryWeld
+      Accessory Right Shortcape Sleeve
+        Part Handle attrs=2
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment RightShoulderAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.000, 0.477, -0.018)
+          SpecialMesh Mesh
+          Vector3Value OriginalSize Value=Vector3(1.090, 1.044, 1.166)
+          Weld AccessoryWeld
+      Accessory Accessory (Vania_Hat)
+        Part Handle attrs=2
+          SpecialMesh Mesh
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.000, -0.095, 0.022)
+          StringValue AvatarPartScaleType Value="Classic"
+          Vector3Value OriginalSize Value=Vector3(2.831, 1.500, 2.956)
+          Weld AccessoryWeld
+      Accessory Accessory (Vania_Scarf)
+        Part Handle attrs=2
+          SpecialMesh Mesh
+          Attachment NeckAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.003, 0.102, -0.012)
+          StringValue AvatarPartScaleType Value="Classic"
+          Vector3Value OriginalSize Value=Vector3(2.205, 0.842, 1.499)
+          Weld AccessoryWeld
+      Accessory Accessory (LongSideBraidHair_Combo)
+        Part Handle attrs=2
+          SpecialMesh Mesh
+          Attachment HairAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.000, 1.280, -0.130)
+          StringValue AvatarPartScaleType Value="Classic"
+          Vector3Value OriginalSize Value=Vector3(2.765, 3.234, 1.880)
+          Weld AccessoryWeld
+      BodyColors Body Colors
+      Model Siege attrs=1
+        Model Parts
+          Model shells
+            MeshPart Shells attrs=1
+              Weld Cylinder.001
+              Weld Cylinder1
+              Weld Cylinder2
+              Weld Cylinder3
+              Weld Cylinder4
+            MeshPart Cylinder.001 attrs=1
+            MeshPart Cylinder1 attrs=1
+            MeshPart Cylinder2 attrs=1
+            MeshPart Cylinder3 attrs=1
+            MeshPart Cylinder4 attrs=1
+          MeshPart Rails.001 attrs=1
+          MeshPart Rails attrs=1
+          MeshPart Cube1 attrs=1
+          MeshPart Hinge attrs=1
+            Weld Cube.001
+            Motor6D Shells
+            Weld Rails.001
+            Weld Barrels
+            Weld Cube1
+            Weld Rails
+          MeshPart Cube.001 attrs=1
+          MeshPart Barrels attrs=1
+            Attachment GunPoint
+          MeshPart Barrels.001 attrs=1
+          MeshPart Cube.002 attrs=1
+          MeshPart Cube.005 attrs=1
+          MeshPart Cube.006 attrs=1
+          MeshPart Cube.007 attrs=1
+          MeshPart Cube.008 attrs=1
+          MeshPart Cube attrs=1
+        Folder CharacterMotor6D
+          Motor6D Equipped attrs=1
+          Motor6D Unequipped attrs=1
+        Part Handle attrs=1
+          Motor6D Cube.004
+          Weld Barrels.001
+          Weld Cube
+          Weld Cube.002
+          Weld Cube.005
+          Weld Cube.006
+          Weld Cube.007
+          Weld Cube.008
+      Folder Hurtboxes
+        Part Head_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Torso_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Left Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Right Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Left Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Right Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part NeonPart1_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Decal_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Decal_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+        Part Parry_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.bombey132
+      Part VapeExpandedHitbox
+        Weld Weld
+    Model cjslanging attrs=1
+      Part Head attrs=1
+        Decal face attrs=1
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+        SpecialMesh Mesh
+          Vector3Value FaceFrontAttachment Value=Vector3(0.000, -0.014, -0.594)
+          Vector3Value HatAttachment Value=Vector3(0.000, 0.607, 0.000)
+          Vector3Value HairAttachment Value=Vector3(0.000, 0.607, 0.000)
+          Vector3Value FaceCenterAttachment Value=Vector3(0.000, -0.094, 0.000)
+          Vector3Value NeckRigAttachment Value=Vector3(0.000, -0.586, 0.000)
+          StringValue AvatarPartScaleType Value="Classic"
+      Part Torso attrs=1
+        Decal roblox attrs=1
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm attrs=1
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm attrs=1
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg attrs=1
+        Attachment LeftFootAttachment
+      Part Right Leg attrs=1
+        Attachment RightFootAttachment
+      Humanoid Humanoid
+        Status Status
+        Animator Animator
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+      Part HumanoidRootPart attrs=1
+        Attachment RootAttachment
+        Motor6D RootJoint
+        Sound Climbing SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+        Sound Died SoundId=rbxasset://sounds/uuhhh.mp3
+        Sound GettingUp SoundId=rbxasset://sounds/action_get_up.mp3
+        Sound Swimming SoundId=rbxasset://sounds/action_swim.mp3
+        Sound Jumping SoundId=rbxasset://sounds/action_jump.mp3
+        Sound Landing SoundId=rbxasset://sounds/action_jump_land.mp3
+        Sound Splash SoundId=rbxasset://sounds/impact_water.mp3
+        Sound FreeFalling SoundId=rbxasset://sounds/action_falling.ogg
+        Sound Running SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+      Shirt Shirt
+      Pants Pants
+      Accessory Neck
+        Part Handle attrs=2
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment NeckAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.004, 0.233, -0.005)
+          SpecialMesh Mesh
+          Vector3Value OriginalSize Value=Vector3(1.500, 0.500, 1.000)
+          Weld AccessoryWeld
+      Accessory ushanka
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment FaceCenterAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.015, -0.186, -0.000)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      Accessory Accessory (defaultAccessory)
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HairAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.046, 0.027, 0.142)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      BodyColors Body Colors
+      Model Siege attrs=1
+        Model Parts
+          Model shells
+            MeshPart Shells attrs=1
+              Weld Cylinder.001
+              Weld Cylinder1
+              Weld Cylinder2
+              Weld Cylinder3
+              Weld Cylinder4
+            MeshPart Cylinder.001 attrs=1
+            MeshPart Cylinder1 attrs=1
+            MeshPart Cylinder2 attrs=1
+            MeshPart Cylinder3 attrs=1
+            MeshPart Cylinder4 attrs=1
+          MeshPart Rails.001 attrs=1
+          MeshPart Rails attrs=1
+          MeshPart Cube1 attrs=1
+          MeshPart Hinge attrs=1
+            Weld Cube.001
+            Motor6D Shells
+            Weld Rails.001
+            Weld Barrels
+            Weld Cube1
+            Weld Rails
+          MeshPart Cube.001 attrs=1
+          MeshPart Barrels attrs=1
+            Attachment GunPoint
+          MeshPart Barrels.001 attrs=1
+          MeshPart Cube.002 attrs=1
+          MeshPart Cube.005 attrs=1
+          MeshPart Cube.006 attrs=1
+          MeshPart Cube.007 attrs=1
+          MeshPart Cube.008 attrs=1
+          MeshPart Cube attrs=1
+        Folder CharacterMotor6D
+          Motor6D Equipped attrs=1
+          Motor6D Unequipped attrs=1
+        Part Handle attrs=1
+          Motor6D Cube.004
+          Weld Barrels.001
+          Weld Cube
+          Weld Cube.002
+          Weld Cube.005
+          Weld Cube.006
+          Weld Cube.007
+          Weld Cube.008
+      Model Redliner attrs=1
+        Model Parts
+          UnionOperation Union attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part NeonPart1 attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Decal attrs=1
+            Decal Decal attrs=1
+          Part Decal attrs=1
+            Decal Decal attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Decal Decal attrs=1
+            Decal Decal attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+            Texture Texture attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+        Folder CharacterMotor6D
+          Motor6D Unequipped attrs=1
+          Motor6D Equipped attrs=1
+          Motor6D In_Matchmaking attrs=1
+        Part Handle attrs=1
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld NeonPart1
+          Weld Decal
+          Weld Decal
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+      Folder Hurtboxes
+        Part Head_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Torso_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Left Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Right Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Left Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Right Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part NeonPart1_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Decal_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Decal_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+        Part Parry_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.cjslanging
+      Part VapeExpandedHitbox
+        Weld Weld
+    Model hurcules2531 attrs=1
+      Part Head attrs=1
+        Decal face attrs=1
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+        SpecialMesh Mesh
+          Vector3Value FaceFrontAttachment Value=Vector3(0.000, -0.014, -0.594)
+          Vector3Value HatAttachment Value=Vector3(0.000, 0.607, 0.000)
+          Vector3Value HairAttachment Value=Vector3(0.000, 0.607, 0.000)
+          Vector3Value FaceCenterAttachment Value=Vector3(0.000, -0.094, 0.000)
+          Vector3Value NeckRigAttachment Value=Vector3(0.000, -0.586, 0.000)
+          StringValue AvatarPartScaleType Value="Classic"
+        Sound PARRY_READY2 SoundId=rbxassetid://139193033689277 attrs=1
+        Attachment Attachment
+        Trail AfterTrail
+        Sound PARRY_READY2 SoundId=rbxassetid://139193033689277 attrs=1
+      Part Torso attrs=1
+        Decal roblox attrs=1
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm attrs=1
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+        Attachment Attachment
+        Trail AfterTrail
+      Part Right Arm attrs=1
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+        Attachment Attachment
+        Trail AfterTrail
+      Part Left Leg attrs=1
+        Attachment LeftFootAttachment
+        Attachment Attachment
+        Trail AfterTrail
+      Part Right Leg attrs=1
+        Attachment RightFootAttachment
+        Attachment Attachment
+        Trail AfterTrail
+      Humanoid Humanoid
+        Status Status
+        Animator Animator
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+      Part HumanoidRootPart attrs=1
+        Attachment RootAttachment
+        Motor6D RootJoint
+        Sound Climbing SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+        Sound Died SoundId=rbxasset://sounds/uuhhh.mp3
+        Sound GettingUp SoundId=rbxasset://sounds/action_get_up.mp3
+        Sound Swimming SoundId=rbxasset://sounds/action_swim.mp3
+        Sound Jumping SoundId=rbxasset://sounds/action_jump.mp3
+        Sound Landing SoundId=rbxasset://sounds/action_jump_land.mp3
+        Sound Splash SoundId=rbxasset://sounds/impact_water.mp3
+        Sound FreeFalling SoundId=rbxasset://sounds/action_falling.ogg
+        Sound Running SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+        Sound 3 SoundId=rbxassetid://113001795037321 attrs=1
+          EqualizerSoundEffect EqualizerSoundEffect
+        Sound DASH SoundId=rbxassetid://15252498172 attrs=1
+      Model Redliner attrs=1
+        Model Parts
+          UnionOperation Union attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part NeonPart1 attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Part attrs=1
+          Part Decal attrs=1
+            Decal Decal attrs=1
+          Part Decal attrs=1
+            Decal Decal attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Texture Texture attrs=1
+            Decal Decal attrs=1
+            Decal Decal attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+            Texture Texture attrs=1
+          MeshPart MeshPart attrs=1
+          MeshPart MeshPart attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+          UnionOperation Union attrs=1
+        Folder CharacterMotor6D
+          Motor6D Unequipped attrs=1
+          Motor6D Equipped attrs=1
+          Motor6D In_Matchmaking attrs=1
+        Part Handle attrs=1
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld Part
+          Weld NeonPart1
+          Weld Decal
+          Weld Decal
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld MeshPart
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+          Weld Union
+      CharacterMesh CharacterMesh
+      CharacterMesh CharacterMesh
+      Shirt Shirt
+      CharacterMesh Roblox 2.0 Right Arm
+      Pants Pants
+      Accessory HaHaHa Animated
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment BodyBackAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.051, -1.957, -0.626)
+          Vector3Value OriginalSize Value=Vector3(0.972, 1.061, 1.004)
+          Weld AccessoryWeld
+      Accessory Accessory (MeshPartAccessory)
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment FaceCenterAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, -0.005, 0.007)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      Accessory Accessory (Meshes/meshPartAccessory)
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.211, -0.257)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      Accessory Accessory (Meshes/KittyShoulderPalAccessory)
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment LeftShoulderAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.020, -0.377, -0.000)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      Accessory Accessory (autism chain necklace)
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment NeckAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.026, 0.190, 0.052)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      BodyColors Body Colors
+      Model Castigate attrs=1
+        Model Parts
+          MeshPart Cylinder7s attrs=1
+          MeshPart Hammer attrs=1
+          MeshPart Grip attrs=1
+            SurfaceAppearance SurfaceAppearance
+          MeshPart MainBarrel attrs=1
+            Attachment Gunpoint
+          MeshPart Muzzle attrs=1
+            SurfaceAppearance SurfaceAppearance
+          MeshPart MuzzleBase attrs=1
+            SurfaceAppearance SurfaceAppearance
+          MeshPart Rail attrs=1
+          MeshPart TopStrap attrs=1
+          MeshPart Trigger attrs=1
+          MeshPart UnderBarrel attrs=1
+          Part Engraving attrs=1
+            Decal Decal attrs=1
+        Folder CharacterMotor6D
+          Motor6D Unequipped attrs=1
+          Motor6D Equipped attrs=1
+          Motor6D In_Matchmaking attrs=1
+        ObjectValue Gunpoint Value=Workspace.Entities.hurcules2531.Castigate.Parts.MainBarrel.Gunpoint
+        Part Handle attrs=1
+          Weld Cylinder7s
+          Weld Hammer
+          Weld Grip
+          Weld MainBarrel
+          Weld Muzzle
+          Weld MuzzleBase
+          Weld Rail
+          Weld TopStrap
+          Weld Trigger
+          Weld UnderBarrel
+          Weld Engraving
+      Folder Hurtboxes
+        Part Head_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Torso_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Left Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Right Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Left Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Right Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part NeonPart1_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Part_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Decal_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Decal_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Engraving_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+        Part Parry_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.hurcules2531
+      Part VapeExpandedHitbox
+        Weld Weld
+      Highlight Highlight
+    Model WhyisAaron attrs=1
+      Part Head attrs=1
+        SpecialMesh Mesh
+        Decal face attrs=1
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+        Sound SMOOTH_RISER SoundId=rbxassetid://138232244624745 attrs=1
+      Part Torso attrs=1
+        Decal roblox attrs=1
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm attrs=1
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm attrs=1
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg attrs=1
+        Attachment LeftFootAttachment
+      Part Right Leg attrs=1
+        Attachment RightFootAttachment
+      Humanoid Humanoid
+        Status Status
+        Animator Animator
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+      Part HumanoidRootPart attrs=1
+        Attachment RootAttachment
+        Motor6D RootJoint
+        Sound Climbing SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+        Sound Died SoundId=rbxasset://sounds/uuhhh.mp3
+        Sound GettingUp SoundId=rbxasset://sounds/action_get_up.mp3
+        Sound Swimming SoundId=rbxasset://sounds/action_swim.mp3
+        Sound Jumping SoundId=rbxasset://sounds/action_jump.mp3
+        Sound Landing SoundId=rbxasset://sounds/action_jump_land.mp3
+        Sound Splash SoundId=rbxasset://sounds/impact_water.mp3
+        Sound FreeFalling SoundId=rbxasset://sounds/action_falling.ogg
+        Sound Running SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+      Model Jetstream3P attrs=1
+        Folder CharacterMotor6D
+          Motor6D Unequipped attrs=1
+          Motor6D Equipped attrs=1
+          Motor6D In_Matchmaking attrs=1
+        Model Parts
+          MeshPart Meshes/muramasa_MurasamaSword attrs=1
+          MeshPart Meshes/muramasa_MurasamaSword attrs=1
+          MeshPart Meshes/muramasa_MurasamaSword.001 attrs=1
+          MeshPart Meshes/muramasa_MurasamaSword.002 attrs=1
+        Part Handle attrs=1
+          Weld Meshes/muramasa_MurasamaSword.002
+          Weld Meshes/muramasa_MurasamaSword.001
+          Weld Meshes/muramasa_MurasamaSword
+          Weld Meshes/muramasa_MurasamaSword
+      Shirt Shirt
+      Pants Pants
+      Accessory Meshes/Daisy bouquet (1)Accessory
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment WaistCenterAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.067, 1.411, 0.023)
+          Vector3Value OriginalSize Value=Vector3(3.300, 1.000, 1.300)
+          Weld AccessoryWeld
+      Accessory FlowerEyesWHITE
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment FaceFrontAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, -0.049, -0.065)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      Accessory Facless Blush Face Mask Skin Tone
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment FaceCenterAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, -0.000, -0.000)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      Accessory Accessory (BRose (Left))
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment BodyFrontAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.668, -0.194, -0.696)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      Accessory Accessory (WRose (Left))
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment BodyFrontAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.592, -0.215, -0.755)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      Accessory FlowerCrown_AccAccessory
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HatAttachment attrs=1
+            Vector3Value OriginalPosition Value=Vector3(0.007, 0.260, -0.020)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Attachment vfx_att
+            ParticleEmitter Snowflake
+          Weld AccessoryWeld
+      Accessory Accessory (New Accessory)
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          Attachment HatAttachment attrs=1
+            Vector3Value OriginalPosition Value=Vector3(0.001, -0.143, -0.560)
+          StringValue AvatarPartScaleType Value="Classic"
+          Vector3Value OriginalSize Value=Vector3(1.373, 0.543, 0.472)
+          Weld AccessoryWeld
+      Accessory Accessory (flower aura)
+        Part Handle attrs=2
+          SpecialMesh Mesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment NeckAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.076, -0.109, 0.000)
+          Vector3Value OriginalSize Value=Vector3(1.200, 1.069, 1.193)
+          Weld AccessoryWeld
+      Accessory Accessory (Hat_GG_Diadem Of Resurgence)
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.000, 0.030, 0.040)
+          StringValue AvatarPartScaleType Value="Classic"
+          Vector3Value OriginalSize Value=Vector3(1.592, 2.102, 1.306)
+          Weld AccessoryWeld
+      Accessory Accessory (MeshPartAccessory)
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HairAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.046, 0.882, 0.056)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      BodyColors Body Colors
+      Model AfterburnSIE3P attrs=1
+        Folder CharacterMotor6D
+          Motor6D Equipped attrs=1
+          Motor6D Unequipped attrs=1
+        Model Parts attrs=1
+          MeshPart Rails attrs=1
+            SurfaceAppearance SurfaceAppearance
+          MeshPart Rails.001 attrs=1
+            SurfaceAppearance SurfaceAppearance
+            Attachment Gunpoint
+          MeshPart Hinge attrs=1
+            Weld Rails.001
+        Part Handle attrs=1
+          Weld Rails.001
+          Weld Rails
+          Weld Hinge
+          Attachment Gunpoint
+      Folder Hurtboxes
+        Part Head_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Torso_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Left Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Right Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Left Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Right Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+        Part Parry_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Entities.WhyisAaron
+      Part VapeExpandedHitbox
+        Weld Weld
+  Folder Debris
+    Model Bj2f6 attrs=1
+      Part Head attrs=1
+        SpecialMesh Mesh
+        Decal face attrs=1
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+      Part Torso attrs=1
+        Decal roblox attrs=1
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm attrs=1
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm attrs=1
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg attrs=1
+        Attachment LeftFootAttachment
+      Part Right Leg attrs=1
+        Attachment RightFootAttachment
+      Humanoid Humanoid
+        Status Status
+        Animator Animator
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+      Part HumanoidRootPart attrs=1
+        Attachment RootAttachment
+        Motor6D RootJoint
+        Sound Climbing SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+        Sound Died SoundId=rbxasset://sounds/uuhhh.mp3
+        Sound GettingUp SoundId=rbxasset://sounds/action_get_up.mp3
+        Sound Swimming SoundId=rbxasset://sounds/action_swim.mp3
+        Sound Jumping SoundId=rbxasset://sounds/action_jump.mp3
+        Sound Landing SoundId=rbxasset://sounds/action_jump_land.mp3
+        Sound Splash SoundId=rbxasset://sounds/impact_water.mp3
+        Sound FreeFalling SoundId=rbxasset://sounds/action_falling.ogg
+        Sound Running SoundId=rbxasset://sounds/action_footsteps_plastic.mp3
+      Pants Pants
+      Accessory Accessory (MeshPart veil)
+        Part Handle attrs=2
+          SpecialMesh SpecialMesh
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.018, 0.749, -0.139)
+          StringValue AvatarPartScaleType Value="Classic"
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+      BodyColors Body Colors
+      Model AfterburnSIE3P attrs=1
+        Folder CharacterMotor6D
+          Motor6D Equipped attrs=1
+          Motor6D Unequipped attrs=1
+        Model Parts attrs=1
+          MeshPart Rails attrs=1
+            SurfaceAppearance SurfaceAppearance
+          MeshPart Rails.001 attrs=1
+            SurfaceAppearance SurfaceAppearance
+            Attachment Gunpoint
+          MeshPart Hinge attrs=1
+            Weld Rails.001
+        Part Handle attrs=1
+          Weld Rails.001
+          Weld Rails
+          Weld Hinge
+          Attachment Gunpoint
+      Model Darkness3P attrs=1
+        Folder CharacterMotor6D
+          Motor6D Unequipped attrs=1
+          Motor6D Equipped attrs=1
+          Motor6D In_Matchmaking attrs=1
+        Model Parts attrs=1
+          MeshPart HandleGlow attrs=1
+          MeshPart Handle attrs=1
+            SurfaceAppearance SurfaceAppearance
+            Attachment at1ds
+              Attachment at2ds
+              Beam glow
+              Beam glow
+              Beam glow
+          MeshPart BladeGlow attrs=1
+          MeshPart BladeAlpha attrs=1
+            SurfaceAppearance SurfaceAppearance
+        Part Handle attrs=1
+          Weld HandleGlow
+          Weld Handle
+          Weld BladeGlow
+          Weld BladeAlpha
+      Folder Hurtboxes
+        Part Head_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Debris.Bj2f6
+        Part Torso_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Debris.Bj2f6
+        Part Left Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Debris.Bj2f6
+        Part Right Arm_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Debris.Bj2f6
+        Part Left Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Debris.Bj2f6
+        Part Right Leg_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Debris.Bj2f6
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Debris.Bj2f6
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Debris.Bj2f6
+        Part Handle_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Debris.Bj2f6
+        Part Parry_Hurtbox attrs=2
+          Weld Weld
+          ObjectValue model_identifier Value=Workspace.Debris.Bj2f6
+      Part Part
+        Weld Weld
+  Terrain Terrain
+    Clouds Clouds
+  SpawnLocation SpawnLocation
+  Folder SilentAimTracers
