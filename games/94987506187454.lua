@@ -2,7 +2,7 @@
 	REDLINER shared game script (MAIN + FFA + MATCH place IDs).
 	Place IDs: 94987506187454 (main), 115875349872417 (FFA), 126691165749976 (match).
 	All three places share one Vape profile config (FFA place ID 115875349872417).
-	Auto Parry, Auto Attack, Reach, HitBoxes, Draw Timer HUD,
+	Auto Parry, Kill aura, HitBoxes, Draw Timer HUD,
 	Hitbox Visualizer (swing/cone/bullet/enemy).
 ]]
 
@@ -39,6 +39,7 @@ local entitylib = vape.Libraries.entity
 
 pcall(function()
 	vape:Remove('Reach')
+	vape:Remove('Auto Attack')
 	vape:Remove('HitBoxes')
 end)
 
@@ -194,8 +195,7 @@ local autoParryActive = false
 local alwaysParryActive = false
 local alwaysParryVelocitySetting = ALWAYS_PARRY_DEFAULT_VELOCITY
 local autoAttackActive = false
-local reachActive = false
-local reachExtend = 0
+local reachExtend = 6
 local redlinerHitboxesActive = false
 local redlinerHitboxExpand = 0
 local redlinerHitboxVisualize = false
@@ -767,7 +767,10 @@ getResolvedMeleePacket = function()
 end
 
 function getMeleeReach()
-	return BASE_SWORD_REACH + (reachActive and reachExtend or 0)
+	if not autoAttackActive then
+		return BASE_SWORD_REACH
+	end
+	return math.max(autoAttackRangeSetting, BASE_SWORD_REACH) + reachExtend
 end
 
 -- ---------------------------------------------------------------------------
@@ -2296,7 +2299,7 @@ bindLocalRespawnHandler = function()
 				return
 			end
 			refreshMyHurtboxes()
-			if autoAttackActive or alwaysParryActive or reachActive then
+			if autoAttackActive or alwaysParryActive then
 				if invalidateClientClassesCache then
 					invalidateClientClassesCache()
 				end
@@ -2685,7 +2688,7 @@ getEnemyHurtboxesInRange = function(range, origin, requireVisible)
 		return a.Distance < b.Distance
 	end)
 	local results = {}
-	local maxResults = (autoAttackActive or reachActive) and AUTO_ATTACK_MAX_HURTBOXES or 8
+	local maxResults = autoAttackActive and AUTO_ATTACK_MAX_HURTBOXES or 8
 	for i = 1, math.min(#sorted, maxResults) do
 		table.insert(results, sorted[i].Part)
 	end
@@ -2924,24 +2927,21 @@ local function wrapReachCallable(label, fn, wrapperFactory)
 end
 
 getActiveMeleeReach = function()
-	if reachActive then
-		return getMeleeReach()
-	end
 	if autoAttackActive then
-		return math.max(autoAttackRangeSetting, BASE_SWORD_REACH)
+		return getMeleeReach()
 	end
 	return BASE_SWORD_REACH
 end
 
 local function getHitboxCastExtend()
-	if reachActive then
+	if autoAttackActive then
 		return reachExtend
 	end
 	return 0
 end
 
 local function shouldExtendMeleeCombat()
-	return reachActive or autoAttackActive
+	return autoAttackActive
 end
 
 safeAimDirection = function(origin, targetPos, fallback)
@@ -3192,32 +3192,6 @@ applyClashVelocitySpoof = function()
 	movement[velocityField] = horiz * getAlwaysParryVelocityMag()
 end
 
-local function aimAutoAttackHitboxes(attack)
-	if not autoAttackActive or type(attack) ~= 'table' or type(attack.hitboxes) ~= 'table' then
-		return
-	end
-	local root = getLocalRoot()
-	if not root then
-		return
-	end
-	local target = getNearestEnemyInAttackRange(autoAttackRangeSetting)
-	if not target then
-		return
-	end
-	local targetPart = target:FindFirstChild('HumanoidRootPart')
-		or target:FindFirstChild('Head_Hurtbox')
-		or target:FindFirstChild('Head')
-	if not targetPart then
-		return
-	end
-	local origin = CFrame.lookAt(root.Position, targetPart.Position)
-	for _, hb in attack.hitboxes do
-		if type(hb) == 'table' then
-			hb.origin = origin
-		end
-	end
-end
-
 local function getMeleePacketBaseFire()
 	if not resolveRedlinerRuntime() then
 		return nil
@@ -3385,11 +3359,10 @@ installAttackReachHook = function()
 		end
 		local function makeWrapper(oldFn)
 			return function(attack, ...)
-				aimAutoAttackHitboxes(attack)
 				local results = oldFn(attack, ...)
 				local added = extendAttackHurtboxes(attack)
 				if shouldExtendMeleeCombat() and type(attack.hit_hurtboxes) == 'table' and #attack.hit_hurtboxes > 0 then
-					if reachDebugEnabled or (reachActive and reachExtend > 0) then
+					if reachDebugEnabled or (autoAttackActive and reachExtend > 0) then
 						reachDebugLog(
 							methodName,
 							'extend=', reachExtend,
@@ -3400,7 +3373,7 @@ installAttackReachHook = function()
 					end
 					return attack.hit_hurtboxes
 				end
-				if reachDebugEnabled or (reachActive and reachExtend > 0) then
+				if reachDebugEnabled or (autoAttackActive and reachExtend > 0) then
 					reachDebugLog(
 						methodName,
 						'extend=', reachExtend,
@@ -3444,7 +3417,7 @@ local function buildHitboxCastWrapper(oldCast)
 				'shape=', shape,
 				'extend=', reachExtend,
 				'totalReach=', getMeleeReach(),
-				'reachActive=', reachActive
+				'killAura=', autoAttackActive
 			)
 		end
 		if getHitboxCastExtend() > 0 then
@@ -3493,11 +3466,11 @@ local function buildHitboxCastWrapper(oldCast)
 				'shape=', shape,
 				'sizeType=', typeof(self.size),
 				'size=', origSize,
-				'reachActive=', reachActive,
+				'killAura=', autoAttackActive,
 				'reachExtend=', reachExtend
 			)
 		elseif reachDebugEnabled then
-			reachDebugSkip('cast_no_extend', 'cast without extension', 'shape=', shape, 'reachActive=', reachActive, 'extend=', reachExtend)
+			reachDebugSkip('cast_no_extend', 'cast without extension', 'shape=', shape, 'killAura=', autoAttackActive, 'extend=', reachExtend)
 		end
 		result = oldCast(self)
 		if hud.hitboxVisualizerSwingEnabled and shape == 'Cone' and typeof(origSize) == 'number' then
@@ -3610,7 +3583,7 @@ logReachHookStatus = function(context)
 	end
 	reachDebugLog(
 		'hook status (' .. context .. ')',
-		'reachActive=', reachActive,
+		'killAura=', autoAttackActive,
 		'extend=', reachExtend,
 		'totalReach=', getMeleeReach(),
 		'hitboxHook=', hitboxReachHooked,
@@ -3661,15 +3634,13 @@ bindPacketListeners = function()
 	if not resolveRedlinerRuntime() then
 		return
 	end
-	if autoParryActive or alwaysParryActive or autoAttackActive or reachActive then
+	if autoParryActive or alwaysParryActive or autoAttackActive then
 		installSessionPacketHook()
 	end
-	if reachActive or reachDebugEnabled or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
+	if autoAttackActive or reachDebugEnabled or hud.hitboxVisualizerSwingEnabled or hud.hitboxVisualizerBulletEnabled then
 		installCombatReachHooks()
-	elseif autoAttackActive and not attackReachHooked then
-		installAttackReachHook()
 	end
-	if (autoAttackActive or alwaysParryActive or reachActive) then
+	if autoAttackActive or alwaysParryActive then
 		rebuildMeleePacketFireChain()
 	end
 	installCombatEventHook()
@@ -3703,7 +3674,7 @@ end
 
 lplr.CharacterAdded:Connect(function()
 	task.defer(function()
-		if reachActive or autoAttackActive or alwaysParryActive then
+		if autoAttackActive or alwaysParryActive then
 			bindPacketListeners()
 		end
 	end)
@@ -3713,7 +3684,7 @@ end)
 
 run(function()
 -- ---------------------------------------------------------------------------
--- Auto attack
+-- Kill aura (auto melee)
 -- ---------------------------------------------------------------------------
 
 pressAttackClick = function()
@@ -3863,12 +3834,13 @@ local function tryAutoAttack(attackDelay)
 		return
 	end
 
-	local target = getNearestEnemyInAttackRange(autoAttackRangeSetting)
+	local attackRange = getMeleeReach()
+	local target = getNearestEnemyInAttackRange(attackRange)
 	if not target then
 		return
 	end
 
-	if hud.antiParryEnabled and shouldBlockMeleeAttack(autoAttackRangeSetting) then
+	if hud.antiParryEnabled and shouldBlockMeleeAttack(attackRange) then
 		return
 	end
 
@@ -3897,38 +3869,35 @@ end
 
 combatHeartbeat = function(meleeRange)
 	meleeRangeSetting = meleeRange
-	if reachActive or reachDebugEnabled or autoParryActive then
+	if autoAttackActive or reachDebugEnabled or autoParryActive then
 		bindPacketListeners()
 	end
 	if hud.hitboxVisualizerSwingEnabled and not hitboxReachHooked then
 		installHitboxReachHook()
 	end
 
-	if reachActive and (not hitboxReachHooked or not attackReachHooked or not meleePacketReachHooked) then
+	if autoAttackActive and (not hitboxReachHooked or not attackReachHooked or not meleePacketReachHooked) then
 		installCombatReachHooks()
 		if reachDebugEnabled then
 			logReachHookStatus('heartbeat retry')
 		end
-	elseif (autoAttackActive or alwaysParryActive) and not meleePacketReachHooked then
+	elseif alwaysParryActive and not meleePacketReachHooked then
 		resolveRedlinerRuntime(true)
 		rebuildMeleePacketFireChain()
-		if autoAttackActive and not attackReachHooked then
-			installAttackReachHook()
-		end
 	end
 
 	if reachDebugEnabled and tick() - lastReachDebugHeartbeat > 2 then
 		lastReachDebugHeartbeat = tick()
 		local root = getLocalRoot()
-		local meleeReach = getMeleeReach()
+		local meleeReach = autoAttackActive and getMeleeReach() or BASE_SWORD_REACH
 		local nearbyCount = 0
 		if root then
-			nearbyCount = #getEnemyHurtboxesInRange(meleeReach, root.Position)
+			nearbyCount = #getEnemyHurtboxesInRange(meleeReach, root.Position, false)
 		end
 		local _, nearestDist, nearestName = describeNearestEnemy(meleeReach, root and root.Position)
 		reachDebugLog(
 			'heartbeat',
-			'active=', reachActive,
+			'killAura=', autoAttackActive,
 			'extend=', reachExtend,
 			'totalReach=', meleeReach,
 			'hitboxHook=', hitboxReachHooked,
@@ -4910,11 +4879,8 @@ run(function()
 	end
 
 	local AutoParry
-	local AutoAttack
-	local Reach
+	local KillAura
 	local MeleeRange
-	local ExtendReach
-	local AttackCooldown
 	local Debug
 	local TestParry
 
@@ -4967,8 +4933,8 @@ run(function()
 		Tooltip = 'Outgoing velocityMag on melee packets. Tutorial dummy is 50 u/s; default 200 wins clashes and applies max destabilization pressure.',
 	})
 
-	AutoAttack = extras:CreateModule({
-		Name = 'Auto Attack',
+	KillAura = extras:CreateModule({
+		Name = 'Kill aura',
 		Function = function(callback)
 			autoAttackActive = callback
 			if callback then
@@ -4976,43 +4942,87 @@ run(function()
 				if resolveMovementApi then
 					resolveMovementApi()
 				end
-				installAttackReachHook()
+				bindPacketListeners()
+				installCombatReachHooks()
+				logReachHookStatus('enabled')
 				rebuildMeleePacketFireChain()
 				bindAutoAttackLoop()
-				notif('Auto Attack', '360 melee — hits all enemies in range via hurtbox merge.', 4)
+				notif('Kill aura', '360 melee — hitbox + packet reach at your Attack Range + Extend.', 4)
 			else
 				rebuildMeleePacketFireChain()
 			end
 		end,
-		Tooltip = 'Swings when any valid enemy is within Attack Range (360). Merges all enemy hurtboxes in range into the melee packet, including behind you and off-screen.',
+		Tooltip = 'Swings when any valid enemy is within range (360). Hooks Attack.Hitbox.cast, Attack.cast*, and melee packets so reach is equal in every direction.',
 	})
 
-	AutoAttack:CreateToggle({
+	KillAura:CreateToggle({
 		Name = 'Anti Parry',
 		Default = true,
 		Function = function(callback)
 			hud.antiParryEnabled = callback
 		end,
-		Tooltip = 'Skips attacking when any enemy in Attack Range is playing a parry animation (360, no LOS required).',
+		Tooltip = 'Skips attacking when any enemy in range is playing a parry animation (360, no LOS required).',
 	})
 
-	Reach = extras:CreateModule({
-		Name = 'Reach',
+	KillAura:CreateSlider({
+		Name = 'Attack Range',
+		Min = 4,
+		Max = 30,
+		Default = AUTO_ATTACK_RANGE_DEFAULT,
+		Function = function(val)
+			autoAttackRangeSetting = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end,
+		Tooltip = 'Base distance to detect enemies and trigger swings (360). Total hit reach is max(this, ' .. BASE_SWORD_REACH .. ') + Extend.',
+	})
+
+	ExtendReach = KillAura:CreateSlider({
+		Name = 'Extend',
+		Min = 0,
+		Max = 20,
+		Default = 6,
+		Function = function(val)
+			reachExtend = val
+			reachDebugLog('Extend slider=', val, 'totalReach=', getMeleeReach())
+		end,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end,
+		Tooltip = 'Extra reach on swing hitboxes + hurtbox merge on top of Attack Range (base sword ' .. BASE_SWORD_REACH .. ' studs).',
+	})
+
+	KillAura:CreateSlider({
+		Name = 'Attack Delay',
+		Min = 0,
+		Max = 1,
+		Decimal = 100,
+		Default = 0.38,
+		Function = function(val)
+			attackDelaySetting = val
+		end,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end,
+		Tooltip = 'Seconds between swings. 0 = minimum delay. Pauses briefly after parry.',
+	})
+
+	KillAura:CreateToggle({
+		Name = 'Reach Debug',
+		Default = false,
 		Function = function(callback)
-			reachActive = callback
+			reachDebugEnabled = callback
 			if callback then
+				print('[REDLINER][Reach] debug ON - enable Kill aura and swing near enemies')
 				bindPacketListeners()
-				logReachHookStatus('enabled')
-				reachDebugLog('Reach ENABLED — extend=', reachExtend, 'totalReach=', getMeleeReach())
-				notif('Reach', 'Extends Attack.Hitbox.cast + outgoing melee packet hurtboxes.', 5)
+				logReachHookStatus('debug toggled on')
 			else
-				reachExtend = 0
-				reachDebugLog('Reach DISABLED')
-				logReachHookStatus('disabled')
-				installMeleePacketReachHook()
+				print('[REDLINER][Reach] debug OFF')
+				table.clear(lastReachDebugSkipAt)
 			end
 		end,
-		Tooltip = 'Hooks Attack.Hitbox.cast and melee packet Fire (base ' .. BASE_SWORD_REACH .. ' studs + Extend slider).',
+		Tooltip = 'Prints [REDLINER][Reach] hook install, hitbox cast, and heartbeat logs to console.',
 	})
 
 	MeleeRange = AutoParry:CreateSlider({
@@ -5363,67 +5373,6 @@ run(function()
 		ParryModeDropdown:SetValue(d.parryMode)
 		setToggleDefault(ThreatDebug, d.threatDebug)
 	end
-
-	ExtendReach = Reach:CreateSlider({
-		Name = 'Extend',
-		Min = 0,
-		Max = 20,
-		Default = 6,
-		Function = function(val)
-			reachExtend = val
-			reachDebugLog('Extend slider=', val, 'totalReach=', getMeleeReach())
-		end,
-		Suffix = function(val)
-			return val == 1 and 'stud' or 'studs'
-		end,
-		Tooltip = 'Extra Z-depth on swing hitboxes + merges distant Hurtboxes into melee packets (base ' .. BASE_SWORD_REACH .. ' studs).',
-	})
-
-	Reach:CreateToggle({
-		Name = 'Reach Debug',
-		Default = false,
-		Function = function(callback)
-			reachDebugEnabled = callback
-			if callback then
-				print('[REDLINER][Reach] debug ON - swing sword near an enemy and watch console')
-				bindPacketListeners()
-				logReachHookStatus('debug toggled on')
-			else
-				print('[REDLINER][Reach] debug OFF')
-				table.clear(lastReachDebugSkipAt)
-			end
-		end,
-		Tooltip = 'Prints [REDLINER][Reach] hook install, hitbox cast, and heartbeat logs to console.',
-	})
-
-	AttackCooldown = AutoAttack:CreateSlider({
-		Name = 'Attack Delay',
-		Min = 0,
-		Max = 1,
-		Decimal = 100,
-		Default = 0.38,
-		Function = function(val)
-			attackDelaySetting = val
-		end,
-		Suffix = function(val)
-			return val == 1 and 'second' or 'seconds'
-		end,
-		Tooltip = 'Seconds between LMB clicks. 0 = every frame (~60/s). Pauses briefly after parry.',
-	})
-
-	AutoAttack:CreateSlider({
-		Name = 'Attack Range',
-		Min = 4,
-		Max = 30,
-		Default = AUTO_ATTACK_RANGE_DEFAULT,
-		Function = function(val)
-			autoAttackRangeSetting = val
-		end,
-		Suffix = function(val)
-			return val == 1 and 'stud' or 'studs'
-		end,
-		Tooltip = 'Max distance to an enemy before Auto Attack sends LMB.',
-	})
 
 	Debug = AutoParry:CreateToggle({
 		Name = 'Debug',
@@ -5808,7 +5757,7 @@ run(function()
 		bindLocalRespawnHandler()
 
 		runService.Heartbeat:Connect(function()
-			if not AutoParry.Enabled and not AlwaysParry.Enabled and not AutoAttack.Enabled and not Reach.Enabled
+			if not AutoParry.Enabled and not AlwaysParry.Enabled and not KillAura.Enabled
 				and not HitBoxes.Enabled and not hud.drawTimerEnabled
 				and not hud.bulletWarningsEnabled and not hud.impactEspEnabled
 				and not hud.healthEspEnabled and not hud.aimlockDetectorEnabled
@@ -5850,6 +5799,6 @@ run(function()
 		repeat
 			task.wait(0.25)
 		until vape.Loaded or tick() - start > 20
-		notif('REDLINER', 'Extras loaded: reach, hitboxes, ESP, and aimlock ready. Use Combat tab for Silent Aim.', 6)
+		notif('REDLINER', 'Extras loaded: kill aura, hitboxes, ESP, and aimlock ready. Use Combat tab for Silent Aim.', 6)
 	end)
 end)
