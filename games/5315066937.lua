@@ -1,19 +1,15 @@
 --[[
-	Ugc 5315066937 — surf/bhop (server-replicated inputs, client sim display).
+	Ugc 5315066937 — surf/bhop speed boost (safe).
 
-	RE findings:
-	  - /timescale & EVENT_INPUT_TIMESCALE are NO-OP on autohop (allow_timescale=false, Module_52:215).
-	  - RootTimer.Scale corrupts ReplicateTimelineEvents → kick.
-	  - StyleInfo.mv = air strafe cap (Module_67 u252). Surf uses sim tick rate + collision.
-	  - SimulationSynchronization pulls client sim back to server state when they diverge.
+	Broken approaches (removed):
+	  - Blocking SimulationSynchronization → NaN sim times, broken camera
+	  - sim:HandleControl SetTimescale with wrong clock → timer offset NaN
+	  - RootTimer.Scale → replication kick
 
-	Working approach for autohop real runs:
-	  1. Resolve live sim via View → PlaybackContext.Context.Simulation
-	  2. Patch StyleInfo.mv (+ air_accel) on live GameMechanics every tick
-	  3. sim:HandleControl("Timer", rootTime, "SetTimescale", scale) on live Simulation.Timer
-	  4. Hook Phys.SetVelocity on live sim (delta scale horizontal changes)
-	  5. Pause SimulationSynchronization resync while boost is active (client sim keeps boost)
-	  6. Hook Styles.CreateStyleInfo so SetStyle refreshes keep boosted mv
+	Safe approach:
+	  - Patch StyleInfo.mv (+ air_accel) on live GameMechanics (strafe cap, Module_67)
+	  - Hook Phys.SetVelocity on live sim (horizontal delta scale — surf + strafe)
+	  - After SyncState, re-apply horizontal velocity boost (server sync won't zero it out instantly)
 ]]
 
 local run = function(func)
@@ -38,27 +34,18 @@ end
 
 local extras = vape.Categories.Extras
 
-local MAX_SCALE = 2
-local RESOLVE_INTERVAL = 1
+local RESOLVE_INTERVAL = 1.5
 
 local speedState = {
-	view = nil,
-	playback = nil,
 	sim = nil,
 	mechanics = nil,
 	phys = nil,
-	rootTimer = nil,
-	director = nil,
-	simSync = nil,
-	styles = nil,
-	mechBaselines = {},
+	baselines = {},
 	physHooked = nil,
 	physOrigSetVel = nil,
-	syncRunOrig = nil,
 	syncStateOrig = nil,
-	createStyleOrig = nil,
+	syncStateSim = nil,
 	lastResolveAt = 0,
-	lastSimTimescale = 1,
 }
 
 local speedActive = false
@@ -72,52 +59,7 @@ local function looksLikeView(obj)
 	if player ~= 'Local' and player ~= lplr and player ~= lplr.Name then
 		return false
 	end
-	return type(obj.PlaybackContext) == 'table' or obj.ModeCount ~= nil
-end
-
-local function looksLikeStyles(obj)
-	return type(obj) == 'table'
-		and type(obj.CreateStyleInfo) == 'function'
-		and type(obj.DefaultStyle) == 'number'
-end
-
-local function looksLikeSimulationDirector(obj)
-	return type(obj) == 'table'
-		and type(obj.TickRate) == 'number'
-		and type(obj.HandleInput) == 'function'
-		and type(obj.OutputMulticall) == 'table'
-		and type(obj.ControlMulticall) == 'table'
-		and type(obj.StyleInfo) == 'table'
-end
-
-local function looksLikeSimSync(obj)
-	return type(obj) == 'table'
-		and type(obj.SynchronizeState) == 'function'
-		and type(obj.Run) == 'function'
-		and type(obj.BindSimulation) == 'function'
-		and obj.KetchupSimulation ~= nil
-		and obj.Simulation ~= nil
-end
-
-local function looksLikeGameMechanics(obj)
-	if type(obj) ~= 'table' or type(obj.SetStyle) ~= 'function' then
-		return false
-	end
-	local si = obj.StyleInfo
-	return type(si) == 'table' and type(si.mv) == 'number' and obj.Simulation ~= nil
-end
-
-local function looksLikeRootTimer(obj)
-	return type(obj) == 'table'
-		and type(obj.Time) == 'function'
-		and type(obj.SetScale) == 'function'
-end
-
-local function looksLikeTimerSystem(obj)
-	if type(obj) ~= 'table' or type(obj.Run) ~= 'function' then
-		return false
-	end
-	return looksLikeRootTimer(obj.RootTimer)
+	return obj.ModeCount ~= nil or type(obj.PlaybackContext) == 'table'
 end
 
 local function looksLikeContextManager(obj)
@@ -126,14 +68,19 @@ local function looksLikeContextManager(obj)
 		and type(obj.RegisterContext) == 'function'
 end
 
+local function looksLikeGameMechanics(obj)
+	if type(obj) ~= 'table' or type(obj.SetStyle) ~= 'function' then
+		return false
+	end
+	local si = obj.StyleInfo
+	return type(si) == 'table' and type(si.mv) == 'number' and type(obj.Simulation) == 'table'
+end
+
 local function simScore(sim)
 	if type(sim) ~= 'table' or not sim.Phys then
 		return -1
 	end
-	local score = 0
-	if sim.MovingPartsEnabled == true then
-		score += 1e12
-	end
+	local score = sim.MovingPartsEnabled == true and 1e12 or 0
 	if type(sim.Phys.Time) == 'number' then
 		score += sim.Phys.Time * 1000
 	end
@@ -164,7 +111,7 @@ local function pickLiveSim(ctx)
 	return best
 end
 
-local function resolveTargets(force)
+local function resolveLive(force)
 	local now = tick()
 	if not force and speedState.sim and now - speedState.lastResolveAt < RESOLVE_INTERVAL then
 		return speedState.sim ~= nil
@@ -175,11 +122,9 @@ local function resolveTargets(force)
 		return false
 	end
 
-	local view, styles, director, simSync, rootTimer, timerSystem, contextManager
-	local bestMech, bestMechScore
-	local sim, mechanics
+	local view, contextManager, bestMech, bestMechScore
 
-	local function scanGc(includeTables)
+	local function scan(includeTables)
 		local gcOk, gc = pcall(getgc, includeTables)
 		if not gcOk or type(gc) ~= 'table' then
 			return
@@ -194,25 +139,6 @@ local function resolveTargets(force)
 			if not contextManager and looksLikeContextManager(obj) then
 				contextManager = obj
 			end
-			if not styles and looksLikeStyles(obj) then
-				styles = obj
-			end
-			if not director and looksLikeSimulationDirector(obj) then
-				director = obj
-			end
-			if not simSync and looksLikeSimSync(obj) then
-				simSync = obj
-			end
-			if not timerSystem and looksLikeTimerSystem(obj) then
-				timerSystem = obj
-			end
-			if not rootTimer and looksLikeRootTimer(obj) then
-				if type(obj.Scale) == 'number' and obj.Scale >= 1 and not obj.Parent then
-					rootTimer = obj
-				elseif type(obj.Scale) == 'number' and obj.Scale == 1 and type(obj.Pt) == 'number' then
-					rootTimer = obj
-				end
-			end
 			if looksLikeGameMechanics(obj) then
 				local score = simScore(obj.Simulation)
 				if score > (bestMechScore or -1) then
@@ -223,14 +149,9 @@ local function resolveTargets(force)
 		end
 	end
 
-	scanGc(true)
-	if not view or not simSync then
-		scanGc(false)
-	end
-
-	if simSync and simSync.Simulation and simSync.Simulation.GameMechanics then
-		sim = simSync.Simulation
-		mechanics = sim.GameMechanics
+	scan(true)
+	if not view then
+		scan(false)
 	end
 
 	local playback = view and view.PlaybackContext
@@ -242,39 +163,18 @@ local function resolveTargets(force)
 			playback = result
 		end
 	end
-	local ctx = playback and playback.Context
-	local viewSim = pickLiveSim(ctx)
-	if viewSim and viewSim.GameMechanics then
-		sim = viewSim
-		mechanics = viewSim.GameMechanics
-	end
+
+	local sim = playback and pickLiveSim(playback.Context)
+	local mechanics = sim and sim.GameMechanics
 
 	if not sim and bestMech and bestMechScore and bestMechScore > 0 then
 		mechanics = bestMech
 		sim = bestMech.Simulation
 	end
 
-	if not rootTimer and timerSystem then
-		rootTimer = timerSystem.RootTimer
-	end
-	if not rootTimer and ctx and type(ctx.Timer) == 'table' and looksLikeRootTimer(ctx.Timer.Parent) then
-		rootTimer = ctx.Timer.Parent
-	end
-
-	if simSync and not simSync.Simulation then
-		simSync = nil
-	end
-
-	speedState.view = view
-	speedState.playback = playback
 	speedState.sim = sim
 	speedState.mechanics = mechanics
 	speedState.phys = sim and sim.Phys or nil
-	speedState.rootTimer = rootTimer
-	speedState.director = director
-	speedState.simSync = simSync
-	speedState.styles = styles
-
 	return sim ~= nil and mechanics ~= nil
 end
 
@@ -295,6 +195,23 @@ local function scaleVelocityDelta(oldVel, newVel, mult)
 		return Vector3.new(boosted.X, newVel.Y, boosted.Z)
 	end
 	return newVel
+end
+
+local function boostHorizontalVelocity(phys, mult)
+	if not phys or mult <= 1 then
+		return
+	end
+	local vel = phys.Velocity
+	if typeof(vel) ~= 'Vector3' then
+		return
+	end
+	local horiz = Vector3.new(vel.X, 0, vel.Z)
+	local mag = horiz.Magnitude
+	if mag < 1 then
+		return
+	end
+	local boosted = horiz * mult
+	phys.Velocity = Vector3.new(boosted.X, vel.Y, boosted.Z)
 end
 
 local function unhookPhys()
@@ -324,74 +241,35 @@ local function hookPhys(phys)
 	end
 end
 
-local function installSyncBlock()
-	local sync = speedState.simSync
-	if not sync then
-		return
+local function unhookSyncState()
+	if speedState.syncStateSim and speedState.syncStateOrig then
+		speedState.syncStateSim.SyncState = speedState.syncStateOrig
 	end
-	if not speedState.syncRunOrig and type(sync.Run) == 'function' then
-		speedState.syncRunOrig = sync.Run
-		sync.Run = function(self)
-			if speedActive then
-				return
-			end
-			return speedState.syncRunOrig(self)
-		end
-	end
-	if not speedState.syncStateOrig and type(sync.SynchronizeState) == 'function' then
-		speedState.syncStateOrig = sync.SynchronizeState
-		sync.SynchronizeState = function(self, ...)
-			if speedActive then
-				return
-			end
-			return speedState.syncStateOrig(self, ...)
-		end
-	end
-end
-
-local function restoreSyncBlock()
-	local sync = speedState.simSync
-	if sync and speedState.syncRunOrig then
-		sync.Run = speedState.syncRunOrig
-	end
-	if sync and speedState.syncStateOrig then
-		sync.SynchronizeState = speedState.syncStateOrig
-	end
-	speedState.syncRunOrig = nil
+	speedState.syncStateSim = nil
 	speedState.syncStateOrig = nil
 end
 
-local function installCreateStyleHook()
-	local styles = speedState.styles
-	if not styles or speedState.createStyleOrig then
+local function hookSyncState(sim)
+	if not sim or speedState.syncStateSim == sim then
 		return
 	end
-	speedState.createStyleOrig = styles.CreateStyleInfo
-	styles.CreateStyleInfo = function(styleId, gameId)
-		local info = speedState.createStyleOrig(styleId, gameId)
-		if speedActive and info and speedMultiplier > 1 then
-			local baseMv = info.mv or 2.7
-			info.mv = baseMv * speedMultiplier
-			if type(info.air_accel) == 'number' then
-				info.air_accel = info.air_accel * speedMultiplier
-			end
+	unhookSyncState()
+	local orig = sim.SyncState
+	if type(orig) ~= 'function' then
+		return
+	end
+	speedState.syncStateOrig = orig
+	speedState.syncStateSim = sim
+	sim.SyncState = function(self, source)
+		orig(self, source)
+		if speedActive and speedMultiplier > 1 then
+			boostHorizontalVelocity(self.Phys, speedMultiplier)
 		end
-		return info
 	end
 end
 
-local function restoreCreateStyleHook()
-	if speedState.styles and speedState.createStyleOrig then
-		speedState.styles.CreateStyleInfo = speedState.createStyleOrig
-	end
-	speedState.createStyleOrig = nil
-end
-
-local function refreshBaseline(owner, si)
-	if not si then
-		return
-	end
-	local base = speedState.mechBaselines[owner]
+local function refreshBaseline(mech, si)
+	local base = speedState.baselines[mech]
 	if base and base.styleInfo == si then
 		return
 	end
@@ -403,19 +281,23 @@ local function refreshBaseline(owner, si)
 			air = air / speedMultiplier
 		end
 	end
-	speedState.mechBaselines[owner] = {
+	speedState.baselines[mech] = {
 		styleInfo = si,
 		mv = mv,
 		air_accel = air,
 	}
 end
 
-local function applyStyleBoostFor(owner, si)
-	if not si or speedMultiplier <= 1 then
+local function applyMechanicsBoost(mech)
+	if not mech or speedMultiplier <= 1 then
 		return
 	end
-	refreshBaseline(owner, si)
-	local base = speedState.mechBaselines[owner]
+	local si = mech.StyleInfo
+	if not si then
+		return
+	end
+	refreshBaseline(mech, si)
+	local base = speedState.baselines[mech]
 	if not base or base.styleInfo ~= si then
 		return
 	end
@@ -425,15 +307,8 @@ local function applyStyleBoostFor(owner, si)
 	end
 end
 
-local function applyMechanicsBoost(mechanics)
-	if not mechanics then
-		return
-	end
-	applyStyleBoostFor(mechanics, mechanics.StyleInfo)
-end
-
-local function restoreMechanicsBoost()
-	for owner, base in speedState.mechBaselines do
+local function restoreBaselines()
+	for _, base in speedState.baselines do
 		local si = base.styleInfo
 		if si and base.mv then
 			si.mv = base.mv
@@ -442,93 +317,39 @@ local function restoreMechanicsBoost()
 			si.air_accel = base.air_accel
 		end
 	end
-	speedState.mechBaselines = {}
+	speedState.baselines = {}
 end
 
-local function applySimTimescale(sim, rootTimer, scale)
-	if not sim or type(sim.HandleControl) ~= 'function' then
-		return
-	end
-	scale = math.clamp(scale, 1, MAX_SCALE)
-	if math.abs(scale - speedState.lastSimTimescale) < 0.001 then
-		return
-	end
-	local ok = pcall(function()
-		local t
-		if rootTimer and type(rootTimer.Time) == 'function' then
-			t = rootTimer:Time()
-		elseif sim.Timer and type(sim.Timer.Time) == 'function' then
-			t = sim.Timer:Time()
-		elseif sim.Phys then
-			t = sim.Phys.Time
-		else
-			t = tick()
-		end
-		sim:HandleControl('Timer', t, 'SetTimescale', scale)
-	end)
-	if ok then
-		speedState.lastSimTimescale = scale
-	end
-end
-
-local function restoreSimTimescale(sim, rootTimer)
-	if sim and rootTimer and type(sim.HandleControl) == 'function' then
-		pcall(function()
-			sim:HandleControl('Timer', rootTimer:Time(), 'SetTimescale', 1)
-		end)
-	end
-	speedState.lastSimTimescale = 1
-end
-
-local function applyAllBoosts()
-	if not speedState.sim or not speedState.mechanics then
+local function installHooks()
+	local sim = speedState.sim
+	if not sim then
 		return false
 	end
-	if speedState.phys ~= speedState.sim.Phys then
-		speedState.phys = speedState.sim.Phys
-		hookPhys(speedState.phys)
+	if speedState.phys ~= sim.Phys then
+		speedState.phys = sim.Phys
 	end
+	hookPhys(speedState.phys)
+	hookSyncState(sim)
 	applyMechanicsBoost(speedState.mechanics)
-	if speedState.director then
-		applyStyleBoostFor(speedState.director, speedState.director.StyleInfo)
-	end
-	if speedState.simSync and speedState.simSync.KetchupSimulation then
-		local km = speedState.simSync.KetchupSimulation.GameMechanics
-		if km then
-			applyMechanicsBoost(km)
-		end
-	end
-	applySimTimescale(speedState.sim, speedState.rootTimer, speedMultiplier)
 	return true
 end
 
-local function teardownBoost()
-	restoreMechanicsBoost()
-	restoreSimTimescale(speedState.sim, speedState.rootTimer)
+local function teardown()
+	restoreBaselines()
 	unhookPhys()
-	restoreSyncBlock()
-	restoreCreateStyleHook()
-	speedState.view = nil
-	speedState.playback = nil
+	unhookSyncState()
 	speedState.sim = nil
 	speedState.mechanics = nil
 	speedState.phys = nil
-	speedState.rootTimer = nil
-	speedState.director = nil
-	speedState.simSync = nil
-	speedState.styles = nil
 	speedState.lastResolveAt = 0
 end
 
 run(function()
-	local resolveFailStreak = 0
-	local hookedOnce = false
-	local lastNotifyAt = 0
+	local resolveFail = 0
 
 	lplr.CharacterAdded:Connect(function()
 		if speedActive then
-			teardownBoost()
-			hookedOnce = false
+			teardown()
 		end
 	end)
 
@@ -538,82 +359,50 @@ run(function()
 		Function = function(callback)
 			speedActive = callback
 			if callback then
-				teardownBoost()
-				hookedOnce = false
-				resolveFailStreak = 0
-				local enableOk, enableErr = pcall(function()
-					if resolveTargets(true) then
-						installSyncBlock()
-						installCreateStyleHook()
-						hookPhys(speedState.phys)
-						applyAllBoosts()
-						hookedOnce = true
-					else
-						pcall(function()
-							vape:CreateNotification('Speed Boost', 'Join a map and start moving…', 4)
-						end)
-					end
-				end)
-				if not enableOk then
-					warn('[UGC531 Speed]', enableErr)
+				teardown()
+				resolveFail = 0
+				if not resolveLive(true) or not installHooks() then
+					pcall(function()
+						vape:CreateNotification('Speed Boost', 'Load a map first — waiting for simulation…', 4)
+					end)
 				end
 				local tickEvent = runService.PreSimulation or runService.Heartbeat
 				Speed:Clean(tickEvent:Connect(function()
 					if not speedActive then
 						return
 					end
-					local ok, err = pcall(function()
+					pcall(function()
 						if not speedState.sim then
-							if resolveTargets(false) then
-								resolveFailStreak = 0
-								if not hookedOnce then
-									installSyncBlock()
-									installCreateStyleHook()
-									hookedOnce = true
-								end
-								hookPhys(speedState.phys)
-								applyAllBoosts()
+							if resolveLive(false) then
+								resolveFail = 0
+								installHooks()
 							else
-								resolveFailStreak += 1
-								if resolveFailStreak == 90 and tick() - lastNotifyAt > 12 then
-									lastNotifyAt = tick()
-									pcall(function()
-										vape:CreateNotification('Speed Boost', 'Waiting for live simulation…', 3)
-									end)
-								end
-								if resolveFailStreak >= 180 then
-									resolveFailStreak = 0
-									resolveTargets(true)
+								resolveFail += 1
+								if resolveFail >= 180 then
+									resolveFail = 0
+									resolveLive(true)
 								end
 							end
 						else
-							applyAllBoosts()
+							installHooks()
 						end
 					end)
-					if not ok then
-						warn('[UGC531 Speed]', err)
-					end
 				end))
 			else
-				teardownBoost()
-				hookedOnce = false
+				teardown()
 			end
 		end,
-		Tooltip = 'Boosts live sim mv + tick rate on autohop. Blocks server resync rollback while enabled.',
+		Tooltip = 'Raises mv + horizontal velocity on the live simulation. Does not touch timers or sync blocking.',
 	})
 
 	Speed:CreateSlider({
 		Name = 'Multiplier',
 		Min = 1,
-		Max = MAX_SCALE,
+		Max = 3,
 		Decimal = 10,
 		Default = 1.5,
 		Function = function(val)
 			speedMultiplier = val
-			speedState.lastSimTimescale = 0
-			if speedActive then
-				applyAllBoosts()
-			end
 		end,
 		Suffix = function(val)
 			return val .. 'x'
