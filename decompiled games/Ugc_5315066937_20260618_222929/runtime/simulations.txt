@@ -1,0 +1,86 @@
+# Simulation tables found in gc
+
+## Simulation 1
+Timer	{Offset=0, Scale=1}
+ShouldRun	nil
+GameMechanics.MaxSpeed	nil
+GameMechanics.Accelerate	nil
+GameMechanics.AirAccelerate	nil
+GameMechanics.Gravity	nil
+GameMechanics.Style	1
+Phys.Time	0
+Phys.Position	Vector3(0.0000, 0.0000, 0.0000)
+Phys.Velocity	Vector3(0.0000, 0.0000, 0.0000)
+
+## Simulation 2
+Timer	{Offset=0, Scale=1}
+ShouldRun	nil
+GameMechanics.MaxSpeed	nil
+GameMechanics.Accelerate	nil
+GameMechanics.AirAccelerate	nil
+GameMechanics.Gravity	nil
+GameMechanics.Style	1
+Phys.Time	12.39
+Phys.Position	Vector3(615.8255, 282.9659, -352.8334)
+Phys.Velocity	Vector3(0.0000, 0.0000, 0.0000)
+
+## Simulation 3
+Timer	{Offset=0, Scale=1}
+ShouldRun	nil
+GameMechanics.MaxSpeed	nil
+GameMechanics.Accelerate	nil
+GameMechanics.AirAccelerate	nil
+GameMechanics.Gravity	nil
+GameMechanics.Style	1
+Phys.Time	12.39
+Phys.Position	Vector3(615.8255, 282.9659, -352.8334)
+Phys.Velocity	Vector3(0.0000, 0.0000, 0.0000)
+
+## Simulation 4
+Timer	{Offset=0, Scale=1}
+ShouldRun	nil
+GameMechanics.MaxSpeed	nil
+GameMechanics.Accelerate	nil
+GameMechanics.AirAccelerate	nil
+GameMechanics.Gravity	nil
+GameMechanics.Style	1
+Phys.Time	12.39
+Phys.Position	Vector3(615.8255, 282.9659, -352.8334)
+Phys.Velocity	Vector3(0.0000, 0.0000, 0.0000)
+
+## Simulation 5
+Timer	{Offset=0, Scale=1}
+ShouldRun	nil
+GameMechanics.MaxSpeed	nil
+GameMechanics.Accelerate	nil
+GameMechanics.AirAccelerate	nil
+GameMechanics.Gravity	nil
+GameMechanics.Style	1
+Phys.Time	0
+Phys.Position	Vector3(0.0000, 0.0000, 0.0000)
+Phys.Velocity	Vector3(0.0000, 0.0000, 0.0000)
+
+## Simulation 6
+Timer	{Offset=12.393774271011353, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, SavedScale=1, Scale=0}
+ShouldRun	nil
+GameMechanics.MaxSpeed	nil
+GameMechanics.Accelerate	nil
+GameMechanics.AirAccelerate	nil
+GameMechanics.Gravity	nil
+GameMechanics.Style	1
+Phys.Time	12.39
+Phys.Position	Vector3(615.8255, 282.9659, -352.8334)
+Phys.Velocity	Vector3(0.0000, 0.0000, 0.0000)
+
+## Simulation 7
+Timer	{Offset=12.393774271011353, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, SavedScale=1, Scale=0}
+ShouldRun	nil
+GameMechanics.MaxSpeed	nil
+GameMechanics.Accelerate	nil
+GameMechanics.AirAccelerate	nil
+GameMechanics.Gravity	nil
+GameMechanics.Style	1
+Phys.Time	12.393774271011353
+Phys.Position	Vector3(615.8255, 282.9659, -352.8334)
+Phys.Velocity	Vector3(0.0000, 0.0000, 0.0000)
+

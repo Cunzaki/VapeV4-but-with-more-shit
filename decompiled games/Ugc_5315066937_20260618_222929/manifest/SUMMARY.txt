@@ -1,0 +1,43 @@
+UGC 5315066937 Full Engine Dump
+place=5315066937 (Ugc)
+job=2dad3d5f-9cef-4138-9e81-01bb4fe3ee56
+root=decompiled games/Ugc_5315066937_20260618_222929
+backup=game_dumps/Ugc_5315066937_20260618_222929
+started=2026-06-19T02:29:29Z
+finished=2026-06-19T02:29:54Z
+
+IMPORTANT: Load a map and start moving before dumping for runtime/ snapshots.
+Engine modules live in scripts_shared/ (Simulation, GameMechanics, Physics, …).
+Wiring/UI modules live in scripts/.
+
+live_scripts:
+  found=4
+  decompiled=4
+  bytecode=0
+  failed=0
+recovered_modules:
+  found=165
+  decompiled=165
+  bytecode=0
+  failed=0
+tags=26
+live=table: 0x293587e85e1a339a
+missingSourcePaths=44
+obtainHooked=false
+rsCapturedEarly=0
+obtainCalls=0
+mappedSources=0
+reconcile=table: 0x25ef1aa69b2d2cfa
+remotes=35
+recovered=table: 0x903483b1aca7bafa
+sourcePaths=44
+
+runtime:
+  gameMechanicsCount=0
+  realtimeContextCount=13
+  playbackContextCount=0
+  hasRootTimer=true
+  hasContextManager=false
+  hasView=true
+  hasStyles=false
+  simulationCount=7

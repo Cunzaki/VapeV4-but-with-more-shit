@@ -1,7 +1,0 @@
-# Obfuscation detection summary
-threshold=5
-decompiled=50
-plain=39
-deobfuscated=11
-autoDetect=true
-deobfuscateWhenDetected=true

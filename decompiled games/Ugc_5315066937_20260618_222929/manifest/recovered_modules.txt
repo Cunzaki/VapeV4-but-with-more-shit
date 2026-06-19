@@ -1,0 +1,16 @@
+# Recovered ModuleScript instances from getgc()
+# total=165
+# source_paths_in_memory=44
+
+Priority files for Speed Boost RE:
+  scripts_shared/Simulation.ModuleScript.lua
+  scripts_shared/GameMechanics.ModuleScript.lua
+  scripts_shared/Physics.ModuleScript.lua
+  scripts_shared/RealtimeTimerSystem.ModuleScript.lua
+  scripts_client/RealtimeContext.ModuleScript.lua
+  scripts_client/SimulationSynchronization.ModuleScript.lua
+
+See manifest/module_coverage.txt — goal is missing=0 for RS Client/Shared paths.
+See manifest/module_source_map.txt and manifest/obtain_log.txt for naming diagnostics.
+See manifest/source_paths.txt for all debug.info module paths still in memory.
+See runtime/ for live singleton snapshots (run on a map before dumping).

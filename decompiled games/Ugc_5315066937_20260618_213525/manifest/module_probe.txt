@@ -1,3 +1,0 @@
-# Module require probe (shallow, pcall)
-# WARNING: side effects possible; skipped on failure
-

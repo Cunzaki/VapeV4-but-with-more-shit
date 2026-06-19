@@ -2,13 +2,10 @@
 	Ugc place 5315066937 — custom surf/bhop engine (Load.ModuleScript DI).
 
 	After bootstrap, ReplicatedStorage Client/Shared modules are destroyed and
-	_G.obtain is nilled. Cheat hooks must resolve singletons from getgc().
+	_G.obtain is nilled. Hooks resolve singletons from getgc() / ContextManager.
 
-	Local playback:
-		ContextManager.GetContext("Local") -> PlaybackContext
-		PlaybackContext.Context            -> RealtimeContext (GetPV, Timer, SmoothingSimulation)
-		Main Simulation                    -> table where .Timer == RealtimeContext.Timer
-		RootTimer.Scale                    -> sim tick rate (old SpeedHack path)
+	Movement speed is driven by StyleInfo.mv (not MaxSpeed). Timer rate uses
+	Simulation.Timer:SetScale(rootTime, scale) — see Timers module + SimulationWiring.
 ]]
 
 local run = function(func)
@@ -33,16 +30,13 @@ end
 
 local extras = vape.Categories.Extras
 
-local gameApi = {
-	contextManager = nil,
-	view = nil,
-	playbackContext = nil,
-	realtimeContext = nil,
+local speedState = {
+	playback = nil,
+	liveSim = nil,
 	rootTimer = nil,
-	liveSimulations = {},
-	mechanicsTargets = {},
+	styleInfos = {},
+	styleBaselines = {},
 	timerBaseline = nil,
-	mechanicsBaselines = {},
 	lastResolveAt = 0,
 }
 
@@ -60,197 +54,230 @@ local function looksLikeView(obj)
 	return player == 'Local' or player == lplr or player == lplr.Name
 end
 
-local function looksLikeRootTimer(obj)
+local function looksLikeStyleInfo(obj)
 	return type(obj) == 'table'
-		and type(obj.Time) == 'function'
-		and type(obj.Scale) == 'number'
-end
-
-local function looksLikeRealtimeContext(obj)
-	return type(obj) == 'table'
-		and type(obj.GetPV) == 'function'
-		and type(obj.GetOutput) == 'function'
-		and looksLikeRootTimer(obj.Timer)
+		and type(obj.mv) == 'number'
+		and type(obj.tickrate) == 'number'
 end
 
 local function looksLikeGameMechanics(obj)
+	return type(obj) == 'table' and looksLikeStyleInfo(obj.StyleInfo)
+end
+
+local function looksLikeTimer(obj)
 	return type(obj) == 'table'
-		and type(obj.MaxSpeed) == 'number'
-		and (type(obj.Accelerate) == 'number' or type(obj.SetStyle) == 'function')
+		and type(obj.Time) == 'function'
+		and type(obj.SetScale) == 'function'
+		and type(obj.GetGlobalScale) == 'function'
 end
 
 local function looksLikeSimulation(obj)
 	return type(obj) == 'table'
+		and looksLikeTimer(obj.Timer)
 		and looksLikeGameMechanics(obj.GameMechanics)
 		and obj.Phys ~= nil
-		and obj.Timer ~= nil
 end
 
-local function resolveGameApi(force)
-	local now = tick()
-	if not force and gameApi.contextManager and now - gameApi.lastResolveAt < 1 then
-		return gameApi
+local function looksLikePlaybackContext(obj)
+	return type(obj) == 'table'
+		and looksLikeTimer(obj.Timer)
+		and type(obj.Context) == 'table'
+		and (looksLikeStyleInfo(obj.StyleInfo) or looksLikeSimulation(obj.Context.Simulation))
+end
+
+local function looksLikeRootTimer(obj)
+	return looksLikeTimer(obj) and obj.Parent == nil
+end
+
+local function addStyleInfo(targets, seen, styleInfo)
+	if not looksLikeStyleInfo(styleInfo) or seen[styleInfo] then
+		return
 	end
-	gameApi.lastResolveAt = now
-	gameApi.playbackContext = nil
-	gameApi.realtimeContext = nil
-	gameApi.rootTimer = nil
-	gameApi.liveSimulations = {}
-	gameApi.mechanicsTargets = {}
+	seen[styleInfo] = true
+	table.insert(targets, styleInfo)
+end
+
+local function collectStyleInfos(playback, sim)
+	local list = {}
+	local seen = {}
+	if playback then
+		addStyleInfo(list, seen, playback.StyleInfo)
+	end
+	if sim and sim.GameMechanics then
+		addStyleInfo(list, seen, sim.GameMechanics.StyleInfo)
+	end
+	return list
+end
+
+local function resolveSpeedTargets(force)
+	local now = tick()
+	if not force and speedState.playback and now - speedState.lastResolveAt < 0.5 then
+		return speedState
+	end
+	speedState.lastResolveAt = now
+	speedState.playback = nil
+	speedState.liveSim = nil
+	speedState.rootTimer = nil
+	speedState.styleInfos = {}
 
 	if not getgc then
-		return gameApi
+		return speedState
 	end
 	local gcOk, gc = pcall(getgc, true)
 	if not gcOk or type(gc) ~= 'table' then
-		return gameApi
+		return speedState
 	end
 
+	local contextManager, view
 	for _, obj in gc do
 		if type(obj) ~= 'table' then
 			continue
 		end
-		if not gameApi.contextManager and looksLikeContextManager(obj) then
-			gameApi.contextManager = obj
-		elseif not gameApi.view and looksLikeView(obj) then
-			gameApi.view = obj
+		if not contextManager and looksLikeContextManager(obj) then
+			contextManager = obj
+		elseif not view and looksLikeView(obj) then
+			view = obj
+		elseif not speedState.rootTimer and looksLikeRootTimer(obj) then
+			speedState.rootTimer = obj
 		end
 	end
 
 	local playback
-	if gameApi.contextManager then
-		playback = gameApi.contextManager.GetContext('Local')
-			or gameApi.contextManager.GetContext(lplr)
-	end
-	if not playback and gameApi.view then
-		playback = gameApi.view.PlaybackContext
-	end
-	gameApi.playbackContext = playback
-
-	local context = playback and playback.Context
-	if looksLikeRealtimeContext(context) then
-		gameApi.realtimeContext = context
-		gameApi.rootTimer = context.Timer
-	elseif gameApi.view and gameApi.view.PlaybackContext and looksLikeRealtimeContext(gameApi.view.PlaybackContext.Context) then
-		gameApi.realtimeContext = gameApi.view.PlaybackContext.Context
-		gameApi.rootTimer = gameApi.realtimeContext.Timer
-	end
-
-	if not gameApi.rootTimer then
-		for _, obj in gc do
-			if looksLikeRootTimer(obj) and type(obj.GetScale) == 'function' then
-				gameApi.rootTimer = obj
-				break
-			end
+	if contextManager then
+		local ok, result = pcall(function()
+			return contextManager.GetContext('Local') or contextManager.GetContext(lplr)
+		end)
+		if ok and looksLikePlaybackContext(result) then
+			playback = result
 		end
 	end
+	if not playback and view and looksLikePlaybackContext(view.PlaybackContext) then
+		playback = view.PlaybackContext
+	end
+	speedState.playback = playback
 
-	if gameApi.rootTimer then
-		local live = {}
-		for _, obj in gc do
-			if looksLikeSimulation(obj) and obj.Timer == gameApi.rootTimer then
-				table.insert(live, obj)
-			end
-		end
-		gameApi.liveSimulations = live
-
-		local smoothing = gameApi.realtimeContext and gameApi.realtimeContext.SmoothingSimulation
-		if looksLikeSimulation(smoothing) then
-			local seen = false
-			for _, sim in live do
-				if sim == smoothing then
-					seen = true
-					break
-				end
-			end
-			if not seen then
-				table.insert(gameApi.liveSimulations, smoothing)
-			end
-		end
-
-		local seenMech = {}
-		for _, sim in gameApi.liveSimulations do
-			local mech = sim.GameMechanics
-			if looksLikeGameMechanics(mech) and not seenMech[mech] then
-				seenMech[mech] = true
-				table.insert(gameApi.mechanicsTargets, mech)
-			end
+	local sim
+	if playback and playback.Context then
+		local ctx = playback.Context
+		if looksLikeSimulation(ctx.Simulation) then
+			sim = ctx.Simulation
+		elseif looksLikeSimulation(ctx) then
+			sim = ctx
 		end
 	end
+	speedState.liveSim = sim
 
-	return gameApi
+	if sim and looksLikeTimer(sim.Timer) then
+		if sim.Timer.Parent and looksLikeTimer(sim.Timer.Parent) then
+			speedState.rootTimer = sim.Timer.Parent
+		end
+	elseif playback and playback.Timer and playback.Timer.Parent and looksLikeTimer(playback.Timer.Parent) then
+		speedState.rootTimer = playback.Timer.Parent
+	end
+
+	speedState.styleInfos = collectStyleInfos(playback, sim)
+	return speedState
 end
 
 local function captureBaselines()
-	if gameApi.rootTimer and not gameApi.timerBaseline then
-		gameApi.timerBaseline = gameApi.rootTimer.Scale
-	end
-	for _, mech in gameApi.mechanicsTargets do
-		if not gameApi.mechanicsBaselines[mech] then
-			gameApi.mechanicsBaselines[mech] = {
-				MaxSpeed = mech.MaxSpeed,
-				Accelerate = mech.Accelerate,
-				AirAccelerate = mech.AirAccelerate,
+	for _, styleInfo in speedState.styleInfos do
+		if not speedState.styleBaselines[styleInfo] then
+			speedState.styleBaselines[styleInfo] = {
+				mv = styleInfo.mv,
+				timescale = styleInfo.timescale,
+				tickrate = styleInfo.tickrate,
 			}
+		end
+	end
+	if speedState.liveSim and speedState.liveSim.Timer and speedState.timerBaseline == nil then
+		local timer = speedState.liveSim.Timer
+		local scale = timer.GetScale and timer:GetScale() or timer.Scale
+		if type(scale) == 'number' and scale > 0 then
+			speedState.timerBaseline = scale
+		elseif speedState.rootTimer then
+			speedState.timerBaseline = speedState.rootTimer.GetScale
+				and speedState.rootTimer:GetScale()
+				or speedState.rootTimer.Scale
+				or 1
+		else
+			speedState.timerBaseline = 1
 		end
 	end
 end
 
 local function restoreSpeedBoost()
-	if gameApi.rootTimer and gameApi.timerBaseline then
-		gameApi.rootTimer.Scale = gameApi.timerBaseline
-	end
-	for mech, base in gameApi.mechanicsBaselines do
-		if base.MaxSpeed then
-			mech.MaxSpeed = base.MaxSpeed
+	for styleInfo, base in speedState.styleBaselines do
+		if base.mv then
+			styleInfo.mv = base.mv
 		end
-		if base.Accelerate then
-			mech.Accelerate = base.Accelerate
+		if base.timescale then
+			styleInfo.timescale = base.timescale
 		end
-		if base.AirAccelerate then
-			mech.AirAccelerate = base.AirAccelerate
+		if base.tickrate then
+			styleInfo.tickrate = base.tickrate
 		end
 	end
-	gameApi.timerBaseline = nil
-	table.clear(gameApi.mechanicsBaselines)
+	if speedState.liveSim and speedState.liveSim.Timer and speedState.timerBaseline then
+		local timer = speedState.liveSim.Timer
+		local rootTime = speedState.rootTimer and speedState.rootTimer:Time() or tick()
+		pcall(function()
+			timer:SetScale(rootTime, speedState.timerBaseline)
+		end)
+	end
+	speedState.styleBaselines = {}
+	speedState.timerBaseline = nil
 end
 
 local function resetSpeedCache()
-	gameApi.playbackContext = nil
-	gameApi.realtimeContext = nil
-	gameApi.rootTimer = nil
-	gameApi.liveSimulations = {}
-	gameApi.mechanicsTargets = {}
-	gameApi.timerBaseline = nil
-	table.clear(gameApi.mechanicsBaselines)
+	speedState.playback = nil
+	speedState.liveSim = nil
+	speedState.rootTimer = nil
+	speedState.styleInfos = {}
+	speedState.styleBaselines = {}
+	speedState.timerBaseline = nil
+	speedState.lastResolveAt = 0
 end
 
-local function applySpeedMultiplier(multiplier, useTimer, usePhysics)
-	resolveGameApi(false)
-	if not gameApi.rootTimer and #gameApi.mechanicsTargets == 0 then
+local function applyStyleMultiplier(multiplier)
+	for _, styleInfo in speedState.styleInfos do
+		local base = speedState.styleBaselines[styleInfo]
+		if base and base.mv then
+			styleInfo.mv = base.mv * multiplier
+		end
+		if base and base.timescale then
+			styleInfo.timescale = base.timescale * multiplier
+		end
+	end
+	return #speedState.styleInfos > 0
+end
+
+local function applyTimerMultiplier(multiplier)
+	if not speedState.liveSim or not speedState.liveSim.Timer then
+		return false
+	end
+	local timer = speedState.liveSim.Timer
+	local rootTime = speedState.rootTimer and speedState.rootTimer:Time() or tick()
+	local base = speedState.timerBaseline or 1
+	local ok = pcall(function()
+		timer:SetScale(rootTime, base * multiplier)
+	end)
+	return ok
+end
+
+local function applySpeedMultiplier(multiplier, useStyle, useTimer)
+	resolveSpeedTargets(false)
+	if #speedState.styleInfos == 0 and not speedState.liveSim then
 		return false
 	end
 	captureBaselines()
-	if useTimer and gameApi.rootTimer and gameApi.timerBaseline then
-		gameApi.rootTimer.Scale = gameApi.timerBaseline * multiplier
+	local ok = false
+	if useStyle then
+		ok = applyStyleMultiplier(multiplier) or ok
 	end
-	if usePhysics then
-		for _, mech in gameApi.mechanicsTargets do
-			local base = gameApi.mechanicsBaselines[mech]
-			if base then
-				if base.MaxSpeed then
-					mech.MaxSpeed = base.MaxSpeed * multiplier
-				end
-				if base.Accelerate then
-					mech.Accelerate = base.Accelerate * multiplier
-				end
-				if base.AirAccelerate then
-					mech.AirAccelerate = base.AirAccelerate * multiplier
-				end
-			end
-		end
+	if useTimer then
+		ok = applyTimerMultiplier(multiplier) or ok
 	end
-	return gameApi.rootTimer ~= nil or #gameApi.mechanicsTargets > 0
+	return ok
 end
 
 run(function()
@@ -259,12 +286,12 @@ run(function()
 	local speedMode = 'Both'
 	local resolveFailStreak = 0
 
-	local function modeUsesTimer()
-		return speedMode == 'Timer' or speedMode == 'Both'
+	local function modeUsesStyle()
+		return speedMode == 'Style' or speedMode == 'Both'
 	end
 
-	local function modeUsesPhysics()
-		return speedMode == 'Physics' or speedMode == 'Both'
+	local function modeUsesTimer()
+		return speedMode == 'Timer' or speedMode == 'Both'
 	end
 
 	lplr.CharacterAdded:Connect(function()
@@ -278,10 +305,10 @@ run(function()
 			speedActive = callback
 			if callback then
 				resetSpeedCache()
-				resolveGameApi(true)
-				if not applySpeedMultiplier(speedMultiplier, modeUsesTimer(), modeUsesPhysics()) then
+				resolveSpeedTargets(true)
+				if not applySpeedMultiplier(speedMultiplier, modeUsesStyle(), modeUsesTimer()) then
 					pcall(function()
-						vape:CreateNotification('Speed Boost', 'Waiting for simulation to load…', 4)
+						vape:CreateNotification('Speed Boost', 'Waiting for map simulation…', 4)
 					end)
 				end
 				local tickEvent = runService.PreSimulation or runService.Heartbeat
@@ -289,7 +316,7 @@ run(function()
 					if not speedActive then
 						return
 					end
-					if applySpeedMultiplier(speedMultiplier, modeUsesTimer(), modeUsesPhysics()) then
+					if applySpeedMultiplier(speedMultiplier, modeUsesStyle(), modeUsesTimer()) then
 						resolveFailStreak = 0
 						return
 					end
@@ -297,7 +324,7 @@ run(function()
 					if resolveFailStreak >= 120 then
 						resolveFailStreak = 0
 						resetSpeedCache()
-						resolveGameApi(true)
+						resolveSpeedTargets(true)
 					end
 				end))
 			else
@@ -305,7 +332,7 @@ run(function()
 				resetSpeedCache()
 			end
 		end,
-		Tooltip = 'Boosts local sim tick rate (RootTimer.Scale) and/or GameMechanics on the live player simulation. Timer mode matches the old SpeedHack. High values may desync validated runs.',
+		Tooltip = 'Boosts StyleInfo.mv / timescale and simulation Timer:SetScale on the local playback sim. Style mode changes ground speed; Timer mode speeds sim ticks.',
 	})
 
 	Speed:CreateSlider({
@@ -324,7 +351,7 @@ run(function()
 
 	Speed:CreateDropdown({
 		Name = 'Mode',
-		List = { 'Both', 'Timer', 'Physics' },
+		List = { 'Both', 'Style', 'Timer' },
 		Default = 1,
 		Function = function(val)
 			speedMode = val

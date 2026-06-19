@@ -1,0 +1,1 @@
+{"gameMechanicsCount":0,"realtimeContextCount":13,"playbackContextCount":0,"hasRootTimer":true,"hasContextManager":false,"hasView":true,"hasStyles":false,"simulationCount":7}

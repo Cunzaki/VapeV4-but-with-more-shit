@@ -1,0 +1,80 @@
+# RealtimeContext tables
+
+## RealtimeContext 1
+Timer	{Offset=0, Parent={Offset=-7.2680238535585175, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, Scale=1.0006404914666773}, Scale=1}
+SmoothingSimulation	nil
+GetPV.pos	Vector3(625.2708, 285.2950, -338.5128)
+GetPV.vel	Vector3(8.4290, -9.3323, 16.7419)
+
+## RealtimeContext 2
+Timer	{Offset=416.26916386791083, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, Scale=1}
+SmoothingSimulation	nil
+GetPV.pos	Vector3(804.7133, 28.8422, -668.0433)
+GetPV.vel	Vector3(14.5476, 14.2342, -51.5239)
+
+## RealtimeContext 3
+Timer	{Offset=694.79006357892, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, Scale=1}
+SmoothingSimulation	nil
+GetPV.pos	Vector3(672.9404, 267.9105, -195.3893)
+GetPV.vel	Vector3(8.2779, -39.4409, 104.6638)
+
+## RealtimeContext 4
+Timer	{Offset=1072.5991485216084, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, Scale=1}
+SmoothingSimulation	nil
+GetPV.pos	Vector3(1357.0172, 92.0538, -495.8354)
+GetPV.vel	Vector3(17.0297, 23.5774, 25.0962)
+
+## RealtimeContext 5
+Timer	{Offset=637.3985972976684, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, Scale=1}
+SmoothingSimulation	nil
+GetPV.pos	Vector3(551.2160, 204.3903, -679.7689)
+GetPV.vel	Vector3(11.8997, -0.0003, 6.5972)
+
+## RealtimeContext 6
+Timer	{Offset=0, Parent={Offset=83.18133616201568, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, Scale=0.9997705975372326}, Scale=1}
+SmoothingSimulation	nil
+GetPV.pos	Vector3(615.7799, 282.9659, -350.9257)
+GetPV.vel	Vector3(0.0000, 0.0000, 0.0000)
+
+## RealtimeContext 7
+Timer	{Offset=0, Parent={Offset=0, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, Scale=1}, Scale=1}
+SmoothingSimulation	nil
+GetPV.pos	nil
+GetPV.vel	nil
+
+## RealtimeContext 8
+Timer	{Offset=0, Parent={Offset=0, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, Scale=1}, Scale=1}
+SmoothingSimulation	nil
+GetPV.pos	nil
+GetPV.vel	nil
+
+## RealtimeContext 9
+Timer	{Offset=5346.418597297668, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, Scale=1}
+SmoothingSimulation	nil
+GetPV.pos	Vector3(17.2658, 279.2162, -277.2040)
+GetPV.vel	Vector3(-0.9050, 0.0000, 17.9772)
+
+## RealtimeContext 10
+Timer	{Offset=0, Parent={Offset=16.096206730067905, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, Scale=0.9996602323865943}, Scale=1}
+SmoothingSimulation	nil
+GetPV.pos	Vector3(634.6372, 284.8745, -270.0960)
+GetPV.vel	Vector3(-4.3823, -3.3203, 58.3618)
+
+## RealtimeContext 11
+Timer	{Offset=-106.17282485961914, Parent={Offset=985.8204527574305, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, Scale=0.9998647233705469}, Scale=1}
+SmoothingSimulation	nil
+GetPV.pos	Vector3(619.2787, 282.9659, -347.9005)
+GetPV.vel	Vector3(-0.0061, -0.0031, 0.0061)
+
+## RealtimeContext 12
+Timer	{Offset=-28.2596173286438, Parent={Offset=124.38833562460059, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, Scale=1.0000767828323376}, Scale=1}
+SmoothingSimulation	nil
+GetPV.pos	Vector3(655.9952, 221.4308, -149.4585)
+GetPV.vel	Vector3(41.0370, -57.8842, -28.4111)
+
+## RealtimeContext 13
+Timer	{Offset=12.393774271011353, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, SavedScale=1, Scale=0}
+SmoothingSimulation	{Camera={Angles=Vector3(-0.0101, -0.0397, 0.0000), AnglesVelocity=Vector3(0.0000, 0.0000, 0.0000), Blunder=Vector3(0.0000, 0.0000, 0.0000), BlunderRotVelocity=Vector3(0.0000, 0.0000, 0.0000), CFrameOffset=CFrame, FOV=0.9999999999999999, MaxAngle=1.5707963267948966, MinAngle=-1.5707963267948966, MousePos=Vector2, Offset=Vector3(0.0000, 2.0000, 0.0000), Sensitivity=0.3, Time=12.393774271011353, UseAbsoluteSens=false, VSensMul=1, Zoom=1}, GameMechanics={Density=0.985, FlyMode=0, FlySpeed=80, GameControls={Action1=false, Action2=false, Crouch=false, Jump=false, LookDown=false, LookLeft=false, LookRight=false, LookUp=false, MousePos=Vector2, MoveBack=false, MoveDown=false, MoveForward=false, MoveLeft=false, MoveRight=false, MoveUp=false, ScrollPos=0, Sprint=false, Time=12.393774271011353, Use=false, Zoom=false}, IsPhysicsPart=function, IsTouchable=function, JumpEdge=false, JumpTime=0.715588, JumpVelocity=17.8897, LastOutputAcceleration=Vector3(0.0000, 0.0000, -0.0000), LastOutputAngles=Vector3(-0.0101, -0.0397, 0.0000), LastOutputPosition=Vector3(615.8255, 282.9659, -352.8334), LastOutputTickInfo=9, LastOutputTime=12.393774271011353, LastOutputVelocity=Vector3(0.0000, 0.0000, 0.0000), MapInfo={GameID=2, Id=136780492844729, MapChangeID=1, MapSpawnId=1, MinY=-59.534088134765625, RobloxModel=Workspace.surf_a, Spawn={1=..., 2=..., 20=..., 3=..., 4=..., 55=..., 7=...}, WormholeIn={11=...}, WormholeOut={11=...}, Zone={Finish=..., Start=...}}, SetSpawns={}, Simulation={Camera={Angles=..., AnglesVelocity=..., Blunder=..., BlunderRotVelocity=..., CFrameOffset=..., FOV=..., MaxAngle=..., MinAngle=..., MousePos=..., Offset=..., Sensitivity=..., Time=..., UseAbsoluteSens=..., VSensMul=..., Zoom=...}, GameMechanics={Density=..., FlyMode=..., FlySpeed=..., GameControls=..., IsPhysicsPart=..., IsTouchable=..., JumpEdge=..., JumpTime=..., JumpVelocity=..., LastOutputAcceleration=..., LastOutputAngles=..., LastOutputPosition=..., LastOutputTickInfo=..., LastOutputTime=..., LastOutputVelocity=..., MapInfo=..., SetSpawns=..., Simulation=..., SpawnId=..., Style=..., ...+10}, MovingPartsEnabled=false, OutputMulticall={Objects=...}, Phys={Acceleration=..., CalculateHitBox=..., Contacts=..., EffectiveGravity=..., GameMechanics=..., Gravity=..., HSR=..., HalfSize=..., Handlers=..., OnPrepare=..., OnUpdate=..., PhysicsEvent=..., Position=..., PositionAdvanced=..., PositionChanged=..., Time=..., Velocity=..., VelocityChanged=..., World=...}, PostTick={List=...}, Ready=true, States={}, Timer={Offset=..., Parent=..., SavedScale=..., Scale=...}, World={ActivateIndex=..., ById=..., Cache0=..., Cache1=..., CloneToOriginal=..., ID=..., InteractiveContext=..., InteractiveIndex=..., ObjectGroupBasePart=..., ObjectGroups=..., OriginalToClone=..., OverlapParams=..., ReferenceWorld=..., ReverseIndex=..., RobloxModel=..., StateIndex=..., Storage=..., TimeVaryingIndex=..., Timer=...}, Zones={InZones=..., VState=...}}, SpawnId=1, Style=1, ...+10}, MovingPartsEnabled=false, OutputMulticall={Objects={}}, Phys={Acceleration=Vector3(0.0000, 0.0000, -0.0000), CalculateHitBox=function, Contacts={MapStart=nil, Wall=nil}, EffectiveGravity=Vector3(0.0000, -50.0000, 0.0000), GameMechanics={Density=0.985, FlyMode=0, FlySpeed=80, GameControls={Action1=..., Action2=..., Crouch=..., Jump=..., LookDown=..., LookLeft=..., LookRight=..., LookUp=..., MousePos=..., MoveBack=..., MoveDown=..., MoveForward=..., MoveLeft=..., MoveRight=..., MoveUp=..., ScrollPos=..., Sprint=..., Time=..., Use=..., Zoom=...}, IsPhysicsPart=function, IsTouchable=function, JumpEdge=false, JumpTime=0.715588, JumpVelocity=17.8897, LastOutputAcceleration=Vector3(0.0000, 0.0000, -0.0000), LastOutputAngles=Vector3(-0.0101, -0.0397, 0.0000), LastOutputPosition=Vector3(615.8255, 282.9659, -352.8334), LastOutputTickInfo=9, LastOutputTime=12.393774271011353, LastOutputVelocity=Vector3(0.0000, 0.0000, 0.0000), MapInfo={GameID=..., Id=..., MapChangeID=..., MapSpawnId=..., MinY=..., RobloxModel=..., Spawn=..., WormholeIn=..., WormholeOut=..., Zone=...}, SetSpawns={}, Simulation={Camera=..., GameMechanics=..., MovingPartsEnabled=..., OutputMulticall=..., Phys=..., PostTick=..., Ready=..., States=..., Timer=..., World=..., Zones=...}, SpawnId=1, Style=1, ...+10}, Gravity=Vector3(0.0000, -50.0000, 0.0000), HSR=Vector3(0.9900, 2.4900, 0.9900), HalfSize=Vector3(1.0000, 2.5000, 1.0000), Handlers={CollisionEnd={List=...}, CollisionStart={List=...}, ForceTrigger={List=...}, Jump={List=...}, TickEnd={List=...}}, OnPrepare={List={1=...}}, OnUpdate={List={1=...}}, PhysicsEvent={Time=12.393774271011353, Type="TickEnd"}, Position=Vector3(615.8255, 282.9659, -352.8334), PositionAdvanced={List={1=..., 2=...}}, PositionChanged={List={1=..., 2=...}}, Time=12.393774271011353, Velocity=Vector3(0.0000, 0.0000, 0.0000), VelocityChanged={List={1=...}}, World={ActivateIndex={}, ById={}, Cache0={CFrames=..., Time=..., TimeOverrides=...}, Cache1={CFrames=..., Time=..., TimeOverrides=...}, CloneToOriginal={}, ID=1, InteractiveContext={}, InteractiveIndex={}, ObjectGroupBasePart={}, ObjectGroups={}, OriginalToClone={}, OverlapParams=OverlapParams, ReferenceWorld={ActivateIndex=..., ById=..., Cache0=..., Cache1=..., CloneToOriginal=..., ID=..., InteractiveContext=..., InteractiveIndex=..., ObjectGroupBasePart=..., ObjectGroups=..., OriginalToClone=..., OverlapParams=..., ReferenceWorld=..., ReverseIndex=..., RobloxModel=..., StateIndex=..., Storage=..., TimeVaryingIndex=..., Timer=...}, ReverseIndex={}, RobloxModel=Workspace.surf_a, StateIndex={}, Storage=Workspace.Camera.Model, TimeVaryingIndex={}, Timer={Offset=..., Parent=..., Scale=...}}}, PostTick={List={}}, Ready=true, States={}, Timer={Offset=12.393774271011353, Parent={Offset=-1781818162.8339956, Pt=1781818192.4874797, Scale=1}, SavedScale=1, Scale=0}, World={ActivateIndex={}, ById={}, Cache0={CFrames={}, Time=0, TimeOverrides={}}, Cache1={CFrames={}, Time=0, TimeOverrides={}}, CloneToOriginal={}, ID=1, InteractiveContext={}, InteractiveIndex={}, ObjectGroupBasePart={}, ObjectGroups={}, OriginalToClone={}, OverlapParams=OverlapParams, ReferenceWorld={ActivateIndex={}, ById={}, Cache0={CFrames=..., Time=..., TimeOverrides=...}, Cache1={CFrames=..., Time=..., TimeOverrides=...}, CloneToOriginal={}, ID=1, InteractiveContext={}, InteractiveIndex={}, ObjectGroupBasePart={}, ObjectGroups={}, OriginalToClone={}, OverlapParams=OverlapParams, ReferenceWorld={ActivateIndex=..., ById=..., Cache0=..., Cache1=..., CloneToOriginal=..., ID=..., InteractiveContext=..., InteractiveIndex=..., ObjectGroupBasePart=..., ObjectGroups=..., OriginalToClone=..., OverlapParams=..., ReferenceWorld=..., ReverseIndex=..., RobloxModel=..., StateIndex=..., Storage=..., TimeVaryingIndex=..., Timer=...}, ReverseIndex={}, RobloxModel=Workspace.surf_a, StateIndex={}, Storage=Workspace.Camera.Model, TimeVaryingIndex={}, Timer={Offset=..., Scale=...}}, ReverseIndex={}, RobloxModel=Workspace.surf_a, StateIndex={}, Storage=Workspace.Camera.Model, TimeVaryingIndex={}, Timer={Offset=0, Scale=1}}, Zones={InZones={MapStart=nil}, VState=false}}
+GetPV.pos	Vector3(615.8255, 282.9659, -352.8334)
+GetPV.vel	Vector3(0.0000, 0.0000, 0.0000)
+

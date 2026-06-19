@@ -1,0 +1,53 @@
+# module coverage vs debug.info source paths
+
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Playerlist
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Rules
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.InitMuteManager
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Teleport
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.ServerList
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Product
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Highscores
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.DatabaseConnectionStatus
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.InputRequirements
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Console
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.BotWiring
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Clipboard
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Spectators
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Styles
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.BindsUI
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Tutorial(bhop)
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.RaceControls
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.SpectateControls
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.MapRating
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Menu
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.RankList
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.ShopGui
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.ShowKeys
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.ClientCommands
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Gauges
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Flail
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.OldShowKeys
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.BotControls
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Tutorial(surf)
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Paint
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.InfoProvider
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.HUD
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.PremiumPrompt
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Equipment
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.VisibilityControl
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Chat
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Replication
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.BotDiff
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Tag
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Nominate
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.SimulationWiring
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.RobloxCamera
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.Vote
+MISSING	Players.Bj2f6.PlayerScripts.Main.Load.LoadingScreen
+
+# summary
+source_paths=44
+mapped=0
+recovered_jobs=165
+missing=44
+obtain_captured=0
