@@ -1,15 +1,11 @@
 --[[
-	Ugc 5315066937 — MV gain boost (modernized _G.Wtf / 2.7 constant patch).
+	Ugc 5315066937 — MV gain (2.7 strafe cap).
 
-	RE: GameMechanics default mv = 2.7 (Styles u4). Air strafe cap reads StyleInfo.mv
-	(Module_67 u252). SetStyle → CreateStyleInfo on every sync, so patching StyleInfo
-	alone or Phys velocity does not stick / causes rescues.
+	Lagback cause: client mv above server-authoritative sim → Module_97 keeps
+	resyncing velocity. Keep Gain ~1.1–1.25 on ranked runs.
 
-	Old exploit: debug.setconstant on a closure whose constant[1] == 2.7 (nups == 1).
-	That targeted the default-mv path inside style creation. We replicate via:
-	  1) Hook Styles.CreateStyleInfo (primary — survives SetStyle / SyncState)
-	  2) Expanded debug.setconstant scan (legacy bytecode path)
-	  3) Re-apply on all live GameMechanics + View StyleInfo each tick
+	Implementation: hook Styles.CreateStyleInfo only (no per-frame getgc, no
+	velocity hooks, no SetStyle spam). Optional one-shot legacy constant scan.
 ]]
 
 local run = function(func)
@@ -35,37 +31,21 @@ end
 local extras = vape.Categories.Extras
 
 local DEFAULT_MV = 2.7
+local MAINTAIN_INTERVAL = 2.5
 
 local boostActive = false
-local boostMultiplier = 1.3
+local boostMultiplier = 1.15
 
 local state = {
 	styleBaselines = {},
-	defaultTemplate = nil,
-	defaultTemplateMv = nil,
 	createStyleHooked = false,
 	createStyleOrig = nil,
 	constantPatches = {},
-	constantScanDone = false,
+	lastMaintainAt = 0,
 }
 
 local function obtain(name)
 	return _G.obtain and _G.obtain(name) or nil
-end
-
-local function looksLikeDefaultStyle(t)
-	return type(t) == 'table'
-		and t.mv == DEFAULT_MV
-		and t.tickrate == 100
-		and t.autohop == true
-		and t.allow_timescale == false
-end
-
-local function looksLikeGameMechanics(t)
-	return type(t) == 'table'
-		and type(t.SetStyle) == 'function'
-		and type(t.StyleInfo) == 'table'
-		and type(t.Simulation) == 'table'
 end
 
 local function styleKey(styleId, gameId)
@@ -77,11 +57,9 @@ local function rememberBaseline(styleId, gameId, mv)
 		return
 	end
 	local key = styleKey(styleId or 1, gameId)
-	if state.styleBaselines[key] then
-		return state.styleBaselines[key]
+	if not state.styleBaselines[key] then
+		state.styleBaselines[key] = mv
 	end
-	state.styleBaselines[key] = mv
-	return mv
 end
 
 local function applyMvToStyleInfo(si, styleId, gameId)
@@ -91,14 +69,7 @@ local function applyMvToStyleInfo(si, styleId, gameId)
 	local id = styleId or si.id
 	local key = styleKey(id, gameId)
 	if not state.styleBaselines[key] then
-		local raw = si.mv
-		if boostActive and boostMultiplier > 1 and raw > DEFAULT_MV * 0.99 then
-			local guess = raw / boostMultiplier
-			if guess >= DEFAULT_MV * 0.85 and guess <= DEFAULT_MV * 1.15 then
-				raw = guess
-			end
-		end
-		state.styleBaselines[key] = raw
+		state.styleBaselines[key] = si.mv
 	end
 	if boostActive and boostMultiplier > 1 then
 		si.mv = state.styleBaselines[key] * boostMultiplier
@@ -107,12 +78,39 @@ local function applyMvToStyleInfo(si, styleId, gameId)
 	end
 end
 
+local function getLiveMechanics()
+	local view = obtain('View')
+	if not view or not view.PlaybackContext then
+		return nil, nil, nil
+	end
+	local ctx = view.PlaybackContext.Context
+	if not ctx then
+		return nil, nil, view.StyleInfo
+	end
+	local simMech = ctx.Simulation and ctx.Simulation.GameMechanics
+	local smoothMech = ctx.SmoothingSimulation and ctx.SmoothingSimulation.GameMechanics
+	return simMech, smoothMech, view.StyleInfo
+end
+
+local function refreshLiveStyleInfo()
+	local simMech, smoothMech, viewSi = getLiveMechanics()
+	for _, mech in { simMech, smoothMech } do
+		if mech and mech.StyleInfo then
+			local gameId = mech.MapInfo and mech.MapInfo.GameID
+			applyMvToStyleInfo(mech.StyleInfo, mech.Style, gameId)
+		end
+	end
+	if viewSi then
+		applyMvToStyleInfo(viewSi, viewSi.id, nil)
+	end
+end
+
 local function hookCreateStyleInfo()
 	if state.createStyleHooked then
 		return true
 	end
 	local styles = obtain('Styles')
-	if (not styles or type(styles.CreateStyleInfo) ~= 'function') then
+	if not styles or type(styles.CreateStyleInfo) ~= 'function' then
 		styles = obtain('GameMechanics')
 	end
 	if not styles or type(styles.CreateStyleInfo) ~= 'function' then
@@ -152,76 +150,30 @@ local function restoreConstantPatches()
 		end
 	end
 	state.constantPatches = {}
-	state.constantScanDone = false
 end
 
-local function patchConstantAt(func, idx, originalValue)
-	if not debug or not debug.setconstant then
-		return false
-	end
-	if not state.constantPatches[func] then
-		state.constantPatches[func] = {}
-	end
-	if state.constantPatches[func][idx] == nil then
-		state.constantPatches[func][idx] = originalValue
-	end
-	local target = originalValue * boostMultiplier
-	pcall(function()
-		debug.setconstant(func, idx, target)
-	end)
-	return true
-end
-
-local function scanMvConstantFunctions(force)
+local function scanLegacyConstantOnce()
 	if not getgc or not debug or not debug.getconstants or not debug.getinfo then
-		return 0
+		return
 	end
-	if state.constantScanDone and not force then
-		return 0
+	if next(state.constantPatches) then
+		return
 	end
-
-	local patched = 0
-
-	local function tryPatchFunction(v)
-		local ok, info = pcall(debug.getinfo, v)
-		if not ok or type(info) ~= 'table' then
-			return
-		end
-		local okC, constants = pcall(debug.getconstants, v)
-		if not okC or type(constants) ~= 'table' then
-			return
-		end
-
-		-- Exact signature from the old working script
-		if constants[1] == DEFAULT_MV and info.nups == 1 then
-			if patchConstantAt(v, 1, DEFAULT_MV) then
-				patched += 1
-			end
-			return
-		end
-
-		-- Game update fallback: small closures still carrying default mv
-		if info.nups and info.nups <= 2 then
-			for idx, val in constants do
-				if val == DEFAULT_MV and type(idx) == 'number' then
-					if patchConstantAt(v, idx, DEFAULT_MV) then
-						patched += 1
-					end
-				end
-			end
-		end
-	end
-
 	for _, v in getgc() do
-		if type(v) == 'function' then
-			pcall(tryPatchFunction, v)
+		if type(v) ~= 'function' then
+			continue
 		end
+		pcall(function()
+			local info = debug.getinfo(v)
+			local constants = debug.getconstants(v)
+			if constants[1] == DEFAULT_MV and info.nups == 1 then
+				if not state.constantPatches[v] then
+					state.constantPatches[v] = { [1] = DEFAULT_MV }
+				end
+				debug.setconstant(v, 1, DEFAULT_MV * boostMultiplier)
+			end
+		end)
 	end
-
-	if patched > 0 then
-		state.constantScanDone = true
-	end
-	return patched
 end
 
 local function refreshConstantPatches()
@@ -237,66 +189,12 @@ local function refreshConstantPatches()
 	end
 end
 
-local function patchDefaultTemplate()
-	if not getgc then
-		return
-	end
-	for _, obj in getgc(true) do
-		if looksLikeDefaultStyle(obj) then
-			if not state.defaultTemplate then
-				state.defaultTemplate = obj
-				state.defaultTemplateMv = obj.mv
-			end
-			if boostActive and boostMultiplier > 1 then
-				obj.mv = (state.defaultTemplateMv or DEFAULT_MV) * boostMultiplier
-			elseif state.defaultTemplateMv then
-				obj.mv = state.defaultTemplateMv
-			end
-		end
-	end
-end
-
-local function patchAllLiveStyleInfo()
-	if not getgc then
-		return 0
-	end
-	local count = 0
-	for _, obj in getgc(true) do
-		if type(obj) == 'table' and type(obj.mv) == 'number' and type(obj.id) == 'number' then
-			if obj.tickrate == 100 or obj.autohop ~= nil or obj.allow_strafe ~= nil then
-				if boostActive and boostMultiplier > 1 then
-					applyMvToStyleInfo(obj, obj.id, nil)
-					count += 1
-				end
-			end
-		end
-		if looksLikeGameMechanics(obj) then
-			local si = obj.StyleInfo
-			local mapInfo = obj.MapInfo
-			local gameId = mapInfo and mapInfo.GameID
-			if boostActive and boostMultiplier > 1 then
-				applyMvToStyleInfo(si, obj.Style, gameId)
-				count += 1
-			end
-		end
-		if type(obj) == 'table' and (obj.Player == 'Local' or obj.Player == lplr) and type(obj.StyleInfo) == 'table' then
-			if boostActive and boostMultiplier > 1 then
-				applyMvToStyleInfo(obj.StyleInfo, obj.StyleInfo.id, nil)
-				count += 1
-			end
-		end
-	end
-	return count
-end
-
-local function reapplyStyleOnMechanics()
-	if not getgc then
-		return
-	end
-	for _, obj in getgc(true) do
-		if looksLikeGameMechanics(obj) and type(obj.Style) == 'number' then
+local function restoreLiveStylesOnce()
+	local simMech, smoothMech = getLiveMechanics()
+	for _, mech in { simMech, smoothMech } do
+		if mech and type(mech.Style) == 'number' then
 			pcall(function()
-				obj:SetStyle(obj.Style)
+				mech:SetStyle(mech.Style)
 			end)
 		end
 	end
@@ -304,27 +202,35 @@ end
 
 local function installBoost()
 	hookCreateStyleInfo()
-	patchDefaultTemplate()
-	scanMvConstantFunctions(true)
-	patchAllLiveStyleInfo()
+	scanLegacyConstantOnce()
+	refreshLiveStyleInfo()
+	refreshConstantPatches()
+	state.lastMaintainAt = tick()
+end
+
+local function maintainBoost()
+	local now = tick()
+	if now - state.lastMaintainAt < MAINTAIN_INTERVAL then
+		return
+	end
+	state.lastMaintainAt = now
+	if not state.createStyleHooked then
+		hookCreateStyleInfo()
+	end
+	refreshLiveStyleInfo()
 end
 
 local function teardown()
 	boostActive = false
 	unhookCreateStyleInfo()
 	restoreConstantPatches()
-	if state.defaultTemplate and state.defaultTemplateMv then
-		state.defaultTemplate.mv = state.defaultTemplateMv
-	end
-	reapplyStyleOnMechanics()
+	restoreLiveStylesOnce()
+	state.lastMaintainAt = 0
 end
 
 run(function()
-	local scanAttempts = 0
-
 	lplr.CharacterAdded:Connect(function()
 		if boostActive then
-			state.constantScanDone = false
 			task.defer(installBoost)
 		end
 	end)
@@ -335,56 +241,39 @@ run(function()
 		Function = function(callback)
 			if callback then
 				boostActive = true
-				scanAttempts = 0
-				state.constantScanDone = false
 				installBoost()
 				if not state.createStyleHooked then
 					pcall(function()
 						vape:CreateNotification(
 							'Speed Boost',
-							'Waiting for Styles module — enter a map if mv boost has no effect.',
+							'Load a map first. Use Gain 1.1–1.25 to reduce lagback.',
 							4
 						)
 					end)
 				end
-				local tickEvent = runService.PreSimulation or runService.Heartbeat
+				local tickEvent = runService.Heartbeat
 				Speed:Clean(tickEvent:Connect(function()
-					if not boostActive then
-						return
+					if boostActive then
+						pcall(maintainBoost)
 					end
-					pcall(function()
-						if not state.createStyleHooked then
-							hookCreateStyleInfo()
-						end
-						if not state.constantScanDone and scanAttempts < 120 then
-							scanAttempts += 1
-							if scanAttempts % 10 == 0 then
-								scanMvConstantFunctions(true)
-							end
-						end
-						patchDefaultTemplate()
-						patchAllLiveStyleInfo()
-						refreshConstantPatches()
-					end)
 				end))
 			else
 				teardown()
 			end
 		end,
-		Tooltip = 'Raises mv (default 2.7 strafe cap) via CreateStyleInfo + legacy 2.7 constant patch. Use 1.1–1.4 on ranked runs.',
+		Tooltip = 'Raises mv strafe cap via CreateStyleInfo. Lower gain = less server lagback.',
 	})
 
 	Speed:CreateSlider({
 		Name = 'Gain',
 		Min = 1,
-		Max = 3,
-		Decimal = 10,
-		Default = 1.3,
+		Max = 1.5,
+		Decimal = 100,
+		Default = 1.15,
 		Function = function(val)
 			boostMultiplier = val
 			if boostActive then
-				installBoost()
-				reapplyStyleOnMechanics()
+				refreshLiveStyleInfo()
 				refreshConstantPatches()
 			end
 		end,
