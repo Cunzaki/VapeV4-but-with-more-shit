@@ -1297,16 +1297,16 @@ function collectEnemyGunAimSources(char, aimModel)
 			end
 		end
 		if not hasMuzzle then
-			local hrp = model:FindFirstChild('HumanoidRootPart')
-			local head = model:FindFirstChild('Head')
-			if hrp then
-				table.insert(rays, {origin = hrp.Position, direction = hrp.CFrame.LookVector})
-				table.insert(dots, getAimDot3D(hrp.Position, hrp.CFrame.LookVector, targetPos))
-			end
-			if head then
-				table.insert(rays, {origin = head.Position, direction = head.CFrame.LookVector})
-				table.insert(dots, getAimDot3D(head.Position, head.CFrame.LookVector, targetPos))
-			end
+		local hrp = model:FindFirstChild('HumanoidRootPart')
+		local head = model:FindFirstChild('Head')
+		if hrp then
+			table.insert(rays, {origin = hrp.Position, direction = hrp.CFrame.LookVector})
+			table.insert(dots, getAimDot3D(hrp.Position, hrp.CFrame.LookVector, targetPos))
+		end
+		if head then
+			table.insert(rays, {origin = head.Position, direction = head.CFrame.LookVector})
+			table.insert(dots, getAimDot3D(head.Position, head.CFrame.LookVector, targetPos))
+		end
 		end
 	end
 	return rays, dots
@@ -1317,7 +1317,7 @@ function getEnemyGunOrigin(char)
 		return nil
 	end
 	for _, desc in char:GetDescendants() do
-		if desc:IsA('BasePart') and isGunMuzzlePart(desc.Name) then
+			if desc:IsA('BasePart') and isGunMuzzlePart(desc.Name) then
 			return desc.Position
 		end
 	end
@@ -1433,7 +1433,7 @@ function isEnemyAimingAtMeForGun(char, aimModel)
 	end
 	for _, ray in rays do
 		if isGunRayThreatening(ray.origin, ray.direction, GUN_RAY_MAX_RANGE, GUN_RAY_HIT_RADIUS) then
-			return true, maxDot, need
+	return true, maxDot, need
 		end
 	end
 	return false, maxDot, need
@@ -1477,11 +1477,11 @@ function shouldParryGun(char, confirmedAttack, aimModel, packetAimDir, shotOrigi
 				return true
 			end
 			local aiming, dot, need = isGunAimDirAtMe(origin, packetAimDir, char)
-			if aiming then
-				return true
-			end
-			local myRoot = getLocalRoot()
-			if myRoot then
+	if aiming then
+		return true
+	end
+		local myRoot = getLocalRoot()
+		if myRoot then
 				local packetDot = packetAimDir.Unit:Dot((myRoot.Position - origin).Unit)
 				if packetDot >= 0.12 and getClosestEnemyDistance(char) <= 80 then
 					return true
@@ -1496,10 +1496,10 @@ function shouldParryGun(char, confirmedAttack, aimModel, packetAimDir, shotOrigi
 		if dist <= 40 then
 			local maxDot = math.max(getGunAimDot(char, aimModel), getHeadAimDotFromModel(aimModel or char))
 			if maxDot >= math.min(gunAimDotSetting, 0.3) then
-				return true
+					return true
+				end
 			end
 		end
-	end
 	local aiming, dot, need = isEnemyAimingAtMeForGun(char, aimModel)
 	if aiming then
 		return true
@@ -1837,13 +1837,13 @@ function pressParryKey()
 		return false
 	end
 	parryBlockAttackUntil = tick() + PARRY_ATTACK_BLOCK_SEC
-	withThread(function()
-		pcall(function()
-			virtualInputManager:SendKeyEvent(true, PARRY_KEY, false, game)
-		end)
-		if keypress then
-			pcall(keypress, PARRY_VK)
-		end
+		withThread(function()
+			pcall(function()
+				virtualInputManager:SendKeyEvent(true, PARRY_KEY, false, game)
+			end)
+			if keypress then
+				pcall(keypress, PARRY_VK)
+			end
 	end)
 	task.defer(function()
 		withThread(function()
@@ -2053,7 +2053,7 @@ shouldBlockMeleeAttack = function(attackRange)
 		if plr ~= lplr and plr.Character and plr.Character.Parent then
 			if getClosestEnemyDistance(plr.Character) <= attackRange then
 				if isEnemyParrying(plr) then
-					return true
+				return true
 				end
 			end
 		end
@@ -2486,7 +2486,7 @@ bindLocalRespawnHandler = function()
 				local waitedHum = char:WaitForChild('Humanoid', 8)
 				if waitedHum then
 					waitedHum.Died:Connect(function()
-						blockLocalParry()
+				blockLocalParry()
 					end)
 				end
 			end)
@@ -2560,30 +2560,30 @@ startEnemyWatchers = function()
 end
 
 local function resolveGunParryShooter(arg1, arg9, arg10)
-	local char
-	if typeof(arg1) == 'string' and arg1 ~= '' then
-		local plr = playersService:FindFirstChild(arg1)
-		if plr and plr ~= lplr then
-			char = plr.Character
+		local char
+		if typeof(arg1) == 'string' and arg1 ~= '' then
+			local plr = playersService:FindFirstChild(arg1)
+			if plr and plr ~= lplr then
+				char = plr.Character
+			end
 		end
-	end
 	if char then
 		return char
 	end
-	local uid
+			local uid
 	if typeof(arg10) == 'number' and arg10 > 0 then
 		uid = arg10
-	elseif typeof(arg9) == 'number' and arg9 > 0 then
-		uid = arg9
-	elseif typeof(arg1) == 'number' and arg1 > 0 then
-		uid = arg1
-	end
-	if uid then
-		local plr = playersService:GetPlayerByUserId(uid)
-		if plr and plr ~= lplr then
+			elseif typeof(arg9) == 'number' and arg9 > 0 then
+				uid = arg9
+			elseif typeof(arg1) == 'number' and arg1 > 0 then
+				uid = arg1
+			end
+			if uid then
+				local plr = playersService:GetPlayerByUserId(uid)
+				if plr and plr ~= lplr then
 			return plr.Character
-		end
-	end
+				end
+			end
 	return nil
 end
 
@@ -2596,14 +2596,14 @@ local function handleIncomingGunParryPacket(char, aimDir, gunName, sourceTag, sh
 	end
 	if (not char or not char.Parent) and typeof(shotOrigin) == 'Vector3' then
 		char = findGunShooterFromShotPacket(shotOrigin, aimDir)
-	end
-	if not char or not char.Parent then
-		return
-	end
+		end
+		if not char or not char.Parent then
+			return
+		end
 	char = resolveParryTargetChar(char)
-	if not isEnemyInGunThreatRange(char) then
-		return
-	end
+		if not isEnemyInGunThreatRange(char) then
+			return
+		end
 	if not shouldParryGun(char, true, char, aimDir, shotOrigin) then
 		return
 	end
@@ -2619,12 +2619,12 @@ local function handleIncomingParryCuePacket(char, cueData)
 		return
 	end
 	if typeof(char) ~= 'Instance' or not char:IsA('Model') then
-		return
-	end
+			return
+		end
 	local plr = getPlayerFromModel(char)
 	if not plr or plr == lplr then
-		return
-	end
+			return
+		end
 	char = resolveParryTargetChar(char)
 	if not char or not char.Parent or not isEnemyCharVisible(char) then
 		return
@@ -2790,8 +2790,8 @@ local function isLocalOwnedHurtbox(part)
 		return false
 	end
 	if lplr.Character and (owner == lplr.Character or owner:IsDescendantOf(lplr.Character)) then
-		return true
-	end
+			return true
+		end
 	local plr = getPlayerFromModel(owner)
 	if plr == lplr then
 		return true
@@ -2986,10 +2986,10 @@ getEnemyHurtboxesInRange = function(range, origin, requireVisible)
 						local entry = bestPerEnemy[key]
 						if not entry or dist < entry.Distance then
 							bestPerEnemy[key] = {Part = part, Distance = dist}
-						end
 					end
 				end
 			end
+		end
 		end
 	end
 	local sorted = {}
@@ -3970,7 +3970,7 @@ local function hookGunBulletVizFire(packet, aimIndex, originIndex)
 			task.defer(function()
 				local startPos = typeof(origin) == 'Vector3' and origin or nil
 				if not startPos then
-					local root = getLocalRoot()
+				local root = getLocalRoot()
 					startPos = root and root.Position
 				end
 				if startPos then
@@ -4262,19 +4262,19 @@ getNearestEnemyInAttackRange = function(attackRange)
 		end
 	end
 	if not nearestModel then
-		for _, plr in playersService:GetPlayers() do
+	for _, plr in playersService:GetPlayers() do
 			if plr ~= lplr and plr.Character and plr.Character.Parent then
 				local enemyRoot = plr.Character:FindFirstChild('HumanoidRootPart')
-				if enemyRoot then
-					local dist = (enemyRoot.Position - origin).Magnitude
+					if enemyRoot then
+						local dist = (enemyRoot.Position - origin).Magnitude
 					if dist <= attackRange and dist < nearestDist and passesAngle(enemyRoot.Position) then
 						nearestModel = plr.Character
-						nearestDist = dist
+							nearestDist = dist
+						end
 					end
 				end
 			end
 		end
-	end
 	autoAttackTargetCache.time = now
 	autoAttackTargetCache.range = attackRange
 	autoAttackTargetCache.model = nearestModel
@@ -4326,7 +4326,7 @@ bindAutoAttackLoop = function()
 	task.spawn(function()
 		while true do
 			if autoAttackActive then
-				tryAutoAttack(attackDelaySetting)
+		tryAutoAttack(attackDelaySetting)
 				local interval = attackDelaySetting > 0 and attackDelaySetting or AUTO_ATTACK_MIN_DELAY
 				task.wait(math.max(interval, AUTO_ATTACK_SCAN_INTERVAL))
 			else
@@ -5313,8 +5313,8 @@ run(function()
 			if sub then
 				sub:GetPropertyChangedSignal('Text'):Wait()
 				vapeEvents.MatchEnded:Fire(sub.Text:find('WON') and true or false, results)
-			end
 		end
+	end
 	end))
 
 	if game.PlaceId == MATCH_PLACE_ID then
@@ -5322,8 +5322,8 @@ run(function()
 			local sessioninfo = vape.Libraries and vape.Libraries.sessioninfo
 			if sessioninfo then
 				sessioninfo:AddItem('Games'):Increment()
-			end
-		end)
+		end
+	end)
 	end
 end)
 
@@ -5338,7 +5338,7 @@ run(function()
 	end
 
 	local parryAnimId
-	pcall(function()
+			pcall(function()
 		local anim = replicatedStorage.Assets.Animations:FindFirstChild('3P_Parry', true)
 		if anim then
 			parryAnimId = anim.AnimationId
@@ -5389,8 +5389,8 @@ run(function()
 							SilentAim:Toggle()
 						end
 					end)
-					return
-				end
+		return
+	end
 				task.spawn(function()
 					repeat
 						if circleObject then
@@ -5555,8 +5555,8 @@ run(function()
 				local function enable()
 					if not installAlwaysStunHooks() then
 						notif('Always Stun', 'Hooks unavailable — need hookfunction + in-match ClientRoot.', 5, 'alert')
-					end
-				end
+		end
+	end
 				if tick() - scriptStartTime < 2 then
 					task.delay(2, enable)
 				else
@@ -5659,8 +5659,8 @@ run(function()
 							end
 						end
 					end))
-				end
 			end
+		end
 		end,
 		Tooltip = 'Movement-controller fly (Space up, LeftAlt down).',
 	})
@@ -5708,7 +5708,7 @@ run(function()
 						end
 					end
 					movement[velocityField] = Vector3.new(dir.X, oldvel.Y, dir.Z)
-				end))
+	end))
 			end
 		end,
 		Tooltip = 'Ground long jump with optional auto-disable.',
@@ -5736,7 +5736,7 @@ run(function()
 						oldvel = Vector3.new(0, speedCustomJump and speedJumpPower or 40, 0)
 					end
 					movement[velocityField] = Vector3.new(dir.X, oldvel.Y, dir.Z)
-				end))
+	end))
 			end
 		end,
 		Tooltip = 'Horizontal speed via movement controller.',
