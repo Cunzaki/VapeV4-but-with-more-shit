@@ -55,6 +55,7 @@ local speedState = {
 	physHooked = nil,
 	physOrigSetVel = nil,
 	syncRunOrig = nil,
+	syncStateOrig = nil,
 	createStyleOrig = nil,
 	lastResolveAt = 0,
 	lastSimTimescale = 1,
@@ -106,17 +107,23 @@ local function looksLikeGameMechanics(obj)
 	return type(si) == 'table' and type(si.mv) == 'number' and obj.Simulation ~= nil
 end
 
-local function looksLikeTimerSystem(obj)
-	return type(obj) == 'table'
-		and type(obj.Run) == 'function'
-		and looksLikeRootTimer(obj.RootTimer)
-end
-
 local function looksLikeRootTimer(obj)
 	return type(obj) == 'table'
 		and type(obj.Time) == 'function'
 		and type(obj.SetScale) == 'function'
-		and type(obj.Pt) == 'number'
+end
+
+local function looksLikeTimerSystem(obj)
+	if type(obj) ~= 'table' or type(obj.Run) ~= 'function' then
+		return false
+	end
+	return looksLikeRootTimer(obj.RootTimer)
+end
+
+local function looksLikeContextManager(obj)
+	return type(obj) == 'table'
+		and type(obj.GetContext) == 'function'
+		and type(obj.RegisterContext) == 'function'
 end
 
 local function simScore(sim)
@@ -168,8 +175,9 @@ local function resolveTargets(force)
 		return false
 	end
 
-	local view, styles, director, simSync, rootTimer, timerSystem
+	local view, styles, director, simSync, rootTimer, timerSystem, contextManager
 	local bestMech, bestMechScore
+	local sim, mechanics
 
 	local function scanGc(includeTables)
 		local gcOk, gc = pcall(getgc, includeTables)
@@ -183,6 +191,9 @@ local function resolveTargets(force)
 			if not view and looksLikeView(obj) then
 				view = obj
 			end
+			if not contextManager and looksLikeContextManager(obj) then
+				contextManager = obj
+			end
 			if not styles and looksLikeStyles(obj) then
 				styles = obj
 			end
@@ -195,8 +206,12 @@ local function resolveTargets(force)
 			if not timerSystem and looksLikeTimerSystem(obj) then
 				timerSystem = obj
 			end
-			if not rootTimer and looksLikeRootTimer(obj) and type(obj.Scale) == 'number' and obj.Scale == 1 then
-				rootTimer = obj
+			if not rootTimer and looksLikeRootTimer(obj) then
+				if type(obj.Scale) == 'number' and obj.Scale >= 1 and not obj.Parent then
+					rootTimer = obj
+				elseif type(obj.Scale) == 'number' and obj.Scale == 1 and type(obj.Pt) == 'number' then
+					rootTimer = obj
+				end
 			end
 			if looksLikeGameMechanics(obj) then
 				local score = simScore(obj.Simulation)
@@ -213,10 +228,26 @@ local function resolveTargets(force)
 		scanGc(false)
 	end
 
+	if simSync and simSync.Simulation and simSync.Simulation.GameMechanics then
+		sim = simSync.Simulation
+		mechanics = sim.GameMechanics
+	end
+
 	local playback = view and view.PlaybackContext
+	if not playback and contextManager then
+		local ok, result = pcall(function()
+			return contextManager.GetContext('Local') or contextManager.GetContext(lplr)
+		end)
+		if ok and type(result) == 'table' then
+			playback = result
+		end
+	end
 	local ctx = playback and playback.Context
-	local sim = pickLiveSim(ctx)
-	local mechanics = sim and sim.GameMechanics
+	local viewSim = pickLiveSim(ctx)
+	if viewSim and viewSim.GameMechanics then
+		sim = viewSim
+		mechanics = viewSim.GameMechanics
+	end
 
 	if not sim and bestMech and bestMechScore and bestMechScore > 0 then
 		mechanics = bestMech
@@ -230,9 +261,8 @@ local function resolveTargets(force)
 		rootTimer = ctx.Timer.Parent
 	end
 
-	if simSync and not sim and simSync.Simulation then
-		sim = simSync.Simulation
-		mechanics = sim.GameMechanics
+	if simSync and not simSync.Simulation then
+		simSync = nil
 	end
 
 	speedState.view = view
@@ -296,15 +326,26 @@ end
 
 local function installSyncBlock()
 	local sync = speedState.simSync
-	if not sync or speedState.syncRunOrig then
+	if not sync then
 		return
 	end
-	speedState.syncRunOrig = sync.Run
-	sync.Run = function(self)
-		if speedActive then
-			return
+	if not speedState.syncRunOrig and type(sync.Run) == 'function' then
+		speedState.syncRunOrig = sync.Run
+		sync.Run = function(self)
+			if speedActive then
+				return
+			end
+			return speedState.syncRunOrig(self)
 		end
-		return speedState.syncRunOrig(self)
+	end
+	if not speedState.syncStateOrig and type(sync.SynchronizeState) == 'function' then
+		speedState.syncStateOrig = sync.SynchronizeState
+		sync.SynchronizeState = function(self, ...)
+			if speedActive then
+				return
+			end
+			return speedState.syncStateOrig(self, ...)
+		end
 	end
 end
 
@@ -313,7 +354,11 @@ local function restoreSyncBlock()
 	if sync and speedState.syncRunOrig then
 		sync.Run = speedState.syncRunOrig
 	end
+	if sync and speedState.syncStateOrig then
+		sync.SynchronizeState = speedState.syncStateOrig
+	end
 	speedState.syncRunOrig = nil
+	speedState.syncStateOrig = nil
 end
 
 local function installCreateStyleHook()
@@ -401,7 +446,7 @@ local function restoreMechanicsBoost()
 end
 
 local function applySimTimescale(sim, rootTimer, scale)
-	if not sim or not rootTimer or type(sim.HandleControl) ~= 'function' then
+	if not sim or type(sim.HandleControl) ~= 'function' then
 		return
 	end
 	scale = math.clamp(scale, 1, MAX_SCALE)
@@ -409,7 +454,16 @@ local function applySimTimescale(sim, rootTimer, scale)
 		return
 	end
 	local ok = pcall(function()
-		local t = rootTimer:Time()
+		local t
+		if rootTimer and type(rootTimer.Time) == 'function' then
+			t = rootTimer:Time()
+		elseif sim.Timer and type(sim.Timer.Time) == 'function' then
+			t = sim.Timer:Time()
+		elseif sim.Phys then
+			t = sim.Phys.Time
+		else
+			t = tick()
+		end
 		sim:HandleControl('Timer', t, 'SetTimescale', scale)
 	end)
 	if ok then
@@ -487,47 +541,57 @@ run(function()
 				teardownBoost()
 				hookedOnce = false
 				resolveFailStreak = 0
-				if resolveTargets(true) then
-					installSyncBlock()
-					installCreateStyleHook()
-					hookPhys(speedState.phys)
-					applyAllBoosts()
-					hookedOnce = true
-				else
-					pcall(function()
-						vape:CreateNotification('Speed Boost', 'Join a map and start moving…', 4)
-					end)
+				local enableOk, enableErr = pcall(function()
+					if resolveTargets(true) then
+						installSyncBlock()
+						installCreateStyleHook()
+						hookPhys(speedState.phys)
+						applyAllBoosts()
+						hookedOnce = true
+					else
+						pcall(function()
+							vape:CreateNotification('Speed Boost', 'Join a map and start moving…', 4)
+						end)
+					end
+				end)
+				if not enableOk then
+					warn('[UGC531 Speed]', enableErr)
 				end
 				local tickEvent = runService.PreSimulation or runService.Heartbeat
 				Speed:Clean(tickEvent:Connect(function()
 					if not speedActive then
 						return
 					end
-					if not speedState.sim then
-						if resolveTargets(false) then
-							resolveFailStreak = 0
-							if not hookedOnce then
-								installSyncBlock()
-								installCreateStyleHook()
-								hookedOnce = true
-							end
-							hookPhys(speedState.phys)
-							applyAllBoosts()
-						else
-							resolveFailStreak += 1
-							if resolveFailStreak == 90 and tick() - lastNotifyAt > 12 then
-								lastNotifyAt = tick()
-								pcall(function()
-									vape:CreateNotification('Speed Boost', 'Waiting for live simulation…', 3)
-								end)
-							end
-							if resolveFailStreak >= 180 then
+					local ok, err = pcall(function()
+						if not speedState.sim then
+							if resolveTargets(false) then
 								resolveFailStreak = 0
-								resolveTargets(true)
+								if not hookedOnce then
+									installSyncBlock()
+									installCreateStyleHook()
+									hookedOnce = true
+								end
+								hookPhys(speedState.phys)
+								applyAllBoosts()
+							else
+								resolveFailStreak += 1
+								if resolveFailStreak == 90 and tick() - lastNotifyAt > 12 then
+									lastNotifyAt = tick()
+									pcall(function()
+										vape:CreateNotification('Speed Boost', 'Waiting for live simulation…', 3)
+									end)
+								end
+								if resolveFailStreak >= 180 then
+									resolveFailStreak = 0
+									resolveTargets(true)
+								end
 							end
+						else
+							applyAllBoosts()
 						end
-					else
-						applyAllBoosts()
+					end)
+					if not ok then
+						warn('[UGC531 Speed]', err)
 					end
 				end))
 			else
