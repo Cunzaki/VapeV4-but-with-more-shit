@@ -1,0 +1,1075 @@
+# Instance tree: ReplicatedStorage
+
+ReplicatedStorage ReplicatedStorage
+  RemoteFunction RemoteFetch
+  RemoteEvent RemoteCall
+  RemoteEvent TimerReplication
+  RemoteEvent TimelineEvents
+  Model Characters
+    Model 59777518
+      Humanoid Humanoid
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+      BodyColors Body Colors
+      AudioEmitter AudioEmitter
+        Wire Wire
+      CharacterMesh CharacterMesh
+      Accessory NarwhalShoulderBuddy
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment LeftShoulderAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.382, -0.196, 0.210)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      CharacterMesh Roblox 2.0 Right Arm
+      CharacterMesh CharacterMesh
+      CharacterMesh CharacterMesh
+      Accessory Cinnamoroll Backpack
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment BodyBackAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, -0.200, -0.341)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Accessory Infinity_Scarf_WHT_Accessory
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment NeckAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.013, 0.270, -0.006)
+          Vector3Value OriginalSize Value=Vector3(2.000, 1.200, 1.400)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      CharacterMesh CharacterMesh
+      Accessory Meshes/gentle hornsAccessory
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, -0.662, 0.204)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Accessory Miauccino Special Pajama Set
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment FaceFrontAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.001, 0.557, -0.101)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Shirt Shirt
+      Accessory OvejaCel
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, -0.627, 0.048)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Accessory Accessory (Cloud Cone)
+        Part Handle attrs=1
+          SpecialMesh Mesh
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, -0.875, 0.009)
+          StringValue AvatarPartScaleType Value="Classic"
+          Vector3Value OriginalSize Value=Vector3(1.000, 2.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Pants Pants
+      Part Head
+        Decal face
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+        SpecialMesh Mesh
+      Part Torso
+        Decal roblox
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg
+        Attachment LeftFootAttachment
+      Part Right Leg
+        Attachment RightFootAttachment
+      Part HumanoidRootPart
+        Attachment RootAttachment
+        Motor6D RootJoint
+    Model 63836155
+      Humanoid Humanoid
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+      AudioEmitter AudioEmitter
+        Wire Wire
+      BodyColors Body Colors
+      Shirt Shirt
+      Accessory AngryBirds_RedHead
+        Part Handle attrs=1
+          SpecialMesh Mesh
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.300, 0.080)
+          Vector3Value OriginalSize Value=Vector3(1.420, 0.870, 1.410)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Pants Pants
+      Part HumanoidRootPart
+        Attachment RootAttachment
+        Motor6D RootJoint
+      Part Right Leg
+        Attachment RightFootAttachment
+      Part Left Leg
+        Attachment LeftFootAttachment
+      Part Right Arm
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Arm
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Torso
+        Decal roblox
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Head
+        SpecialMesh Mesh
+        Decal face
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+    Model 374051044
+      Humanoid Humanoid
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+      AudioEmitter AudioEmitter
+        Wire Wire
+      BodyColors Body Colors
+      CharacterMesh CharacterMesh
+      CharacterMesh CharacterMesh
+      CharacterMesh CharacterMesh
+      CharacterMesh CharacterMesh
+      Shirt Shirt
+      Accessory InternationalFedora
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.011, -0.204, 0.117)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      CharacterMesh CharacterMesh
+      Pants Pants
+      Part Head
+        Decal face
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+        SpecialMesh Mesh
+          Vector3Value FaceFrontAttachment Value=Vector3(-0.000, -0.017, -0.469)
+          Vector3Value HatAttachment Value=Vector3(-0.000, 0.596, 0.027)
+          Vector3Value HairAttachment Value=Vector3(-0.000, 0.596, 0.027)
+          Vector3Value FaceCenterAttachment Value=Vector3(-0.000, 0.014, -0.094)
+          Vector3Value NeckRigAttachment Value=Vector3(-0.000, -0.509, 0.051)
+      Part Torso
+        Decal roblox
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg
+        Attachment LeftFootAttachment
+      Part Right Leg
+        Attachment RightFootAttachment
+      Part HumanoidRootPart
+        Attachment RootAttachment
+        Motor6D RootJoint
+    Model 4149651655
+      Humanoid Humanoid
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+      AudioEmitter AudioEmitter
+        Wire Wire
+      BodyColors Body Colors
+      Accessory Accessory (halo1)
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.025, -0.767, 0.026)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Shirt Shirt
+      Accessory Accessory (Neck 1.0)
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment NeckAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.000, 0.312, -0.018)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Pants Pants
+      Part Head
+        Decal face
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+        SpecialMesh Mesh
+          Vector3Value FaceCenterAttachment Value=Vector3(0.000, 0.000, 0.000)
+          Vector3Value FaceFrontAttachment Value=Vector3(0.000, 0.000, -0.600)
+          Vector3Value HairAttachment Value=Vector3(0.000, 0.600, 0.000)
+          Vector3Value HatAttachment Value=Vector3(0.000, 0.600, 0.000)
+          Vector3Value NeckRigAttachment Value=Vector3(0.000, -0.500, 0.000)
+      Part Torso
+        Decal roblox
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg
+        Attachment LeftFootAttachment
+      Part Right Leg
+        Attachment RightFootAttachment
+      Part HumanoidRootPart
+        Attachment RootAttachment
+        Motor6D RootJoint
+    Model 4051409091
+      Accessory Y2K Silver Heart Belly Piercing
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment BodyFrontAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.363, -0.015)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      ShirtGraphic Shirt Graphic
+      Accessory Monster Buddy Hat
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.483, -0.280)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Accessory Y2K Cyberstar Glasses
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment FaceFrontAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, -0.144, 0.420)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Accessory y2k layered necklaces
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment NeckAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.001, 0.253, -0.135)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Accessory Meshes/Roblox_UGC_Sword_5 (1)Accessory
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment BodyBackAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.121, -0.187, -0.263)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Accessory Accessory (Meshes/Skirt_Side_RufflesAccessory)
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment WaistCenterAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, -0.108, 0.038)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Accessory MeshPartAccessory
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HairAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.757, -0.132)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Humanoid Humanoid
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+      BodyColors Body Colors
+      CharacterMesh CharacterMesh
+      Pants Pants
+      CharacterMesh CharacterMesh
+      Shirt Shirt
+      CharacterMesh CharacterMesh
+      Part Head
+        SpecialMesh Mesh
+        Decal face
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+      Part Torso
+        Decal roblox
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg
+        Attachment LeftFootAttachment
+      Part Right Leg
+        Attachment RightFootAttachment
+      Part HumanoidRootPart
+        Attachment RootAttachment
+        Motor6D RootJoint
+    Model 1944730170
+      Accessory A Nose
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment FaceCenterAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.003, -0.391, 0.474)
+          Vector3Value OriginalSize Value=Vector3(0.350, 0.350, 0.350)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Humanoid Humanoid
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+      AudioEmitter AudioEmitter
+        Wire Wire
+      BodyColors Body Colors
+      Pants Pants
+      Shirt Shirt
+      Accessory Accessory (lightyear)
+        Part Handle attrs=1
+          TouchTransmitter TouchInterest
+          SpecialMesh Mesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HairAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.345, -0.010)
+          Vector3Value OriginalSize Value=Vector3(2.020, 1.010, 1.010)
+          Weld AccessoryWeld
+      Part Head
+        SpecialMesh Mesh
+        Decal face
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+      Part Torso
+        Decal roblox
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg
+        Attachment LeftFootAttachment
+      Part Right Leg
+        Attachment RightFootAttachment
+      Part HumanoidRootPart
+        Attachment RootAttachment
+        Motor6D RootJoint
+    Model 1158502039
+      Humanoid Humanoid
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+      BodyColors Body Colors
+      Accessory Sheathed Back Waist Katanas
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment BodyBackAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.196, 0.571, -0.168)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          TouchTransmitter TouchInterest
+      Pants Pants
+      Accessory Eyepatch
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment FaceFrontAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.000, -0.188, -0.598)
+          Vector3Value OriginalSize Value=Vector3(1.100, 0.600, 1.100)
+          TouchTransmitter TouchInterest
+      Shirt Shirt
+      Part Head
+        Decal face
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+        SpecialMesh Mesh
+          Vector3Value FaceFrontAttachment Value=Vector3(0.000, -0.014, -0.595)
+          Vector3Value HatAttachment Value=Vector3(0.000, 0.607, -0.000)
+          Vector3Value HairAttachment Value=Vector3(0.000, 0.607, -0.000)
+          Vector3Value FaceCenterAttachment Value=Vector3(0.000, -0.094, -0.000)
+          Vector3Value NeckRigAttachment Value=Vector3(0.000, -0.586, -0.000)
+          StringValue AvatarPartScaleType Value="Classic"
+      Part Torso
+        Decal roblox
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm
+        Attachment RightGripAttachment
+        Attachment RightShoulderAttachment
+      Part Left Leg
+        Attachment LeftFootAttachment
+      Part Right Leg
+        Attachment RightFootAttachment
+      Part HumanoidRootPart
+        Attachment RootAttachment
+        Motor6D RootJoint
+    Model 92159464
+      Humanoid Humanoid
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+      AudioEmitter AudioEmitter
+        Wire Wire
+      BodyColors Body Colors
+      CharacterMesh CharacterMesh
+      Accessory Trashcan Warrior
+        Part Handle attrs=1
+          SpecialMesh Mesh
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.200, -0.000)
+          Vector3Value OriginalSize Value=Vector3(2.000, 2.000, 2.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Accessory Kiwi
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.150, -0.600, 0.300)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Attachment VFX_Att
+            ParticleEmitter Hearts
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Pants Pants
+      CharacterMesh CharacterMesh
+      Shirt Shirt
+      Accessory Accessory (beard)
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment FaceCenterAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.003, 0.150, -0.428)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Part Head
+        SpecialMesh Mesh
+        Decal face
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+      Part Torso
+        Decal roblox
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg
+        Attachment LeftFootAttachment
+      Part Right Leg
+        Attachment RightFootAttachment
+      Part HumanoidRootPart
+        Attachment RootAttachment
+        Motor6D RootJoint
+    Model 11041300289
+      Part Head
+        SpecialMesh Mesh
+        Decal face
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+      Part Torso
+        Decal roblox
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg
+        Attachment LeftFootAttachment
+      Part Right Leg
+        Attachment RightFootAttachment
+      Humanoid Humanoid
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+      Part HumanoidRootPart
+        Attachment RootAttachment
+        Motor6D RootJoint
+      BodyColors Body Colors
+      AudioEmitter AudioEmitter
+        Wire Wire
+      Pants Pants
+      Accessory Accessory (MeshPart veil)
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          Attachment HatAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.018, 0.749, -0.139)
+          StringValue AvatarPartScaleType Value="Classic"
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+    Model 427490837
+      Part Head
+        SpecialMesh Mesh
+        Decal face
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+      Part Torso
+        Decal roblox
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg
+        Attachment LeftFootAttachment
+      Part Right Leg
+        Attachment RightFootAttachment
+      Humanoid Humanoid
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+      Part HumanoidRootPart
+        Attachment RootAttachment
+        Motor6D RootJoint
+      AudioEmitter AudioEmitter
+        Wire Wire
+      BodyColors Body Colors
+      Accessory Accessory (CellSagaGokuFace)
+        Part Handle attrs=1
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment FaceCenterAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.000, 0.000)
+          SpecialMesh Mesh
+          Vector3Value OriginalSize Value=Vector3(1.214, 1.219, 1.214)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Shirt Shirt
+      Accessory Accessory (GokuEars)
+        Part Handle attrs=1
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment FaceCenterAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.140, -0.100)
+          SpecialMesh Mesh
+          Vector3Value OriginalSize Value=Vector3(1.519, 0.523, 0.228)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Pants Pants
+      Accessory Accessory (Trunks)
+        Part Handle attrs=1
+          SpecialMesh SpecialMesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Attachment HairAttachment
+            Vector3Value OriginalPosition Value=Vector3(-0.016, -0.106, 0.304)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 1.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+    Model 217400102
+      Part Head
+        Decal face
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+        SpecialMesh Mesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Vector3Value NeckRigAttachment Value=Vector3(0.000, -0.545, 0.000)
+          Vector3Value FaceFrontAttachment Value=Vector3(0.000, -0.016, -0.595)
+          Vector3Value HatAttachment Value=Vector3(0.000, 0.605, 0.000)
+          Vector3Value HairAttachment Value=Vector3(0.000, 0.605, 0.000)
+          Vector3Value FaceCenterAttachment Value=Vector3(0.000, -0.095, 0.000)
+      Part Torso
+        Decal roblox
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg
+        Attachment LeftFootAttachment
+      Part Right Leg
+        Attachment RightFootAttachment
+      Humanoid Humanoid
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+      Part HumanoidRootPart
+        Attachment RootAttachment
+        Motor6D RootJoint
+      AudioEmitter AudioEmitter
+        Wire Wire
+      BodyColors Body Colors
+      Accessory BrownCharmerHair
+        Part Handle attrs=1
+          SpecialMesh Mesh
+          Attachment HairAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.175, 0.050)
+          Vector3Value OriginalSize Value=Vector3(1.200, 1.000, 1.600)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Pants Pants
+      Shirt Shirt
+    Model 8448161263
+      Part Head
+        SpecialMesh Mesh
+        Decal face
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+      Part Torso
+        Decal roblox
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg
+        Attachment LeftFootAttachment
+      Part Right Leg
+        Attachment RightFootAttachment
+      Humanoid Humanoid
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+          AccessoryDescription AccessoryDescription
+      Part HumanoidRootPart
+        Attachment RootAttachment
+        Motor6D RootJoint
+      AudioEmitter AudioEmitter
+        Wire Wire
+      BodyColors Body Colors
+      Accessory RCap
+        Part Handle attrs=1
+          SpecialMesh Mesh
+          Attachment HatAttachment attrs=1
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.050, 0.110)
+          Vector3Value OriginalSize Value=Vector3(1.970, 1.810, 1.410)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Accessory Robloxclassicred
+        Part Handle attrs=1
+          SpecialMesh Mesh
+          Attachment HatAttachment attrs=1
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.050, 0.100)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 2.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      Pants Pants
+    Model 7166638353
+      Part Head
+        Decal face
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+        SpecialMesh Mesh
+          Vector3Value FaceFrontAttachment Value=Vector3(0.000, -0.014, -0.595)
+          Vector3Value HatAttachment Value=Vector3(0.000, 0.607, -0.000)
+          Vector3Value HairAttachment Value=Vector3(0.000, 0.607, -0.000)
+          Vector3Value FaceCenterAttachment Value=Vector3(0.000, -0.094, -0.000)
+          Vector3Value NeckRigAttachment Value=Vector3(0.000, -0.586, -0.000)
+          StringValue AvatarPartScaleType Value="Classic"
+      Part Torso
+        Decal roblox
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg
+        Attachment LeftFootAttachment
+      Part Right Leg
+        Attachment RightFootAttachment
+      Humanoid Humanoid
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+      Part HumanoidRootPart
+        Attachment RootAttachment
+        Motor6D RootJoint
+      BodyColors Body Colors
+      Pants Pants
+      AudioEmitter AudioEmitter
+        Wire Wire
+      CharacterMesh CharacterMesh
+      CharacterMesh CharacterMesh
+      ShirtGraphic Shirt Graphic
+      CharacterMesh CharacterMesh
+      CharacterMesh CharacterMesh
+      CharacterMesh CharacterMesh
+    Model 507036637
+      Part Head
+        Decal face
+        Attachment HairAttachment
+        Attachment HatAttachment
+        Attachment FaceFrontAttachment
+        Attachment FaceCenterAttachment
+        SpecialMesh Mesh
+          StringValue AvatarPartScaleType Value="Classic"
+          Vector3Value NeckRigAttachment Value=Vector3(0.000, -0.545, 0.000)
+          Vector3Value FaceFrontAttachment Value=Vector3(0.000, -0.016, -0.595)
+          Vector3Value HatAttachment Value=Vector3(0.000, 0.605, 0.000)
+          Vector3Value HairAttachment Value=Vector3(0.000, 0.605, 0.000)
+          Vector3Value FaceCenterAttachment Value=Vector3(0.000, -0.095, 0.000)
+      Part Torso
+        Decal roblox
+        Attachment NeckAttachment
+        Attachment BodyFrontAttachment
+        Attachment BodyBackAttachment
+        Attachment LeftCollarAttachment
+        Attachment RightCollarAttachment
+        Attachment WaistFrontAttachment
+        Attachment WaistCenterAttachment
+        Attachment WaistBackAttachment
+        Motor6D Right Shoulder
+        Motor6D Left Shoulder
+        Motor6D Right Hip
+        Motor6D Left Hip
+        Motor6D Neck
+      Part Left Arm
+        Attachment LeftShoulderAttachment
+        Attachment LeftGripAttachment
+      Part Right Arm
+        Attachment RightShoulderAttachment
+        Attachment RightGripAttachment
+      Part Left Leg
+        Attachment LeftFootAttachment
+      Part Right Leg
+        Attachment RightFootAttachment
+      Humanoid Humanoid
+        HumanoidDescription HumanoidDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          BodyPartDescription BodyPartDescription
+          AccessoryDescription AccessoryDescription
+      Part HumanoidRootPart
+        Attachment RootAttachment
+        Motor6D RootJoint
+      BodyColors Body Colors
+      CharacterMesh CharacterMesh
+      Accessory Pal Hair
+        Part Handle attrs=1
+          SpecialMesh Mesh
+          Attachment HairAttachment
+            Vector3Value OriginalPosition Value=Vector3(0.000, 0.350, 0.250)
+          Vector3Value OriginalSize Value=Vector3(1.000, 1.000, 2.000)
+          Weld AccessoryWeld
+          TouchTransmitter TouchInterest
+      CharacterMesh CharacterMesh
+      CharacterMesh CharacterMesh
+      Pants Pants
+      AudioEmitter AudioEmitter
+        Wire Wire
+      CharacterMesh CharacterMesh
+      CharacterMesh CharacterMesh
+      Shirt Shirt

@@ -1,0 +1,5 @@
+# Instance tree: StarterPlayer
+
+StarterPlayer StarterPlayer
+  StarterPlayerScripts StarterPlayerScripts
+  StarterCharacterScripts StarterCharacterScripts

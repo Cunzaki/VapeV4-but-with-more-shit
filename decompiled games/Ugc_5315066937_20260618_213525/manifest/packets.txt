@@ -1,0 +1,3 @@
+# Packet registry
+
+(not enabled — set CONFIG.GAME_EXTRAS or join a REDLINER-like place)

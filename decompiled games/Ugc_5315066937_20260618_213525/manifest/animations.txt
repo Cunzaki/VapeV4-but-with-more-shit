@@ -1,0 +1,3 @@
+# Animation catalog
+# Format: path | AnimationId | name
+

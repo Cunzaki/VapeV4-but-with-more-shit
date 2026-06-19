@@ -1,23 +1,26 @@
 --[[
-	REDLINER Full Game Dumper (standalone)
+	Universal Full Game Dumper (standalone)
 
-	Dumps decompiled scripts, bytecode fallbacks, remotes, packets, animations,
-	ReadOnly player stats, collection tags, and module export maps into one folder.
+	Dumps decompiled scripts, bytecode fallbacks, remotes, tags, animations,
+	instance trees, and optional game-specific extras into one folder.
+
+	Works on any Roblox place — not tied to REDLINER. Obfuscation is detected
+	per script; deobfuscation runs only when markers are found.
 
 	Usage (executor):
-		loadstring(readfile('tools/redliner_full_dumper.lua'), 'redliner_dumper')()
+		loadstring(readfile('tools/redliner_full_dumper.lua'), 'game_dumper')()
 
 	Or paste this entire file into your executor and run.
 
 	Output (executor workspace):
-		redliner_dumps/Ugc_<PlaceId>_<timestamp>/
-			scripts/         — decompiled Lua (Roblox hierarchy)
-			scripts_deobf/   — deobfuscated copy (when DEOBFUSCATE_WRITE_COPY)
+		game_dumps/Ugc_<PlaceId>_<timestamp>/
+			scripts/         — raw decompiler output (always)
+			scripts_deobf/   — deobfuscated copy (only when obfuscation detected)
 			bytecode/        — hex bytecode when decompile fails
-			manifest/        — remotes, tags, animations, packets, trees, index
+			manifest/        — remotes, tags, animations, trees, index
 		decompiled games/Ugc_<PlaceId>_<timestamp>/  — mirror of scripts/ (SYNC_TO_DECOMPILED)
 
-	Join a live match before dumping. Copy the mirror folder into this repo's decompiled games/.
+	Join the target game before dumping. Copy the mirror folder into this repo's decompiled games/.
 
 	Requires: writefile, makefolder, isfolder
 	Optional: decompile, getscriptbytecode, getnilinstances, getscripts,
@@ -26,7 +29,7 @@
 ]]
 
 local CONFIG = {
-	OUTPUT_ROOT = 'redliner_dumps',
+	OUTPUT_ROOT = 'game_dumps',
 	SYNC_TO_DECOMPILED = true, -- mirror scripts/ into decompiled games/Ugc_<placeId>_<timestamp>/
 	INCLUDE_CORE_PACKAGES = false,
 	INCLUDE_CORE_GUI = false,
@@ -36,15 +39,30 @@ local CONFIG = {
 	DECOMPILE_CONCURRENCY = 2, -- keep low; 40 parallel decompiles often OOM/crash executors
 	WRITE_EVERY_N = 1, -- write each script immediately after decompile
 	PROGRESS_EVERY_N = 5,
-	DEOBFUSCATE = true, -- post-process decompiled Lua for readability
-	DEOBFUSCATE_WRITE_COPY = true, -- also write scripts_deobf/ mirror
+	AUTO_DETECT_OBFUSCATION = true,
+	DEOBFUSCATE_WHEN_DETECTED = true, -- only deobfuscate scripts that look obfuscated
+	DEOBFUSCATE_WRITE_COPY = true, -- write scripts_deobf/ for obfuscated scripts
+	OBFUSCATION_SCORE_THRESHOLD = 5, -- min score from detectObfuscation() to treat as obfuscated
 	DUMP_ALL_SCRIPTS = false, -- true = skip Roblox noise filter (very large dump)
-	REQUIRE_PROBE = true, -- shallow require ModuleScripts under Assets (pcall)
+	REQUIRE_PROBE = true, -- shallow require ModuleScripts under game roots (pcall)
 	REQUIRE_PROBE_MAX = 250,
+	GAME_EXTRAS = 'auto', -- false | true | 'auto' — packets/item defs when REDLINER-like layout found
 	TREE_MAX_DEPTH = 12,
 	WAIT_FOR_GAME_LOAD = true,
-	GAME_LOAD_TIMEOUT = 60,
-	LOG_PREFIX = '[REDLINER Dumper]',
+	GAME_LOAD_TIMEOUT = 90,
+	PRIORITY_PATH_HINTS = {
+		'ReplicatedStorage',
+		'ServerStorage',
+		'ServerScriptService',
+		'StarterPlayer',
+		'StarterGui',
+		'Workspace',
+	},
+	GC_KEYWORDS = {
+		'remote', 'packet', 'replicate', 'hitbox', 'parry', 'damage', 'weapon',
+		'anticheat', 'kick', 'ban', 'exploit', 'fireserver', 'invoke',
+	},
+	LOG_PREFIX = '[Game Dumper]',
 }
 
 local SCRIPT_CLASSES = {
@@ -207,17 +225,13 @@ end
 
 local function isPriorityScript(script)
 	local full = script:GetFullName()
-	if full:find('ReplicatedStorage%.Assets', 1, true) then
-		return true
+	if full:find('CorePackages', 1, true) or full:find('CoreGui', 1, true) then
+		return false
 	end
-	if full:find('ReplicatedStorage%.Start', 1, true) then
-		return true
-	end
-	if full:find('ServerStorage', 1, true) then
-		return true
-	end
-	if full:find('ServerScriptService', 1, true) then
-		return true
+	for _, hint in CONFIG.PRIORITY_PATH_HINTS do
+		if full:find(hint, 1, true) then
+			return true
+		end
 	end
 	return false
 end
@@ -227,20 +241,44 @@ local function waitForGameLoad()
 		return true
 	end
 	local rs = game:GetService('ReplicatedStorage')
+	local lplr = playersService.LocalPlayer
 	local deadline = tick() + CONFIG.GAME_LOAD_TIMEOUT
 	while tick() < deadline do
-		local assets = rs:FindFirstChild('Assets')
-		local startFolder = rs:FindFirstChild('Start')
-		local modules = assets and assets:FindFirstChild('ModuleScripts')
-		local packets = modules and modules:FindFirstChild('Packets')
-		if assets and startFolder and packets then
-			log('Game load ready (Assets + Start + Packets)')
+		local ready = false
+		if game:IsLoaded() then
+			ready = true
+		end
+		if #rs:GetChildren() > 0 then
+			ready = true
+		end
+		if lplr and lplr.Character and lplr.Character:FindFirstChild('HumanoidRootPart') then
+			ready = true
+		end
+		if ready then
+			log('Game load ready')
 			return true
 		end
 		task.wait(0.5)
 	end
-	warnLog('Timed out waiting for Assets/Start/Packets - dumping anyway')
+	warnLog('Timed out waiting for game load - dumping anyway')
 	return false
+end
+
+local function hasRedlinerLikeLayout()
+	local rs = game:GetService('ReplicatedStorage')
+	local assets = rs:FindFirstChild('Assets')
+	local modules = assets and assets:FindFirstChild('ModuleScripts')
+	return modules and modules:FindFirstChild('Packets') ~= nil
+end
+
+local function shouldDumpGameExtras()
+	if CONFIG.GAME_EXTRAS == true then
+		return true
+	end
+	if CONFIG.GAME_EXTRAS == false then
+		return false
+	end
+	return hasRedlinerLikeLayout()
 end
 
 local function isRobloxNoise(script)
@@ -477,46 +515,116 @@ local function tryDecompile(script)
 	return true, src
 end
 
--- REDLINER / LPH obfuscation cleanup (best-effort; not full devirtualization)
-local function deobfuscateLuau(source)
+-- Obfuscation detection + best-effort cleanup (not full devirtualization)
+local OBFUSCATION_MARKERS = {
+	{ id = 'lph', pattern = 'LPH_OBFUSCATED', score = 10 },
+	{ id = 'lph', pattern = 'LPH_JIT_MAX', score = 8 },
+	{ id = 'lph', pattern = 'LPH_JIT', score = 8 },
+	{ id = 'lph', pattern = 'LPH_NO_VIRTUALIZE', score = 8 },
+	{ id = 'lph', pattern = 'LPH_NO_UPVALUES', score = 8 },
+	{ id = 'luraph', pattern = 'luraph', score = 5, ignoreCase = true },
+	{ id = 'ironbrew', pattern = 'IB_DEBUG', score = 8 },
+	{ id = 'moonsec', pattern = 'MoonSec', score = 8, ignoreCase = true },
+	{ id = 'psu', pattern = 'PSU_', score = 6 },
+	{ id = 'flux', pattern = 'FLUX_', score = 6 },
+	{ id = 'hash_keys', pattern = '_x[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]+', score = 2, minCount = 4 },
+	{ id = 'l__alias', pattern = 'l__[%w_]+', score = 1, minCount = 6 },
+	{ id = 'goto_spam', pattern = 'goto ', score = 1, minCount = 12 },
+	{ id = 'string_char', pattern = 'string%.char%(', score = 1, minCount = 8 },
+}
+
+local function countPattern(source, pattern)
+	local count = 0
+	for _ in source:gmatch(pattern) do
+		count += 1
+	end
+	return count
+end
+
+local function detectObfuscation(source)
+	if type(source) ~= 'string' or source == '' then
+		return false, 0, {}
+	end
+	local hits = {}
+	local score = 0
+	for _, marker in OBFUSCATION_MARKERS do
+		if marker.minCount then
+			local count = countPattern(source, marker.pattern)
+			if count >= marker.minCount then
+				hits[marker.id] = (hits[marker.id] or 0) + count
+				score += marker.score
+			end
+		else
+			local found = false
+			if marker.ignoreCase then
+				found = source:lower():find(marker.pattern:lower(), 1, true) ~= nil
+			else
+				found = source:find(marker.pattern, 1, true) ~= nil
+			end
+			if found then
+				hits[marker.id] = 1
+				score += marker.score
+			end
+		end
+	end
+	local vmCount = countPattern(source, 'local v%d+')
+	if vmCount >= 35 then
+		hits.virtualized_locals = vmCount
+		score += 6
+	end
+	local threshold = CONFIG.OBFUSCATION_SCORE_THRESHOLD or 5
+	return score >= threshold, score, hits
+end
+
+local function unwrapLphWrappers(text)
+	local guard = 0
+	while guard < 500 do
+		guard += 1
+		local before = text
+		text = text:gsub('LPH_JIT_MAX%(function', 'function')
+		text = text:gsub('LPH_NO_VIRTUALIZE%(function', 'function')
+		text = text:gsub('LPH_JIT%(function', 'function')
+		text = text:gsub('LPH_NO_UPVALUES%(function', 'function')
+		text = text:gsub('end%)%s*;', 'end;')
+		text = text:gsub('end%)', 'end')
+		if text == before then
+			break
+		end
+	end
+	return text
+end
+
+local function deobfuscateLuau(source, hits)
 	if type(source) ~= 'string' or source == '' then
 		return source
 	end
+	hits = hits or {}
 	local out = source:gsub('\r\n', '\n'):gsub('\r', '\n')
 
-	-- Strip LPH executor stub block injected at top of obfuscated scripts
-	out = out:gsub('if not LPH_OBFUSCATED then.-end;\n', '')
-
-	-- Unwrap LPH passthrough wrappers (common in REDLINER ItemData / Classes)
-	local function unwrapLph(name, text)
-		local pattern = name .. '%(([%s%S]-)%)(%s*;?)'
-		local guard = 0
-		while guard < 500 do
-			guard += 1
-			local before = text
-			text = text:gsub('LPH_JIT_MAX%(function', 'function')
-			text = text:gsub('LPH_NO_VIRTUALIZE%(function', 'function')
-			text = text:gsub('LPH_JIT%(function', 'function')
-			text = text:gsub('LPH_NO_UPVALUES%(function', 'function')
-			-- Remove trailing ) that closed LPH_*(function(...) end)
-			text = text:gsub('end%)%s*;', 'end;')
-			text = text:gsub('end%)', 'end')
-			if text == before then
-				break
-			end
-		end
-		return text
+	if hits.lph or out:find('LPH_', 1, true) then
+		out = out:gsub('if not LPH_OBFUSCATED then.-end;\n', '')
+		out = unwrapLphWrappers(out)
 	end
-	out = unwrapLph('LPH', out)
 
-	-- Normalize require aliases: l__Packets__3 -> Packets (comment only, keeps line valid)
-	out = out:gsub('local (l__[%w_]+) = require%(game:GetService%("ReplicatedStorage"%)%.Assets%.ModuleScripts%.(Packets)%)', function(alias, mod)
-		return string.format('local %s = require(game:GetService("ReplicatedStorage").Assets.ModuleScripts.%s) -- %s', alias, mod, mod)
-	end)
+	if hits.l__alias or out:find('l__', 1, true) then
+		out = out:gsub(
+			'local (l__[%w_]+) = require%(game:GetService%("ReplicatedStorage"%)%.Assets%.ModuleScripts%.(%w+)%)',
+			function(alias, mod)
+				return string.format(
+					'local %s = require(game:GetService("ReplicatedStorage").Assets.ModuleScripts.%s) -- %s',
+					alias, mod, mod
+				)
+			end
+		)
+		out = out:gsub(
+			'local (l__[%w_]+) = require%((.-)%)',
+			function(alias, pathExpr)
+				return string.format('local %s = require(%s) -- deobf alias', alias, pathExpr)
+			end
+		)
+	end
 
-	-- Collapse excessive blank lines
 	out = out:gsub('\n\n\n+', '\n\n')
-
 	if not out:match('\n$') then
 		out ..= '\n'
 	end
@@ -547,6 +655,8 @@ local function dumpAllScripts(scripts)
 	local stats = {
 		found = #jobs,
 		decompiled = 0,
+		deobfuscated = 0,
+		plain = 0,
 		bytecode = 0,
 		failed = 0,
 	}
@@ -573,8 +683,8 @@ local function dumpAllScripts(scripts)
 
 	local function writeProgress()
 		writeText('manifest/decompile_progress.txt', string.format(
-			'processed=%d/%d decompiled=%d bytecode=%d failed=%d pendingWrites=%d\n',
-			idx, #jobs, stats.decompiled, stats.bytecode, stats.failed, #pendingWrites
+			'processed=%d/%d decompiled=%d plain=%d deobfuscated=%d bytecode=%d failed=%d pendingWrites=%d\n',
+			idx, #jobs, stats.decompiled, stats.plain, stats.deobfuscated, stats.bytecode, stats.failed, #pendingWrites
 		))
 	end
 
@@ -598,19 +708,36 @@ local function dumpAllScripts(scripts)
 
 			local decompOk, decompSrc = tryDecompile(script)
 			if decompOk then
-				local text = formatDecompiledHeader(script) .. decompSrc:gsub('\r\n', '\n'):gsub('\r', '\n')
-				if CONFIG.DEOBFUSCATE then
-					text = formatDecompiledHeader(script) .. deobfuscateLuau(decompSrc)
+				local normalized = decompSrc:gsub('\r\n', '\n'):gsub('\r', '\n')
+				local rawText = formatDecompiledHeader(script) .. normalized
+				if not rawText:match('\n$') then
+					rawText ..= '\n'
 				end
-				if not text:match('\n$') then
-					text ..= '\n'
+				queueWrite(job.rel, rawText)
+
+				local obfuscated, obfScore, obfHits = false, 0, {}
+				if CONFIG.AUTO_DETECT_OBFUSCATION then
+					obfuscated, obfScore, obfHits = detectObfuscation(normalized)
 				end
-				queueWrite(job.rel, text)
-				if CONFIG.DEOBFUSCATE and CONFIG.DEOBFUSCATE_WRITE_COPY then
-					local deobfRel = job.rel:gsub('^scripts/', 'scripts_deobf/')
-					queueWrite(deobfRel, text)
+				entry.obfuscated = obfuscated
+				entry.obfuscationScore = obfScore
+				if next(obfHits) then
+					entry.obfuscationHits = obfHits
 				end
-				entry.status = 'decompiled'
+
+				if obfuscated and CONFIG.DEOBFUSCATE_WHEN_DETECTED then
+					local deobfText = formatDecompiledHeader(script)
+						.. deobfuscateLuau(normalized, obfHits)
+					if CONFIG.DEOBFUSCATE_WRITE_COPY then
+						local deobfRel = job.rel:gsub('^scripts/', 'scripts_deobf/')
+						queueWrite(deobfRel, deobfText)
+					end
+					stats.deobfuscated += 1
+					entry.status = 'decompiled+deobf'
+				else
+					stats.plain += 1
+					entry.status = 'decompiled'
+				end
 				stats.decompiled += 1
 			else
 				entry.decompileError = decompSrc
@@ -658,8 +785,8 @@ local function dumpAllScripts(scripts)
 			processJob(job)
 			if idx % CONFIG.PROGRESS_EVERY_N == 0 or idx == #jobs then
 				writeProgress()
-				log(string.format('Processing scripts %d/%d (decompiled=%d bytecode=%d failed=%d)',
-					idx, #jobs, stats.decompiled, stats.bytecode, stats.failed))
+				log(string.format('Processing scripts %d/%d (decompiled=%d plain=%d deobf=%d bytecode=%d failed=%d)',
+					idx, #jobs, stats.decompiled, stats.plain, stats.deobfuscated, stats.bytecode, stats.failed))
 				task.wait()
 			end
 		end
@@ -688,8 +815,8 @@ local function dumpAllScripts(scripts)
 		end
 		while active > 0 do
 			if idx % CONFIG.PROGRESS_EVERY_N == 0 or idx == #jobs then
-				log(string.format('Processing scripts %d/%d (decompiled=%d bytecode=%d failed=%d)',
-					idx, #jobs, stats.decompiled, stats.bytecode, stats.failed))
+				log(string.format('Processing scripts %d/%d (decompiled=%d plain=%d deobf=%d bytecode=%d failed=%d)',
+					idx, #jobs, stats.decompiled, stats.plain, stats.deobfuscated, stats.bytecode, stats.failed))
 			end
 			task.wait()
 		end
@@ -700,6 +827,21 @@ local function dumpAllScripts(scripts)
 	if mirrorRoot ~= '' then
 		manifest.stats.mirrorRoot = mirrorRoot
 	end
+	writeText('manifest/obfuscation_summary.txt', string.format(
+		'# Obfuscation detection summary\n'
+			.. 'threshold=%s\n'
+			.. 'decompiled=%d\n'
+			.. 'plain=%d\n'
+			.. 'deobfuscated=%d\n'
+			.. 'autoDetect=%s\n'
+			.. 'deobfuscateWhenDetected=%s\n',
+		tostring(CONFIG.OBFUSCATION_SCORE_THRESHOLD),
+		stats.decompiled,
+		stats.plain,
+		stats.deobfuscated,
+		tostring(CONFIG.AUTO_DETECT_OBFUSCATION),
+		tostring(CONFIG.DEOBFUSCATE_WHEN_DETECTED)
+	))
 	return stats
 end
 
@@ -977,14 +1119,16 @@ local function dumpModuleProbes()
 		'',
 	}
 	local rs = game:GetService('ReplicatedStorage')
-	local roots = {}
+	local roots = {
+		rs,
+		game:GetService('ServerStorage'),
+		game:GetService('ServerScriptService'),
+		game:GetService('StarterPlayer'),
+		game:GetService('StarterGui'),
+	}
 	local assets = rs:FindFirstChild('Assets')
 	if assets then
-		table.insert(roots, assets)
-	end
-	local serverStorage = game:GetService('ServerStorage')
-	if serverStorage then
-		table.insert(roots, serverStorage)
+		table.insert(roots, 1, assets)
 	end
 	local count = 0
 	for _, root in roots do
@@ -1018,10 +1162,7 @@ local function dumpGcStrings()
 	if type(getgc) ~= 'function' then
 		return
 	end
-	local keywords = {
-		'impact', 'instabil', 'destabil', 'clash', 'stun', 'parry', 'hurtbox',
-		'PacketPredicate', 'heat_on', 'ReadOnly', 'melee', 'Redliner',
-	}
+	local keywords = CONFIG.GC_KEYWORDS or {}
 	local hits = {}
 	local ok, gc = pcall(getgc, true)
 	if not ok or type(gc) ~= 'table' then
@@ -1086,20 +1227,20 @@ local function writeManifest()
 		writeText('manifest/index.json', json)
 	end
 	local summary = {
-		'REDLINER Full Dump Summary',
+		'Universal Full Game Dump Summary',
 		'place=' .. tostring(manifest.placeId) .. ' (' .. manifest.placeName .. ')',
 		'job=' .. game.JobId,
 		'root=' .. dumpRoot,
 		'started=' .. manifest.startedAt,
 		'finished=' .. manifest.finishedAt,
 		'',
-		'NOTE: Server-only scripts (ServerStorage.Assets combat, PacketPredicate)',
-		'only appear if your executor exposes them via getscripts/getgc.',
+		'scripts/ = raw decompiler output for every script.',
+		'scripts_deobf/ = deobfuscated copy only when obfuscation was detected.',
 		'Use bytecode/*.hex.txt + Potassium decompiler for failed scripts.',
 		'',
 		'Copy mirror to repo:',
 		'  decompiled games/Ugc_<placeId>_<timestamp>/scripts/...',
-		'Join a live match (not just menu) before dumping for Start.Client + ItemData.',
+		'Join the live game (not just menu) before dumping for best coverage.',
 		'',
 	}
 	if mirrorRoot ~= '' then
@@ -1146,8 +1287,14 @@ local function runDump()
 	dumpTags()
 	dumpAnimations()
 	dumpReadOnly()
-	dumpPackets()
-	dumpItemDefs()
+	if shouldDumpGameExtras() then
+		log('Game-specific extras enabled (packets/item defs)')
+		dumpPackets()
+		dumpItemDefs()
+	else
+		writeText('manifest/packets.txt', '# Packet registry\n\n(not enabled — set CONFIG.GAME_EXTRAS or join a REDLINER-like place)\n')
+		writeText('manifest/item_defs.txt', '# Item defs\n\n(not enabled)\n')
+	end
 	dumpLoadedModulesList()
 
 	local rs = game:GetService('ReplicatedStorage')
@@ -1170,6 +1317,8 @@ local function runDump()
 	log('Done.')
 	log('Scripts: found=' .. scriptStats.found
 		.. ' decompiled=' .. scriptStats.decompiled
+		.. ' plain=' .. tostring(scriptStats.plain or 0)
+		.. ' deobfuscated=' .. tostring(scriptStats.deobfuscated or 0)
 		.. ' bytecode=' .. scriptStats.bytecode
 		.. ' failed=' .. scriptStats.failed)
 	log('Saved to workspace/' .. dumpRoot)
@@ -1177,7 +1326,7 @@ local function runDump()
 end
 
 local function main()
-	log('Starting full dump for', game.Name, game.PlaceId)
+	log('Starting universal dump for', game.Name, game.PlaceId)
 	local ok, err = pcall(runDump)
 	if not ok then
 		warnLog('Dump failed:', err)
