@@ -6383,7 +6383,7 @@ modules:CreateToggle({
 })
 modules:CreateToggle({
 	Name = 'Use team color',
-	Tooltip = 'Uses the TeamColor property on players for render modules',
+	Tooltip = 'Colors render modules by team. With Teams by torso color, uses each player\'s workspace torso color.',
 	Default = true,
 	Function = function()
 		if mainapi.Libraries.entity and mainapi.Libraries.entity.Running then
@@ -6393,7 +6393,7 @@ modules:CreateToggle({
 })
 modules:CreateToggle({
 	Name = 'Teams by torso color',
-	Tooltip = 'Treats players with matching torso colors as teammates',
+	Tooltip = 'Treats players with matching workspace torso colors as teammates (live updates)',
 	Function = function()
 		if mainapi.Libraries.entity and mainapi.Libraries.entity.Running then
 			mainapi.Libraries.entity.refresh()

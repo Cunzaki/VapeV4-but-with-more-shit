@@ -367,16 +367,31 @@ run(function()
 	if not entitylib then return end
 	local torsoWatcherThread
 	local torsoColorCache = {}
+	local torsoWatchConnections = {}
+
+	local function findTorsoPart(char)
+		if not char then return nil end
+		local torso = char:FindFirstChild('Torso') or char:FindFirstChild('UpperTorso') or char:FindFirstChild('LowerTorso')
+		if torso and torso:IsA('BasePart') then
+			return torso
+		end
+		for _, child in char:GetChildren() do
+			if child:IsA('BasePart') and (child.Name == 'Torso' or child.Name == 'UpperTorso' or child.Name == 'LowerTorso') then
+				return child
+			end
+		end
+		return nil
+	end
 
 	local function getTorsoColor3(char)
 		if not char then return nil end
+		local torso = findTorsoPart(char)
+		if torso then
+			return torso.Color
+		end
 		local body = char:FindFirstChildOfClass('BodyColors')
 		if body then
 			return body.TorsoColor3
-		end
-		local torso = char:FindFirstChild('UpperTorso') or char:FindFirstChild('Torso') or char:FindFirstChild('LowerTorso')
-		if torso and torso:IsA('BasePart') then
-			return torso.Color
 		end
 		local hum = char:FindFirstChildOfClass('Humanoid')
 		if hum and hum.RootPart and hum.RootPart:IsA('BasePart') then
@@ -391,15 +406,63 @@ run(function()
 
 	local function colorsMatch(c1, c2)
 		if not c1 or not c2 then return false end
-		return math.abs(c1.R - c2.R) < 0.01 and math.abs(c1.G - c2.G) < 0.01 and math.abs(c1.B - c2.B) < 0.01
+		return math.abs(c1.R - c2.R) < 0.02 and math.abs(c1.G - c2.G) < 0.02 and math.abs(c1.B - c2.B) < 0.02
+	end
+
+	local function getWorkspaceCharacter(plr)
+		if not plr then return nil end
+		if plr == lplr and entitylib.character and entitylib.character.Character then
+			return entitylib.character.Character
+		end
+		local ent = entitylib.getEntity(plr)
+		if ent and ent.Character then
+			return ent.Character
+		end
+		return plr.Character
 	end
 
 	local function getPlayerTorsoColor(plr)
-		if not plr then return nil end
-		if plr == lplr then
-			return getTorsoColor3(entitylib.character and entitylib.character.Character or lplr.Character)
+		return getTorsoColor3(getWorkspaceCharacter(plr))
+	end
+
+	local function updateCachedTorsoColor(plr)
+		local color = getPlayerTorsoColor(plr)
+		local prev = torsoColorCache[plr]
+		if not prev and not color then
+			return false
 		end
-		return getTorsoColor3(plr.Character)
+		if prev and color and colorsMatch(prev, color) then
+			return false
+		end
+		torsoColorCache[plr] = color
+		return true
+	end
+
+	local function clearTorsoWatch(plr)
+		local conns = torsoWatchConnections[plr]
+		if not conns then return end
+		for _, conn in conns do
+			conn:Disconnect()
+		end
+		torsoWatchConnections[plr] = nil
+	end
+
+	local function bindTorsoWatch(plr, char)
+		clearTorsoWatch(plr)
+		if not char or not vape.Categories.Main.Options['Teams by torso color'].Enabled then return end
+		local torso = findTorsoPart(char)
+		if not torso then return end
+		local conns = {
+			torso:GetPropertyChangedSignal('Color'):Connect(function()
+				if updateCachedTorsoColor(plr) then
+					entitylib.refresh()
+				end
+			end)
+		}
+		torsoWatchConnections[plr] = conns
+		for _, conn in conns do
+			vape:Clean(conn)
+		end
 	end
 
 	entitylib.getUpdateConnections = function(ent)
@@ -428,18 +491,14 @@ run(function()
 		if isFriend(ent.Player) then return false end
 		if not select(2, whitelist:get(ent.Player)) then return false end
 		if vape.Categories.Main.Options['Teams by torso color'].Enabled then
-			local localChar = entitylib.character and entitylib.character.Character or lplr.Character
-			local entChar = ent.Character
-			if not localChar or not entChar then return true end
-			local localColor = torsoColorCache[lplr]
-			local entColor = torsoColorCache[ent.Player]
-			if not localColor then
-				localColor = getTorsoColor3(localChar)
-				if localColor then torsoColorCache[lplr] = localColor end
+			if not ent.Player then return true end
+			local localColor = torsoColorCache[lplr] or getPlayerTorsoColor(lplr)
+			local entColor = torsoColorCache[ent.Player] or getPlayerTorsoColor(ent.Player)
+			if localColor and not torsoColorCache[lplr] then
+				torsoColorCache[lplr] = localColor
 			end
-			if not entColor then
-				entColor = getTorsoColor3(entChar)
-				if entColor then torsoColorCache[ent.Player] = entColor end
+			if entColor and not torsoColorCache[ent.Player] then
+				torsoColorCache[ent.Player] = entColor
 			end
 			if localColor and entColor then
 				return not colorsMatch(localColor, entColor)
@@ -464,14 +523,10 @@ run(function()
 		if isFriend(ent, true) then
 			return Color3.fromHSV(vape.Categories.Friends.Options['Friends color'].Hue, vape.Categories.Friends.Options['Friends color'].Sat, vape.Categories.Friends.Options['Friends color'].Value)
 		end
-		if vape.Categories.Main.Options['Teams by torso color'].Enabled then
-			local torsoColor = torsoColorCache[ent]
-			if not torsoColor then
-				local char = ent.Character
-				if char then
-					torsoColor = getTorsoColor3(char)
-					if torsoColor then torsoColorCache[ent] = torsoColor end
-				end
+		if vape.Categories.Main.Options['Teams by torso color'].Enabled and vape.Categories.Main.Options['Use team color'].Enabled then
+			local torsoColor = torsoColorCache[ent] or getPlayerTorsoColor(ent)
+			if torsoColor and not torsoColorCache[ent] then
+				torsoColorCache[ent] = torsoColor
 			end
 			return torsoColor
 		end
@@ -486,6 +541,10 @@ run(function()
 			task.cancel(torsoWatcherThread)
 			torsoWatcherThread = nil
 		end
+		for plr in torsoWatchConnections do
+			clearTorsoWatch(plr)
+		end
+		table.clear(torsoColorCache)
 		entitylib.kill()
 		entitylib = nil
 	end)
@@ -495,47 +554,66 @@ run(function()
 	vape:Clean(workspace:GetPropertyChangedSignal('CurrentCamera'):Connect(function()
 		gameCamera = workspace.CurrentCamera or workspace:FindFirstChildWhichIsA('Camera')
 	end))
-	local torsoPlayerConnections = {}
-	local function onPlayerCharacterAdded(plr)
-		if torsoColorCache[plr] ~= nil then
-			torsoColorCache[plr] = nil
-		end
+	local function onPlayerCharacterAdded(plr, char)
+		char = char or getWorkspaceCharacter(plr)
+		torsoColorCache[plr] = nil
 		task.wait()
-		local color = getPlayerTorsoColor(plr)
-		if torsoColorCache[plr] ~= color then
-			torsoColorCache[plr] = color
+		bindTorsoWatch(plr, char)
+		if updateCachedTorsoColor(plr) then
 			entitylib.refresh()
 		end
 	end
 	local function onPlayerAdded(plr)
-		local conn = plr.CharacterAdded:Connect(function()
-			onPlayerCharacterAdded(plr)
+		local conn = plr.CharacterAdded:Connect(function(char)
+			onPlayerCharacterAdded(plr, char)
 		end)
-		torsoPlayerConnections[plr] = conn
 		vape:Clean(conn)
+		vape:Clean(plr.CharacterRemoving:Connect(function()
+			clearTorsoWatch(plr)
+			torsoColorCache[plr] = nil
+		end))
 		if plr.Character then
-			task.spawn(function()
-				onPlayerCharacterAdded(plr)
-			end)
+			task.spawn(onPlayerCharacterAdded, plr, plr.Character)
 		end
 	end
 	for _, plr in playersService:GetPlayers() do
 		onPlayerAdded(plr)
 	end
 	vape:Clean(playersService.PlayerAdded:Connect(onPlayerAdded))
+	vape:Clean(playersService.PlayerRemoving:Connect(function(plr)
+		clearTorsoWatch(plr)
+		torsoColorCache[plr] = nil
+	end))
+	vape:Clean(entitylib.Events.EntityAdded:Connect(function(ent)
+		if ent.Player then
+			bindTorsoWatch(ent.Player, ent.Character)
+			if updateCachedTorsoColor(ent.Player) then
+				entitylib.refresh()
+			end
+		end
+	end))
+	vape:Clean(entitylib.Events.LocalAdded:Connect(function(ent)
+		bindTorsoWatch(lplr, ent.Character)
+		if updateCachedTorsoColor(lplr) then
+			entitylib.refresh()
+		end
+	end))
 	torsoWatcherThread = task.spawn(function()
 		while vape.Loaded and entitylib and entitylib.Running do
 			if vape.Categories.Main.Options['Teams by torso color'].Enabled then
 				local changed = false
 				for _, plr in playersService:GetPlayers() do
-					local color = getPlayerTorsoColor(plr)
-					if not torsoColorCache[plr] or (color and not colorsMatch(torsoColorCache[plr], color)) then
-						torsoColorCache[plr] = color
+					if updateCachedTorsoColor(plr) then
 						changed = true
+					end
+					local char = getWorkspaceCharacter(plr)
+					if char and not torsoWatchConnections[plr] then
+						bindTorsoWatch(plr, char)
 					end
 				end
 				for plr in torsoColorCache do
 					if not plr.Parent then
+						clearTorsoWatch(plr)
 						torsoColorCache[plr] = nil
 						changed = true
 					end
@@ -543,10 +621,15 @@ run(function()
 				if changed then
 					entitylib.refresh()
 				end
-			elseif next(torsoColorCache) ~= nil then
-				table.clear(torsoColorCache)
+			else
+				if next(torsoColorCache) ~= nil then
+					table.clear(torsoColorCache)
+				end
+				for plr in torsoWatchConnections do
+					clearTorsoWatch(plr)
+				end
 			end
-			task.wait(0.05)
+			task.wait(0.1)
 		end
 	end)
 end)
