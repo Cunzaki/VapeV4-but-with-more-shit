@@ -177,6 +177,22 @@ entitylib.isVulnerable = function(ent, forcefieldCheck)
 	return not hasInvincibility(ent)
 end
 
+entitylib.isEntityTransparent = function(ent)
+	if not ent or not ent.Character then return false end
+	local function partVisible(part)
+		return part and part:IsA('BasePart') and part.Transparency < 0.99 and part.LocalTransparencyModifier < 0.99
+	end
+	if partVisible(ent.Head) or partVisible(ent.RootPart) then
+		return false
+	end
+	for _, part in ent.Character:GetChildren() do
+		if partVisible(part) then
+			return false
+		end
+	end
+	return true
+end
+
 entitylib.getEntityColor = function(ent)
 	ent = ent.Player
 	return ent and tostring(ent.TeamColor) ~= 'White' and ent.TeamColor.Color or nil
@@ -214,9 +230,10 @@ entitylib.EntityMouse = function(entitysettings)
 			if not entitysettings.Players and v.Player then continue end
 			if not entitysettings.NPCs and v.NPC then continue end
 			if not v.Targetable then continue end
-			local position, vis = gameCamera.WorldToViewportPoint(gameCamera, v[entitysettings.Part].Position)
-			if not vis then continue end
-			local screenMag = (mouseLocation - Vector2.new(position.x, position.y)).Magnitude
+			if entitysettings.InvisibleCheck and entitylib.isEntityTransparent(v) then continue end
+			local position, onScreen = gameCamera.WorldToViewportPoint(gameCamera, v[entitysettings.Part].Position)
+			if position.Z < 0 then continue end
+			local screenMag = (mouseLocation - Vector2.new(position.X, position.Y)).Magnitude
 			if screenMag > entitysettings.Range then continue end
 			if entitylib.isVulnerable(v, entitysettings.Forcefield) then
 				local sortMag = distanceSort and (v[entitysettings.Part].Position - originPos).Magnitude or screenMag
@@ -232,7 +249,9 @@ entitylib.EntityMouse = function(entitysettings)
 		end)
 
 		for _, v in sortingTable do
-			if entitysettings.Wallcheck then
+			if entitysettings.Wallcheck == true then
+				if entitylib.Wallcheck(entitysettings.Origin, v.Entity[entitysettings.Part].Position, true) then continue end
+			elseif entitysettings.Wallcheck then
 				if entitylib.Wallcheck(entitysettings.Origin, v.Entity[entitysettings.Part].Position, entitysettings.Wallcheck) then continue end
 			end
 			table.clear(entitysettings)
@@ -251,6 +270,7 @@ entitylib.EntityPosition = function(entitysettings)
 			if not entitysettings.Players and v.Player then continue end
 			if not entitysettings.NPCs and v.NPC then continue end
 			if not v.Targetable then continue end
+			if entitysettings.InvisibleCheck and entitylib.isEntityTransparent(v) then continue end
 			local mag = (v[entitysettings.Part].Position - localPosition).Magnitude
 			if mag > entitysettings.Range then continue end
 			if entitylib.isVulnerable(v, entitysettings.Forcefield) then
@@ -266,7 +286,9 @@ entitylib.EntityPosition = function(entitysettings)
 		end)
 
 		for _, v in sortingTable do
-			if entitysettings.Wallcheck then
+			if entitysettings.Wallcheck == true then
+				if entitylib.Wallcheck(localPosition, v.Entity[entitysettings.Part].Position, true) then continue end
+			elseif entitysettings.Wallcheck then
 				if entitylib.Wallcheck(localPosition, v.Entity[entitysettings.Part].Position, entitysettings.Wallcheck) then continue end
 			end
 			table.clear(entitysettings)
@@ -286,6 +308,7 @@ entitylib.AllPosition = function(entitysettings)
 			if not entitysettings.Players and v.Player then continue end
 			if not entitysettings.NPCs and v.NPC then continue end
 			if not v.Targetable then continue end
+			if entitysettings.InvisibleCheck and entitylib.isEntityTransparent(v) then continue end
 			local mag = (v[entitysettings.Part].Position - localPosition).Magnitude
 			if mag > entitysettings.Range then continue end
 			if entitylib.isVulnerable(v, entitysettings.Forcefield) then
@@ -298,7 +321,9 @@ entitylib.AllPosition = function(entitysettings)
 		end)
 
 		for _, v in sortingTable do
-			if entitysettings.Wallcheck then
+			if entitysettings.Wallcheck == true then
+				if entitylib.Wallcheck(localPosition, v.Entity[entitysettings.Part].Position, true) then continue end
+			elseif entitysettings.Wallcheck then
 				if entitylib.Wallcheck(localPosition, v.Entity[entitysettings.Part].Position, entitysettings.Wallcheck) then continue end
 			end
 			table.insert(returned, v.Entity)

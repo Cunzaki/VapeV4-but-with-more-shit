@@ -1826,17 +1826,22 @@ run(function()
 				wallbang = entitylib.character.RootPart.Position
 			end
 		end
+		local wallcheck = nil
+		if Target.Walls and Target.Walls.Enabled then
+			wallcheck = vape.Libraries.getVisualizerWallcheckIgnores() or true
+		end
 		local settings = {
 			Range = range,
 			RangePosition = rangePosition,
 			AttackCheck = attackCheck,
-			Wallcheck = Target.Walls.Enabled and vape.Libraries.getVisualizerWallcheckIgnores() or nil,
+			Wallcheck = wallcheck,
 			Wallbang = wallbang,
 			Part = part or 'Head',
 			Origin = origin,
 			Players = Target.Players.Enabled,
 			NPCs = Target.NPCs.Enabled,
-			Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
+			Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false,
+			InvisibleCheck = Target.Invisible and Target.Invisible.Enabled or false
 		}
 		if Mode.Value == 'Mouse' and MouseSort and MouseSort.Value == 'Distance' then
 			settings.MouseDistanceSort = true
@@ -1849,10 +1854,18 @@ run(function()
 		return entitylib['Entity'..Mode.Value](buildCombatQuery(origin, opts.part, opts))
 	end
 
-	local function getAutoFireEntity()
-		local originCF = getAutoFireOriginCF()
-		local origin = (originCF * fireoffset).Position
-		return queryCombatTarget(origin, {part = 'Head'})
+	local function getAutoFireEntity(effectiveOriginCF)
+		effectiveOriginCF = effectiveOriginCF or getAutoFireOriginCF()
+		return entitylib.EntityPosition({
+			Range = Range.Value,
+			Wallcheck = Target.Walls and Target.Walls.Enabled and true or nil,
+			Part = 'Head',
+			Origin = (effectiveOriginCF * fireoffset).Position,
+			Players = Target.Players.Enabled,
+			NPCs = Target.NPCs.Enabled,
+			Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false,
+			InvisibleCheck = Target.Invisible and Target.Invisible.Enabled or false
+		})
 	end
 
 	local function getCombatQueryOrigin()
@@ -2071,6 +2084,9 @@ run(function()
 		lastManipAimPos = aimPos
 		lastManipBodyPos = nil
 		if not Manipulation or not Manipulation.Enabled or not entitylib.isAlive then
+			return origin
+		end
+		if not Target.Walls or not Target.Walls.Enabled then
 			return origin
 		end
 		local bodyPos = entitylib.character.RootPart and entitylib.character.RootPart.Position
@@ -2334,7 +2350,7 @@ run(function()
 		local wantsSounds = HitSounds and HitSounds.Enabled
 		if not wantsTracers and not wantsSounds then return end
 		if not (ent and targetPart and origin) then return end
-		if targetinfo and targetinfo.CombatTarget and targetinfo.CombatTarget ~= ent then return end
+		markCombatTarget(ent)
 		local tracerOrigin = vape.Libraries.cachedVisualizerTracerOrigin or origin
 		if bulletTracerPending and bulletTracerPending.Entity == ent and tick() - (bulletTracerPending.Time or 0) < 0.05 then
 			bulletTracerPending.TargetPosition = targetPart.Position
@@ -2903,17 +2919,17 @@ run(function()
 								end
 							end
 						else
-						ent = getAutoFireEntity()
-						lastAutoFireEnt = ent
+						local origin = getAutoFireOriginCF()
+						local fireEnt = getAutoFireEntity(origin)
+						lastAutoFireEnt = fireEnt
+						ent = fireEnt
 						
-						if ent then
-							markCombatTarget(ent)
-						else
-							lastAutoFireEnt = nil
+						if fireEnt then
+							markCombatTarget(fireEnt)
 						end
 
 						if mouse1click and (isrbxactive or iswindowactive)() then
-							if ent and canClick() then
+							if fireEnt and canClick() then
 								if delayCheck < tick() then
 									if mouseClicked then
 										mouse1release()
@@ -2921,7 +2937,7 @@ run(function()
 									else
 										mouse1press()
 										lastMb1Click = tick()
-										registerShot(ent, ent.Head or ent.RootPart, (getAutoFireOriginCF() * fireoffset).Position)
+										registerShot(fireEnt, fireEnt.Head or fireEnt.RootPart, (origin * fireoffset).Position)
 									end
 									mouseClicked = not mouseClicked
 								end
