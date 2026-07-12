@@ -1694,7 +1694,8 @@ run(function()
 		'Popper', 'Poppercam', 'ZoomController', 'BaseCamera', 'ClassicCamera',
 		'OrbitalCamera', 'LegacyCamera', 'Invisicam', 'MouseLockController', 'CameraInput',
 		'SoundClient', 'SoundController', 'SoundService', 'AudioEmitter', 'FootstepHandler',
-		'Footsteps', 'AmbientSound', 'ReverbController', 'Echo', 'AudioPlayer'
+		'Footsteps', 'AmbientSound', 'ReverbController', 'Echo', 'AudioPlayer',
+		'BaseCamera', 'Client', 'ActiveCast', 'Camera', 'Scripts'
 	}
 	local IGNORE_PARENT_NAMES = {
 		CameraModule = true,
@@ -1703,11 +1704,18 @@ run(function()
 		Replication = true,
 		Sounds = true,
 		Audio = true,
-		SoundService = true
+		SoundService = true,
+		Scripts = true,
+		Camera = true,
+		Storage = true
 	}
+	local TracerClickWindow = 0.4
+	local lastMb1Click = 0
+	local isMb1Held = false
 	local function shouldApplySilentAim()
-		if isMb1Held then return true end
-		if (tick() - lastMb1Click) <= TracerClickWindow then return true end
+		if isMb1Held == true then return true end
+		local lastClick = type(lastMb1Click) == 'number' and lastMb1Click or 0
+		if (tick() - lastClick) <= TracerClickWindow then return true end
 		return false
 	end
 	local function shouldIgnoreSilentAimHook(calling)
@@ -1726,7 +1734,6 @@ run(function()
 		end
 		return false
 	end
-	local TracerClickWindow = 0.4
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
 	local ProjectileRaycast = RaycastParams.new()
@@ -1739,8 +1746,6 @@ run(function()
 	BulletTracerFolder.Parent = workspace
 	local fireoffset, rand, delayCheck = CFrame.identity, Random.new(), tick()
 	local oldnamecall, oldray
-	local lastMb1Click = 0
-	local isMb1Held = false
 	local originalWalkSpeed
 	local originalJumpPower
 	local isFrozen = false
@@ -2641,11 +2646,6 @@ run(function()
 	local function refreshManipPreview()
 		if not Manipulation or not Manipulation.Enabled then return end
 		if not ManipulationVisualizer or not ManipulationVisualizer.Enabled then return end
-		if not shouldApplySilentAim() then
-			lastManipInfo = nil
-			lastManipAimPos = nil
-			return
-		end
 		local now = tick()
 		if (now - lastManipPreviewTime) < MANIP_CACHE_TTL then return end
 		lastManipPreviewTime = now
@@ -2791,7 +2791,8 @@ run(function()
 						if shouldIgnoreSilentAimHook(calling) then
 							return oldray(origin, direction)
 						end
-						if not shouldApplySilentAim() then
+						local ok, shouldShoot = pcall(shouldApplySilentAim)
+						if not ok or not shouldShoot then
 							return oldray(origin, direction)
 						end
 
@@ -2811,10 +2812,12 @@ run(function()
 							end
 
 							local calling = getcallingscript()
-							if shouldIgnoreSilentAimHook(calling) then
-								return oldnamecall(...)
-							end
-							if not shouldApplySilentAim() then
+							if not shouldIgnoreSilentAimHook(calling) then
+								local ok, shouldShoot = pcall(shouldApplySilentAim)
+								if not ok or not shouldShoot then
+									return oldnamecall(...)
+								end
+							else
 								return oldnamecall(...)
 							end
 
