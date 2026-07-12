@@ -1700,6 +1700,11 @@ run(function()
 	local BulletTracerGlow
 	local BulletTracerLightEmission
 	local BulletTracerTexture
+	local Manipulation
+	local ManipulationRadius
+	local ManipulationVisualizer
+	local ManipulationVisualizerColor
+	local Resolver
 	local TRACER_TEXTURES = {
 		['None'] = '',
 		['Lightning'] = 'rbxassetid://446111271',
@@ -1851,7 +1856,13 @@ run(function()
 
 	local function queryCombatTarget(origin, opts)
 		opts = opts or {}
-		return entitylib['Entity'..Mode.Value](buildCombatQuery(origin, opts.part, opts))
+		local method = Mode.Value
+		if (not Target.Walls or not Target.Walls.Enabled) and method == 'Mouse' and not opts.prisonOpts then
+			local mouseEnt = entitylib.EntityMouse(buildCombatQuery(origin, opts.part, opts))
+			if mouseEnt then return mouseEnt end
+			method = 'Position'
+		end
+		return entitylib['Entity'..method](buildCombatQuery(origin, opts.part, opts))
 	end
 
 	local function getAutoFireEntity(effectiveOriginCF)
@@ -1877,8 +1888,11 @@ run(function()
 
 	local RESOLVER_HISTORY = 8
 
-	local function refreshManipRayFilter()
+	local function refreshManipRayFilter(targetChar)
 		local ignore = {lplr.Character, gameCamera}
+		if targetChar then
+			table.insert(ignore, targetChar)
+		end
 		for _, model in vape.Libraries.visualizerModels do
 			if model and model.Parent then
 				table.insert(ignore, model)
@@ -1891,7 +1905,7 @@ run(function()
 	end
 
 	local function isVisibleFromTo(originPos, targetPos, targetChar)
-		refreshManipRayFilter()
+		refreshManipRayFilter(targetChar)
 		local eye = originPos + Vector3.new(0, MANIP_EYE_OFFSET, 0)
 		local delta = targetPos - eye
 		if delta.Magnitude < 0.05 then return true end
@@ -1966,6 +1980,21 @@ run(function()
 		return peek + Vector3.new(0, MANIP_EYE_OFFSET, 0)
 	end
 
+	local function getManipColor()
+		if ManipulationVisualizerColor then
+			return Color3.fromHSV(ManipulationVisualizerColor.Hue, ManipulationVisualizerColor.Sat, ManipulationVisualizerColor.Value)
+		end
+		return Color3.fromRGB(255, 217, 51)
+	end
+
+	local function applyManipBeamColor(color)
+		if manipPeekPart then manipPeekPart.Color = color end
+		if manipBeam then manipBeam.Color = ColorSequence.new(color) end
+		if manipGlowBeam then
+			manipGlowBeam.Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.45))
+		end
+	end
+
 	local function cleanupManipVisuals()
 		if manipVisFolder then
 			pcall(function() manipVisFolder:Destroy() end)
@@ -1976,6 +2005,9 @@ run(function()
 		manipLinePart1 = nil
 		manipBeam = nil
 		manipGlowBeam = nil
+		manipAimBeam = nil
+		manipAimLinePart0 = nil
+		manipAimLinePart1 = nil
 	end
 
 	local function setupManipVisuals()
@@ -1989,7 +2021,7 @@ run(function()
 		manipPeekPart.Shape = Enum.PartType.Ball
 		manipPeekPart.Size = Vector3.new(0.55, 0.55, 0.55)
 		manipPeekPart.Material = Enum.Material.Neon
-		manipPeekPart.Color = Color3.fromRGB(255, 217, 51)
+		manipPeekPart.Color = getManipColor()
 		manipPeekPart.Anchored = true
 		manipPeekPart.CanCollide = false
 		manipPeekPart.CanQuery = false
@@ -2026,7 +2058,7 @@ run(function()
 		manipBeam.LightEmission = 1
 		manipBeam.Width0 = 0.08
 		manipBeam.Width1 = 0.08
-		manipBeam.Color = ColorSequence.new(Color3.fromRGB(255, 217, 51))
+		manipBeam.Color = ColorSequence.new(getManipColor())
 		manipBeam.Transparency = NumberSequence.new(0.35)
 		manipBeam.Parent = manipLinePart0
 
@@ -2037,7 +2069,7 @@ run(function()
 		manipGlowBeam.LightEmission = 0.75
 		manipGlowBeam.Width0 = 0.14
 		manipGlowBeam.Width1 = 0.14
-		manipGlowBeam.Color = ColorSequence.new(Color3.fromRGB(255, 217, 51))
+		manipGlowBeam.Color = ColorSequence.new(getManipColor():Lerp(Color3.new(1, 1, 1), 0.45))
 		manipGlowBeam.Transparency = NumberSequence.new(0.65)
 		manipGlowBeam.Parent = manipLinePart0
 	end
@@ -2058,6 +2090,7 @@ run(function()
 			return
 		end
 
+		applyManipBeamColor(getManipColor())
 		local bodyPos = lastManipBodyPos
 		local aimPos = lastManipAimPos
 		local info = lastManipInfo
@@ -2065,28 +2098,82 @@ run(function()
 		if info.state == 'ready' and info.peek then
 			local eye = peekTrackOrigin(info.peek)
 			manipPeekPart.Position = info.peek
-			manipLinePart0.Position = eye
-			manipLinePart1.Position = aimPos
+			manipLinePart0.Position = bodyPos or info.peek
+			manipLinePart1.Position = info.peek
 			setManipVisualVisible(true)
+			updateManipAimBeam(eye, aimPos)
 		elseif info.state == 'direct' and bodyPos then
 			local eye = bodyPos + Vector3.new(0, MANIP_EYE_OFFSET, 0)
 			manipPeekPart.Position = bodyPos
-			manipLinePart0.Position = eye
-			manipLinePart1.Position = aimPos
+			manipLinePart0.Position = bodyPos
+			manipLinePart1.Position = bodyPos
 			setManipVisualVisible(true)
+			updateManipAimBeam(eye, aimPos)
 		else
 			setManipVisualVisible(false)
+			updateManipAimBeam()
 		end
+	end
+
+	local manipAimBeam
+	local manipAimLinePart0
+	local manipAimLinePart1
+
+	local function ensureManipAimBeam()
+		if manipAimBeam and manipAimBeam.Parent then return end
+		if not manipVisFolder then return end
+		manipAimLinePart0 = Instance.new('Part')
+		manipAimLinePart0.Name = 'PeekRayStart'
+		manipAimLinePart0.Size = Vector3.new(0.1, 0.1, 0.1)
+		manipAimLinePart0.Transparency = 1
+		manipAimLinePart0.Anchored = true
+		manipAimLinePart0.CanCollide = false
+		manipAimLinePart0.CanQuery = false
+		manipAimLinePart0.CanTouch = false
+		manipAimLinePart0.Parent = manipVisFolder
+		manipAimLinePart1 = Instance.new('Part')
+		manipAimLinePart1.Name = 'PeekRayEnd'
+		manipAimLinePart1.Size = Vector3.new(0.1, 0.1, 0.1)
+		manipAimLinePart1.Transparency = 1
+		manipAimLinePart1.Anchored = true
+		manipAimLinePart1.CanCollide = false
+		manipAimLinePart1.CanQuery = false
+		manipAimLinePart1.CanTouch = false
+		manipAimLinePart1.Parent = manipVisFolder
+		local attach0 = Instance.new('Attachment')
+		attach0.Parent = manipAimLinePart0
+		local attach1 = Instance.new('Attachment')
+		attach1.Parent = manipAimLinePart1
+		manipAimBeam = Instance.new('Beam')
+		manipAimBeam.Name = 'PeekAimBeam'
+		manipAimBeam.Attachment0 = attach0
+		manipAimBeam.Attachment1 = attach1
+		manipAimBeam.FaceCamera = true
+		manipAimBeam.LightEmission = 1
+		manipAimBeam.Width0 = 0.1
+		manipAimBeam.Width1 = 0.1
+		manipAimBeam.Parent = manipAimLinePart0
+	end
+
+	local function updateManipAimBeam(eyePos, aimPos)
+		if not ManipulationVisualizer or not ManipulationVisualizer.Enabled or not eyePos or not aimPos then
+			if manipAimBeam then manipAimBeam.Transparency = NumberSequence.new(1) end
+			return
+		end
+		ensureManipAimBeam()
+		if not manipAimBeam or not manipAimLinePart0 or not manipAimLinePart1 then return end
+		local color = getManipColor()
+		manipAimBeam.Color = ColorSequence.new(color)
+		manipAimBeam.Transparency = NumberSequence.new(0.2)
+		manipAimLinePart0.Position = eyePos
+		manipAimLinePart1.Position = aimPos
 	end
 
 	local function applyManipulationOrigin(origin, aimPos, targetChar)
 		lastManipInfo = nil
 		lastManipAimPos = aimPos
 		lastManipBodyPos = nil
-		if not Manipulation or not Manipulation.Enabled or not entitylib.isAlive then
-			return origin
-		end
-		if not Target.Walls or not Target.Walls.Enabled then
+		if not Manipulation or not Manipulation.Enabled or not entitylib.isAlive or typeof(origin) ~= 'Vector3' then
 			return origin
 		end
 		local bodyPos = entitylib.character.RootPart and entitylib.character.RootPart.Position
@@ -2098,8 +2185,6 @@ run(function()
 		lastManipInfo = evaluateManipulationCached(bodyPos, aimPos, maxRadius, targetChar)
 		if lastManipInfo.state == 'ready' and lastManipInfo.peek then
 			return peekTrackOrigin(lastManipInfo.peek)
-		elseif lastManipInfo.state == 'direct' then
-			return bodyPos + Vector3.new(0, MANIP_EYE_OFFSET, 0)
 		end
 		return origin
 	end
@@ -2168,7 +2253,7 @@ run(function()
 		local head = ent.Head or targetPart
 		if not head then return targetPart.Position end
 		local bestPos = head.Position
-		if Target.Walls.Enabled and isVector3(origin) then
+		if Target.Walls and Target.Walls.Enabled and isVector3(origin) then
 			local cf = head.CFrame
 			local size = head.Size
 			local candidates = {
@@ -2443,7 +2528,7 @@ run(function()
 			end
 
 			local allowHit = true
-			if Target.Walls.Enabled then
+			if Target.Walls and Target.Walls.Enabled then
 				local wallIgnores = {lplr.Character, gameCamera}
 				for _, model in vape.Libraries.visualizerModels do
 					if model and model.Parent then
@@ -2521,25 +2606,24 @@ run(function()
 	end
 
 	local function getTarget(origin, obj, prisonOpts)
-		local resolvedPos = select(1, resolveSilentAimOrigin(origin))
-		origin = resolvedPos
+		local weaponOrigin = select(1, resolveSilentAimOrigin(origin))
 		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then return end
 		local targetPart = (rand.NextNumber(rand, 0, 100) < (AutoFire.Enabled and 100 or HeadshotChance.Value)) and 'Head' or 'RootPart'
-		local ent = queryCombatTarget(origin, {part = targetPart, prisonOpts = prisonOpts})
+		local ent = queryCombatTarget(getCombatQueryOrigin(), {part = targetPart, prisonOpts = prisonOpts})
 
 		if ent then
 			local part = ent[targetPart]
 			markCombatTarget(ent)
 			if isMb1Held or (tick() - lastMb1Click) <= TracerClickWindow then
-				registerShot(ent, part, origin)
+				registerShot(ent, part, weaponOrigin)
 			end
-			local aimPos = getAimPosition(ent, part, origin)
-			origin = applyManipulationOrigin(origin, aimPos, ent.Character)
+			local aimPos = getAimPosition(ent, part, weaponOrigin)
+			weaponOrigin = applyManipulationOrigin(weaponOrigin, aimPos, ent.Character)
 			if Projectile.Enabled then
 				ProjectileRaycast.FilterDescendantsInstances = {gameCamera, ent.Character}
 				ProjectileRaycast.CollisionGroup = part.CollisionGroup
 			end
-			return ent, part, origin, aimPos
+			return ent, part, weaponOrigin, aimPos
 		end
 	end
 
@@ -2673,6 +2757,9 @@ run(function()
 			local ent, targetPart, origin, aimPos = getTarget(args[1].Origin)
 			if not ent then return end
 			aimPos = aimPos or targetPart.Position
+			if Wallbang.Enabled then
+				return {targetPart, aimPos, targetPart.GetClosestPointOnSurface(targetPart, origin), targetPart.Material}
+			end
 			if typeof(args[2]) == 'table' then
 				for _, model in vape.Libraries.visualizerModels do
 					if model and model.Parent then
@@ -2695,9 +2782,10 @@ run(function()
 					end
 				end
 			end
+			args[1] = origin
 			args[2] = CFrame.lookAt(origin, aimPos).LookVector * args[2].Magnitude
 			if Wallbang.Enabled then
-				RaycastWhitelist.FilterDescendantsInstances = {targetPart}
+				RaycastWhitelist.FilterDescendantsInstances = {ent.Character or targetPart}
 				args[3] = RaycastWhitelist
 			end
 		end,
@@ -2721,8 +2809,10 @@ run(function()
 			if Projectile.Enabled then
 				local calc = prediction.SolveTrajectory(origin, ProjectileSpeed.Value, ProjectileGravity.Value, aimPos, targetPart.Velocity, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
 				if not calc then return end
+				args[1] = origin
 				args[2] = CFrame.lookAt(origin, calc).LookVector * args[2].Magnitude
 			else
+				args[1] = origin
 				args[2] = CFrame.lookAt(origin, aimPos).LookVector * args[2].Magnitude
 			end
 		end
@@ -3385,6 +3475,9 @@ run(function()
 		Function = function(callback)
 			ManipulationRadius.Object.Visible = callback
 			ManipulationVisualizer.Object.Visible = callback
+			if ManipulationVisualizerColor then
+				ManipulationVisualizerColor.Object.Visible = callback and ManipulationVisualizer.Enabled
+			end
 			if not callback then
 				lastManipInfo = nil
 				lastManipAimPos = nil
@@ -3412,12 +3505,26 @@ run(function()
 		Visible = false,
 		Tooltip = 'Draws peek point and line-to-target beams in the world',
 		Function = function(callback)
+			if ManipulationVisualizerColor then
+				ManipulationVisualizerColor.Object.Visible = callback and Manipulation.Enabled
+			end
 			if SilentAim.Enabled then
 				if callback then
 					setupManipVisuals()
 				else
 					cleanupManipVisuals()
 				end
+			end
+		end
+	})
+	ManipulationVisualizerColor = SilentAim:CreateColorSlider({
+		Name = 'Manip Color',
+		Darker = true,
+		Visible = false,
+		Function = function()
+			applyManipBeamColor(getManipColor())
+			if lastManipInfo and lastManipAimPos then
+				updateManipVisuals()
 			end
 		end
 	})
