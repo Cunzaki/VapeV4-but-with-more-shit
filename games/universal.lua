@@ -208,20 +208,25 @@ vape:Clean(lplr.OnTeleport:Connect(function()
 	end
 end))
 
-local frictionTable, oldfrict = {}
+local frictionTable, oldfrict = {}, {}
 local function updateVelocity()
 	if getTableSize(frictionTable) > 0 then
-		if entitylib.isAlive then
-			for _, v in entitylib.character.Character:GetChildren() do
-				if v:IsA('BasePart') and v.Name ~= 'HumanoidRootPart' and not oldfrict[v] then
-					oldfrict[v] = v.CustomPhysicalProperties or 'none'
-					v.CustomPhysicalProperties = PhysicalProperties.new(0.0001, 0.2, 0.5, 1, 1)
+		if entitylib and entitylib.isAlive and entitylib.character then
+			local char = entitylib.character.Character
+			if char and char.Parent then
+				for _, v in char:GetChildren() do
+					if v and v.Parent and v:IsA('BasePart') and v.Name ~= 'HumanoidRootPart' and not oldfrict[v] then
+						oldfrict[v] = v.CustomPhysicalProperties or 'none'
+						v.CustomPhysicalProperties = PhysicalProperties.new(0.0001, 0.2, 0.5, 1, 1)
+					end
 				end
 			end
 		end
 	else
-		for i, v in oldfrict do
-			i.CustomPhysicalProperties = v ~= 'none' and v or nil
+		for part, props in oldfrict do
+			if part and part.Parent then
+				part.CustomPhysicalProperties = props ~= 'none' and props or nil
+			end
 		end
 		table.clear(oldfrict)
 	end
