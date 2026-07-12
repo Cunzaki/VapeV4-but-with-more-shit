@@ -1766,160 +1766,25 @@ run(function()
 	local bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	local healthCache = setmetatable({}, {__mode = 'k'})
 	local resolverCache = setmetatable({}, {__mode = 'k'})
-	local scanDebugFolder = nil
-	local resolverDebugFolder = nil
-	local scanPointParts = {}
-	local resolverDebugParts = {}
-	local scanActiveThisFrame = false
-	local lastDebugRenderTime = 0
-	local DEBUG_RENDER_INTERVAL = 0.1
-	
-	local PositionManipulation
-	local PositionManipulationRadius
-	local PositionManipulationVisualizer
-	local PositionManipulationVisualizerMaterial
-	local PositionManipulationVisualizerColorToggle
-	local PositionManipulationVisualizerColor
-	local PositionManipulationRadiusVisualizer
-	local PositionManipulationRadiusVisualizerColor
-	local PositionManipulationScanQuality
-	
-	local pmClone
-	local pmCloneRoot
-	local pmRealRoot
-	local pmMotorMap = {}
-	local pmRadiusPart
-	local pmTargetPosition = nil
-	local pmLockedTarget = nil
 	local silentAimHookBusy = false
-	local pmRaycastParams = RaycastParams.new()
-	local pmFloorParams = RaycastParams.new()
-	pmFloorParams.FilterType = Enum.RaycastFilterType.Exclude
-	pmFloorParams.RespectCanCollide = true
-	local pmIgnoreInstances = {}
-	local lastPMFrame = 0
-	local pmScanAngleIdx = 0
-	local pmScanRadiusIdx = 0
-	local pmScanYIdx = 0
-	local PM_SCAN = {
-		Low = {throttle = 0.1, budget = 20, angles = 8, radii = 3, y = 2},
-		Medium = {throttle = 0.06, budget = 40, angles = 12, radii = 4, y = 2},
-		High = {throttle = 0.04, budget = 72, angles = 16, radii = 6, y = 3},
-		Ultra = {throttle = 0.025, budget = 120, angles = 24, radii = 8, y = 3},
-	}
-	
-	local function pmClearLock()
-		pmTargetPosition = nil
-		pmLockedTarget = nil
-	end
-	
-	local function refreshPMRaycastFilter()
-		table.clear(pmIgnoreInstances)
-		pmIgnoreInstances[1] = lplr.Character
-		pmIgnoreInstances[2] = gameCamera
-		if pmClone then pmIgnoreInstances[3] = pmClone end
-		if pmRadiusPart then pmIgnoreInstances[4] = pmRadiusPart end
-		local idx = #pmIgnoreInstances
-		for _, model in vape.Libraries.visualizerModels do
-			if model and model.Parent then
-				idx += 1
-				pmIgnoreInstances[idx] = model
-			end
-		end
-		pmRaycastParams.FilterType = Enum.RaycastFilterType.Exclude
-		pmRaycastParams.FilterDescendantsInstances = pmIgnoreInstances
-		pmRaycastParams.RespectCanCollide = true
-		pmFloorParams.FilterDescendantsInstances = pmIgnoreInstances
-	end
-	
-	local function pmIsFloorValid(pos)
-		local down = workspace:Raycast(pos + Vector3.new(0, 2.5, 0), Vector3.new(0, -5, 0), pmFloorParams)
-		if not down then return false end
-		if workspace:Raycast(pos + Vector3.new(0, 0.5, 0), Vector3.new(0, 2.5, 0), pmFloorParams) then
-			return false
-		end
-		return true
-	end
-	
-	local function pmGetRayOrigins(testPos, localChar, localPos)
-		local origins = {testPos + Vector3.new(0, 1.5, 0)}
-		if localChar.Head then
-			table.insert(origins, testPos + Vector3.new(0, localChar.Head.Position.Y - localPos.Y, 0))
-		end
-		return origins
-	end
-	
-	local function pmHasLineOfSight(testPos, targetEnt, aimPart, localChar, localPos)
-		for _, rayOrigin in pmGetRayOrigins(testPos, localChar, localPos) do
-			local delta = aimPart.Position - rayOrigin
-			local dist = delta.Magnitude
-			if dist < 0.5 then return true end
-			local result = workspace:Raycast(rayOrigin, delta, pmRaycastParams)
-			if not result then
-				return true
-			end
-			local hitChar = result.Instance and result.Instance:FindFirstAncestorOfClass('Model')
-			if hitChar == targetEnt.Character then
-				return true
-			end
-		end
-		return false
-	end
-	
-	local function pmTryPosition(testPos, localPos, radius, targetEnt, aimPart, localChar)
-		if (testPos - localPos).Magnitude > radius + 0.25 then return end
-		if not pmIsFloorValid(testPos) then return end
-		if not pmHasLineOfSight(testPos, targetEnt, aimPart, localChar, localPos) then return end
-		return (testPos - localPos).Magnitude
-	end
-	
-	local function validatePMLock()
-		if not pmTargetPosition or not pmLockedTarget then return false end
-		if not pmLockedTarget.Character or not pmLockedTarget.RootPart then return false end
-		if not entitylib.targetCheck(pmLockedTarget) then return false end
-		if not entitylib.isVulnerable(pmLockedTarget, (Target.Forcefield and Target.Forcefield.Enabled) or false) then return false end
-		local localChar = entitylib.character
-		if not localChar or not localChar.RootPart then return false end
-		if (pmTargetPosition - localChar.RootPart.Position).Magnitude > PositionManipulationRadius.Value + 1 then return false end
-		local aimPart = pmLockedTarget.Head or pmLockedTarget.RootPart
-		if not aimPart then return false end
-		if not pmIsFloorValid(pmTargetPosition) then return false end
-		return pmHasLineOfSight(pmTargetPosition, pmLockedTarget, aimPart, localChar, localChar.RootPart.Position)
-	end
-	
-	local function pmTargetInFov(ent)
-		local part = ent.Head or ent.RootPart
-		if not part then return false end
-		if Mode.Value == 'Mouse' then
-			local mouseLocation = inputService:GetMouseLocation()
-			local screenPos, onScreen = gameCamera:WorldToViewportPoint(part.Position)
-			if not onScreen then return false end
-			return (Vector2.new(screenPos.X, screenPos.Y) - mouseLocation).Magnitude <= Range.Value
-		end
-		if not pmTargetPosition then return false end
-		return (part.Position - pmTargetPosition).Magnitude <= Range.Value
-	end
-	
-	local function getPMAutoFireEntity()
-		if not validatePMLock() then
-			pmClearLock()
-			return nil
-		end
-		if not pmTargetInFov(pmLockedTarget) then return nil end
-		if Target.Walls.Enabled then
-			local aimPart = pmLockedTarget.Head or pmLockedTarget.RootPart
-			if aimPart and entitylib.Wallcheck(pmTargetPosition, aimPart.Position, vape.Libraries.getVisualizerWallcheckIgnores()) then
-				return nil
-			end
-		end
-		return pmLockedTarget
-	end
-	
+
+	local manipVisFolder
+	local manipPeekPart
+	local manipLinePart0
+	local manipLinePart1
+	local manipBeam
+	local manipGlowBeam
+	local lastManipInfo = nil
+	local lastManipAimPos = nil
+	local lastManipBodyPos = nil
+	local MANIP_EYE_OFFSET = 2.5
+	local MANIP_STEPS = 16
+	local manipRayParams = RaycastParams.new()
+	manipRayParams.RespectCanCollide = true
+	manipRayParams.FilterType = Enum.RaycastFilterType.Exclude
+
 	local function getAutoFireEntity(effectiveOriginCF)
-		if PositionManipulation and PositionManipulation.Enabled then
-			return getPMAutoFireEntity()
-		end
-		return entitylib['Entity'..Mode.Value]({
+		return entitylib.EntityPosition({
 			Range = Range.Value,
 			Wallcheck = Target.Walls.Enabled and vape.Libraries.getVisualizerWallcheckIgnores() or nil,
 			Part = 'Head',
@@ -1929,68 +1794,216 @@ run(function()
 			Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
 		})
 	end
-	
-	local pmCameraProxy
-	local pmOriginalCameraSubject
-	
-	local function cleanupPMCameraProxy()
-		if pmCameraProxy then
-			pmCameraProxy:Destroy()
-			pmCameraProxy = nil
+
+	local RESOLVER_HISTORY = 8
+
+	local function refreshManipRayFilter()
+		local ignore = {lplr.Character, gameCamera}
+		for _, model in vape.Libraries.visualizerModels do
+			if model and model.Parent then
+				table.insert(ignore, model)
+			end
 		end
-		local cam = workspace.CurrentCamera
-		if cam and pmOriginalCameraSubject then
-			cam.CameraSubject = pmOriginalCameraSubject
-			pmOriginalCameraSubject = nil
+		if manipVisFolder and manipVisFolder.Parent then
+			table.insert(ignore, manipVisFolder)
 		end
-	end
-	
-	local function setupPMCameraProxy()
-		cleanupPMCameraProxy()
-		
-		local cam = workspace.CurrentCamera
-		if not cam then return end
-		
-		local char = entitylib.character and entitylib.character.Character
-		local hum = char and char:FindFirstChild("Humanoid")
-		if not hum or hum.Health <= 0 then return end
-		
-		pmOriginalCameraSubject = cam.CameraSubject
-		
-		pmCameraProxy = Instance.new("Part")
-		pmCameraProxy.Name = "VapePositionManipulationCameraProxy"
-		pmCameraProxy.Transparency = 1
-		pmCameraProxy.CanCollide = false
-		pmCameraProxy.CanQuery = false
-		pmCameraProxy.CanTouch = false
-		pmCameraProxy.Anchored = true
-		pmCameraProxy.Size = Vector3.new(0.1, 0.1, 0.1)
-		pmCameraProxy.Parent = workspace
-		
-		cam.CameraSubject = pmCameraProxy
+		manipRayParams.FilterDescendantsInstances = ignore
 	end
 
-	local resolverConfig = {
-		HistorySize = 6,
-		JitterThreshold = 0.15,
-		VelocitySmoothing = 0.6,
-		PredictiveMultiplier = 1.05
-	}
+	local function isVisibleFromTo(originPos, targetPos, targetChar)
+		refreshManipRayFilter()
+		local eye = originPos + Vector3.new(0, MANIP_EYE_OFFSET, 0)
+		local delta = targetPos - eye
+		if delta.Magnitude < 0.05 then return true end
+		local result = workspace:Raycast(eye, delta, manipRayParams)
+		if not result then return true end
+		if targetChar and result.Instance then
+			return result.Instance:IsDescendantOf(targetChar)
+		end
+		return false
+	end
+
+	local function searchManipRing(origin, targetPos, radius, steps, targetChar)
+		for i = 0, steps - 1 do
+			local angle = (i / steps) * math.pi * 2
+			local peek = Vector3.new(
+				origin.X + math.cos(angle) * radius,
+				origin.Y,
+				origin.Z + math.sin(angle) * radius
+			)
+			if isVisibleFromTo(peek, targetPos, targetChar) then
+				return peek, radius
+			end
+		end
+		return nil, radius
+	end
+
+	local function searchManipPeek(origin, targetPos, maxRadius, targetChar)
+		maxRadius = math.clamp(math.floor((maxRadius or 10) * 100 + 0.5) / 100, 1, 10)
+		local r = 1
+		while r < maxRadius - 0.05 do
+			local peek = searchManipRing(origin, targetPos, r, MANIP_STEPS, targetChar)
+			if peek then return peek, r end
+			r += 1
+		end
+		return searchManipRing(origin, targetPos, maxRadius, MANIP_STEPS, targetChar)
+	end
+
+	local function evaluateManipulation(origin, targetPos, maxRadius, targetChar)
+		if not origin or not targetPos then
+			return {state = 'blocked', peek = nil, radius = maxRadius or 10}
+		end
+		if isVisibleFromTo(origin, targetPos, targetChar) then
+			return {state = 'direct', peek = nil, radius = maxRadius or 10}
+		end
+		local peek, radius = searchManipPeek(origin, targetPos, maxRadius, targetChar)
+		if peek then
+			return {state = 'ready', peek = peek, radius = radius}
+		end
+		return {state = 'blocked', peek = nil, radius = maxRadius or 10}
+	end
+
+	local function peekTrackOrigin(peek)
+		return peek + Vector3.new(0, MANIP_EYE_OFFSET, 0)
+	end
+
+	local function cleanupManipVisuals()
+		if manipVisFolder then
+			pcall(function() manipVisFolder:Destroy() end)
+		end
+		manipVisFolder = nil
+		manipPeekPart = nil
+		manipLinePart0 = nil
+		manipLinePart1 = nil
+		manipBeam = nil
+		manipGlowBeam = nil
+	end
+
+	local function setupManipVisuals()
+		cleanupManipVisuals()
+		manipVisFolder = Instance.new('Folder')
+		manipVisFolder.Name = 'SilentAimManipVis'
+		manipVisFolder.Parent = workspace
+
+		manipPeekPart = Instance.new('Part')
+		manipPeekPart.Name = 'PeekPoint'
+		manipPeekPart.Shape = Enum.PartType.Ball
+		manipPeekPart.Size = Vector3.new(0.55, 0.55, 0.55)
+		manipPeekPart.Material = Enum.Material.Neon
+		manipPeekPart.Color = Color3.fromRGB(255, 217, 51)
+		manipPeekPart.Anchored = true
+		manipPeekPart.CanCollide = false
+		manipPeekPart.CanQuery = false
+		manipPeekPart.CanTouch = false
+		manipPeekPart.CastShadow = false
+		manipPeekPart.Transparency = 0.15
+		manipPeekPart.Parent = manipVisFolder
+
+		local function makeAnchor(name)
+			local part = Instance.new('Part')
+			part.Name = name
+			part.Size = Vector3.new(0.1, 0.1, 0.1)
+			part.Transparency = 1
+			part.Anchored = true
+			part.CanCollide = false
+			part.CanQuery = false
+			part.CanTouch = false
+			part.Parent = manipVisFolder
+			return part
+		end
+
+		manipLinePart0 = makeAnchor('PeekLineStart')
+		manipLinePart1 = makeAnchor('PeekLineEnd')
+
+		local attach0 = Instance.new('Attachment')
+		attach0.Parent = manipLinePart0
+		local attach1 = Instance.new('Attachment')
+		attach1.Parent = manipLinePart1
+
+		manipBeam = Instance.new('Beam')
+		manipBeam.Attachment0 = attach0
+		manipBeam.Attachment1 = attach1
+		manipBeam.FaceCamera = true
+		manipBeam.LightEmission = 1
+		manipBeam.Width0 = 0.08
+		manipBeam.Width1 = 0.08
+		manipBeam.Color = ColorSequence.new(Color3.fromRGB(255, 217, 51))
+		manipBeam.Transparency = NumberSequence.new(0.35)
+		manipBeam.Parent = manipLinePart0
+
+		manipGlowBeam = Instance.new('Beam')
+		manipGlowBeam.Attachment0 = attach0
+		manipGlowBeam.Attachment1 = attach1
+		manipGlowBeam.FaceCamera = true
+		manipGlowBeam.LightEmission = 0.75
+		manipGlowBeam.Width0 = 0.14
+		manipGlowBeam.Width1 = 0.14
+		manipGlowBeam.Color = ColorSequence.new(Color3.fromRGB(255, 217, 51))
+		manipGlowBeam.Transparency = NumberSequence.new(0.65)
+		manipGlowBeam.Parent = manipLinePart0
+	end
+
+	local function setManipVisualVisible(visible)
+		if manipPeekPart then manipPeekPart.Transparency = visible and 0.15 or 1 end
+		if manipBeam then manipBeam.Transparency = NumberSequence.new(visible and 0.35 or 1) end
+		if manipGlowBeam then manipGlowBeam.Transparency = NumberSequence.new(visible and 0.65 or 1) end
+	end
+
+	local function updateManipVisuals()
+		if not ManipulationVisualizer or not ManipulationVisualizer.Enabled or not manipPeekPart then
+			setManipVisualVisible(false)
+			return
+		end
+		if not lastManipInfo or not lastManipAimPos then
+			setManipVisualVisible(false)
+			return
+		end
+
+		local bodyPos = lastManipBodyPos
+		local aimPos = lastManipAimPos
+		local info = lastManipInfo
+
+		if info.state == 'ready' and info.peek then
+			local eye = peekTrackOrigin(info.peek)
+			manipPeekPart.Position = info.peek
+			manipLinePart0.Position = eye
+			manipLinePart1.Position = aimPos
+			setManipVisualVisible(true)
+		elseif info.state == 'direct' and bodyPos then
+			local eye = bodyPos + Vector3.new(0, MANIP_EYE_OFFSET, 0)
+			manipPeekPart.Position = bodyPos
+			manipLinePart0.Position = eye
+			manipLinePart1.Position = aimPos
+			setManipVisualVisible(true)
+		else
+			setManipVisualVisible(false)
+		end
+	end
+
+	local function applyManipulationOrigin(origin, aimPos, targetChar)
+		lastManipInfo = nil
+		lastManipAimPos = aimPos
+		lastManipBodyPos = nil
+		if not Manipulation or not Manipulation.Enabled or not entitylib.isAlive then
+			return origin
+		end
+		local bodyPos = entitylib.character.RootPart and entitylib.character.RootPart.Position
+		if not bodyPos or not aimPos then
+			return origin
+		end
+		lastManipBodyPos = bodyPos
+		local maxRadius = ManipulationRadius and ManipulationRadius.Value or 10
+		lastManipInfo = evaluateManipulation(bodyPos, aimPos, maxRadius, targetChar)
+		if lastManipInfo.state == 'ready' and lastManipInfo.peek then
+			return peekTrackOrigin(lastManipInfo.peek)
+		elseif lastManipInfo.state == 'direct' then
+			return bodyPos + Vector3.new(0, MANIP_EYE_OFFSET, 0)
+		end
+		return origin
+	end
 
 	local function isVector3(val)
 		return type(val) == 'userdata' and typeof(val) == 'Vector3'
-	end
-
-	local function safeVelocity(vel)
-		if not isVector3(vel) then return Vector3.zero end
-		local vx = vel.X
-		local vy = vel.Y
-		local vz = vel.Z
-		if vx ~= vx or vy ~= vy or vz ~= vz then return Vector3.zero end
-		if not math.isfinite(vx) then vx = 0 end
-		if not math.isfinite(vy) then vy = 0 end
-		if not math.isfinite(vz) then vz = 0 end
-		return Vector3.new(vx, vy, vz)
 	end
 
 	local function safeMagnitude(vec)
@@ -1998,13 +2011,6 @@ run(function()
 		local m = vec.Magnitude
 		if m ~= m or not math.isfinite(m) then return 0 end
 		return m
-	end
-
-	local function safeUnit(vec)
-		if not isVector3(vec) then return Vector3.zero end
-		local m = vec.Magnitude
-		if m ~= m or m < 0.001 or not math.isfinite(m) then return Vector3.zero end
-		return vec / m
 	end
 
 	local function getPartHitpointsLight(part, origin)
@@ -2035,282 +2041,84 @@ run(function()
 		return hitpoints
 	end
 
-	local function calculateScanScore(hitpoint, origin, targetVel)
+	local function calculateHitpointScore(hitpoint, origin, wallIgnores, targetChar)
 		if not hitpoint or not isVector3(hitpoint.pos) or not isVector3(origin) then return 0, 0 end
-		local direction = hitpoint.pos - origin
-		if not isVector3(direction) then return 0, 0 end
-		local distance = safeMagnitude(direction)
-		if distance < 0.1 then return 0, 0 end
-		local normalizedDir = direction / distance
-		if not isVector3(normalizedDir) then return 0, 0 end
-		local targetUnit = safeUnit(targetVel)
-		if not isVector3(targetUnit) then targetUnit = Vector3.zero end
-		local dotProduct = 0
-		local success, err = pcall(function()
-			dotProduct = normalizedDir:Dot(targetUnit)
-		end)
-		if not success then return 0, 0 end
-		if dotProduct ~= dotProduct then dotProduct = 0 end
-		dotProduct = math.clamp(dotProduct, -1, 1)
-		local angleScore = math.max(0, dotProduct)
-		local targetSpeed = safeMagnitude(targetVel)
-		local timeToHit = distance / math.max(1000, targetSpeed)
-		local predictedOffset = targetVel * timeToHit * resolverConfig.PredictiveMultiplier
-		local predictedDist = safeMagnitude(predictedOffset)
-		local predictionBonus = 1 / (1 + predictedDist)
-		local finalScore = (angleScore * 0.4) + (hitpoint.weight * 0.3) + (predictionBonus * 0.3)
-		if finalScore ~= finalScore or not math.isfinite(finalScore) then return 0, 0 end
-		return math.min(finalScore, 1), distance
+		local distance = safeMagnitude(hitpoint.pos - origin)
+		if distance < 0.1 then return 0, distance end
+		if wallIgnores and entitylib.Wallcheck(origin, hitpoint.pos, wallIgnores) then
+			return 0, distance
+		end
+		local centerBonus = 1 / (1 + distance * 0.01)
+		return hitpoint.weight * centerBonus, distance
 	end
 
-	local function updateResolverCache(ent)
-		if not ent or not ent.Character then
-			resolverCache[ent] = nil
-			return nil
-		end
-		local rootPart = ent.RootPart
-		if not rootPart then return nil end
-		local currentTime = tick()
-		local currentPos = rootPart.Position
-		local currentVel = safeVelocity(rootPart.AssemblyLinearVelocity)
-		if not resolverCache[ent] then
-			resolverCache[ent] = {
-				positions = {},
-				velocities = {},
-				timestamps = {},
-				jitterDetected = false,
-				lastResolvedPos = currentPos,
-				predictedPos = currentPos,
-				predictedVel = Vector3.zero
-			}
-		end
+	local function pushResolverSample(ent, samplePos)
+		if not ent or not samplePos then return nil end
 		local cache = resolverCache[ent]
-		table.insert(cache.positions, currentPos)
-		table.insert(cache.velocities, currentVel)
-		table.insert(cache.timestamps, currentTime)
-		while #cache.positions > resolverConfig.HistorySize do
-			table.remove(cache.positions, 1)
-			table.remove(cache.velocities, 1)
-			table.remove(cache.timestamps, 1)
+		if not cache then
+			cache = {samples = {}}
+			resolverCache[ent] = cache
 		end
-		cache.jitterDetected = false
-		if #cache.positions >= 3 then
-			local totalJitter = 0
-			for i = 2, #cache.positions do
-				local prev = cache.positions[i - 1]
-				local curr = cache.positions[i]
-				local prevPrev = cache.positions[i - 2] or prev
-				local expected = prev + (prev - prevPrev)
-				local jitter = safeMagnitude(curr - expected)
-				totalJitter = totalJitter + jitter
+		table.insert(cache.samples, samplePos)
+		while #cache.samples > RESOLVER_HISTORY do
+			table.remove(cache.samples, 1)
+		end
+		if #cache.samples == 0 then
+			cache.resolvedPos = samplePos
+			return cache
+		end
+		local sum = Vector3.zero
+		for _, pos in cache.samples do
+			sum += pos
+		end
+		cache.resolvedPos = sum / #cache.samples
+		if #cache.samples >= 3 then
+			local variance = 0
+			for _, pos in cache.samples do
+				variance += safeMagnitude(pos - cache.resolvedPos)
 			end
-			local avgJitter = totalJitter / (#cache.positions - 1)
-			cache.jitterDetected = avgJitter > resolverConfig.JitterThreshold
+			variance /= #cache.samples
+			if variance > 0.35 then
+				table.sort(cache.samples, function(a, b)
+					return safeMagnitude(a - cache.resolvedPos) < safeMagnitude(b - cache.resolvedPos)
+				end)
+				local trimmed = {}
+				local keep = math.max(2, math.floor(#cache.samples * 0.6))
+				for i = 1, keep do
+					trimmed[i] = cache.samples[i]
+				end
+				cache.samples = trimmed
+				sum = Vector3.zero
+				for _, pos in cache.samples do
+					sum += pos
+				end
+				cache.resolvedPos = sum / #cache.samples
+			end
 		end
-		local avgVel = Vector3.zero
-		for _, v in cache.velocities do
-			avgVel = avgVel + v
-		end
-		avgVel = avgVel / math.max(#cache.velocities, 1)
-		avgVel = avgVel * resolverConfig.VelocitySmoothing + currentVel * (1 - resolverConfig.VelocitySmoothing)
-		local timeDelta = math.max(currentTime - (cache.timestamps[1] or currentTime), 0.001)
-		local displacement = currentPos - (cache.positions[1] or currentPos)
-		local smoothVel = displacement / timeDelta
-		if safeMagnitude(smoothVel) > 500 then
-			smoothVel = safeUnit(smoothVel) * 500
-		end
-		local combinedVel = (avgVel + smoothVel) * 0.5
-		if safeMagnitude(combinedVel) > 500 then
-			combinedVel = safeUnit(combinedVel) * 500
-		end
-		cache.lastResolvedPos = currentPos
-		cache.predictedPos = currentPos + (combinedVel * resolverConfig.PredictiveMultiplier)
-		cache.predictedVel = combinedVel
 		return cache
 	end
 
-	local function getResolvedPosition(ent)
-		local cache = resolverCache[ent]
-		if not cache then return nil, false, nil end
-		return cache.predictedPos, cache.jitterDetected, cache.lastResolvedPos, cache.predictedVel
-	end
-
-	local function clearScanDebugParts()
-		for _, part in scanPointParts do
-			pcall(function() part:Destroy() end)
+	local function resolveHeadPosition(ent, targetPart, origin)
+		if not Resolver or not Resolver.Enabled or not ent or not targetPart then
+			return targetPart.Position
 		end
-		table.clear(scanPointParts)
-		if scanDebugFolder then
-			pcall(function() scanDebugFolder:Destroy() end)
-		end
-		scanDebugFolder = nil
-	end
-
-	local function clearResolverDebugParts()
-		for _, part in resolverDebugParts do
-			pcall(function() part:Destroy() end)
-		end
-		table.clear(resolverDebugParts)
-		if resolverDebugFolder then
-			pcall(function() resolverDebugFolder:Destroy() end)
-		end
-		resolverDebugFolder = nil
-	end
-
-	local DEBUG_LOG_INTERVAL = 0.5
-	local lastDebugLogTime = 0
-	local lastLoggedTarget = nil
-	local lastLoggedScanData = nil
-	local lastLoggedResolverData = nil
-
-	local function debugLog(...)
-		local now = tick()
-		if (now - lastDebugLogTime) < DEBUG_LOG_INTERVAL then return end
-		lastDebugLogTime = now
-		local args = {...}
-		local parts = {}
-		for i, v in ipairs(args) do
-			if type(v) == 'userdata' and typeof(v) == 'Vector3' then
-				table.insert(parts, string.format('Vector3(%.1f, %.1f, %.1f)', v.X, v.Y, v.Z))
-			elseif type(v) == 'boolean' then
-				table.insert(parts, v and 'true' or 'false')
-			elseif v == nil then
-				table.insert(parts, 'nil')
-			else
-				table.insert(parts, tostring(v))
-			end
-		end
-		print('[SilentAim]', table.concat(parts, ' | '))
-	end
-
-	local function renderPositionScanDebug(hitpoints, bestPoint, origin)
-	end
-
-	local function renderResolverDebug(rawPos, predictedPos)
-	end
-
-	local lastScanTarget = nil
-	local SCAN_THROTTLE = 0.05
-
-	local function updateDebugVisualization()
-		if not DebugVisualization or not DebugVisualization.Enabled then return end
-		local now = tick()
-		if (now - lastDebugLogTime) < DEBUG_LOG_INTERVAL then return end
-		lastDebugLogTime = now
-		local localChar = entitylib.character
-		if not localChar then
-			debugLog('Status: No local character found')
-			return
-		end
-		local localRoot = localChar.RootPart
-		if not localRoot then
-			debugLog('Status: Local character has no RootPart')
-			return
-		end
-		local localPos = localRoot.Position
-		local maxRange = Range and Range.Value or 150
-		local bestTarget = nil
-		local bestDistance = math.huge
-		local targetCount = 0
-		for _, ent in entitylib.List do
-			if ent == entitylib.character then continue end
-			if not ent.Character then continue end
-			targetCount = targetCount + 1
-			local entRoot = ent.RootPart
-			if not entRoot then continue end
-			local dist = (entRoot.Position - localPos).Magnitude
-			if dist < bestDistance and dist <= maxRange then
-				bestDistance = dist
-				bestTarget = ent
-			end
-		end
-		if not bestTarget then
-			debugLog('Status: No valid targets in range', 'Targets found:', targetCount, 'Range:', maxRange)
-			return
-		end
-		local targetRoot = bestTarget.RootPart
-		local targetHead = bestTarget.Head
-		if not targetRoot then return end
-		local targetParts = {targetRoot}
-		if targetHead then table.insert(targetParts, targetHead) end
-		local allHitpoints = {}
-		for _, part in targetParts do
-			local hps = getPartHitpointsLight(part, localPos)
-			for _, hp in hps do
-				hp.sourcePart = part
-				table.insert(allHitpoints, hp)
-				if #allHitpoints >= 30 then break end
-			end
-			if #allHitpoints >= 30 then break end
-		end
-		if #allHitpoints == 0 then
-			debugLog('Target:', bestTarget.Name, 'Distance:', string.format('%.1f', bestDistance), 'Hitpoints: None generated')
-			return
-		end
-		local targetVel = Vector3.zero
-		if isVector3(targetRoot.AssemblyLinearVelocity) then
-			targetVel = safeVelocity(targetRoot.AssemblyLinearVelocity)
-		end
-		local bestPoint = nil
-		local bestScore = 0
-		for _, hp in allHitpoints do
-			local score = calculateScanScore(hp, localPos, targetVel)
+		local head = ent.Head or targetPart
+		local wallIgnores = Target.Walls.Enabled and vape.Libraries.getVisualizerWallcheckIgnores() or nil
+		local hitpoints = getPartHitpointsLight(head, origin)
+		local bestPos, bestScore = head.Position, -1
+		for _, hp in hitpoints do
+			local score = calculateHitpointScore(hp, origin, wallIgnores, ent.Character)
 			if score > bestScore then
 				bestScore = score
-				bestPoint = hp
+				bestPos = hp.pos
 			end
 		end
-		debugLog('Target:', bestTarget.Name, 'Dist:', string.format('%.1f', bestDistance), 'HPs:', #allHitpoints, 'Best:', bestPoint and bestPoint.name or 'none', 'Score:', string.format('%.3f', bestScore))
-		if Resolver and Resolver.Enabled then
-			updateResolverCache(bestTarget)
-			local resolvedPos, jitterDetected, rawPos = getResolvedPosition(bestTarget)
-			if rawPos and resolvedPos then
-				local offset = (resolvedPos - rawPos).Magnitude
-				debugLog('Resolver: Raw', string.format('%.1f, %.1f, %.1f', rawPos.X, rawPos.Y, rawPos.Z), 'Pred', string.format('%.1f, %.1f, %.1f', resolvedPos.X, resolvedPos.Y, resolvedPos.Z), 'Offset:', string.format('%.2f', offset), 'Jitter:', jitterDetected)
-			end
-		end
+		local cache = pushResolverSample(ent, bestPos)
+		return cache and cache.resolvedPos or bestPos
 	end
 
-	local function getBestScanPosition(ent, origin, wallcheckEnabled)
-		if not ent or not ent.Character then return nil, nil, 0 end
-		if not isVector3(origin) then return nil, nil, 0 end
-		local now = tick()
-		if ent == lastScanTarget and (now - lastScanTime) < SCAN_THROTTLE then
-			return nil, nil, 0
-		end
-		lastScanTarget = ent
-		lastScanTime = now
-		local targetParts = {}
-		if ent.RootPart then table.insert(targetParts, ent.RootPart) end
-		if ent.Head then table.insert(targetParts, ent.Head) end
-		if #targetParts == 0 then return nil, nil, 0 end
-		local allHitpoints = {}
-		for _, part in targetParts do
-			local hps = getPartHitpointsLight(part, origin)
-			for _, hp in hps do
-				hp.sourcePart = part
-				table.insert(allHitpoints, hp)
-				if #allHitpoints >= 30 then break end
-			end
-			if #allHitpoints >= 30 then break end
-		end
-		if #allHitpoints == 0 then return nil, nil, 0 end
-		local targetVel = Vector3.zero
-		if ent.RootPart and isVector3(ent.RootPart.AssemblyLinearVelocity) then
-			targetVel = safeVelocity(ent.RootPart.AssemblyLinearVelocity)
-		end
-		local bestPoint = nil
-		local bestScore = 0
-		local bestDistance = 0
-		for _, hp in allHitpoints do
-			local score, dist = calculateScanScore(hp, origin, targetVel)
-			if score > bestScore then
-				bestScore = score
-				bestPoint = hp
-				bestDistance = dist
-			end
-		end
-		return bestPoint, bestPoint and bestPoint.pos, bestDistance
+	local function getAimPosition(ent, targetPart, origin)
+		return resolveHeadPosition(ent, targetPart, origin)
 	end
 
 	local function getTracerColors()
@@ -2458,302 +2266,6 @@ run(function()
 	local function resetTracerTracking()
 		clearBulletTracers()
 		healthCache = setmetatable({}, {__mode = 'k'})
-	end
-	
-	local function cleanupPMClone()
-		if pmClone then
-			vape.Libraries.unregisterVisualizerModel(pmClone)
-			pmClone:Destroy()
-		end
-		pmClone = nil
-		pmCloneRoot = nil
-		pmRealRoot = nil
-		pmMotorMap = {}
-	end
-	
-	local function setupPMClone()
-		cleanupPMClone()
-		
-		local char = entitylib.character and entitylib.character.Character
-		if not char then return end
-		
-		char.Archivable = true
-		pmRealRoot = char:FindFirstChild("HumanoidRootPart")
-		if not pmRealRoot then return end
-		
-		pmClone = char:Clone()
-		if not pmClone then return end
-		
-		pmClone.Name = "PositionManipulationVisualizer"
-		
-		pmMotorMap = {}
-		local realMotors = {}
-		for _, v in ipairs(char:GetDescendants()) do
-			if v:IsA("Motor6D") then
-				realMotors[v.Name] = v
-			end
-		end
-		
-		for _, d in ipairs(pmClone:GetDescendants()) do
-			if d:IsA("Motor6D") then
-				local realMotor = realMotors[d.Name]
-				if realMotor then
-					pmMotorMap[d] = realMotor
-				end
-			end
-		end
-		
-		local torso = pmClone:FindFirstChild('UpperTorso') or pmClone:FindFirstChild('Torso') or pmClone:FindFirstChild('HumanoidRootPart')
-		local hrp = pmClone:FindFirstChild('HumanoidRootPart')
-		if hrp then
-			pmClone.PrimaryPart = hrp
-		elseif torso then
-			pmClone.PrimaryPart = torso
-		end
-		
-		for _, obj in ipairs(pmClone:GetDescendants()) do
-			if obj:IsA("BasePart") then
-				local isAccessoryPart = false
-				local parent = obj.Parent
-				while parent and parent ~= pmClone do
-					if parent:IsA('Accessory') then
-						isAccessoryPart = true
-						break
-					end
-					parent = parent.Parent
-				end
-				
-				local isBodyPart = (obj.Name == 'Head' or obj.Name == 'UpperTorso' or obj.Name == 'LowerTorso' or obj.Name == 'Torso' or obj.Name == 'LeftUpperArm' or obj.Name == 'LeftLowerArm' or obj.Name == 'LeftHand' or obj.Name == 'RightUpperArm' or obj.Name == 'RightLowerArm' or obj.Name == 'RightHand' or obj.Name == 'LeftUpperLeg' or obj.Name == 'LeftLowerLeg' or obj.Name == 'LeftFoot' or obj.Name == 'RightUpperLeg' or obj.Name == 'RightLowerLeg' or obj.Name == 'RightFoot')
-				
-				if obj.Name == "HumanoidRootPart" then
-					obj.Anchored = true
-				elseif obj.Name == "Head" then
-					obj.Anchored = false
-				elseif isAccessoryPart then
-					obj.Anchored = true
-				elseif isBodyPart then
-					obj.Anchored = false
-				else
-					obj.Anchored = false
-				end
-				
-				obj.CanCollide = false
-				obj.CanTouch = false
-				obj.CanQuery = false
-				obj.Massless = true
-				obj.CastShadow = false
-				obj.Material = Enum.Material[PositionManipulationVisualizerMaterial.Value] or Enum.Material.ForceField
-				obj.Transparency = 0.4
-				
-				if PositionManipulationVisualizerColorToggle.Enabled then
-					local color = Color3.fromHSV(PositionManipulationVisualizerColor.Hue, PositionManipulationVisualizerColor.Sat, PositionManipulationVisualizerColor.Value)
-					obj.Color = color
-				end
-			elseif obj:IsA("Humanoid") then
-				obj:Destroy()
-			elseif obj:IsA("WeldConstraint") or obj:IsA("Weld") then
-				local isAccessoryWeld = false
-				local parent = obj.Parent
-				while parent and parent ~= pmClone do
-					if parent:IsA('Accessory') then
-						isAccessoryWeld = true
-						break
-					end
-					parent = parent.Parent
-				end
-				
-				local isBodyWeld = (obj.Part0 and (obj.Part0.Name == 'Head' or obj.Part0.Name == 'Torso' or obj.Part0.Name == 'UpperTorso' or obj.Part0.Name == 'HumanoidRootPart'))
-				
-				if not (isAccessoryWeld or isBodyWeld) then
-					obj:Destroy()
-				end
-			elseif obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("Tool") then
-				obj:Destroy()
-			end
-		end
-		
-		pmClone.Parent = workspace
-		vape.Libraries.registerVisualizerModel(pmClone)
-		
-		pmCloneRoot = pmClone:FindFirstChild("HumanoidRootPart")
-		if not pmCloneRoot then
-			cleanupPMClone()
-			return
-		end
-	end
-	
-	local function cleanupPMRadius()
-		if pmRadiusPart then
-			pmRadiusPart:Destroy()
-		end
-		pmRadiusPart = nil
-	end
-	
-	local function setupPMRadius()
-		cleanupPMRadius()
-		
-		pmRadiusPart = Instance.new("Part")
-		pmRadiusPart.Name = "PositionManipulationRadius"
-		pmRadiusPart.Shape = Enum.PartType.Ball
-		pmRadiusPart.Anchored = true
-		pmRadiusPart.CanCollide = false
-		pmRadiusPart.CanTouch = false
-		pmRadiusPart.CanQuery = false
-		pmRadiusPart.CastShadow = false
-		pmRadiusPart.Material = Enum.Material.ForceField
-		pmRadiusPart.Transparency = 0.7
-		pmRadiusPart.Color = Color3.fromHSV(PositionManipulationRadiusVisualizerColor.Hue, PositionManipulationRadiusVisualizerColor.Sat, PositionManipulationRadiusVisualizerColor.Value)
-		pmRadiusPart.Parent = workspace
-	end
-	
-	local function findBestPosition()
-		if not PositionManipulation or not PositionManipulation.Enabled then
-			pmClearLock()
-			return nil
-		end
-		if silentAimHookBusy or vape.Libraries.silentAimHookBusy then
-			return pmTargetPosition
-		end
-		
-		local now = tick()
-		local quality = PositionManipulationScanQuality and PositionManipulationScanQuality.Value or 'Medium'
-		local cfg = PM_SCAN[quality] or PM_SCAN.Medium
-		
-		if pmTargetPosition and pmLockedTarget and not validatePMLock() then
-			pmClearLock()
-			lastPMFrame = 0
-		end
-		
-		if now - lastPMFrame < cfg.throttle then
-			return pmTargetPosition
-		end
-		lastPMFrame = now
-		
-		local localChar = entitylib.character
-		if not localChar or not localChar.RootPart then
-			pmClearLock()
-			return nil
-		end
-		
-		local localPos = localChar.RootPart.Position
-		local radius = PositionManipulationRadius.Value
-		local weaponRange = Range.Value
-		refreshPMRaycastFilter()
-		
-		local sortedTargets = {}
-		for _, ent in entitylib.List do
-			if ent == entitylib.character then continue end
-			if not ent.Character or not ent.RootPart then continue end
-			if not entitylib.targetCheck(ent) then continue end
-			if not entitylib.isVulnerable(ent, (Target.Forcefield and Target.Forcefield.Enabled) or false) then continue end
-			local dist = (ent.RootPart.Position - localPos).Magnitude
-			if dist <= weaponRange + radius then
-				table.insert(sortedTargets, {Entity = ent, Distance = dist})
-			end
-		end
-		
-		table.sort(sortedTargets, function(a, b)
-			return a.Distance < b.Distance
-		end)
-		
-		if #sortedTargets == 0 then
-			pmClearLock()
-			pmScanAngleIdx, pmScanRadiusIdx, pmScanYIdx = 0, 0, 0
-			return nil
-		end
-		
-		local bestPosition, bestScore, bestTarget = nil, math.huge, nil
-		local raysUsed = 0
-		
-		local function consider(testPos, targetEnt)
-			local aimPart = targetEnt.Head or targetEnt.RootPart
-			if not aimPart then return end
-			local score = pmTryPosition(testPos, localPos, radius, targetEnt, aimPart, localChar)
-			raysUsed += 3
-			if score and score < bestScore then
-				bestScore = score
-				bestPosition = testPos
-				bestTarget = targetEnt
-			end
-		end
-		
-		-- Fast path: sample toward each nearby target before a full sphere scan
-		for i = 1, math.min(5, #sortedTargets) do
-			local targetEnt = sortedTargets[i].Entity
-			local aimPart = targetEnt.Head or targetEnt.RootPart
-			if not aimPart then continue end
-			
-			local flat = Vector3.new(aimPart.Position.X - localPos.X, 0, aimPart.Position.Z - localPos.Z)
-			if flat.Magnitude < 0.05 then
-				flat = Vector3.new(0, 0, -1)
-			else
-				flat = flat.Unit
-			end
-			local perp = Vector3.new(-flat.Z, 0, flat.X)
-			
-			local radiusSteps = cfg.radii <= 1 and {0} or {0, 0.35, 0.7, 1}
-			local ySteps = cfg.y <= 1 and {0} or {0, -1.5, 1.5}
-			for _, rf in radiusSteps do
-				local r = radius * rf
-				for _, yOff in ySteps do
-					consider(localPos + flat * r + Vector3.new(0, yOff, 0), targetEnt)
-					if r > 2 then
-						consider(localPos + flat * r + perp * 2 + Vector3.new(0, yOff, 0), targetEnt)
-						consider(localPos + flat * r - perp * 2 + Vector3.new(0, yOff, 0), targetEnt)
-					end
-					if bestScore <= 1 then break end
-				end
-				if bestScore <= 1 then break end
-			end
-			if bestScore <= 1 then break end
-		end
-		
-		-- Budgeted sphere scan for edge cases / wider radius coverage
-		if raysUsed < cfg.budget and (not bestPosition or bestScore > radius * 0.25) then
-			local numAngleSamples = cfg.angles
-			local numRadiusSamples = cfg.radii
-			local numYSamples = cfg.y
-			local scansDone = 0
-			
-			while raysUsed < cfg.budget and scansDone < cfg.budget do
-				if pmScanAngleIdx >= numAngleSamples then
-					pmScanAngleIdx = 0
-					pmScanRadiusIdx += 1
-					if pmScanRadiusIdx >= numRadiusSamples then
-						pmScanRadiusIdx = 0
-						pmScanYIdx += 1
-						if pmScanYIdx >= numYSamples then
-							pmScanAngleIdx, pmScanRadiusIdx, pmScanYIdx = 0, 0, 0
-							break
-						end
-					end
-				end
-				
-				local yOffset = numYSamples <= 1 and 0 or (pmScanYIdx / (numYSamples - 1)) * 4 - 2
-				local currentRadius = numRadiusSamples <= 1 and 0 or (pmScanRadiusIdx / (numRadiusSamples - 1)) * radius
-				local angle = (pmScanAngleIdx / numAngleSamples) * math.pi * 2
-				pmScanAngleIdx += 1
-				scansDone += 1
-				
-				local testPos = localPos + Vector3.new(math.cos(angle) * currentRadius, yOffset, math.sin(angle) * currentRadius)
-				for i = 1, math.min(3, #sortedTargets) do
-					consider(testPos, sortedTargets[i].Entity)
-					if bestScore <= 1 then break end
-				end
-				if bestScore <= 1 then break end
-			end
-		else
-			pmScanAngleIdx, pmScanRadiusIdx, pmScanYIdx = 0, 0, 0
-		end
-		
-		if bestPosition then
-			pmTargetPosition = bestPosition
-			pmLockedTarget = bestTarget
-		elseif pmScanAngleIdx == 0 and pmScanRadiusIdx == 0 and pmScanYIdx == 0 then
-			pmClearLock()
-		end
-		
-		return pmTargetPosition
 	end
 
 	local function registerShot(ent, targetPart, origin)
@@ -2920,19 +2432,16 @@ run(function()
 	end
 
 	local function resolveSilentAimOrigin(origin)
-		local baseCF
 		if typeof(origin) == 'CFrame' then
-			baseCF = origin
+			return origin.Position, origin
 		elseif typeof(origin) == 'Vector3' then
-			baseCF = CFrame.new(origin)
+			local baseCF = CFrame.new(origin)
+			return baseCF.Position, baseCF
 		elseif typeof(origin) == 'Ray' then
-			baseCF = CFrame.lookAt(origin.Origin, origin.Origin + origin.Direction)
-		else
-			baseCF = (entitylib.isAlive and entitylib.character.RootPart and entitylib.character.RootPart.CFrame) or gameCamera.CFrame
+			local baseCF = CFrame.lookAt(origin.Origin, origin.Origin + origin.Direction)
+			return baseCF.Position, baseCF
 		end
-		if PositionManipulation and PositionManipulation.Enabled and pmTargetPosition and pmLockedTarget then
-			baseCF = CFrame.new(pmTargetPosition) * (baseCF - baseCF.Position)
-		end
+		local baseCF = (entitylib.isAlive and entitylib.character.RootPart and entitylib.character.RootPart.CFrame) or gameCamera.CFrame
 		return baseCF.Position, baseCF
 	end
 
@@ -2976,32 +2485,24 @@ run(function()
 		})
 
 		if ent then
+			local part = ent[targetPart]
 			if isMb1Held or (tick() - lastMb1Click) <= TracerClickWindow then
-				registerShot(ent, ent[targetPart], origin)
+				registerShot(ent, part, origin)
 			end
 			targetinfo.Targets[ent] = tick() + 1
-			local resolvedPos, jitterDetected, rawPos = nil, false, nil
-			if Resolver.Enabled then
-				updateResolverCache(ent)
-				resolvedPos, jitterDetected, rawPos = getResolvedPosition(ent)
-				if DebugVisualization and DebugVisualization.Enabled and jitterDetected and rawPos and resolvedPos then
-					renderResolverDebug(rawPos, resolvedPos)
-				end
-			end
-			local scanPos = nil
-			if PositionScan.Enabled then
-				local bestPoint, bestPos = getBestScanPosition(ent, origin, Target.Walls.Enabled)
-				if bestPos then
-					scanPos = bestPos
-				end
+			local aimPos = getAimPosition(ent, part, origin)
+			origin = applyManipulationOrigin(origin, aimPos, ent.Character)
+			if Manipulation and Manipulation.Enabled and lastManipInfo and lastManipInfo.state == 'blocked' then
+				return finish()
 			end
 			if Projectile.Enabled then
 				ProjectileRaycast.FilterDescendantsInstances = {gameCamera, ent.Character}
-				ProjectileRaycast.CollisionGroup = ent[targetPart].CollisionGroup
+				ProjectileRaycast.CollisionGroup = part.CollisionGroup
 			end
+			return finish(ent, part, origin, aimPos)
 		end
 		
-		return finish(ent, ent and ent[targetPart], origin)
+		return finish()
 	end
 
 	local function getShootFunction()
@@ -3056,15 +2557,16 @@ run(function()
 	local function PrisonBulletHook(...)
 		local origin, direction = ...
 		local gundata = getPrisonGunData()
-		local ent, targetPart, origin = getTarget(origin, nil, gundata and {
+		local ent, targetPart, origin, aimPos = getTarget(origin, nil, gundata and {
 			rangeLimit = gundata.Range or 1000,
 			attackCheck = not gundata or gundata.Behavior ~= 'Taser'
 		})
 		if not ent then return oldPrisonBulletHook(...) end
+		aimPos = aimPos or targetPart.Position
 		registerShot(ent, targetPart, origin)
 
 		local args = table.pack(...)
-		args[2] = targetPart.Position
+		args[2] = aimPos
 
 		if Wallbang.Enabled then
 			local ignore = {lplr.Character}
@@ -3110,8 +2612,9 @@ run(function()
 
 	local Hooks = {
 		FindPartOnRayWithIgnoreList = function(args)
-			local ent, targetPart, origin = getTarget(args[1].Origin)
+			local ent, targetPart, origin, aimPos = getTarget(args[1].Origin)
 			if not ent then return end
+			aimPos = aimPos or targetPart.Position
 			if typeof(args[2]) == 'table' then
 				for _, model in vape.Libraries.visualizerModels do
 					if model and model.Parent then
@@ -3119,12 +2622,13 @@ run(function()
 					end
 				end
 			end
-			args[1] = Ray.new(origin, CFrame.lookAt(origin, targetPart.Position).LookVector * args[1].Direction.Magnitude)
+			args[1] = Ray.new(origin, CFrame.lookAt(origin, aimPos).LookVector * args[1].Direction.Magnitude)
 		end,
 		Raycast = function(args)
 			if MethodRay.Value ~= 'All' and args[3] and args[3].FilterType ~= Enum.RaycastFilterType[MethodRay.Value] then return end
-			local ent, targetPart, origin = getTarget(args[1])
+			local ent, targetPart, origin, aimPos = getTarget(args[1])
 			if not ent then return end
+			aimPos = aimPos or targetPart.Position
 			if args[3] and args[3].FilterType == Enum.RaycastFilterType.Exclude and typeof(args[3].FilterDescendantsInstances) == 'table' then
 				for _, model in vape.Libraries.visualizerModels do
 					if model and model.Parent and not table.find(args[3].FilterDescendantsInstances, model) then
@@ -3132,32 +2636,34 @@ run(function()
 					end
 				end
 			end
-			args[2] = CFrame.lookAt(origin, targetPart.Position).LookVector * args[2].Magnitude
+			args[2] = CFrame.lookAt(origin, aimPos).LookVector * args[2].Magnitude
 			if Wallbang.Enabled then
 				RaycastWhitelist.FilterDescendantsInstances = {targetPart}
 				args[3] = RaycastWhitelist
 			end
 		end,
 		ScreenPointToRay = function(args)
-			local ent, targetPart, origin = getTarget(gameCamera.CFrame.Position)
+			local ent, targetPart, origin, aimPos = getTarget(gameCamera.CFrame.Position)
 			if not ent then return end
-			local direction = CFrame.lookAt(origin, targetPart.Position)
+			aimPos = aimPos or targetPart.Position
+			local direction = CFrame.lookAt(origin, aimPos)
 			if Projectile.Enabled then
-				local calc = prediction.SolveTrajectory(origin, ProjectileSpeed.Value, ProjectileGravity.Value, targetPart.Position, targetPart.Velocity, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
+				local calc = prediction.SolveTrajectory(origin, ProjectileSpeed.Value, ProjectileGravity.Value, aimPos, targetPart.Velocity, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
 				if not calc then return end
 				direction = CFrame.lookAt(origin, calc)
 			end
 			return Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)
 		end,
 		Ray = function(args)
-			local ent, targetPart, origin = getTarget(args[1])
+			local ent, targetPart, origin, aimPos = getTarget(args[1])
 			if not ent then return end
+			aimPos = aimPos or targetPart.Position
 			if Projectile.Enabled then
-				local calc = prediction.SolveTrajectory(origin, ProjectileSpeed.Value, ProjectileGravity.Value, targetPart.Position, targetPart.Velocity, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
+				local calc = prediction.SolveTrajectory(origin, ProjectileSpeed.Value, ProjectileGravity.Value, aimPos, targetPart.Velocity, workspace.Gravity, ent.HipHeight, nil, ProjectileRaycast)
 				if not calc then return end
 				args[2] = CFrame.lookAt(origin, calc).LookVector * args[2].Magnitude
 			else
-				args[2] = CFrame.lookAt(origin, targetPart.Position).LookVector * args[2].Magnitude
+				args[2] = CFrame.lookAt(origin, aimPos).LookVector * args[2].Magnitude
 			end
 		end
 	}
@@ -3214,82 +2720,14 @@ run(function()
 				SilentAim:Clean(entitylib.Events.LocalAdded:Connect(resetTracerTracking))
 				SilentAim:Clean(runService.RenderStepped:Connect(function()
 					vape.Libraries.refreshVisualizerTracerOrigin()
-				end))
-				
-				if PositionManipulation then
-					if PositionManipulation.Enabled then
-						setupPMCameraProxy()
-						if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
-							setupPMClone()
-						end
-						if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled then
-							setupPMRadius()
-						end
+					if CircleObject and SilentAim.Enabled and Mode.Value == 'Mouse' then
+						CircleObject.Position = inputService:GetMouseLocation()
 					end
-					SilentAim:Clean(entitylib.Events.LocalAdded:Connect(function()
-						if PositionManipulation.Enabled then
-							setupPMCameraProxy()
-							if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
-								setupPMClone()
-							end
-							if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled then
-								setupPMRadius()
-							end
-						end
-					end))
-					SilentAim:Clean(runService.RenderStepped:Connect(function()
-						if not PositionManipulation.Enabled then
-							pmClearLock()
-							return
-						end
-
-						if pmCameraProxy then
-							local char = entitylib.character and entitylib.character.Character
-							local hum = char and char:FindFirstChild("Humanoid")
-							local root = char and char:FindFirstChild("HumanoidRootPart")
-							if hum and root and hum.Health > 0 then
-								local camPos = root.CFrame.Position
-								local camOffset = hum.CameraOffset
-								
-								if hum.Sit and hum.SeatPart then
-									camPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
-								end
-								
-								pmCameraProxy.CFrame = CFrame.new(camPos + camOffset + Vector3.new(0, 1.5, 0))
-							elseif not hum or hum.Health <= 0 then
-								cleanupPMCameraProxy()
-							end
-						end
-
-						pmTargetPosition = findBestPosition()
-
-						if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled and pmCloneRoot then
-							local baseCF = entitylib.character and entitylib.character.RootPart and entitylib.character.RootPart.CFrame
-							if baseCF then
-								for cloneMotor, realMotor in pairs(pmMotorMap) do
-									if cloneMotor and realMotor and cloneMotor.Parent and realMotor.Parent then
-										cloneMotor.Transform = realMotor.Transform
-									end
-								end
-								local targetCF = pmTargetPosition and CFrame.new(pmTargetPosition) * baseCF.Rotation or baseCF
-								pmClone:PivotTo(targetCF)
-							end
-						end
-						if PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled then
-							vape.Libraries.refreshVisualizerTracerOrigin()
-						end
-
-						if PositionManipulationRadiusVisualizer and PositionManipulationRadiusVisualizer.Enabled and pmRadiusPart then
-							local localRoot = entitylib.character and entitylib.character.RootPart
-							if localRoot then
-								pmRadiusPart.Position = localRoot.Position
-								pmRadiusPart.Size = Vector3.new(PositionManipulationRadius.Value * 2, PositionManipulationRadius.Value * 2, PositionManipulationRadius.Value * 2)
-								pmRadiusPart.Color = Color3.fromHSV(PositionManipulationRadiusVisualizerColor.Hue, PositionManipulationRadiusVisualizerColor.Sat, PositionManipulationRadiusVisualizerColor.Value)
-							end
-						end
-					end))
+					updateManipVisuals()
+				end))
+				if ManipulationVisualizer and ManipulationVisualizer.Enabled then
+					setupManipVisuals()
 				end
-				
 				if Method.Value == 'Ray' then
 					oldray = hookfunction(Ray.new, function(origin, direction)
 						if checkcaller() then
@@ -3361,18 +2799,6 @@ run(function()
 				end
 
 				repeat
-					if CircleObject then
-						CircleObject.Position = inputService:GetMouseLocation()
-					end
-					if Resolver.Enabled then
-						for _, ent in entitylib.List do
-							pcall(function() updateResolverCache(ent) end)
-						end
-					end
-					if DebugVisualization and DebugVisualization.Enabled then
-						pcall(function() updateDebugVisualization() end)
-					end
-					
 					processHitDetection()
 					if BulletTracers.Enabled then
 						renderBulletTracers()
@@ -3386,21 +2812,17 @@ run(function()
 							if gundata and tool and (tool:GetAttribute('Local_CurrentAmmo') or 0) > 0 and not tool:GetAttribute('Local_IsShooting') then
 								local limit = gundata.Range or 1000
 								local taser = gundata.Behavior == 'Taser'
-								if PositionManipulation and PositionManipulation.Enabled then
-									ent = getPMAutoFireEntity()
-								else
-									ent = entitylib['Entity'..Mode.Value]({
-										Range = Mode.Value == 'Position' and math.min(Range.Value, limit) or Range.Value,
-										RangePosition = limit,
-										AttackCheck = not taser,
-										Wallcheck = Target.Walls.Enabled and true or nil,
-										Wallbang = Wallbang.Enabled and entitylib.isAlive and entitylib.character.RootPart.Position or nil,
-										Part = 'Head',
-										Origin = entitylib.isAlive and entitylib.character.Head.Position or Vector3.zero,
-										Players = Target.Players.Enabled,
-										NPCs = Target.NPCs.Enabled
-									})
-								end
+								ent = entitylib.EntityPosition({
+									Range = Range.Value,
+									RangePosition = limit,
+									AttackCheck = not taser,
+									Wallcheck = Target.Walls.Enabled and true or nil,
+									Wallbang = Wallbang.Enabled and entitylib.isAlive and entitylib.character.RootPart.Position or nil,
+									Part = 'Head',
+									Origin = entitylib.isAlive and entitylib.character.Head.Position or Vector3.zero,
+									Players = Target.Players.Enabled,
+									NPCs = Target.NPCs.Enabled
+								})
 
 								if ent and entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
 									if not (taser and ent.Character:GetAttribute('Tased')) then
@@ -3418,16 +2840,21 @@ run(function()
 							end
 						else
 						local origin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
-						local effectiveOrigin = origin
-						
-						if PositionManipulation and PositionManipulation.Enabled and pmTargetPosition then
-							effectiveOrigin = CFrame.new(pmTargetPosition) * origin.Rotation
-						end
-						
-						ent = getAutoFireEntity(effectiveOrigin)
+						ent = getAutoFireEntity(origin)
 						
 						if ent then
-							registerShot(ent, ent.Head or ent.RootPart, (effectiveOrigin * fireoffset).Position)
+							local aimPart = ent.Head or ent.RootPart
+							local fireOrigin = (origin * fireoffset).Position
+							if aimPart then
+								local aimPos = getAimPosition(ent, aimPart, fireOrigin)
+								applyManipulationOrigin(fireOrigin, aimPos, ent.Character)
+								if Manipulation and Manipulation.Enabled and lastManipInfo and lastManipInfo.state == 'blocked' then
+									ent = nil
+								end
+							end
+							if ent then
+								registerShot(ent, aimPart, fireOrigin)
+							end
 						end
 
 						if mouse1click and (isrbxactive or iswindowactive)() then
@@ -3454,25 +2881,15 @@ run(function()
 					
 					if not ent and AutoStop and AutoStop.Enabled then
 						local origin = Mode.Value == 'Mouse' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
-						local effectiveOrigin = origin
-						
-						if PositionManipulation and PositionManipulation.Enabled and pmTargetPosition then
-							effectiveOrigin = CFrame.new(pmTargetPosition) * origin.Rotation
-						end
-						
-						if PositionManipulation and PositionManipulation.Enabled then
-							ent = getPMAutoFireEntity()
-						else
-							ent = entitylib['Entity'..Mode.Value]({
-								Range = Range.Value,
-								Wallcheck = Target.Walls.Enabled and vape.Libraries.getVisualizerWallcheckIgnores() or nil,
-								Part = 'Head',
-								Origin = effectiveOrigin.Position,
-								Players = Target.Players.Enabled,
-								NPCs = Target.NPCs.Enabled,
-								Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
-							})
-						end
+						ent = entitylib['Entity'..Mode.Value]({
+							Range = Range.Value,
+							Wallcheck = Target.Walls.Enabled and vape.Libraries.getVisualizerWallcheckIgnores() or nil,
+							Part = 'Head',
+							Origin = origin.Position,
+							Players = Target.Players.Enabled,
+							NPCs = Target.NPCs.Enabled,
+							Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
+						})
 					end
 
 					if AutoStop and AutoStop.Enabled then
@@ -3512,6 +2929,13 @@ run(function()
 				isMb1Held = false
 				clearBulletTracers()
 				resolverCache = setmetatable({}, {__mode = 'k'})
+				lastManipInfo = nil
+				lastManipAimPos = nil
+				lastManipBodyPos = nil
+				cleanupManipVisuals()
+				if CircleObject then
+					CircleObject.Visible = false
+				end
 				if oldnamecall then
 					hookmetamethod(game, '__namecall', oldnamecall)
 				end
@@ -3522,9 +2946,6 @@ run(function()
 					hookfunction(pl.Bullet, oldPrisonBulletHook)
 				end
 				oldnamecall, oldray, oldPrisonBulletHook = nil, nil, nil
-				cleanupPMClone()
-				cleanupPMRadius()
-				cleanupPMCameraProxy()
 				
 				if isFrozen then
 					local char = entitylib.character.Character
@@ -3545,7 +2966,7 @@ run(function()
 		end,
 		Tooltip = 'Silently adjusts your aim towards the enemy'
 	})
-	Target = SilentAim:CreateTargets({Players = true})
+	Target = SilentAim:CreateTargets({Players = true, NPCs = true})
 	Mode = SilentAim:CreateDropdown({
 		Name = 'Mode',
 		List = {'Mouse', 'Position'},
@@ -3653,7 +3074,7 @@ run(function()
 				CircleObject = Drawing.new('Circle')
 				CircleObject.Filled = CircleFilled.Enabled
 				CircleObject.Color = Color3.fromHSV(CircleColor.Hue, CircleColor.Sat, CircleColor.Value)
-				CircleObject.Position = vape.gui.AbsoluteSize / 2
+				CircleObject.Position = inputService:GetMouseLocation()
 				CircleObject.Radius = Range.Value
 				CircleObject.NumSides = 100
 				CircleObject.Transparency = 1 - CircleTransparency.Value
@@ -3873,175 +3294,57 @@ run(function()
 	Resolver = SilentAim:CreateToggle({
 		Name = 'Resolver',
 		Function = function(callback)
-			ResolverMode.Object.Visible = callback
 			if not callback then
 				resolverCache = setmetatable({}, {__mode = 'k'})
 			end
-		end
+		end,
+		Tooltip = 'Scans head hitpoints and averages samples to resolve a stable head position'
 	})
-	ResolverMode = SilentAim:CreateDropdown({
-		Name = 'Resolver Mode',
-		List = {'Adaptive', 'Standard', 'Predictive'},
-		Default = 'Adaptive',
-		Darker = true,
-		Visible = false,
-		Function = function(val)
-			if val == 'Adaptive' then
-				resolverConfig.PredictiveMultiplier = 1.05
-				resolverConfig.VelocitySmoothing = 0.6
-			elseif val == 'Standard' then
-				resolverConfig.PredictiveMultiplier = 1.0
-				resolverConfig.VelocitySmoothing = 0.5
-			elseif val == 'Predictive' then
-				resolverConfig.PredictiveMultiplier = 1.15
-				resolverConfig.VelocitySmoothing = 0.7
+	Manipulation = SilentAim:CreateToggle({
+		Name = 'Manipulation',
+		Function = function(callback)
+			ManipulationRadius.Object.Visible = callback
+			ManipulationVisualizer.Object.Visible = callback
+			if not callback then
+				lastManipInfo = nil
+				lastManipAimPos = nil
+				lastManipBodyPos = nil
+				cleanupManipVisuals()
+			elseif SilentAim.Enabled and ManipulationVisualizer.Enabled then
+				setupManipVisuals()
 			end
 		end,
-		Tooltip = 'Adaptive - Automatically adjusts prediction\nStandard - Basic velocity smoothing\nPredictive - Aggressive prediction for fast targets'
+		Tooltip = 'Shifts the hooked ray origin to a visible peek position around you (April-style ring search)'
 	})
-	PositionScan = SilentAim:CreateToggle({
-		Name = 'Position Scan',
-		Tooltip = 'Scans multiple hit points on targets to find the best position'
-	})
-	DebugVisualization = SilentAim:CreateToggle({
-		Name = 'Debug Visualization',
-		Tooltip = 'Shows debug info in console for SilentAim'
-	})
-	PositionManipulation = SilentAim:CreateToggle({
-		Name = 'Position Manipulation',
-		Tooltip = 'Manipulates your position to make targets visible',
-		Function = function(callback)
-			if not callback then
-				pmClearLock()
-			end
-			PositionManipulationRadius.Object.Visible = callback
-			PositionManipulationVisualizer.Object.Visible = callback
-			PositionManipulationScanQuality.Object.Visible = callback
-			if PositionManipulationVisualizer.Object.Visible then
-				PositionManipulationVisualizerMaterial.Object.Visible = PositionManipulationVisualizer.Enabled
-				PositionManipulationVisualizerColorToggle.Object.Visible = PositionManipulationVisualizer.Enabled
-				PositionManipulationVisualizerColor.Object.Visible = PositionManipulationVisualizer.Enabled
-			end
-			PositionManipulationRadiusVisualizer.Object.Visible = callback
-			if PositionManipulationRadiusVisualizer.Object.Visible then
-				PositionManipulationRadiusVisualizerColor.Object.Visible = PositionManipulationRadiusVisualizer.Enabled
-			end
-		end
-	})
-	PositionManipulationRadius = SilentAim:CreateSlider({
-		Name = 'Scan Radius',
-		Min = 5,
-		Max = 50,
-		Default = 20,
+	ManipulationRadius = SilentAim:CreateSlider({
+		Name = 'Manip Radius',
+		Min = 1,
+		Max = 10,
+		Default = 10,
 		Visible = false,
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
-		end
+		end,
+		Tooltip = 'Maximum horizontal distance to search for a peek position'
 	})
-	PositionManipulationVisualizer = SilentAim:CreateToggle({
-		Name = 'Visualizer',
+	ManipulationVisualizer = SilentAim:CreateToggle({
+		Name = 'Manip Visualizer',
 		Visible = false,
-		Tooltip = 'Shows a clone indicating your manipulated position',
+		Tooltip = 'Draws peek point and line-to-target beams in the world',
 		Function = function(callback)
-			PositionManipulationVisualizerMaterial.Object.Visible = callback
-			PositionManipulationVisualizerColorToggle.Object.Visible = callback
-			PositionManipulationVisualizerColor.Object.Visible = callback
-			if SilentAim and SilentAim.Enabled then
+			if SilentAim.Enabled then
 				if callback then
-					setupPMClone()
+					setupManipVisuals()
 				else
-					cleanupPMClone()
+					cleanupManipVisuals()
 				end
 			end
 		end
 	})
-	PositionManipulationVisualizerMaterial = SilentAim:CreateDropdown({
-		Name = 'Visualizer Material',
-		List = {'ForceField', 'Neon', 'Glass', 'SmoothPlastic'},
-		Default = 'ForceField',
-		Visible = false,
-		Darker = true,
-		Function = function(val)
-			if pmClone then
-				for _, obj in ipairs(pmClone:GetDescendants()) do
-					if obj:IsA("BasePart") then
-						obj.Material = Enum.Material[val] or Enum.Material.ForceField
-					end
-				end
-			end
-		end
-	})
-	PositionManipulationVisualizerColorToggle = SilentAim:CreateToggle({
-		Name = 'Custom Color',
-		Visible = false,
-		Darker = true,
-		Function = function(callback)
-			PositionManipulationVisualizerColor.Object.Visible = callback
-			if pmClone then
-				if callback then
-					local color = Color3.fromHSV(PositionManipulationVisualizerColor.Hue, PositionManipulationVisualizerColor.Sat, PositionManipulationVisualizerColor.Value)
-					for _, obj in ipairs(pmClone:GetDescendants()) do
-						if obj:IsA("BasePart") then
-							obj.Color = color
-						end
-					end
-				else
-					if SilentAim and SilentAim.Enabled then
-						setupPMClone()
-					end
-				end
-			end
-		end
-	})
-	PositionManipulationVisualizerColor = SilentAim:CreateColorSlider({
-		Name = 'Visualizer Color',
-		Visible = false,
-		Darker = true,
-		Function = function(hue, sat, val)
-			if pmClone and PositionManipulationVisualizerColorToggle.Enabled then
-				local color = Color3.fromHSV(hue, sat, val)
-				for _, obj in ipairs(pmClone:GetDescendants()) do
-					if obj:IsA("BasePart") then
-						obj.Color = color
-					end
-				end
-			end
-		end
-	})
-	PositionManipulationRadiusVisualizer = SilentAim:CreateToggle({
-		Name = 'Radius Visualizer',
-		Visible = false,
-		Tooltip = 'Shows the scan radius',
-		Function = function(callback)
-			PositionManipulationRadiusVisualizerColor.Object.Visible = callback
-			if SilentAim and SilentAim.Enabled then
-				if callback then
-					setupPMRadius()
-				else
-					cleanupPMRadius()
-				end
-			end
-		end
-	})
-	PositionManipulationRadiusVisualizerColor = SilentAim:CreateColorSlider({
-		Name = 'Radius Color',
-		Visible = false,
-		Darker = true
-	})
-	PositionManipulationScanQuality = SilentAim:CreateDropdown({
-		Name = 'Scan Quality',
-		List = {'Low', 'Medium', 'High', 'Ultra'},
-		Default = 'Medium',
-		Visible = false,
-		Darker = true,
-		Tooltip = 'Low - Fastest, samples toward targets only\nMedium - Balanced with incremental scan\nHigh - Wider coverage per frame\nUltra - Maximum scan budget'
-	})
-	table.insert(vape.Libraries.tracerOriginProviders, function()
-		if PositionManipulation and PositionManipulation.Enabled and PositionManipulationVisualizer and PositionManipulationVisualizer.Enabled and pmClone then
-			return vape.Libraries.getCloneTracerOrigin(pmClone)
-		end
-	end)
 	vape:Clean(BulletTracerFolder)
+	vape:Clean(function()
+		cleanupManipVisuals()
+	end)
 end)
 
 run(function()
