@@ -1692,10 +1692,26 @@ run(function()
 	local DEFAULT_IGNORED_SCRIPTS = {
 		'ControlScript', 'ControlModule', 'PlayerModule', 'CameraModule',
 		'Popper', 'Poppercam', 'ZoomController', 'BaseCamera', 'ClassicCamera',
-		'OrbitalCamera', 'LegacyCamera', 'Invisicam', 'MouseLockController', 'CameraInput'
+		'OrbitalCamera', 'LegacyCamera', 'Invisicam', 'MouseLockController', 'CameraInput',
+		'SoundClient', 'SoundController', 'SoundService', 'AudioEmitter', 'FootstepHandler',
+		'Footsteps', 'AmbientSound', 'ReverbController', 'Echo', 'AudioPlayer'
 	}
+	local IGNORE_PARENT_NAMES = {
+		CameraModule = true,
+		PlayerModule = true,
+		ZoomController = true,
+		Replication = true,
+		Sounds = true,
+		Audio = true,
+		SoundService = true
+	}
+	local function shouldApplySilentAim()
+		if isMb1Held then return true end
+		if (tick() - lastMb1Click) <= TracerClickWindow then return true end
+		return false
+	end
 	local function shouldIgnoreSilentAimHook(calling)
-		if not calling then return false end
+		if not calling then return true end
 		local list = (IgnoredScripts and #IgnoredScripts.ListEnabled > 0) and IgnoredScripts.ListEnabled or DEFAULT_IGNORED_SCRIPTS
 		local name = calling.Name or tostring(calling)
 		if table.find(list, name) or table.find(list, tostring(calling)) then
@@ -1703,7 +1719,7 @@ run(function()
 		end
 		local parent = calling
 		while parent do
-			if parent.Name == 'CameraModule' or parent.Name == 'PlayerModule' or parent.Name == 'ZoomController' then
+			if IGNORE_PARENT_NAMES[parent.Name] then
 				return true
 			end
 			parent = parent.Parent
@@ -1778,10 +1794,26 @@ run(function()
 	local lastManipAimPos = nil
 	local lastManipBodyPos = nil
 	local MANIP_EYE_OFFSET = 2.5
-	local MANIP_STEPS = 16
+	local MANIP_STEPS = 10
+	local MANIP_CACHE_TTL = 0.08
 	local manipRayParams = RaycastParams.new()
 	manipRayParams.RespectCanCollide = true
 	manipRayParams.FilterType = Enum.RaycastFilterType.Exclude
+	local manipCache = {key = '', info = nil, time = 0}
+
+	local function rawWorkspaceRaycast(origin, direction, params)
+		silentAimHookBusy = true
+		vape.Libraries.silentAimHookBusy = true
+		local ok, result = pcall(function()
+			if oldnamecall then
+				return oldnamecall(workspace, 'Raycast', origin, direction, params)
+			end
+			return workspace:Raycast(origin, direction, params)
+		end)
+		silentAimHookBusy = false
+		vape.Libraries.silentAimHookBusy = false
+		return ok and result or nil
+	end
 
 	local function getAutoFireEntity(effectiveOriginCF)
 		return entitylib.EntityPosition({
@@ -1815,7 +1847,7 @@ run(function()
 		local eye = originPos + Vector3.new(0, MANIP_EYE_OFFSET, 0)
 		local delta = targetPos - eye
 		if delta.Magnitude < 0.05 then return true end
-		local result = workspace:Raycast(eye, delta, manipRayParams)
+		local result = rawWorkspaceRaycast(eye, delta, manipRayParams)
 		if not result then return true end
 		if targetChar and result.Instance then
 			return result.Instance:IsDescendantOf(targetChar)
@@ -1861,6 +1893,25 @@ run(function()
 			return {state = 'ready', peek = peek, radius = radius}
 		end
 		return {state = 'blocked', peek = nil, radius = maxRadius or 10}
+	end
+
+	local function evaluateManipulationCached(origin, targetPos, maxRadius, targetChar)
+		if not origin or not targetPos then
+			return {state = 'blocked', peek = nil, radius = maxRadius or 10}
+		end
+		local now = tick()
+		local key = string.format('%.0f|%.0f|%.0f|%.0f|%.0f|%.0f|%d',
+			origin.X, origin.Y, origin.Z,
+			targetPos.X, targetPos.Y, targetPos.Z,
+			math.floor(maxRadius or 10))
+		if manipCache.key == key and manipCache.info and (now - manipCache.time) < MANIP_CACHE_TTL then
+			return manipCache.info
+		end
+		local info = evaluateManipulation(origin, targetPos, maxRadius, targetChar)
+		manipCache.key = key
+		manipCache.info = info
+		manipCache.time = now
+		return info
 	end
 
 	local function peekTrackOrigin(peek)
@@ -1993,7 +2044,7 @@ run(function()
 		end
 		lastManipBodyPos = bodyPos
 		local maxRadius = ManipulationRadius and ManipulationRadius.Value or 10
-		lastManipInfo = evaluateManipulation(bodyPos, aimPos, maxRadius, targetChar)
+		lastManipInfo = evaluateManipulationCached(bodyPos, aimPos, maxRadius, targetChar)
 		if lastManipInfo.state == 'ready' and lastManipInfo.peek then
 			return peekTrackOrigin(lastManipInfo.peek)
 		elseif lastManipInfo.state == 'direct' then
@@ -2011,45 +2062,6 @@ run(function()
 		local m = vec.Magnitude
 		if m ~= m or not math.isfinite(m) then return 0 end
 		return m
-	end
-
-	local function getPartHitpointsLight(part, origin)
-		if not part or not part.Parent then return {} end
-		local cf = part.CFrame
-		local size = part.Size
-		local hitpoints = {}
-		table.insert(hitpoints, {pos = cf.Position, weight = 1.0, name = 'Center'})
-		local offsets = {
-			Vector3.new(size.X * 0.5, 0, 0),
-			Vector3.new(-size.X * 0.5, 0, 0),
-			Vector3.new(0, size.Y * 0.5, 0),
-			Vector3.new(0, -size.Y * 0.5, 0),
-			Vector3.new(0, 0, size.Z * 0.5),
-			Vector3.new(0, 0, -size.Z * 0.5),
-		}
-		for i = 1, 6 do
-			local pos = cf.Position + offsets[i]
-			table.insert(hitpoints, {pos = pos, weight = 0.7, name = 'V'..i})
-		end
-		local pn = part.Name
-		if pn == 'HumanoidRootPart' or pn == 'Torso' or pn == 'UpperTorso' then
-			table.insert(hitpoints, {pos = cf.Position + Vector3.new(0, size.Y * 0.2, 0), weight = 0.85, name = 'T1'})
-			table.insert(hitpoints, {pos = cf.Position + Vector3.new(0, -size.Y * 0.2, 0), weight = 0.85, name = 'T2'})
-		elseif pn == 'Head' then
-			table.insert(hitpoints, {pos = cf.Position + Vector3.new(0, size.Y * 0.3, 0), weight = 0.95, name = 'HT'})
-		end
-		return hitpoints
-	end
-
-	local function calculateHitpointScore(hitpoint, origin, wallIgnores, targetChar)
-		if not hitpoint or not isVector3(hitpoint.pos) or not isVector3(origin) then return 0, 0 end
-		local distance = safeMagnitude(hitpoint.pos - origin)
-		if distance < 0.1 then return 0, distance end
-		if wallIgnores and entitylib.Wallcheck(origin, hitpoint.pos, wallIgnores) then
-			return 0, distance
-		end
-		local centerBonus = 1 / (1 + distance * 0.01)
-		return hitpoint.weight * centerBonus, distance
 	end
 
 	local function pushResolverSample(ent, samplePos)
@@ -2103,14 +2115,27 @@ run(function()
 			return targetPart.Position
 		end
 		local head = ent.Head or targetPart
-		local wallIgnores = Target.Walls.Enabled and vape.Libraries.getVisualizerWallcheckIgnores() or nil
-		local hitpoints = getPartHitpointsLight(head, origin)
-		local bestPos, bestScore = head.Position, -1
-		for _, hp in hitpoints do
-			local score = calculateHitpointScore(hp, origin, wallIgnores, ent.Character)
-			if score > bestScore then
-				bestScore = score
-				bestPos = hp.pos
+		if not head then return targetPart.Position end
+		local bestPos = head.Position
+		if Target.Walls.Enabled and isVector3(origin) then
+			local cf = head.CFrame
+			local size = head.Size
+			local candidates = {
+				cf.Position,
+				cf.Position + Vector3.new(0, size.Y * 0.25, 0),
+			}
+			for _, pos in candidates do
+				refreshManipRayFilter()
+				local delta = pos - origin
+				if delta.Magnitude < 0.05 then
+					bestPos = pos
+					break
+				end
+				local result = rawWorkspaceRaycast(origin, delta, manipRayParams)
+				if not result or (ent.Character and result.Instance and result.Instance:IsDescendantOf(ent.Character)) then
+					bestPos = pos
+					break
+				end
 			end
 		end
 		local cache = pushResolverSample(ent, bestPos)
@@ -2610,8 +2635,33 @@ run(function()
 		return oldPrisonBulletHook(unpack(args, 1, args.n))
 	end
 
+	local lastAutoFireEnt = nil
+	local lastManipPreviewTime = 0
+
+	local function refreshManipPreview()
+		if not Manipulation or not Manipulation.Enabled then return end
+		if not ManipulationVisualizer or not ManipulationVisualizer.Enabled then return end
+		if not shouldApplySilentAim() then
+			lastManipInfo = nil
+			lastManipAimPos = nil
+			return
+		end
+		local now = tick()
+		if (now - lastManipPreviewTime) < MANIP_CACHE_TTL then return end
+		lastManipPreviewTime = now
+		local ent = lastAutoFireEnt
+		if not ent or not ent.Character then return end
+		local bodyPos = entitylib.character and entitylib.character.RootPart and entitylib.character.RootPart.Position
+		local aimPart = ent.Head or ent.RootPart
+		if not bodyPos or not aimPart then return end
+		local trackOrigin = bodyPos + Vector3.new(0, MANIP_EYE_OFFSET, 0)
+		local aimPos = getAimPosition(ent, aimPart, trackOrigin)
+		applyManipulationOrigin(trackOrigin, aimPos, ent.Character)
+	end
+
 	local Hooks = {
 		FindPartOnRayWithIgnoreList = function(args)
+			if typeof(args[1]) ~= 'Ray' then return end
 			local ent, targetPart, origin, aimPos = getTarget(args[1].Origin)
 			if not ent then return end
 			aimPos = aimPos or targetPart.Position
@@ -2625,6 +2675,7 @@ run(function()
 			args[1] = Ray.new(origin, CFrame.lookAt(origin, aimPos).LookVector * args[1].Direction.Magnitude)
 		end,
 		Raycast = function(args)
+			if typeof(args[1]) ~= 'Vector3' or typeof(args[2]) ~= 'Vector3' then return end
 			if MethodRay.Value ~= 'All' and args[3] and args[3].FilterType ~= Enum.RaycastFilterType[MethodRay.Value] then return end
 			local ent, targetPart, origin, aimPos = getTarget(args[1])
 			if not ent then return end
@@ -2655,6 +2706,7 @@ run(function()
 			return Ray.new(origin + (args[3] and direction.LookVector * args[3] or Vector3.zero), direction.LookVector)
 		end,
 		Ray = function(args)
+			if typeof(args[1]) ~= 'Vector3' or typeof(args[2]) ~= 'Vector3' then return end
 			local ent, targetPart, origin, aimPos = getTarget(args[1])
 			if not ent then return end
 			aimPos = aimPos or targetPart.Position
@@ -2724,6 +2776,7 @@ run(function()
 						CircleObject.Position = inputService:GetMouseLocation()
 					end
 					updateManipVisuals()
+					refreshManipPreview()
 				end))
 				if ManipulationVisualizer and ManipulationVisualizer.Enabled then
 					setupManipVisuals()
@@ -2736,6 +2789,9 @@ run(function()
 						local calling = getcallingscript()
 
 						if shouldIgnoreSilentAimHook(calling) then
+							return oldray(origin, direction)
+						end
+						if not shouldApplySilentAim() then
 							return oldray(origin, direction)
 						end
 
@@ -2756,6 +2812,9 @@ run(function()
 
 							local calling = getcallingscript()
 							if shouldIgnoreSilentAimHook(calling) then
+								return oldnamecall(...)
+							end
+							if not shouldApplySilentAim() then
 								return oldnamecall(...)
 							end
 
@@ -2841,20 +2900,12 @@ run(function()
 						else
 						local origin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
 						ent = getAutoFireEntity(origin)
+						lastAutoFireEnt = ent
 						
 						if ent then
-							local aimPart = ent.Head or ent.RootPart
-							local fireOrigin = (origin * fireoffset).Position
-							if aimPart then
-								local aimPos = getAimPosition(ent, aimPart, fireOrigin)
-								applyManipulationOrigin(fireOrigin, aimPos, ent.Character)
-								if Manipulation and Manipulation.Enabled and lastManipInfo and lastManipInfo.state == 'blocked' then
-									ent = nil
-								end
-							end
-							if ent then
-								registerShot(ent, aimPart, fireOrigin)
-							end
+							registerShot(ent, ent.Head or ent.RootPart, (origin * fireoffset).Position)
+						else
+							lastAutoFireEnt = nil
 						end
 
 						if mouse1click and (isrbxactive or iswindowactive)() then
@@ -2929,6 +2980,10 @@ run(function()
 				isMb1Held = false
 				clearBulletTracers()
 				resolverCache = setmetatable({}, {__mode = 'k'})
+				manipCache.key = ''
+				manipCache.info = nil
+				manipCache.time = 0
+				lastAutoFireEnt = nil
 				lastManipInfo = nil
 				lastManipAimPos = nil
 				lastManipBodyPos = nil
