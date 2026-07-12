@@ -1706,50 +1706,14 @@ run(function()
 	}
 	playHitSound = function() end
 	lastHitsoundTime = 0
-	local DEFAULT_IGNORED_SCRIPTS = {
-		'ControlScript', 'ControlModule', 'PlayerModule', 'CameraModule',
-		'Popper', 'Poppercam', 'ZoomController', 'BaseCamera', 'ClassicCamera',
-		'OrbitalCamera', 'LegacyCamera', 'Invisicam', 'MouseLockController', 'CameraInput',
-		'SoundClient', 'SoundController', 'SoundService', 'AudioEmitter', 'FootstepHandler',
-		'Footsteps', 'AmbientSound', 'ReverbController', 'Echo', 'AudioPlayer',
-		'BaseCamera', 'Client', 'ActiveCast', 'Camera', 'Scripts'
-	}
-	local IGNORE_PARENT_NAMES = {
-		CameraModule = true,
-		PlayerModule = true,
-		ZoomController = true,
-		Replication = true,
-		Sounds = true,
-		Audio = true,
-		SoundService = true,
-		Scripts = true,
-		Camera = true,
-		Storage = true
-	}
+	local DEFAULT_IGNORED_SCRIPTS = {'ControlScript', 'ControlModule'}
 	local TracerClickWindow = 0.4
 	local lastMb1Click = 0
 	local isMb1Held = false
-	local function shouldApplySilentAim()
-		if isMb1Held == true then return true end
-		local lastClick = type(lastMb1Click) == 'number' and lastMb1Click or 0
-		if (tick() - lastClick) <= TracerClickWindow then return true end
-		return false
-	end
 	local function shouldIgnoreSilentAimHook(calling)
-		if not calling then return true end
+		if not calling then return false end
 		local list = (IgnoredScripts and #IgnoredScripts.ListEnabled > 0) and IgnoredScripts.ListEnabled or DEFAULT_IGNORED_SCRIPTS
-		local name = calling.Name or tostring(calling)
-		if table.find(list, name) or table.find(list, tostring(calling)) then
-			return true
-		end
-		local parent = calling
-		while parent do
-			if IGNORE_PARENT_NAMES[parent.Name] then
-				return true
-			end
-			parent = parent.Parent
-		end
-		return false
+		return table.find(list, tostring(calling)) ~= nil
 	end
 	local RaycastWhitelist = RaycastParams.new()
 	RaycastWhitelist.FilterType = Enum.RaycastFilterType.Include
@@ -1824,6 +1788,7 @@ run(function()
 	local manipCache = {key = '', info = nil, time = 0}
 
 	local function rawWorkspaceRaycast(origin, direction, params)
+		local wasBusy = silentAimHookBusy
 		silentAimHookBusy = true
 		vape.Libraries.silentAimHookBusy = true
 		local ok, result = pcall(function()
@@ -1832,8 +1797,10 @@ run(function()
 			end
 			return workspace:Raycast(origin, direction, params)
 		end)
-		silentAimHookBusy = false
-		vape.Libraries.silentAimHookBusy = false
+		if not wasBusy then
+			silentAimHookBusy = false
+			vape.Libraries.silentAimHookBusy = false
+		end
 		return ok and result or nil
 	end
 
@@ -2493,18 +2460,9 @@ run(function()
 	end
 
 	local function getTarget(origin, obj, prisonOpts)
-		if silentAimHookBusy or vape.Libraries.silentAimHookBusy then return end
-		silentAimHookBusy = true
-		vape.Libraries.silentAimHookBusy = true
-		local function finish(...)
-			silentAimHookBusy = false
-			vape.Libraries.silentAimHookBusy = false
-			return ...
-		end
-
 		local resolvedPos = select(1, resolveSilentAimOrigin(origin))
 		origin = resolvedPos
-		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then return finish() end
+		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then return end
 		local targetPart = (rand.NextNumber(rand, 0, 100) < (AutoFire.Enabled and 100 or HeadshotChance.Value)) and 'Head' or 'RootPart'
 		local range = Range.Value
 		local rangePosition, attackCheck, wallbang
@@ -2539,17 +2497,12 @@ run(function()
 			markCombatTarget(ent)
 			local aimPos = getAimPosition(ent, part, origin)
 			origin = applyManipulationOrigin(origin, aimPos, ent.Character)
-			if Manipulation and Manipulation.Enabled and lastManipInfo and lastManipInfo.state == 'blocked' then
-				return finish()
-			end
 			if Projectile.Enabled then
 				ProjectileRaycast.FilterDescendantsInstances = {gameCamera, ent.Character}
 				ProjectileRaycast.CollisionGroup = part.CollisionGroup
 			end
-			return finish(ent, part, origin, aimPos)
+			return ent, part, origin, aimPos
 		end
-		
-		return finish()
 	end
 
 	local function getShootFunction()
@@ -2803,18 +2756,18 @@ run(function()
 						if checkcaller() then
 							return oldray(origin, direction)
 						end
-						local calling = getcallingscript()
-
-						if shouldIgnoreSilentAimHook(calling) then
+						if shouldIgnoreSilentAimHook(getcallingscript()) then
 							return oldray(origin, direction)
 						end
-						local ok, shouldShoot = pcall(shouldApplySilentAim)
-						if not ok or not shouldShoot then
-							return oldray(origin, direction)
-						end
-
+						silentAimHookBusy = true
+						vape.Libraries.silentAimHookBusy = true
 						local args = {origin, direction}
-						Hooks.Ray(args)
+						local ok, err = pcall(Hooks.Ray, args)
+						silentAimHookBusy = false
+						vape.Libraries.silentAimHookBusy = false
+						if not ok then
+							return oldray(origin, direction)
+						end
 						return oldray(unpack(args))
 					end)
 				else
@@ -2828,13 +2781,7 @@ run(function()
 								return oldnamecall(...)
 							end
 
-							local calling = getcallingscript()
-							if not shouldIgnoreSilentAimHook(calling) then
-								local ok, shouldShoot = pcall(shouldApplySilentAim)
-								if not ok or not shouldShoot then
-									return oldnamecall(...)
-								end
-							else
+							if shouldIgnoreSilentAimHook(getcallingscript()) then
 								return oldnamecall(...)
 							end
 
@@ -2843,8 +2790,15 @@ run(function()
 								return oldnamecall(...)
 							end
 
+							silentAimHookBusy = true
+							vape.Libraries.silentAimHookBusy = true
 							local self, args = ..., {select(2, ...)}
-							local r1 = hookFn(args)
+							local ok, r1 = pcall(hookFn, args)
+							silentAimHookBusy = false
+							vape.Libraries.silentAimHookBusy = false
+							if not ok then
+								return oldnamecall(...)
+							end
 							if typeof(r1) == 'Ray' then
 								return r1
 							end
