@@ -62,9 +62,7 @@ local targetinfo = vape.Libraries.targetinfo
 local entitylib
 local TARGET_MARK_DURATION = 2.5
 local function markCombatTarget(ent, duration)
-	if not ent or not targetinfo then return end
-	targetinfo.CombatTarget = ent
-	if targetinfo.Targets then
+	if ent and targetinfo and targetinfo.Targets then
 		targetinfo.Targets[ent] = tick() + (duration or TARGET_MARK_DURATION)
 	end
 end
@@ -1779,7 +1777,7 @@ run(function()
 	local rayParams = RaycastParams.new()
 	local rayParams2 = OverlapParams.new()
 	local bulletTracerActive = {}
-	local bulletTracerPending = nil
+	local bulletTracerPending = setmetatable({}, {__mode = 'k'})
 	local healthCache = setmetatable({}, {__mode = 'k'})
 	local resolverCache = setmetatable({}, {__mode = 'k'})
 	local silentAimHookBusy = false
@@ -1861,13 +1859,7 @@ run(function()
 
 	local function queryCombatTarget(origin, opts)
 		opts = opts or {}
-		local method = Mode.Value
-		if (not Target.Walls or not Target.Walls.Enabled) and method == 'Mouse' and not opts.prisonOpts then
-			local mouseEnt = entitylib.EntityMouse(buildCombatQuery(origin, opts.part, opts))
-			if mouseEnt then return mouseEnt end
-			method = 'Position'
-		end
-		return entitylib['Entity'..method](buildCombatQuery(origin, opts.part, opts))
+		return entitylib['Entity'..Mode.Value](buildCombatQuery(origin, opts.part, opts))
 	end
 
 	local function getAutoFireEntity(effectiveOriginCF)
@@ -2431,7 +2423,6 @@ run(function()
 
 	local function resetTracerTracking()
 		clearBulletTracers()
-		bulletTracerPending = nil
 		healthCache = setmetatable({}, {__mode = 'k'})
 	end
 
@@ -2440,15 +2431,20 @@ run(function()
 		local wantsSounds = HitSounds and HitSounds.Enabled
 		if not wantsTracers and not wantsSounds then return end
 		if not (ent and targetPart and origin) then return end
-		markCombatTarget(ent)
 		local tracerOrigin = vape.Libraries.cachedVisualizerTracerOrigin or origin
-		if bulletTracerPending and bulletTracerPending.Entity == ent and tick() - (bulletTracerPending.Time or 0) < 0.05 then
-			bulletTracerPending.TargetPosition = targetPart.Position
-			bulletTracerPending.Origin = tracerOrigin
-			bulletTracerPending.Time = tick()
+		local existing = bulletTracerPending[ent]
+		if existing then
+			if tick() - (existing.Time or 0) < 0.05 then
+				existing.TargetPosition = targetPart.Position
+				return
+			end
+			existing.Health = math.max(existing.Health or ent.Health, ent.Health)
+			existing.Origin = tracerOrigin
+			existing.TargetPosition = targetPart.Position
+			existing.Time = tick()
 			return
 		end
-		bulletTracerPending = {
+		bulletTracerPending[ent] = {
 			Entity = ent,
 			Health = ent.Health,
 			Origin = tracerOrigin,
@@ -2510,57 +2506,52 @@ run(function()
 		local wantsSound = HitSounds and HitSounds.Enabled
 		if not wantsTracer and not wantsSound then return end
 
-		local pending = bulletTracerPending
-		if not pending then return end
-		local ent = pending.Entity
-		if not ent or not ent.Character then
-			bulletTracerPending = nil
-			return
-		end
-		if (now - pending.Time) > 5 then
-			bulletTracerPending = nil
-			return
-		end
-
-		local currentHealth = ent.Health
-		local lastHealth = healthCache[ent] or currentHealth
-		if currentHealth < lastHealth and currentHealth < pending.Health then
-			local didShootRecently = isMb1Held or (now - lastMb1Click) <= TracerClickWindow
-			if not didShootRecently then
-				pending.Health = math.max(currentHealth, 0)
-				healthCache[ent] = currentHealth
-				return
+		for _, ent in entitylib.List do
+			local currentHealth = ent.Health
+			local lastHealth = healthCache[ent] or currentHealth
+			local pending = bulletTracerPending[ent]
+			if pending and ((now - pending.Time) > 5 or not ent.Character) then
+				bulletTracerPending[ent] = nil
+				pending = nil
 			end
+			if pending and currentHealth < lastHealth and currentHealth < pending.Health then
+				local didShootRecently = isMb1Held or (now - lastMb1Click) <= TracerClickWindow
+				if not didShootRecently then
+					pending.Health = math.max(currentHealth, 0)
+					healthCache[ent] = currentHealth
+					continue
+				end
 
-			local allowHit = true
-			if Target.Walls and Target.Walls.Enabled then
-				local wallIgnores = {lplr.Character, gameCamera}
-				for _, model in vape.Libraries.visualizerModels do
-					if model and model.Parent then
-						table.insert(wallIgnores, model)
+				local allowHit = true
+				if Target.Walls and Target.Walls.Enabled then
+					local wallIgnores = {lplr.Character, gameCamera}
+					for _, model in vape.Libraries.visualizerModels do
+						if model and model.Parent then
+							table.insert(wallIgnores, model)
+						end
+					end
+					BulletTracerWallcheck.FilterDescendantsInstances = wallIgnores
+					local ray = workspace:Raycast(pending.Origin, pending.TargetPosition - pending.Origin, BulletTracerWallcheck)
+					allowHit = ray == nil or (ray.Instance and ray.Instance:IsDescendantOf(ent.Character))
+				end
+				if allowHit then
+					if wantsTracer then
+						spawnBulletTracer(ent, pending, now, getTracerColors())
+					end
+					if wantsSound then
+						playHitSound()
 					end
 				end
-				BulletTracerWallcheck.FilterDescendantsInstances = wallIgnores
-				local ray = workspace:Raycast(pending.Origin, pending.TargetPosition - pending.Origin, BulletTracerWallcheck)
-				allowHit = ray == nil or (ray.Instance and ray.Instance:IsDescendantOf(ent.Character))
-			end
-			if allowHit then
-				if wantsTracer then
-					spawnBulletTracer(ent, pending, now, getTracerColors())
+				pending.Health = math.max(currentHealth, 0)
+				local cachedOrigin = vape.Libraries.cachedVisualizerTracerOrigin
+				if cachedOrigin then
+					pending.Origin = cachedOrigin
 				end
-				if wantsSound then
-					playHitSound()
-				end
+				pending.TargetPosition = (ent.Head or ent.RootPart).Position
+				pending.Time = now
 			end
-			pending.Health = math.max(currentHealth, 0)
-			local cachedOrigin = vape.Libraries.cachedVisualizerTracerOrigin
-			if cachedOrigin then
-				pending.Origin = cachedOrigin
-			end
-			pending.TargetPosition = (ent.Head or ent.RootPart).Position
-			pending.Time = now
+			healthCache[ent] = currentHealth
 		end
-		healthCache[ent] = currentHealth
 	end
 
 	local function renderBulletTracers()
@@ -2614,7 +2605,7 @@ run(function()
 		local weaponOrigin = select(1, resolveSilentAimOrigin(origin))
 		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then return end
 		local targetPart = (rand.NextNumber(rand, 0, 100) < (AutoFire.Enabled and 100 or HeadshotChance.Value)) and 'Head' or 'RootPart'
-		local ent = queryCombatTarget(getCombatQueryOrigin(), {part = targetPart, prisonOpts = prisonOpts})
+		local ent = queryCombatTarget(weaponOrigin, {part = targetPart, prisonOpts = prisonOpts})
 
 		if ent then
 			local part = ent[targetPart]
@@ -2970,18 +2961,7 @@ run(function()
 						renderBulletTracers()
 					end
 					
-					local previousTarget = targetinfo and targetinfo.CombatTarget
-					local ent = queryCombatTarget(getCombatQueryOrigin(), {part = 'Head'})
-					if ent then
-						if previousTarget and previousTarget ~= ent then
-							bulletTracerPending = nil
-						end
-						markCombatTarget(ent)
-					elseif targetinfo then
-						targetinfo.CombatTarget = nil
-						bulletTracerPending = nil
-					end
-
+					local ent
 					if AutoFire.Enabled then
 						if game.PlaceId == 155615604 and vape.Libraries.prisonlife and pl.Shoot then
 							local gundata = getPrisonGunData()
@@ -3018,10 +2998,6 @@ run(function()
 						local fireEnt = getAutoFireEntity(origin)
 						lastAutoFireEnt = fireEnt
 						ent = fireEnt
-						
-						if fireEnt then
-							markCombatTarget(fireEnt)
-						end
 
 						if mouse1click and (isrbxactive or iswindowactive)() then
 							if fireEnt and canClick() then
@@ -3032,6 +3008,7 @@ run(function()
 									else
 										mouse1press()
 										lastMb1Click = tick()
+										markCombatTarget(fireEnt)
 										registerShot(fireEnt, fireEnt.Head or fireEnt.RootPart, (origin * fireoffset).Position)
 									end
 									mouseClicked = not mouseClicked
@@ -3046,6 +3023,10 @@ run(function()
 						end
 					end
 					
+					if not ent and AutoStop and AutoStop.Enabled then
+						ent = queryCombatTarget(getCombatQueryOrigin(), {part = 'Head'})
+					end
+
 					if AutoStop and AutoStop.Enabled then
 						if ent and entitylib.isAlive then
 							local char = entitylib.character.Character
@@ -3082,10 +3063,6 @@ run(function()
 			else
 				isMb1Held = false
 				clearBulletTracers()
-				bulletTracerPending = nil
-				if targetinfo then
-					targetinfo.CombatTarget = nil
-				end
 				resolverCache = setmetatable({}, {__mode = 'k'})
 				manipCache.key = ''
 				manipCache.info = nil
