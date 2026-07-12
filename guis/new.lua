@@ -6370,6 +6370,7 @@ general:CreateButton({
 ]]
 
 local modules = mainapi.Categories.Main:CreateSettingsPane({Name = 'Modules'})
+mainapi.SettingsModules = modules
 shared.VapeHealthCheck = shared.VapeHealthCheck ~= false
 modules:CreateToggle({
 	Name = 'Teams by server',
@@ -7202,6 +7203,58 @@ local lasthealth = 0
 local lastmaxhealth = 0
 targetinfo = {
 	Targets = {},
+	HighlightEnabled = false,
+	HighlightColor = {Hue = 0, Sat = 1, Value = 1, Opacity = 0.5},
+	GetActiveTarget = function(self)
+		for i, expire in self.Targets do
+			if expire < tick() then
+				self.Targets[i] = nil
+			end
+		end
+		local ent, highest = nil, tick()
+		for i, check in self.Targets do
+			if check > highest then
+				ent = i
+				highest = check
+			end
+		end
+		return ent
+	end,
+	ClearHighlight = function(self)
+		if self.HighlightInstance then
+			self.HighlightInstance.Adornee = nil
+			self.HighlightInstance.Enabled = false
+		end
+		self.LastHighlightTarget = nil
+	end,
+	UpdateHighlight = function(self)
+		local ent = self:GetActiveTarget()
+		if not self.HighlightEnabled or not ent or not ent.Character then
+			self:ClearHighlight()
+			return
+		end
+		if not self.HighlightFolder then
+			local folder = Instance.new('Folder')
+			folder.Name = 'VapeTargetHighlights'
+			folder.Parent = workspace
+			self.HighlightFolder = folder
+		end
+		if not self.HighlightInstance then
+			self.HighlightInstance = Instance.new('Highlight')
+			self.HighlightInstance.Name = 'VapeTargetHighlight'
+			self.HighlightInstance.Parent = self.HighlightFolder
+		end
+		local color = self.HighlightColor or {Hue = 0, Sat = 1, Value = 1, Opacity = 0.5}
+		local fillColor = Color3.fromHSV(color.Hue, color.Sat, color.Value)
+		self.HighlightInstance.Adornee = ent.Character
+		self.HighlightInstance.Enabled = true
+		self.HighlightInstance.FillColor = fillColor
+		self.HighlightInstance.OutlineColor = fillColor
+		self.HighlightInstance.FillTransparency = 1 - (color.Opacity or 0.5)
+		self.HighlightInstance.OutlineTransparency = 0
+		self.HighlightInstance.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		self.LastHighlightTarget = ent
+	end,
 	Object = targetinfobkg,
 	UpdateInfo = function(self)
 		local entitylib = mainapi.Libraries
@@ -7310,6 +7363,64 @@ targetinfo = {
 	end
 }
 mainapi.Libraries.targetinfo = targetinfo
+
+local highlightTargetColor
+local highlightTargetConnection
+local function syncHighlightTargetColor()
+	if highlightTargetColor then
+		targetinfo.HighlightColor = {
+			Hue = highlightTargetColor.Hue,
+			Sat = highlightTargetColor.Sat,
+			Value = highlightTargetColor.Value,
+			Opacity = highlightTargetColor.Opacity
+		}
+	end
+end
+local function setHighlightTargetEnabled(enabled)
+	targetinfo.HighlightEnabled = enabled
+	if highlightTargetConnection then
+		highlightTargetConnection:Disconnect()
+		highlightTargetConnection = nil
+	end
+	if enabled then
+		syncHighlightTargetColor()
+		local runService = cloneref(game:GetService('RunService'))
+		highlightTargetConnection = runService.RenderStepped:Connect(function()
+			if targetinfo.HighlightEnabled then
+				targetinfo:UpdateHighlight()
+			end
+		end)
+		mainapi:Clean(highlightTargetConnection)
+	else
+		targetinfo:ClearHighlight()
+	end
+	if highlightTargetColor and highlightTargetColor.Object then
+		highlightTargetColor.Object.Visible = enabled
+	end
+end
+local modulesSettings = mainapi.SettingsModules
+if modulesSettings then
+	modulesSettings:CreateToggle({
+		Name = 'Highlight target',
+		Tooltip = 'Highlights the current combat target from silent aim, aim assist, killaura, and other targeting modules',
+		Default = false,
+		Function = setHighlightTargetEnabled
+	})
+	highlightTargetColor = modulesSettings:CreateColorSlider({
+		Name = 'Color',
+		Visible = false,
+		DefaultHue = 0,
+		DefaultSat = 1,
+		DefaultValue = 1,
+		DefaultOpacity = 0.5,
+		Function = function()
+			syncHighlightTargetColor()
+			if targetinfo.HighlightEnabled then
+				targetinfo:UpdateHighlight()
+			end
+		end
+	})
+end
 
 function mainapi:UpdateTextGUI(afterload)
 	if not afterload and not mainapi.Loaded then return end

@@ -59,6 +59,22 @@ local assetfunction = getcustomasset
 local vape = shared.vape
 local tween = vape.Libraries.tween
 local targetinfo = vape.Libraries.targetinfo
+local TARGET_MARK_DURATION = 2.5
+local function markCombatTarget(ent, duration)
+	if ent and targetinfo and targetinfo.Targets then
+		targetinfo.Targets[ent] = tick() + (duration or TARGET_MARK_DURATION)
+	end
+end
+local function getEntityRenderColor(ent, fallbackColor)
+	if targetinfo and targetinfo.HighlightEnabled and targetinfo.GetActiveTarget then
+		local active = targetinfo:GetActiveTarget()
+		if active == ent and targetinfo.HighlightColor then
+			local color = targetinfo.HighlightColor
+			return Color3.fromHSV(color.Hue, color.Sat, color.Value)
+		end
+	end
+	return entitylib.getEntityColor(ent) or fallbackColor
+end
 local getfontsize = vape.Libraries.getfontsize
 local getcustomasset = vape.Libraries.getcustomasset
 
@@ -1297,6 +1313,7 @@ run(function()
 
 				local ent = resolveTarget()
 				if ent then
+					markCombatTarget(ent)
 					applyAim(ent, dt)
 				end
 			end))
@@ -2519,7 +2536,7 @@ run(function()
 			if isMb1Held or (tick() - lastMb1Click) <= TracerClickWindow then
 				registerShot(ent, part, origin)
 			end
-			targetinfo.Targets[ent] = tick() + 1
+			markCombatTarget(ent)
 			local aimPos = getAimPosition(ent, part, origin)
 			origin = applyManipulationOrigin(origin, aimPos, ent.Character)
 			if Manipulation and Manipulation.Enabled and lastManipInfo and lastManipInfo.state == 'blocked' then
@@ -2888,6 +2905,7 @@ run(function()
 
 								if ent and entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
 									if not (taser and ent.Character:GetAttribute('Tased')) then
+										markCombatTarget(ent)
 										registerShot(ent, ent.Head or ent.RootPart, entitylib.character.Head.Position)
 										if delayCheck < tick() then
 											delayCheck = tick() + (gundata.FireRate or AutoFireShootDelay.Value)
@@ -2906,6 +2924,7 @@ run(function()
 						lastAutoFireEnt = ent
 						
 						if ent then
+							markCombatTarget(ent)
 							registerShot(ent, ent.Head or ent.RootPart, (origin * fireoffset).Position)
 						else
 							lastAutoFireEnt = nil
@@ -2948,6 +2967,7 @@ run(function()
 
 					if AutoStop and AutoStop.Enabled then
 						if ent and entitylib.isAlive then
+							markCombatTarget(ent)
 							local char = entitylib.character.Character
 							local hum = char and char:FindFirstChildOfClass("Humanoid")
 							if hum then
@@ -3541,7 +3561,9 @@ run(function()
 			if callback then
 				repeat
 					if mouse1click and (isrbxactive or iswindowactive)() then
-						if getTriggerBotTarget() and canClick() then
+						local triggerEnt = getTriggerBotTarget()
+						if triggerEnt and canClick() then
+							markCombatTarget(triggerEnt)
 							if delayCheck < tick() then
 								if mouseClicked then
 									mouse1release()
@@ -4644,7 +4666,7 @@ run(function()
 									Entity = v,
 									Check = delta.Magnitude > AttackRange.Value and BoxSwingColor or BoxAttackColor
 								})
-								targetinfo.Targets[v] = tick() + 1
+								markCombatTarget(v)
 								
 								if AttackDelay < tick() then
 									AttackDelay = tick() + (1 / CPS.GetRandomValue())
@@ -5608,6 +5630,7 @@ run(function()
 					})
 	
 					if ent then
+						markCombatTarget(ent)
 						local root, targetPos = entitylib.character.RootPart, ent.RootPart.Position
 						rayCheck.FilterDescendantsInstances = {lplr.Character, gameCamera, ent.Character}
 						rayCheck.CollisionGroup = root.CollisionGroup
@@ -5892,7 +5915,7 @@ run(function()
 		EntityArrow.BorderSizePixel = 0
 		EntityArrow.Visible = false
 		EntityArrow.Image = getcustomasset('newvape/assets/new/arrowmodule.png')
-		EntityArrow.ImageColor3 = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+		EntityArrow.ImageColor3 = getEntityRenderColor(ent, Color3.fromHSV(Color.Hue, Color.Sat, Color.Value))
 		EntityArrow.Parent = Folder
 		Reference[ent] = EntityArrow
 	end
@@ -5911,7 +5934,7 @@ run(function()
 	local function ColorFunc(hue, sat, val)
 		local color = Color3.fromHSV(hue, sat, val)
 		for ent, EntityArrow in Reference do
-			EntityArrow.ImageColor3 = entitylib.getEntityColor(ent) or color
+			EntityArrow.ImageColor3 = getEntityRenderColor(ent, color)
 		end
 	end
 	
@@ -6034,6 +6057,13 @@ run(function()
 	end
 
 	local function getChamColor(ent, fallbackColor)
+		if targetinfo and targetinfo.HighlightEnabled and targetinfo.GetActiveTarget then
+			local active = targetinfo:GetActiveTarget()
+			if active == ent and targetinfo.HighlightColor then
+				local hl = targetinfo.HighlightColor
+				return Color3.fromHSV(hl.Hue, hl.Sat, hl.Value)
+			end
+		end
 		local color = fallbackColor
 		if VisibleOverride.Enabled and isVisible(ent) then
 			color = Color3.fromHSV(VisibleColor.Hue, VisibleColor.Sat, VisibleColor.Value)
@@ -6057,8 +6087,13 @@ run(function()
 			end
 		else
 			obj.FillColor = color
+			local outlineColor = Color3.fromHSV(OutlineColor.Hue, OutlineColor.Sat, OutlineColor.Value)
+			if targetinfo and targetinfo.HighlightEnabled and targetinfo.GetActiveTarget and targetinfo:GetActiveTarget() == ent and targetinfo.HighlightColor then
+				local hl = targetinfo.HighlightColor
+				outlineColor = Color3.fromHSV(hl.Hue, hl.Sat, hl.Value)
+			end
 			local s, _ = pcall(function()
-				obj.OutlineColor = Color3.fromHSV(OutlineColor.Hue, OutlineColor.Sat, OutlineColor.Value)
+				obj.OutlineColor = outlineColor
 				obj.OutlineTransparency = OutlineTransparency.Value
 			end)
 		end
@@ -6461,7 +6496,7 @@ run(function()
 			BoxColor = getESPColor(),
 			ColorResolver = function(plr)
 				local ent = entitylib.getEntity(plr)
-				return ent and (entitylib.getEntityColor(ent) or getESPColor()) or getESPColor()
+				return ent and getEntityRenderColor(ent, getESPColor()) or getESPColor()
 			end,
 			RenderDistance = Distance.Enabled and DistanceLimit.ValueMax or 99999,
 			ShouldRender = function(plr)
@@ -6491,7 +6526,7 @@ run(function()
 			end,
 			ColorResolver = function(plr)
 				local ent = entitylib.getEntity(plr)
-				return ent and (entitylib.getEntityColor(ent) or getESPColor()) or getESPColor()
+				return ent and getEntityRenderColor(ent, getESPColor()) or getESPColor()
 			end
 		})
 	end
@@ -6540,7 +6575,7 @@ run(function()
 			EntityESP.Main.ZIndex = 2
 			EntityESP.Main.Filled = false
 			EntityESP.Main.Thickness = 1
-			EntityESP.Main.Color = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+			EntityESP.Main.Color = getEntityRenderColor(ent, Color3.fromHSV(Color.Hue, Color.Sat, Color.Value))
 	
 			if BoundingBox.Enabled then
 				EntityESP.Border = Drawing.new('Square')
@@ -6615,7 +6650,7 @@ run(function()
 			EntityESP.Line11 = Drawing.new('Line')
 			EntityESP.Line12 = Drawing.new('Line')
 	
-			local color = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+			local color = getEntityRenderColor(ent, Color3.fromHSV(Color.Hue, Color.Sat, Color.Value))
 			for _, v in EntityESP do
 				v.Thickness = 1
 				v.Color = color
@@ -6642,7 +6677,7 @@ run(function()
 			EntityESP.LeftLeg = Drawing.new('Line')
 			EntityESP.RightLeg = Drawing.new('Line')
 	
-			local color = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+			local color = getEntityRenderColor(ent, Color3.fromHSV(Color.Hue, Color.Sat, Color.Value))
 			for _, v in EntityESP do
 				v.Thickness = 2
 				v.Color = color
@@ -7529,7 +7564,7 @@ run(function()
 			nametag.BorderSizePixel = 0
 			nametag.Visible = false
 			nametag.Text = Strings[ent]
-			nametag.TextColor3 = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+			nametag.TextColor3 = getEntityRenderColor(ent, Color3.fromHSV(Color.Hue, Color.Sat, Color.Value))
 			nametag.RichText = true
 			nametag.Parent = Folder
 			Reference[ent] = nametag
@@ -7563,7 +7598,7 @@ run(function()
 			end
 	
 			nametag.Text.Text = Strings[ent]
-			nametag.Text.Color = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+			nametag.Text.Color = getEntityRenderColor(ent, Color3.fromHSV(Color.Hue, Color.Sat, Color.Value))
 			nametag.BG.Size = Vector2.new(nametag.Text.TextBounds.X + 8, nametag.Text.TextBounds.Y + 7)
 			Reference[ent] = nametag
 		end
@@ -7646,7 +7681,7 @@ run(function()
 				end
 	
 				nametag.BG.Size = Vector2.new(nametag.Text.TextBounds.X + 8, nametag.Text.TextBounds.Y + 7)
-				nametag.Text.Color = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+				nametag.Text.Color = getEntityRenderColor(ent, Color3.fromHSV(Color.Hue, Color.Sat, Color.Value))
 			end
 		end
 	}
@@ -8094,7 +8129,7 @@ run(function()
 		local EntityDot = Instance.new('Frame')
 		EntityDot.Size = UDim2.fromOffset(4, 4)
 		EntityDot.AnchorPoint = Vector2.new(0.5, 0.5)
-		EntityDot.BackgroundColor3 = entitylib.getEntityColor(ent) or Color3.fromHSV(PlayerColor.Hue, PlayerColor.Sat, PlayerColor.Value)
+		EntityDot.BackgroundColor3 = getEntityRenderColor(ent, Color3.fromHSV(PlayerColor.Hue, PlayerColor.Sat, PlayerColor.Value))
 		EntityDot.Parent = bkg
 		local EntityCorner = Instance.new('UICorner')
 		EntityCorner.CornerRadius = UDim.new(DotStyle.Value == 'Circles' and 1 or 0, 0)
@@ -8140,7 +8175,7 @@ run(function()
 				end))
 				Radar:Clean(vape.Categories.Friends.ColorUpdate.Event:Connect(function()
 					for ent, EntityDot in Reference do
-						EntityDot.BackgroundColor3 = entitylib.getEntityColor(ent) or Color3.fromHSV(PlayerColor.Hue, PlayerColor.Sat, PlayerColor.Value)
+						EntityDot.BackgroundColor3 = getEntityRenderColor(ent, Color3.fromHSV(PlayerColor.Hue, PlayerColor.Sat, PlayerColor.Value))
 					end
 				end))
 				Radar:Clean(runService.RenderStepped:Connect(function()
@@ -8180,7 +8215,7 @@ run(function()
 		Name = 'Player Color',
 		Function = function(hue, sat, val)
 			for ent, EntityDot in Reference do
-				EntityDot.BackgroundColor3 = entitylib.getEntityColor(ent) or Color3.fromHSV(hue, sat, val)
+				EntityDot.BackgroundColor3 = getEntityRenderColor(ent, Color3.fromHSV(hue, sat, val))
 			end
 		end
 	})
@@ -8505,7 +8540,7 @@ run(function()
 		local EntityTracer = Drawing.new('Line')
 		EntityTracer.Thickness = 1
 		EntityTracer.Transparency = 1 - Transparency.Value
-		EntityTracer.Color = entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+		EntityTracer.Color = getEntityRenderColor(ent, Color3.fromHSV(Color.Hue, Color.Sat, Color.Value))
 		Reference[ent] = EntityTracer
 	end
 	
@@ -8527,7 +8562,7 @@ run(function()
 		if DistanceColor.Enabled then return end
 		local tracerColor = Color3.fromHSV(hue, sat, val)
 		for ent, EntityTracer in Reference do
-			EntityTracer.Color = entitylib.getEntityColor(ent) or tracerColor
+			EntityTracer.Color = getEntityRenderColor(ent, tracerColor)
 		end
 	end
 	
@@ -12869,7 +12904,7 @@ run(function()
 	local function getLineColor(plr)
 		local ent = plr and entitylib.getEntity(plr)
 		if ent then
-			return entitylib.getEntityColor(ent) or Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+			return getEntityRenderColor(ent, Color3.fromHSV(Color.Hue, Color.Sat, Color.Value))
 		end
 		return Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
 	end
