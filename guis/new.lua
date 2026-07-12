@@ -7203,13 +7203,20 @@ local lasthealth = 0
 local lastmaxhealth = 0
 targetinfo = {
 	Targets = {},
+	CombatTarget = nil,
 	HighlightEnabled = false,
 	HighlightColor = {Hue = 0, Sat = 1, Value = 1, Opacity = 0.5},
 	GetActiveTarget = function(self)
 		for i, expire in self.Targets do
 			if expire < tick() then
 				self.Targets[i] = nil
+				if self.CombatTarget == i then
+					self.CombatTarget = nil
+				end
 			end
+		end
+		if self.CombatTarget and self.Targets[self.CombatTarget] and self.Targets[self.CombatTarget] > tick() then
+			return self.CombatTarget
 		end
 		local ent, highest = nil, tick()
 		for i, check in self.Targets do
@@ -7218,6 +7225,7 @@ targetinfo = {
 				highest = check
 			end
 		end
+		self.CombatTarget = ent
 		return ent
 	end,
 	ClearHighlight = function(self)
@@ -7266,16 +7274,13 @@ targetinfo = {
 		for i, v in self.Targets do
 			if v < tick() then
 				self.Targets[i] = nil
+				if self.CombatTarget == i then
+					self.CombatTarget = nil
+				end
 			end
 		end
 
-		local v, highest = nil, tick()
-		for i, check in self.Targets do
-			if check > highest then
-				v = i
-				highest = check
-			end
-		end
+		local v = self:GetActiveTarget()
 
 		targetinfobkg.Visible = v ~= nil or mainapi.gui.ScaledGui.ClickGui.Visible
 		if v then

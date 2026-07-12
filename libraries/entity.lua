@@ -208,18 +208,21 @@ end
 entitylib.EntityMouse = function(entitysettings)
 	if entitylib.isAlive then
 		local mouseLocation, sortingTable = inputService.GetMouseLocation(inputService), {}
+		local originPos = entitysettings.Origin or entitylib.character.HumanoidRootPart.Position
+		local distanceSort = entitysettings.MouseDistanceSort
 		for _, v in entitylib.List do
 			if not entitysettings.Players and v.Player then continue end
 			if not entitysettings.NPCs and v.NPC then continue end
 			if not v.Targetable then continue end
 			local position, vis = gameCamera.WorldToViewportPoint(gameCamera, v[entitysettings.Part].Position)
 			if not vis then continue end
-			local mag = (mouseLocation - Vector2.new(position.x, position.y)).Magnitude
-			if mag > entitysettings.Range then continue end
+			local screenMag = (mouseLocation - Vector2.new(position.x, position.y)).Magnitude
+			if screenMag > entitysettings.Range then continue end
 			if entitylib.isVulnerable(v, entitysettings.Forcefield) then
+				local sortMag = distanceSort and (v[entitysettings.Part].Position - originPos).Magnitude or screenMag
 				table.insert(sortingTable, {
 					Entity = v,
-					Magnitude = v.Target and -1 or mag
+					Magnitude = v.Target and -1 or sortMag
 				})
 			end
 		end

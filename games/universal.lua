@@ -59,9 +59,12 @@ local assetfunction = getcustomasset
 local vape = shared.vape
 local tween = vape.Libraries.tween
 local targetinfo = vape.Libraries.targetinfo
+local entitylib
 local TARGET_MARK_DURATION = 2.5
 local function markCombatTarget(ent, duration)
-	if ent and targetinfo and targetinfo.Targets then
+	if not ent or not targetinfo then return end
+	targetinfo.CombatTarget = ent
+	if targetinfo.Targets then
 		targetinfo.Targets[ent] = tick() + (duration or TARGET_MARK_DURATION)
 	end
 end
@@ -73,7 +76,7 @@ local function getEntityRenderColor(ent, fallbackColor)
 			return Color3.fromHSV(color.Hue, color.Sat, color.Value)
 		end
 	end
-	return entitylib.getEntityColor(ent) or fallbackColor
+	return (entitylib and entitylib.getEntityColor and entitylib.getEntityColor(ent)) or fallbackColor
 end
 local getfontsize = vape.Libraries.getfontsize
 local getcustomasset = vape.Libraries.getcustomasset
@@ -205,7 +208,7 @@ vape:Clean(lplr.OnTeleport:Connect(function()
 	end
 end))
 
-local frictionTable, oldfrict, entitylib = {}, {}
+local frictionTable, oldfrict = {}
 local function updateVelocity()
 	if getTableSize(frictionTable) > 0 then
 		if entitylib.isAlive then
@@ -1667,6 +1670,7 @@ run(function()
 	local SilentAim
 	local Target
 	local Mode
+	local MouseSort
 	local Method
 	local MethodRay
 	local IgnoredScripts
@@ -1765,7 +1769,7 @@ run(function()
 	local rayParams = RaycastParams.new()
 	local rayParams2 = OverlapParams.new()
 	local bulletTracerActive = {}
-	local bulletTracerPending = setmetatable({}, {__mode = 'k'})
+	local bulletTracerPending = nil
 	local healthCache = setmetatable({}, {__mode = 'k'})
 	local resolverCache = setmetatable({}, {__mode = 'k'})
 	local silentAimHookBusy = false
@@ -1804,16 +1808,58 @@ run(function()
 		return ok and result or nil
 	end
 
-	local function getAutoFireEntity(effectiveOriginCF)
-		return entitylib.EntityPosition({
-			Range = Range.Value,
+	local function getAutoFireOriginCF()
+		return AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
+	end
+
+	local function buildCombatQuery(origin, part, opts)
+		opts = opts or {}
+		local range = opts.range or Range.Value
+		local rangePosition, attackCheck, wallbang
+		if opts.prisonOpts then
+			if opts.prisonOpts.rangeLimit then
+				range = Mode.Value == 'Position' and math.min(Range.Value, opts.prisonOpts.rangeLimit) or Range.Value
+				rangePosition = opts.prisonOpts.rangeLimit
+			end
+			attackCheck = opts.prisonOpts.attackCheck
+			if Wallbang.Enabled and entitylib.isAlive then
+				wallbang = entitylib.character.RootPart.Position
+			end
+		end
+		local settings = {
+			Range = range,
+			RangePosition = rangePosition,
+			AttackCheck = attackCheck,
 			Wallcheck = Target.Walls.Enabled and vape.Libraries.getVisualizerWallcheckIgnores() or nil,
-			Part = 'Head',
-			Origin = (effectiveOriginCF * fireoffset).Position,
+			Wallbang = wallbang,
+			Part = part or 'Head',
+			Origin = origin,
 			Players = Target.Players.Enabled,
 			NPCs = Target.NPCs.Enabled,
 			Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
-		})
+		}
+		if Mode.Value == 'Mouse' and MouseSort and MouseSort.Value == 'Distance' then
+			settings.MouseDistanceSort = true
+		end
+		return settings
+	end
+
+	local function queryCombatTarget(origin, opts)
+		opts = opts or {}
+		return entitylib['Entity'..Mode.Value](buildCombatQuery(origin, opts.part, opts))
+	end
+
+	local function getAutoFireEntity()
+		local originCF = getAutoFireOriginCF()
+		local origin = (originCF * fireoffset).Position
+		return queryCombatTarget(origin, {part = 'Head'})
+	end
+
+	local function getCombatQueryOrigin()
+		if Mode.Value == 'Mouse' then
+			return (getAutoFireOriginCF() * fireoffset).Position
+		end
+		return entitylib.isAlive and entitylib.character.RootPart.Position or gameCamera.CFrame.Position
 	end
 
 	local RESOLVER_HISTORY = 8
@@ -2279,6 +2325,7 @@ run(function()
 
 	local function resetTracerTracking()
 		clearBulletTracers()
+		bulletTracerPending = nil
 		healthCache = setmetatable({}, {__mode = 'k'})
 	end
 
@@ -2287,20 +2334,15 @@ run(function()
 		local wantsSounds = HitSounds and HitSounds.Enabled
 		if not wantsTracers and not wantsSounds then return end
 		if not (ent and targetPart and origin) then return end
+		if targetinfo and targetinfo.CombatTarget and targetinfo.CombatTarget ~= ent then return end
 		local tracerOrigin = vape.Libraries.cachedVisualizerTracerOrigin or origin
-		local existing = bulletTracerPending[ent]
-		if existing then
-			if tick() - (existing.Time or 0) < 0.05 then
-				existing.TargetPosition = targetPart.Position
-				return
-			end
-			existing.Health = math.max(existing.Health or ent.Health, ent.Health)
-			existing.Origin = tracerOrigin
-			existing.TargetPosition = targetPart.Position
-			existing.Time = tick()
+		if bulletTracerPending and bulletTracerPending.Entity == ent and tick() - (bulletTracerPending.Time or 0) < 0.05 then
+			bulletTracerPending.TargetPosition = targetPart.Position
+			bulletTracerPending.Origin = tracerOrigin
+			bulletTracerPending.Time = tick()
 			return
 		end
-		bulletTracerPending[ent] = {
+		bulletTracerPending = {
 			Entity = ent,
 			Health = ent.Health,
 			Origin = tracerOrigin,
@@ -2362,52 +2404,57 @@ run(function()
 		local wantsSound = HitSounds and HitSounds.Enabled
 		if not wantsTracer and not wantsSound then return end
 
-		for _, ent in entitylib.List do
-			local currentHealth = ent.Health
-			local lastHealth = healthCache[ent] or currentHealth
-			local pending = bulletTracerPending[ent]
-			if pending and ((now - pending.Time) > 5 or not ent.Character) then
-				bulletTracerPending[ent] = nil
-				pending = nil
-			end
-			if pending and currentHealth < lastHealth and currentHealth < pending.Health then
-				local didShootRecently = isMb1Held or (now - lastMb1Click) <= TracerClickWindow
-				if not didShootRecently then
-					pending.Health = math.max(currentHealth, 0)
-					healthCache[ent] = currentHealth
-					continue
-				end
-
-				local allowHit = true
-				if Target.Walls.Enabled then
-					local wallIgnores = {lplr.Character, gameCamera}
-					for _, model in vape.Libraries.visualizerModels do
-						if model and model.Parent then
-							table.insert(wallIgnores, model)
-						end
-					end
-					BulletTracerWallcheck.FilterDescendantsInstances = wallIgnores
-					local ray = workspace:Raycast(pending.Origin, pending.TargetPosition - pending.Origin, BulletTracerWallcheck)
-					allowHit = ray == nil or (ray.Instance and ray.Instance:IsDescendantOf(ent.Character))
-				end
-				if allowHit then
-					if wantsTracer then
-						spawnBulletTracer(ent, pending, now, getTracerColors())
-					end
-					if wantsSound then
-						playHitSound()
-					end
-				end
-				pending.Health = math.max(currentHealth, 0)
-				local cachedOrigin = vape.Libraries.cachedVisualizerTracerOrigin
-				if cachedOrigin then
-					pending.Origin = cachedOrigin
-				end
-				pending.TargetPosition = (ent.Head or ent.RootPart).Position
-				pending.Time = now
-			end
-			healthCache[ent] = currentHealth
+		local pending = bulletTracerPending
+		if not pending then return end
+		local ent = pending.Entity
+		if not ent or not ent.Character then
+			bulletTracerPending = nil
+			return
 		end
+		if (now - pending.Time) > 5 then
+			bulletTracerPending = nil
+			return
+		end
+
+		local currentHealth = ent.Health
+		local lastHealth = healthCache[ent] or currentHealth
+		if currentHealth < lastHealth and currentHealth < pending.Health then
+			local didShootRecently = isMb1Held or (now - lastMb1Click) <= TracerClickWindow
+			if not didShootRecently then
+				pending.Health = math.max(currentHealth, 0)
+				healthCache[ent] = currentHealth
+				return
+			end
+
+			local allowHit = true
+			if Target.Walls.Enabled then
+				local wallIgnores = {lplr.Character, gameCamera}
+				for _, model in vape.Libraries.visualizerModels do
+					if model and model.Parent then
+						table.insert(wallIgnores, model)
+					end
+				end
+				BulletTracerWallcheck.FilterDescendantsInstances = wallIgnores
+				local ray = workspace:Raycast(pending.Origin, pending.TargetPosition - pending.Origin, BulletTracerWallcheck)
+				allowHit = ray == nil or (ray.Instance and ray.Instance:IsDescendantOf(ent.Character))
+			end
+			if allowHit then
+				if wantsTracer then
+					spawnBulletTracer(ent, pending, now, getTracerColors())
+				end
+				if wantsSound then
+					playHitSound()
+				end
+			end
+			pending.Health = math.max(currentHealth, 0)
+			local cachedOrigin = vape.Libraries.cachedVisualizerTracerOrigin
+			if cachedOrigin then
+				pending.Origin = cachedOrigin
+			end
+			pending.TargetPosition = (ent.Head or ent.RootPart).Position
+			pending.Time = now
+		end
+		healthCache[ent] = currentHealth
 	end
 
 	local function renderBulletTracers()
@@ -2430,18 +2477,16 @@ run(function()
 
 	local function firePrisonTracers(shootOrigin, targetPosition, ent)
 		lastMb1Click = tick()
+		if not ent then return end
+		markCombatTarget(ent)
 		local tracerOrigin = getLocalTracerOrigin()
 		local prison = vape.Libraries.prisonlife
 		local legitTracers = vape.Legit and vape.Legit.Modules and vape.Legit.Modules.BulletTracers
 		if legitTracers and legitTracers.Enabled and prison and prison.fireTracers then
 			prison.fireTracers(tracerOrigin, targetPosition)
 		end
-		if BulletTracers and BulletTracers.Enabled and ent then
-			local mainColor, glowColor = getTracerColors()
-			spawnBulletTracer(ent, {
-				Origin = tracerOrigin,
-				TargetPosition = targetPosition,
-			}, tick(), mainColor, glowColor)
+		if BulletTracers and BulletTracers.Enabled then
+			registerShot(ent, ent.Head or ent.RootPart, tracerOrigin)
 		end
 	end
 
@@ -2464,37 +2509,14 @@ run(function()
 		origin = resolvedPos
 		if rand.NextNumber(rand, 0, 100) > (AutoFire.Enabled and 100 or HitChance.Value) then return end
 		local targetPart = (rand.NextNumber(rand, 0, 100) < (AutoFire.Enabled and 100 or HeadshotChance.Value)) and 'Head' or 'RootPart'
-		local range = Range.Value
-		local rangePosition, attackCheck, wallbang
-		if prisonOpts then
-			if prisonOpts.rangeLimit then
-				range = Mode.Value == 'Position' and math.min(Range.Value, prisonOpts.rangeLimit) or Range.Value
-				rangePosition = prisonOpts.rangeLimit
-			end
-			attackCheck = prisonOpts.attackCheck
-			if Wallbang.Enabled and entitylib.isAlive then
-				wallbang = entitylib.character.RootPart.Position
-			end
-		end
-		local ent = entitylib['Entity'..Mode.Value]({
-			Range = range,
-			RangePosition = rangePosition,
-			AttackCheck = attackCheck,
-			Wallcheck = Target.Walls.Enabled and vape.Libraries.getVisualizerWallcheckIgnores() or nil,
-			Wallbang = wallbang,
-			Part = targetPart,
-			Origin = origin,
-			Players = Target.Players.Enabled,
-			NPCs = Target.NPCs.Enabled,
-			Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
-		})
+		local ent = queryCombatTarget(origin, {part = targetPart, prisonOpts = prisonOpts})
 
 		if ent then
 			local part = ent[targetPart]
+			markCombatTarget(ent)
 			if isMb1Held or (tick() - lastMb1Click) <= TracerClickWindow then
 				registerShot(ent, part, origin)
 			end
-			markCombatTarget(ent)
 			local aimPos = getAimPosition(ent, part, origin)
 			origin = applyManipulationOrigin(origin, aimPos, ent.Character)
 			if Projectile.Enabled then
@@ -2619,7 +2641,7 @@ run(function()
 		local now = tick()
 		if (now - lastManipPreviewTime) < MANIP_CACHE_TTL then return end
 		lastManipPreviewTime = now
-		local ent = lastAutoFireEnt
+		local ent = queryCombatTarget(getCombatQueryOrigin(), {part = 'Head'})
 		if not ent or not ent.Character then return end
 		local bodyPos = entitylib.character and entitylib.character.RootPart and entitylib.character.RootPart.Position
 		local aimPart = ent.Head or ent.RootPart
@@ -2837,7 +2859,18 @@ run(function()
 						renderBulletTracers()
 					end
 					
-					local ent
+					local previousTarget = targetinfo and targetinfo.CombatTarget
+					local ent = queryCombatTarget(getCombatQueryOrigin(), {part = 'Head'})
+					if ent then
+						if previousTarget and previousTarget ~= ent then
+							bulletTracerPending = nil
+						end
+						markCombatTarget(ent)
+					elseif targetinfo then
+						targetinfo.CombatTarget = nil
+						bulletTracerPending = nil
+					end
+
 					if AutoFire.Enabled then
 						if game.PlaceId == 155615604 and vape.Libraries.prisonlife and pl.Shoot then
 							local gundata = getPrisonGunData()
@@ -2845,41 +2878,36 @@ run(function()
 							if gundata and tool and (tool:GetAttribute('Local_CurrentAmmo') or 0) > 0 and not tool:GetAttribute('Local_IsShooting') then
 								local limit = gundata.Range or 1000
 								local taser = gundata.Behavior == 'Taser'
-								ent = entitylib.EntityPosition({
-									Range = Range.Value,
-									RangePosition = limit,
-									AttackCheck = not taser,
-									Wallcheck = Target.Walls.Enabled and true or nil,
-									Wallbang = Wallbang.Enabled and entitylib.isAlive and entitylib.character.RootPart.Position or nil,
-									Part = 'Head',
-									Origin = entitylib.isAlive and entitylib.character.Head.Position or Vector3.zero,
-									Players = Target.Players.Enabled,
-									NPCs = Target.NPCs.Enabled
+								ent = queryCombatTarget(entitylib.isAlive and entitylib.character.Head.Position or Vector3.zero, {
+									part = 'Head',
+									prisonOpts = {
+										rangeLimit = limit,
+										attackCheck = not taser
+									}
 								})
 
 								if ent and entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
 									if not (taser and ent.Character:GetAttribute('Tased')) then
 										markCombatTarget(ent)
-										registerShot(ent, ent.Head or ent.RootPart, entitylib.character.Head.Position)
 										if delayCheck < tick() then
 											delayCheck = tick() + (gundata.FireRate or AutoFireShootDelay.Value)
 											local shootOrigin = entitylib.character.Head.Position
+											registerShot(ent, ent.Head or ent.RootPart, shootOrigin)
 											local obj = {UserInputState = Enum.UserInputState.Begin, UserInputType = Enum.UserInputType.MouseButton1, Position = Vector3.zero}
 											task.spawn(pl.Shoot, obj)
 											obj.UserInputState = Enum.UserInputState.End
+											lastMb1Click = tick()
 											firePrisonTracers(shootOrigin, ent.Head.Position, ent)
 										end
 									end
 								end
 							end
 						else
-						local origin = AutoFireMode.Value == 'Camera' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
-						ent = getAutoFireEntity(origin)
+						ent = getAutoFireEntity()
 						lastAutoFireEnt = ent
 						
 						if ent then
 							markCombatTarget(ent)
-							registerShot(ent, ent.Head or ent.RootPart, (origin * fireoffset).Position)
 						else
 							lastAutoFireEnt = nil
 						end
@@ -2893,6 +2921,7 @@ run(function()
 									else
 										mouse1press()
 										lastMb1Click = tick()
+										registerShot(ent, ent.Head or ent.RootPart, (getAutoFireOriginCF() * fireoffset).Position)
 									end
 									mouseClicked = not mouseClicked
 								end
@@ -2906,22 +2935,8 @@ run(function()
 						end
 					end
 					
-					if not ent and AutoStop and AutoStop.Enabled then
-						local origin = Mode.Value == 'Mouse' and gameCamera.CFrame or entitylib.isAlive and entitylib.character.RootPart.CFrame or CFrame.identity
-						ent = entitylib['Entity'..Mode.Value]({
-							Range = Range.Value,
-							Wallcheck = Target.Walls.Enabled and vape.Libraries.getVisualizerWallcheckIgnores() or nil,
-							Part = 'Head',
-							Origin = origin.Position,
-							Players = Target.Players.Enabled,
-							NPCs = Target.NPCs.Enabled,
-							Forcefield = (Target.Forcefield and Target.Forcefield.Enabled) or false
-						})
-					end
-
 					if AutoStop and AutoStop.Enabled then
 						if ent and entitylib.isAlive then
-							markCombatTarget(ent)
 							local char = entitylib.character.Character
 							local hum = char and char:FindFirstChildOfClass("Humanoid")
 							if hum then
@@ -2956,6 +2971,10 @@ run(function()
 			else
 				isMb1Held = false
 				clearBulletTracers()
+				bulletTracerPending = nil
+				if targetinfo then
+					targetinfo.CombatTarget = nil
+				end
 				resolverCache = setmetatable({}, {__mode = 'k'})
 				manipCache.key = ''
 				manipCache.info = nil
@@ -3006,9 +3025,22 @@ run(function()
 			if CircleObject then
 				CircleObject.Visible = SilentAim.Enabled and val == 'Mouse'
 			end
+			if MouseSort then
+				MouseSort.Object.Visible = val == 'Mouse'
+			end
 		end,
 		Tooltip = 'Mouse - Checks for entities near the mouses position\nPosition - Checks for entities near the local character'
 	})
+	MouseSort = SilentAim:CreateDropdown({
+		Name = 'Mouse Priority',
+		List = {'Crosshair', 'Distance'},
+		Darker = true,
+		Visible = false,
+		Tooltip = 'Crosshair - Closest to mouse on screen\nDistance - Closest world distance within FOV'
+	})
+	if Mode.Value == 'Mouse' then
+		MouseSort.Object.Visible = true
+	end
 	Method = SilentAim:CreateDropdown({
 		Name = 'Method',
 		List = {'FindPartOnRay', 'FindPartOnRayWithIgnoreList', 'FindPartOnRayWithWhitelist', 'ScreenPointToRay', 'ViewportPointToRay', 'Raycast', 'Ray'},
