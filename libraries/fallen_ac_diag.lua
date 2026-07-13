@@ -265,7 +265,7 @@ function Diag.write(report)
 	pcall(function()
 		writefile(folder .. '/' .. stamp .. '.json', game:GetService('HttpService'):JSONEncode(report))
 	end)
-	print('[FallenACDiag]\n' .. text)
+	print('[FallenACDiag] wrote ' .. folder .. '/latest.txt (' .. #text .. ' bytes)')
 	return folder .. '/latest.txt'
 end
 
