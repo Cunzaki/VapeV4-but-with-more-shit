@@ -107,13 +107,28 @@ local deadMeta = {
 }
 
 local function neutralizeRemotesBanTable()
+	local remotesInst = ReplicatedStorage:FindFirstChild('Remotes')
 	local hooked = false
 	for _, tbl in getgc(true) do
-		if type(tbl) == 'table' then
-			local first = rawget(tbl, 1)
-			if typeof(first) == 'Instance' and first.Name == 'Remotes' then
+		if type(tbl) ~= 'table' then
+			-- skip
+		else
+			local remotesIndex
+			if remotesInst then
 				for i = 1, 32 do
-					if i ~= 1 then
+					if rawget(tbl, i) == remotesInst then
+						remotesIndex = i
+						break
+					end
+				end
+			end
+			local first = rawget(tbl, 1)
+			if not remotesIndex and typeof(first) == 'Instance' and first.Name == 'Remotes' then
+				remotesIndex = 1
+			end
+			if remotesIndex then
+				for i = 1, 32 do
+					if i ~= remotesIndex then
 						local banTable = rawget(tbl, i)
 						if type(banTable) == 'table' and banTable ~= tbl then
 							pcall(setmetatable, banTable, deadMeta)
@@ -218,6 +233,59 @@ local function scanRecursiveBypass()
 	return hooked > 0, hooked
 end
 
+local function waitForAcInit(character, timeout)
+	timeout = timeout or 25
+	if not (Diag and Diag.hasBanTargets) then
+		task.wait(math.min(timeout, 3))
+		return
+	end
+	local hum = character and character:FindFirstChildOfClass('Humanoid')
+	local deadline = tick() + timeout
+	pcall(function()
+		ReplicatedStorage:WaitForChild('Remotes', 10)
+	end)
+	while tick() < deadline do
+		if Diag.hasBanTargets(character, hum) then
+			log('AC ban tables visible in GC')
+			return
+		end
+		local r = character and (character:FindFirstChild('InventoryController') or character:FindFirstChild('StateController'))
+		if r then
+			task.wait(0.5)
+		else
+			task.wait(0.25)
+		end
+	end
+	log('AC ban tables not in GC yet — continuing with B3 only; background poll active')
+end
+
+local function startBackgroundStrictPass(player)
+	task.spawn(function()
+		local deadline = tick() + 120
+		while tick() < deadline do
+			task.wait(3)
+			if status.Strict then break end
+			local char = player.Character
+			local hum = char and char:FindFirstChildOfClass('Humanoid')
+			if char and hum then
+				local wasStrict = status.Strict
+				runBypassPass(char)
+				if status.Bypass1 or status.Bypass2 or not wasStrict then
+					runDiagnostics(char)
+				end
+				if status.Strict then
+					log('strict bypass complete (B1+B2+B3)')
+					local vape = shared.vape
+					if vape and vape.CreateNotification then
+						vape:CreateNotification('Fallen Bypass', 'Full bypass active (B1+B2+B3)', 8, 'info')
+					end
+					break
+				end
+			end
+		end
+	end)
+end
+
 local function runDiagnostics(character)
 	if not Diag then return end
 	local ok, path = pcall(Diag.run, character, status)
@@ -313,9 +381,16 @@ if not character then
 	return false
 end
 
-local maxWait = status.IsFallen and 90 or 20
+local maxWait = status.IsFallen and 30 or 20
+if status.IsFallen then
+	waitForAcInit(character, 25)
+end
 log('scanning gc (up to ' .. maxWait .. 's)...')
 local bypassed = runBypassWithRetry(character, maxWait)
+
+if status.IsFallen then
+	startBackgroundStrictPass(player)
+end
 
 if not bypassed and status.IsFallen then
 	local path = status.LastDiagPath or 'fallen_ac_dumps/latest.txt'
