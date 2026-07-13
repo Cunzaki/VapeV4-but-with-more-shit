@@ -378,95 +378,34 @@ local UnitDirections = {
 	Vector3.new(0, 1, -1).Unit, Vector3.new(0, -1, -1).Unit,
 }
 
-local manipOffsets = {
-	Vector3.new(0.5, 0, 0), Vector3.new(-0.5, 0, 0),
-	Vector3.new(0.5, 0.5, 0), Vector3.new(-0.5, 0.5, 0),
-	Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0),
-	Vector3.new(1, 0.5, 0), Vector3.new(-1, 0.5, 0),
-	Vector3.new(1, 1, 0), Vector3.new(-1, 1, 0),
-	Vector3.new(0, 0.5, 0),
-	Vector3.new(0, 1, 0),
-	Vector3.new(0, 1.5, 0),
-	Vector3.new(0, 0, -0.5),
-	Vector3.new(0, 0, -1),
-	Vector3.new(0, 1, -1), Vector3.new(0, 1, 1),
-	Vector3.new(0.5, 0, -1), Vector3.new(-0.5, 0, -1),
-	Vector3.new(1, 0, -1), Vector3.new(-1, 0, -1),
-	Vector3.new(1, 1, -1), Vector3.new(-1, 1, -1),
-	Vector3.new(1.5, 0, 0), Vector3.new(-1.5, 0, 0),
-	Vector3.new(1.5, 1, 0), Vector3.new(-1.5, 1, 0),
-	Vector3.new(1.5, 0, -1), Vector3.new(-1.5, 0, -1),
-	Vector3.new(0, 2, 0),
-	Vector3.new(0, 2, -1),
-	Vector3.new(0, 2, -2),
-	Vector3.new(1, 2, 0), Vector3.new(-1, 2, 0),
-	Vector3.new(2, 0, 0), Vector3.new(-2, 0, 0),
-	Vector3.new(2, 0.5, 0), Vector3.new(-2, 0.5, 0),
-	Vector3.new(2, 1, 0), Vector3.new(-2, 1, 0),
-	Vector3.new(2, 1.5, 0), Vector3.new(-2, 1.5, 0),
-	Vector3.new(2, 2, 0), Vector3.new(-2, 2, 0),
-	Vector3.new(2, 0, -1), Vector3.new(-2, 0, -1),
-	Vector3.new(2, 0, -2), Vector3.new(-2, 0, -2),
-	Vector3.new(2, 1, -2), Vector3.new(-2, 1, -2),
-	Vector3.new(0, 3, 0),
-	Vector3.new(0, 3, -1),
-	Vector3.new(0, 3, -2),
-	Vector3.new(1, 3, 0), Vector3.new(-1, 3, 0),
-	Vector3.new(2.5, 0, 0), Vector3.new(-2.5, 0, 0),
-	Vector3.new(2.5, 1, 0), Vector3.new(-2.5, 1, 0),
-	Vector3.new(2.5, 2, 0), Vector3.new(-2.5, 2, 0),
-	Vector3.new(3, 0, 0), Vector3.new(-3, 0, 0),
-	Vector3.new(3, 1, 0), Vector3.new(-3, 1, 0),
-	Vector3.new(3, 2, 0), Vector3.new(-3, 2, 0),
-	Vector3.new(3, 3, 0), Vector3.new(-3, 3, 0),
-	Vector3.new(0, 4, 0),
-	Vector3.new(0, 4, -1),
-	Vector3.new(0, 4, -2),
-	Vector3.new(0.2, 3.9, 0),
-	Vector3.new(3.5, 0, 0), Vector3.new(-3.5, 0, 0),
-	Vector3.new(3.5, 1, 0), Vector3.new(-3.5, 1, 0),
-	Vector3.new(3.5, 2, 0), Vector3.new(-3.5, 2, 0),
-	Vector3.new(4, 0, 0), Vector3.new(-4, 0, 0),
-	Vector3.new(4, 1, 0), Vector3.new(-4, 1, 0),
-	Vector3.new(4, 2, 0), Vector3.new(-4, 2, 0),
-	Vector3.new(2, 0, -3), Vector3.new(-2, 0, -3),
-	Vector3.new(3, 1.5, -3), Vector3.new(-3, 1.5, -3),
-	Vector3.new(0, 5, 0),
-	Vector3.new(1.8, 4.1, 1),
-	Vector3.new(2.1, 4.4, 1.1),
-	Vector3.new(5, 0, 0), Vector3.new(-5, 0, 0),
-	Vector3.new(0, 0, -5),
-	Vector3.new(3, 0, -5), Vector3.new(-3, 0, -5),
-	Vector3.new(4, 2, -5), Vector3.new(-4, 2, -5),
-	Vector3.new(5, 2, 0), Vector3.new(-5, 2, 0),
-	Vector3.new(5, 3, 0), Vector3.new(-5, 3, 0),
-	Vector3.new(0, 6, 0),
-	Vector3.new(0.15, 5.2, 0.1),
-	Vector3.new(-1.8, 5.4, -0.2),
-	Vector3.new(-2.3, 6.0, -0.4),
-	Vector3.new(0.1, 6.0, 0.0),
-	Vector3.new(6, 0, 0), Vector3.new(-6, 0, 0),
-	Vector3.new(6, 2, 0), Vector3.new(-6, 2, 0),
-	Vector3.new(7, 0, 0), Vector3.new(-7, 0, 0),
-	Vector3.new(7, 2, 0), Vector3.new(-7, 2, 0),
-	Vector3.new(3, 5, 0), Vector3.new(-3, 5, 0),
-	Vector3.new(5, 4, 0), Vector3.new(-5, 4, 0),
-	Vector3.new(0.1, 7.5, 0.0),
-	Vector3.new(0.1, 8.0, 0.0),
-	Vector3.new(0, 9, 0),
-	Vector3.new(8, 0, 0), Vector3.new(-8, 0, 0),
-	Vector3.new(8, 3, 0), Vector3.new(-8, 3, 0),
-	Vector3.new(10, 0, 0), Vector3.new(-10, 0, 0),
-	Vector3.new(10, 3, 0), Vector3.new(-10, 3, 0),
-	Vector3.new(4, 0, -8), Vector3.new(-4, 0, -8),
-	Vector3.new(6, 2, -8), Vector3.new(-6, 2, -8),
-	Vector3.new(0, 4, -8),
-	Vector3.new(0, 5, -10),
-	Vector3.new(4, 4, -10), Vector3.new(-4, 4, -10),
-	Vector3.new(0, 6, -12),
-	Vector3.new(2, 0, 4), Vector3.new(-2, 0, 4),
-	Vector3.new(0, 3, 5),
-}
+local function getSourceManipOffsets(camCF)
+	return {
+		camCF * CFrame.new(3, 0, 0),
+		camCF * CFrame.new(-3, 0, 0),
+		camCF * CFrame.new(-6, 0, 0),
+		camCF * CFrame.new(6, 0, 0),
+		camCF * CFrame.new(3, 2, 0),
+		camCF * CFrame.new(-3, 2, 0),
+		camCF * CFrame.new(-6, 2, 0),
+		camCF * CFrame.new(6, 2, 0),
+		camCF * CFrame.new(4, 0, 0),
+		camCF * CFrame.new(-4, 2, 0),
+		camCF * CFrame.new(-4, 0, 0),
+		camCF * CFrame.new(4, 2, 0),
+		camCF * CFrame.new(7, 0, 0),
+		camCF * CFrame.new(-7, 2, 0),
+		camCF * CFrame.new(-7, 0, 0),
+		camCF * CFrame.new(7, 2, 0),
+		camCF * CFrame.new(0.2, 3.9, 0),
+		camCF * CFrame.new(1.8, 4.1, 1),
+		camCF * CFrame.new(2.1, 4.4, 1.1),
+		camCF * CFrame.new(0.15, 5.2, 0.1),
+		camCF * CFrame.new(-1.8, 5.4, -0.2),
+		camCF * CFrame.new(-2.3, 6.35, -0.4),
+		camCF * CFrame.new(0.1, 7.5, 0),
+		camCF * CFrame.new(0.1, 8, 0),
+	}
+end
 
 local function IsCFrameVisible(fromCF, toCF, rayParams)
 	if not (fromCF and toCF) then
@@ -508,74 +447,14 @@ local function GetHitScanPos(originCF, targetPart, rayParams)
 	return nil
 end
 
-local function IsManipPathClear(origin, targetPart)
-	if not (origin and targetPart) then
-		return false
-	end
-	local to = targetPart.CFrame.Position
-	local dir = to - origin
-	local result = workspace:Raycast(origin, dir, RayParams)
-	if not result then
-		return true
-	end
-	local inst = result.Instance
-	return inst and inst:IsDescendantOf(targetPart.Parent) or false
-end
-
-local function IsAimPointReachable(origin, aimPoint, targetPart)
-	if not (origin and aimPoint) then
-		return false
-	end
-	local dir = aimPoint - origin
-	local result = workspace:Raycast(origin, dir, RayParams)
-	if not result then
-		return true
-	end
-	if targetPart then
-		local inst = result.Instance
-		if inst and inst:IsDescendantOf(targetPart.Parent) then
-			return true
-		end
-	end
-	return false
-end
-
-local function IsCandidateReachable(originPos, candidatePos)
-	if not (originPos and candidatePos) then
-		return false
-	end
-	local dir = candidatePos - originPos
-	if dir.Magnitude < 0.05 then
-		return true
-	end
-	local result = workspace:Raycast(originPos, dir, RayParams)
-	if not result then
-		return true
-	end
-	return false
-end
-
-local function FindVisiblePosition(Origin, Destination, AimPoint)
-	local o = (typeof(Origin) == 'CFrame') and Origin or CFrame.new(Origin)
-	local oPos = o.Position
+local function FindVisiblePosition(_Origin, Destination)
+	local camCF = camera.CFrame
 	local maxDist = flags.ManipulationDistance or 5
-	if AimPoint then
-		for i = 1, #manipOffsets do
-			local off = manipOffsets[i]
-			if off.Magnitude <= maxDist then
-				local pos = o * off
-				if IsCandidateReachable(oPos, pos) and IsManipPathClear(pos, Destination) and IsAimPointReachable(pos, AimPoint, Destination) then
-					return pos
-				end
-			end
-		end
-	end
-	for i = 1, #manipOffsets do
-		local off = manipOffsets[i]
-		if off.Magnitude <= maxDist then
-			local pos = o * off
-			if IsCandidateReachable(oPos, pos) and IsManipPathClear(pos, Destination) then
-				return pos
+	for _, offset in getSourceManipOffsets(camCF) do
+		local newOrigin = offset.Position
+		if (newOrigin - camCF.Position).Magnitude <= maxDist + 0.05 then
+			if IsPartVisibleFromCF(CFrame.new(newOrigin), Destination, RayParams) then
+				return newOrigin
 			end
 		end
 	end
@@ -899,8 +778,7 @@ vape:Clean(runService.Heartbeat:Connect(function()
 				local manipThrottle = bothOn and (1 / 30) or 0.05
 				if (now - (EntityData.LastManip or 0)) > manipThrottle then
 					EntityData.LastManip = now
-					local aimPoint = HitScanned and ScannedPosition or nil
-					local vp = FindVisiblePosition(StartCF, ClosestTarget, aimPoint)
+					local vp = FindVisiblePosition(StartCF, ClosestTarget)
 					if vp then
 						Manipulated = true
 						ManipulatedPart = ClosestTarget
@@ -1469,6 +1347,77 @@ run(function()
 		end))
 	end
 
+	-- source.lua fixed flashpoint slots; insulin.lua dynamic scan fallback
+	local function applyFlashpointStack(stacklevel, Stack, finalTarget, manipPos)
+		if not (stacklevel and Stack and finalTarget and debug.setstack) then
+			return false
+		end
+
+		local cameraStack = rawget(Stack, 45)
+		local flashStack = rawget(Stack, 51)
+		local hrpStack = rawget(Stack, 52)
+		if typeof(cameraStack) == 'CFrame' and typeof(flashStack) == 'Vector3' and typeof(hrpStack) == 'CFrame' then
+			local camPos = cameraStack.p
+			local fakeCam = CFrame.new(camPos, finalTarget)
+			local fakeHrp = CFrame.new(hrpStack.p, finalTarget)
+			local newFlash = CFrame.new(flashStack, finalTarget).p
+			if manipPos then
+				newFlash = CFrame.new(manipPos, finalTarget).p
+				fakeCam = CFrame.new(newFlash + (camPos - flashStack), finalTarget)
+				fakeHrp = CFrame.new(newFlash + (hrpStack.p - flashStack), finalTarget)
+			end
+			debug.setstack(stacklevel, 45, fakeCam)
+			debug.setstack(stacklevel, 54, finalTarget)
+			debug.setstack(stacklevel, 52, fakeHrp)
+			debug.setstack(stacklevel, 51, newFlash)
+			return true
+		end
+
+		local cameraIndex, hrpIndex, flashIndex, mouseIndex
+		local cameraValue, hrpValue, flashValue, mouseValue
+		for i = 1, 100 do
+			local v = rawget(Stack, i)
+			if not v then continue end
+			local t = typeof(v)
+			if t == 'CFrame' and not cameraValue then
+				local ok, p = pcall(function() return v.p end)
+				if ok and typeof(p) == 'Vector3' then
+					cameraValue, cameraIndex = v, i
+				end
+			elseif t == 'CFrame' and cameraValue and not hrpValue and v ~= cameraValue then
+				local ok, p = pcall(function() return v.p end)
+				if ok and typeof(p) == 'Vector3' then
+					hrpValue, hrpIndex = v, i
+				end
+			elseif t == 'Vector3' and not flashValue then
+				flashValue, flashIndex = v, i
+			elseif t == 'Vector3' and flashValue and v ~= flashValue and not mouseValue then
+				mouseValue, mouseIndex = v, i
+			end
+		end
+
+		if not (cameraValue and hrpValue and flashValue and mouseValue) then
+			return false
+		end
+
+		local camPos = cameraValue.p
+		local hrpPos = hrpValue.p
+		local newFlash = CFrame.new(flashValue, finalTarget).p
+		if manipPos then
+			cameraValue = CFrame.new(manipPos + (camPos - flashValue), finalTarget)
+			hrpValue = CFrame.new(manipPos + (hrpPos - flashValue), finalTarget)
+			newFlash = manipPos
+		else
+			cameraValue = CFrame.new(camPos, finalTarget)
+			hrpValue = CFrame.new(hrpPos, finalTarget)
+		end
+		debug.setstack(stacklevel, cameraIndex, cameraValue)
+		debug.setstack(stacklevel, hrpIndex, hrpValue)
+		debug.setstack(stacklevel, flashIndex, newFlash)
+		debug.setstack(stacklevel, mouseIndex, finalTarget)
+		return true
+	end
+
 	installCombatHooks = function()
 		if not VFXModule then
 			return
@@ -1519,10 +1468,10 @@ run(function()
 					FallenState.ShouldHit = (math.floor(Random.new():NextNumber(0, 1) * 100) / 100) <= ((flags.HitChance or 100) / 100)
 
 					local stacklevel = isvalidlevel(3) and 3 or (isvalidlevel(2) and 2)
-					if stacklevel and Targeting.TargetPart and debug.getstack and debug.setstack then
+					if stacklevel and Targeting.TargetPart and FallenState.ShouldHit and flags.Mode == 'Silent' and debug.getstack then
 						LastPredictionPos = nil
 						local startPos = Args[1].Position or Args[1].PositionFirst or camera.CFrame.Position
-						local targetPos = Targeting.ScannedPosition or (Targeting.TargetPart and Targeting.TargetPart.Position)
+						local targetPos = Targeting.ScannedPosition or Targeting.TargetPart.Position
 						local oldspeed = Args[1].Speed
 						local Gravity = Args[1].Gravity or 0
 						local G = Gravity * -196.2
@@ -1534,20 +1483,12 @@ run(function()
 							local root = char and (char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('Torso'))
 							local vel
 							if root then
-								local ok, v = pcall(function()
-									return root.AssemblyLinearVelocity
-								end)
-								if ok then
-									vel = v
-								end
+								local okVel, v = pcall(function() return root.AssemblyLinearVelocity end)
+								if okVel then vel = v end
 							end
 							if (not vel or vel.Magnitude < 0.05) and part then
-								local ok, v = pcall(function()
-									return part.AssemblyLinearVelocity
-								end)
-								if ok then
-									vel = v
-								end
+								local okVel, v = pcall(function() return part.AssemblyLinearVelocity end)
+								if okVel then vel = v end
 							end
 							if vel and vel.Magnitude < 500 and vel.Magnitude == vel.Magnitude then
 								targetVel = vel
@@ -1556,111 +1497,42 @@ run(function()
 
 						local pingComp = 0
 						do
-							local ok, ping = pcall(lplr.GetNetworkPing, lplr)
-							if ok and type(ping) == 'number' and ping == ping and ping < 1 then
+							local okPing, ping = pcall(lplr.GetNetworkPing, lplr)
+							if okPing and type(ping) == 'number' and ping == ping and ping < 1 then
 								pingComp = ping
 							end
 						end
 
-						local Drop = 0
-						local Lead = Vector3.zero
+						local Drop, Lead = 0, Vector3.zero
 						if oldspeed and oldspeed > 0 and targetPos then
 							local TimeToHit = (targetPos - startPos).Magnitude / oldspeed
 							for _ = 1, 6 do
 								Lead = targetVel * (TimeToHit + pingComp)
 								Drop = -0.5 * G * TimeToHit * TimeToHit
-								if tostring(Drop):find('nan') then
-									Drop = 0
-								end
+								if tostring(Drop):find('nan') then Drop = 0 end
 								local aimPoint = targetPos + Lead + Vector3.new(0, Drop, 0)
 								TimeToHit = (aimPoint - startPos).Magnitude / oldspeed
 							end
 						end
-						if tostring(Lead.X):find('nan') then
-							Lead = Vector3.zero
-						end
+						if tostring(Lead.X):find('nan') then Lead = Vector3.zero end
+
 						LastPredictionPos = Lead + Vector3.new(0, Drop, 0)
 						FallenState.LastPredictionPos = LastPredictionPos
 						FallenState.LastBulletSpeed = oldspeed
 						FallenState.LastBulletGravity = Gravity
 
+						local finalTarget = Targeting.ScannedPosition or Targeting.TargetPart.Position
+						if LastPredictionPos then
+							finalTarget = finalTarget + LastPredictionPos
+						end
+
 						pcall(function()
-							local Stack = debug.getstack(stacklevel)
-							local finalTarget = Targeting.ScannedPosition or Targeting.TargetPart.Position
-							if LastPredictionPos then
-								finalTarget = finalTarget + LastPredictionPos
-							end
-
-							-- Iridescent fixed stack slots (ViewmodelController level 3)
-							local CameraStack = rawget(Stack, 45)
-							local FlashpartStack = rawget(Stack, 51)
-							local HRPStack = rawget(Stack, 52)
-							local MouseHitStack = rawget(Stack, 54)
-
-							if typeof(CameraStack) == 'CFrame' and typeof(FlashpartStack) == 'Vector3' and typeof(HRPStack) == 'CFrame' and typeof(MouseHitStack) == 'Vector3' then
-								local HitPosition = finalTarget
-								local CameraPosition = CameraStack.Position
-								local FakeCameraCFrame = CFrame.new(CameraPosition, HitPosition)
-								local FakeHRPCFrame = CFrame.new(HRPStack.Position, HitPosition)
-								local NewFlashpartPosition = CFrame.new(FlashpartStack, HitPosition).Position
-
-								if ManipPos then
-									NewFlashpartPosition = CFrame.new(ManipPos, HitPosition).Position
-									local FlashpartOffsetCamera = CameraPosition - FlashpartStack
-									local FlashpartOffsetHRP = HRPStack.Position - FlashpartStack
-									FakeCameraCFrame = CFrame.new(NewFlashpartPosition + FlashpartOffsetCamera, HitPosition)
-									FakeHRPCFrame = CFrame.new(NewFlashpartPosition + FlashpartOffsetHRP, HitPosition)
-								end
-
-								debug.setstack(stacklevel, 45, FakeCameraCFrame)
-								debug.setstack(stacklevel, 54, HitPosition)
-								debug.setstack(stacklevel, 52, FakeHRPCFrame)
-								debug.setstack(stacklevel, 51, NewFlashpartPosition)
-								return
-							end
-
-							-- Fallback: dynamic scan if stack layout shifts
-							local CameraIndex, HRPIndex, FlashIndex, MouseIndex
-							local CameraValue, HRPValue, FlashValue, MouseValue
-							for i = 1, 100 do
-								local v = rawget(Stack, i)
-								if v then
-									local t = typeof(v)
-									if t == 'CFrame' and not CameraValue then
-										CameraValue = v
-										CameraIndex = i
-									elseif t == 'CFrame' and CameraValue and not HRPValue and v ~= CameraValue then
-										HRPValue = v
-										HRPIndex = i
-									elseif t == 'Vector3' and not FlashValue then
-										FlashValue = v
-										FlashIndex = i
-									elseif t == 'Vector3' and FlashValue and v ~= FlashValue and not MouseValue then
-										MouseValue = v
-										MouseIndex = i
-									end
-								end
-							end
-							if CameraValue and HRPValue and FlashValue and MouseValue then
-								local camPos = CameraValue.Position
-								local hrpPos = HRPValue.Position
-								local newFlash = CFrame.new(FlashValue, finalTarget).Position
-								if ManipPos then
-									local offC = camPos - FlashValue
-									local offH = hrpPos - FlashValue
-									CameraValue = CFrame.new(ManipPos + offC, finalTarget)
-									HRPValue = CFrame.new(ManipPos + offH, finalTarget)
-									newFlash = ManipPos
-								else
-									CameraValue = CFrame.new(camPos, finalTarget)
-									HRPValue = CFrame.new(hrpPos, finalTarget)
-								end
-								debug.setstack(stacklevel, CameraIndex, CameraValue)
-								debug.setstack(stacklevel, HRPIndex, HRPValue)
-								debug.setstack(stacklevel, FlashIndex, newFlash)
-								debug.setstack(stacklevel, MouseIndex, finalTarget)
-							end
+							applyFlashpointStack(stacklevel, debug.getstack(stacklevel), finalTarget, ManipPos)
 						end)
+					end
+
+					if flags.InstantBullet then
+						Args[1].Speed = 9e9
 					end
 
 					if Args[1].Terminate then
@@ -1676,11 +1548,11 @@ run(function()
 							end
 							local origin = Args[1].Position
 							local dir = (hit - origin).Unit
-							local cp = CFrame.lookAt(origin, hit).Position
+							local cp = CFrame.new(origin, hit).Position
 							if Targeting.ManipulatedPosition then
 								local mp = Targeting.ManipulatedPosition
 								dir = (hit - mp).Unit
-								cp = CFrame.lookAt(mp, hit).Position
+								cp = CFrame.new(mp, hit).Position
 							end
 							Args[1].Position = cp
 							if Args[1].PositionFirst then
@@ -1807,78 +1679,30 @@ run(function()
 		end
 	end
 
-	-- VMNetworkPointer discovery + fire rewrite
-	vape:Clean(runService.Heartbeat:Connect(function()
-		if FallenState.NetworkHooked or not (getgc and getconstants and getinfo and getupvalue and hookfunction) then
-			return
-		end
-		local hookedSet = FallenState._hookedClosures
-		if not hookedSet then
-			hookedSet = setmetatable({}, { __mode = 'k' })
-			FallenState._hookedClosures = hookedSet
-		end
-		for _, v in getgc(true) do
-			if type(v) == 'function' and (not islclosure or islclosure(v)) and not hookedSet[v] then
-				local ok, constants = pcall(getconstants, v)
-				if not ok or not constants then
-					continue
-				end
-				local infoOk, info = pcall(getinfo, v)
-				if infoOk and info and type(info.source) == 'string' and info.source:find('ViewmodelController') then
-					if constants[1] == 'Parent' and constants[2] == 'CFrame' then
-						hookedSet[v] = true
-						local network = getupvalue(v, 1)
-						if type(network) == 'function' then
-							FallenState.VMNetworkPointer = network
-							FallenState.NetworkHooked = true
-							local old
-							old = hookfunction(network, function(rt, remote, hash, ...)
-								local netArgs = { ... }
-								vape.Libraries.silentAimHookBusy = true
-								local ok, ret = pcall(function()
-								local args = netArgs
-								if hash == FIRE_HASH then
-									if rawlen(args) ~= 8 or not Targeting.TargetPart then
-										return old(rt, remote, hash, unpack(args))
-									end
-									local ServerTime, WeaponName, CameraCFrame, MuzzlePos, CharacterCFrame, Spread, OtherSpread, MouseRaycast =
-										unpack(args)
-									local targetPos = Targeting.ScannedPosition or Targeting.TargetPart.Position
-									if LastPredictionPos then
-										targetPos = targetPos + LastPredictionPos
-									end
-									local CharacterPos = CharacterCFrame.Position
-									local ManipPos = Targeting.ManipulatedPosition
-									if ManipPos then
-										CharacterPos = ManipPos
-									end
-									MouseRaycast = targetPos
-									local FlashWorld = CharacterCFrame:PointToWorldSpace(MuzzlePos)
-									local offset = CameraCFrame:PointToObjectSpace(FlashWorld)
-									CameraCFrame = CFrame.lookAt(CharacterPos, targetPos)
-									MuzzlePos = offset
-									local hawk = CFrame.lookAt(CharacterPos, targetPos)
-									local pitch, yaw = hawk:ToEulerAnglesYXZ()
-									CharacterCFrame = CFrame.new(CharacterPos) * CFrame.fromEulerAnglesYXZ(pitch, yaw, 0)
-									args = { ServerTime, WeaponName, CameraCFrame, MuzzlePos, CharacterCFrame, Spread, OtherSpread, MouseRaycast }
-								end
-								return old(rt, remote, hash, unpack(args))
-								end)
-								vape.Libraries.silentAimHookBusy = false
-								if ok then
-									return ret
-								end
-								return old(rt, remote, hash, unpack(netArgs))
-							end)
+	-- Discover VMNetwork for reload/auto features — no fire hook (source uses CreateProjectile only)
+	if not FallenState._vmNetworkScan then
+		FallenState._vmNetworkScan = true
+		vape:Clean(runService.Heartbeat:Connect(function()
+			if FallenState.VMNetworkPointer or not (getgc and getconstants and getinfo and getupvalue) then
+				return
+			end
+			for _, v in getgc(true) do
+				if type(v) == 'function' and (not islclosure or islclosure(v)) then
+					local okC, constants = pcall(getconstants, v)
+					local okI, info = pcall(getinfo, v)
+					if okC and okI and info and type(info.source) == 'string' and info.source:find('ViewmodelController') then
+						if constants[1] == 'Parent' and constants[2] == 'CFrame' then
+							local network = getupvalue(v, 1)
+							if type(network) == 'function' then
+								FallenState.VMNetworkPointer = network
+								break
+							end
 						end
 					end
 				end
 			end
-			if FallenState.NetworkHooked then
-				break
-			end
-		end
-	end))
+		end))
+	end
 end)
 
 ---------------------------------------------------------------------------
