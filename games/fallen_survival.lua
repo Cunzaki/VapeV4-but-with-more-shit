@@ -1478,9 +1478,10 @@ run(function()
 			FallenState.ProjectileHooked = true
 			local CreateProjectile = VFXModule.CreateProjectile
 			VFXModule.CreateProjectile = function(self, ...)
+				local allArgs = { ... }
 				vape.Libraries.silentAimHookBusy = true
 				local ok, result = pcall(function()
-				local Args = { ... }
+				local Args = { unpack(allArgs) }
 				local Traceback = ''
 				pcall(function()
 					Traceback = debug.traceback()
@@ -1714,7 +1715,7 @@ run(function()
 				if ok then
 					return result
 				end
-				return CreateProjectile(self, ...)
+				return CreateProjectile(self, unpack(allArgs))
 			end
 		end
 
@@ -1832,9 +1833,10 @@ run(function()
 							FallenState.NetworkHooked = true
 							local old
 							old = hookfunction(network, function(rt, remote, hash, ...)
+								local netArgs = { ... }
 								vape.Libraries.silentAimHookBusy = true
 								local ok, ret = pcall(function()
-								local args = { ... }
+								local args = netArgs
 								if hash == FIRE_HASH then
 									if rawlen(args) ~= 8 or not Targeting.TargetPart then
 										return old(rt, remote, hash, unpack(args))
@@ -1866,7 +1868,7 @@ run(function()
 								if ok then
 									return ret
 								end
-								return old(rt, remote, hash, ...)
+								return old(rt, remote, hash, unpack(netArgs))
 							end)
 						end
 					end
