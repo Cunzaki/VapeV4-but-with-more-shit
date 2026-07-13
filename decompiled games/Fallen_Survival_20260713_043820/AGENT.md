@@ -116,9 +116,20 @@ Most anticheat remotes use **obfuscated names** (binary garbage strings) — see
 | Timing | Required? |
 |--------|-----------|
 | **Before any cheat GUI / universal modules** | **YES** — Vape runs `fallen_bypass.lua` in `main.lua` first |
-| **On first spawn** | YES — bypass #2 needs `Character` + `Humanoid` in GC |
+| **After AssetContainer is required** | **YES** — `StateAssetController` calls `require(AssetContainer)()` ~line 58; ban tables do not exist in `getgc` before this |
+| **After `ReplicatedStorage.Remotes` exists** | YES |
+| **After character controllers clone** (`InventoryController` / `StateController` on character) | Recommended readiness signal |
 | **On every respawn** | YES — re-neutralize character ban tables |
-| **After AssetContainer loads** | YES — proto hooks retry until AC functions appear in `getgc` |
+
+**Common failure:** `Failed to load. 0x01` when bypass runs too early (before AssetContainer init). Fixed in v2 bypass with `waitForAnticheatInit()` + retry loops.
+
+### Offset probe (when AC updates again)
+
+```lua
+loadstring(readfile("tools/fallen_gc_probe.lua"), "fallen_gc_probe")()
+```
+
+Writes `fallen_gc_probe_<PlaceId>.json` with current GC table indices for Remotes + Character contexts.
 
 ### Bypass stages (implemented in `libraries/fallen_bypass.lua`)
 

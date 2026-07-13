@@ -1,7 +1,9 @@
 --[[
 	Fallen Survival anticheat bypass for Vape.
 	Must run before universal / GUI modules load.
-	Combines GC ban-table neutralization (bypas.txt) with AssetContainer proto hooks.
+
+	Stage 0x01 failed when this ran too early — AssetContainer must be required
+	(StateAssetController line ~58) before Remotes ban tables exist in getgc.
 ]]
 
 if getgenv().FallenBypassLoaded then
@@ -37,6 +39,13 @@ local islclosure_fn = islclosure or (debug and debug.islclosure)
 local isexecutorclosure_fn = isexecutorclosure or function() return false end
 local hookfunction_fn = hookfunction or replaceclosure
 local setrawmetatable_fn = setrawmetatable or setmetatable
+local DEBUG = getgenv().FallenBypassDebug == true
+
+local function debugLog(...)
+	if DEBUG then
+		warn('[FallenBypass]', ...)
+	end
+end
 
 if not (getinfo_fn and getprotos_fn and getproto_fn and getconstants_fn and hookfunction_fn) then
 	warn('[FallenBypass] Missing hook/debug APIs')
@@ -59,65 +68,166 @@ if not validateFallenGame() then
 	return false
 end
 
-local function runBanTableBypass(character, humanoid)
-	local bypassCheck1 = false
-	local bypassCheck2 = false
-
-	LPH_JIT_MAX(function()
-		for _, tbl in getgc(true) do
-			if type(tbl) ~= 'table' then continue end
-			if typeof(rawget(tbl, 1)) == 'Instance' and rawget(tbl, 1).Name == 'Remotes' then
-				local banTable = rawget(tbl, 4)
-				if type(banTable) == 'table' then
-					setmetatable(banTable, {
-						__index = function() end,
-						__newindex = function() end
-					})
-					bypassCheck1 = true
-				end
-			end
+local function tableLength(tbl)
+	if rawlen then
+		return rawlen(tbl)
+	end
+	local n = 0
+	for k in tbl do
+		if type(k) == 'number' and k > n then
+			n = k
 		end
-	end)()
+	end
+	return n
+end
 
-	if not bypassCheck1 then
-		Client:Kick('Failed to load. 0x01')
+local function neutralizeBanTable(tbl)
+	if type(tbl) ~= 'table' then
 		return false
 	end
-
-	LPH_JIT_MAX(function()
-		for _, tbl in getgc(true) do
-			if type(tbl) ~= 'table' then continue end
-			if rawget(tbl, 1) == character and rawget(tbl, 2) == humanoid and #tbl == 9 then
-				local banTable1 = rawget(tbl, 8)
-				local banTable2 = rawget(tbl, 5)
-				if type(banTable1) == 'table' then
-					setmetatable(banTable1, {
-						__index = function() end,
-						__newindex = function() end
-					})
-				end
-				if type(banTable2) == 'table' then
-					setmetatable(banTable2, {
-						__index = function() end,
-						__newindex = function() end
-					})
-				end
-				rawset(tbl, 5, nil)
-				bypassCheck2 = true
-			end
-		end
-	end)()
-
-	if not bypassCheck2 then
-		Client:Kick('Failed to load. 0x02')
-		return false
-	end
-
+	setmetatable(tbl, {
+		__index = function() end,
+		__newindex = function() end
+	})
 	return true
 end
 
+local function assetContainerInGc()
+	for _, func in getgc(false) do
+		if type(func) ~= 'function' then continue end
+		local info = getinfo_fn(func)
+		if info and info.source and info.source:find('AssetContainer') then
+			return true
+		end
+	end
+	return false
+end
+
+local function waitForAnticheatInit(maxWait)
+	local deadline = tick() + maxWait
+	local modules = ReplicatedStorage:WaitForChild('Modules', maxWait)
+	modules:WaitForChild('AssetContainer', maxWait)
+	local remotes = ReplicatedStorage:WaitForChild('Remotes', maxWait)
+	if not remotes then
+		return nil
+	end
+
+	local character = Client.Character or Client.CharacterAdded:Wait()
+	character:WaitForChild('Humanoid', maxWait)
+	character:WaitForChild('HumanoidRootPart', maxWait)
+
+	while tick() < deadline do
+		if character:FindFirstChild('InventoryController') or character:FindFirstChild('StateController') then
+			debugLog('character controllers ready')
+			return remotes
+		end
+		if assetContainerInGc() then
+			debugLog('AssetContainer closures in gc')
+			return remotes
+		end
+		task.wait(0.2)
+	end
+
+	return remotes
+end
+
+local REMOTES_BAN_OFFSETS = {4, 3, 5, 6, 2, 7, 8}
+local CHARACTER_BAN_OFFSETS = {5, 8, 3, 4, 6, 7, 9, 10}
+local CHARACTER_TABLE_LENGTHS = {9, 8, 10, 11, 12, 7}
+
+local function findRemotesContextTable(remotesFolder)
+	for _, tbl in getgc(true) do
+		if type(tbl) ~= 'table' then continue end
+
+		local remotesIndex
+		for i = 1, 24 do
+			if rawget(tbl, i) == remotesFolder then
+				remotesIndex = i
+				break
+			end
+		end
+
+		if remotesIndex then
+			return tbl, remotesIndex
+		end
+
+		local first = rawget(tbl, 1)
+		if typeof(first) == 'Instance' and first == remotesFolder then
+			return tbl, 1
+		end
+		if typeof(first) == 'Instance' and first.Name == 'Remotes' and first:IsA('Folder') then
+			return tbl, 1
+		end
+	end
+	return nil
+end
+
+local function bypassRemotesBanTable(remotesFolder)
+	local context, remotesIndex = findRemotesContextTable(remotesFolder)
+	if not context then
+		return false
+	end
+
+	debugLog('remotes context at index', remotesIndex)
+
+	for _, offset in REMOTES_BAN_OFFSETS do
+		local banTable = rawget(context, offset)
+		if type(banTable) == 'table' and banTable ~= context and neutralizeBanTable(banTable) then
+			debugLog('neutralized remotes ban table at offset', offset)
+			return true
+		end
+	end
+
+	for i = 1, 24 do
+		if i == remotesIndex then continue end
+		local banTable = rawget(context, i)
+		if type(banTable) == 'table' and banTable ~= context and neutralizeBanTable(banTable) then
+			debugLog('neutralized remotes ban table at scanned offset', i)
+			return true
+		end
+	end
+
+	return false
+end
+
+local function bypassCharacterBanTables(character, humanoid)
+	local matched = false
+
+	for _, tbl in getgc(true) do
+		if type(tbl) ~= 'table' then continue end
+		if rawget(tbl, 1) ~= character or rawget(tbl, 2) ~= humanoid then continue end
+
+		local len = tableLength(tbl)
+		local validLen = false
+		for _, checkLen in CHARACTER_TABLE_LENGTHS do
+			if len == checkLen then
+				validLen = true
+				break
+			end
+		end
+		if not validLen and (len < 7 or len > 14) then
+			continue
+		end
+
+		debugLog('character context table len', len)
+
+		for _, offset in CHARACTER_BAN_OFFSETS do
+			local banTable = rawget(tbl, offset)
+			if type(banTable) == 'table' and neutralizeBanTable(banTable) then
+				debugLog('neutralized character ban table at offset', offset)
+				matched = true
+			end
+		end
+
+		rawset(tbl, 5, nil)
+		matched = true
+	end
+
+	return matched
+end
+
 local function runRecursiveTableBypass()
-	local success, err = pcall(function()
+	local ok, bypassed = pcall(function()
 		local function protectRecursiveTable(recursiveTbl, banIndexValue)
 			setrawmetatable_fn(recursiveTbl, {
 				__newindex = function(self, index, value)
@@ -126,10 +236,10 @@ local function runRecursiveTableBypass()
 						local id1 = rawget(value, 1)
 						local id2 = rawget(value, 2)
 						local id4 = rawget(value, 4)
-						local len = rawlen and rawlen(value) or #value
+						local len = rawlen and rawlen(value) or tableLength(value)
 
 						if id1 then
-							if type(id1) == 'table' and len == 2 and rawlen(id1) == 1 and not rawget(id1, 'n') then
+							if type(id1) == 'table' and len == 2 and rawlen and rawlen(id1) == 1 and not rawget(id1, 'n') then
 								local insideVal = rawget(id1, 1)
 								local outsideVal = rawget(value, 2)
 								if insideVal and outsideVal and tonumber(insideVal) and tonumber(outsideVal) then
@@ -178,18 +288,14 @@ local function runRecursiveTableBypass()
 			end
 		end)()
 
-		if not bypassed then
-			Client:Kick('Failed to load. 0x03')
-			return false
-		end
-		return true
+		return bypassed
 	end)
 
-	if not success then
-		Client:Kick(tostring(err))
+	if not ok then
+		debugLog('recursive bypass error', bypassed)
 		return false
 	end
-	return true
+	return bypassed == true
 end
 
 local function hookAssetContainerProtos()
@@ -273,26 +379,55 @@ local function hookAssetContainerProtos()
 	return hooked > 0
 end
 
+local function retryUntil(timeout, interval, fn)
+	local deadline = tick() + timeout
+	repeat
+		if fn() then
+			return true
+		end
+		task.wait(interval)
+	until tick() >= deadline
+	return false
+end
+
 local function runBypassForCharacter(character)
-	local humanoid = character:FindFirstChildOfClass('Humanoid') or character:WaitForChild('Humanoid', 15)
-	local root = character:FindFirstChild('HumanoidRootPart') or character:WaitForChild('HumanoidRootPart', 15)
+	local humanoid = character:FindFirstChildOfClass('Humanoid') or character:WaitForChild('Humanoid', 20)
+	local root = character:FindFirstChild('HumanoidRootPart') or character:WaitForChild('HumanoidRootPart', 20)
 	if not humanoid or not root then
 		warn('[FallenBypass] Character not ready')
 		return false
 	end
 
-	if not runBanTableBypass(character, humanoid) then
-		return false
-	end
-	if not runRecursiveTableBypass() then
+	local remotesFolder = waitForAnticheatInit(45)
+	if not remotesFolder then
+		Client:Kick('Failed to load. 0x00')
 		return false
 	end
 
-	task.defer(function()
-		for _ = 1, 8 do
-			if hookAssetContainerProtos() then break end
-			task.wait(0.35)
-		end
+	local stage1 = retryUntil(25, 0.25, function()
+		return bypassRemotesBanTable(remotesFolder)
+	end)
+	if not stage1 then
+		Client:Kick('Failed to load. 0x01')
+		return false
+	end
+
+	local stage2 = retryUntil(20, 0.25, function()
+		return bypassCharacterBanTables(character, humanoid)
+	end)
+	if not stage2 then
+		Client:Kick('Failed to load. 0x02')
+		return false
+	end
+
+	local stage3 = retryUntil(15, 0.25, runRecursiveTableBypass)
+	if not stage3 then
+		Client:Kick('Failed to load. 0x03')
+		return false
+	end
+
+	task.spawn(function()
+		retryUntil(20, 0.35, hookAssetContainerProtos)
 	end)
 
 	return true
@@ -307,13 +442,10 @@ getgenv().FallenBypassLoaded = true
 shared.FallenBypassLoaded = true
 
 Client.CharacterAdded:Connect(function(newCharacter)
-	task.wait(0.25)
+	task.wait(0.5)
 	runBypassForCharacter(newCharacter)
-	task.defer(function()
-		for _ = 1, 6 do
-			if hookAssetContainerProtos() then break end
-			task.wait(0.35)
-		end
+	task.spawn(function()
+		retryUntil(15, 0.35, hookAssetContainerProtos)
 	end)
 end)
 
