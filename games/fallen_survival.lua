@@ -187,17 +187,52 @@ local function isTeam(player)
 	return clanTeamCache[player.UserId] and true or false
 end
 
+local function resolveCharacter(entity, object)
+	if object and object.Class == 'Player' then
+		local player = object.Player
+		if not player and typeof(entity) == 'Instance' and entity:IsA('Player') then
+			player = entity
+		end
+		return player and player.Character
+	end
+	if typeof(entity) == 'Instance' then
+		if entity:IsA('Player') then
+			return entity.Character
+		end
+		if entity:IsA('Model') then
+			return entity
+		end
+	end
+	return object and object.Character
+end
+
 local function getRoot(model)
 	if not model then
 		return nil
 	end
-	return model:FindFirstChild('HumanoidRootPart')
-		or model.PrimaryPart
-		or model:FindFirstChild('RootPart')
-		or model:FindFirstChild('Torso')
+	if model:IsA('Player') then
+		model = model.Character
+	end
+	if not model then
+		return nil
+	end
+	local hrp = model:FindFirstChild('HumanoidRootPart')
+	if hrp then
+		return hrp
+	end
+	if model:IsA('Model') and model.PrimaryPart then
+		return model.PrimaryPart
+	end
+	return model:FindFirstChild('RootPart') or model:FindFirstChild('Torso')
 end
 
 local function getTargetPart(model, desired)
+	if not model then
+		return nil
+	end
+	if model:IsA('Player') then
+		model = model.Character
+	end
 	if not model then
 		return nil
 	end
@@ -205,7 +240,7 @@ local function getTargetPart(model, desired)
 		or model:FindFirstChild('Head')
 		or model:FindFirstChild('UpperTorso')
 		or model:FindFirstChild('HumanoidRootPart')
-		or model.PrimaryPart
+		or (model:IsA('Model') and model.PrimaryPart)
 end
 
 local function getDistanceFromCenter(part)
@@ -578,6 +613,16 @@ local function registerPlayerTarget(player)
 		Humanoid = nil,
 		CoreInformation = { Visible = false, OnScreen = false, Root = nil },
 	}
+	vape:Clean(player.CharacterAdded:Connect(function(char)
+		local entry = Targeting.Targets[player]
+		if entry then
+			entry.Character = char
+			entry.LastUpdate = 0
+			entry.Root = nil
+			entry.Humanoid = nil
+			entry.CoreInformation = { Visible = false, OnScreen = false, Root = nil }
+		end
+	end))
 end
 
 for _, player in playersService:GetPlayers() do
@@ -702,11 +747,8 @@ vape:Clean(runService.Heartbeat:Connect(function()
 			continue
 		end
 
-		local character = Object.Character
-		if not character or not character.Parent then
-			character = (Object.Class == 'Player' and Object.Player.Character) or Entity
-			Object.Character = character
-		end
+		local character = resolveCharacter(Entity, Object)
+		Object.Character = character
 		if not character or not character.Parent then
 			Object.CoreInformation = Object.CoreInformation or {}
 			Object.CoreInformation.Visible = false
@@ -2548,10 +2590,7 @@ local function makeEspModule(category, name, classFilter)
 				continue
 			end
 
-			local character = object.Character
-			if class == 'Player' then
-				character = object.Player and object.Player.Character
-			end
+			local character = resolveCharacter(entity, object)
 			if not character or not character.Parent then
 				continue
 			end
@@ -2743,7 +2782,7 @@ run(function()
 				if desc:IsA('BasePart') then
 					pos = desc.Position
 				else
-					local r = getRoot(desc) or desc.PrimaryPart or desc:FindFirstChildWhichIsA('BasePart')
+					local r = getRoot(desc) or (desc:IsA('Model') and desc.PrimaryPart) or desc:FindFirstChildWhichIsA('BasePart')
 					pos = r and r.Position
 				end
 				if not pos then
@@ -2761,7 +2800,7 @@ run(function()
 					bb.AlwaysOnTop = true
 					bb.Size = UDim2.fromOffset(160, 28)
 					bb.StudsOffset = Vector3.new(0, 2, 0)
-					bb.Adornee = desc:IsA('BasePart') and desc or (getRoot(desc) or desc.PrimaryPart)
+					bb.Adornee = desc:IsA('BasePart') and desc or (getRoot(desc) or (desc:IsA('Model') and desc.PrimaryPart))
 					bb.Parent = guiParent()
 					local text = Instance.new('TextLabel')
 					text.Name = 'Label'
