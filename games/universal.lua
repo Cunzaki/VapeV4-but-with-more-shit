@@ -3715,6 +3715,42 @@ run(function()
 end)
 	
 run(function()
+	local AnticheatBypass
+
+	AnticheatBypass = vape.Categories.Utility:CreateModule({
+		Name = 'Anticheat Bypass',
+		Tooltip = 'Fallen Ultimate V3 / fishy recursive-table bypass. Loads in every game; active in Fallen Survival.',
+		ExtraText = function()
+			local fb = vape.Libraries.fallenBypass
+			if not fb then return 'Loading' end
+			if not fb.IsFallen then return 'Idle' end
+			if fb.Active then
+				return fb.HookCount > 0 and ('Active ('..tostring(fb.HookCount)..')') or 'Active'
+			end
+			return fb.LastError and 'Error' or 'Waiting'
+		end,
+		Function = function(callback)
+			if callback then return end
+			task.defer(function()
+				local fb = vape.Libraries.fallenBypass
+				if fb and fb.Run then
+					fb.Run(15)
+				end
+				if not AnticheatBypass.Enabled then
+					AnticheatBypass:Toggle(true)
+				end
+			end)
+		end
+	})
+
+	task.defer(function()
+		if not AnticheatBypass.Enabled then
+			AnticheatBypass:Toggle(true)
+		end
+	end)
+end)
+
+run(function()
 	local AntiFall
 	local Method
 	local Mode

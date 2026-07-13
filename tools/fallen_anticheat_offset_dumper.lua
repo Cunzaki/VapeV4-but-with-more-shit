@@ -32,6 +32,30 @@ local OUTPUT_ROOT = "fallen_ac_dumps"
 
 local client = Players.LocalPlayer
 
+local tableIdentityCache = setmetatable({}, { __mode = "k" })
+local nextTableId = 0
+
+local function safeToString(value)
+	if type(value) == "table" then
+		local cached = tableIdentityCache[value]
+		if cached then
+			return cached
+		end
+		nextTableId = nextTableId + 1
+		local id = string.format("table#%d", nextTableId)
+		tableIdentityCache[value] = id
+		return id
+	end
+	local ok, result = pcall(tostring, value)
+	if ok and type(result) == "string" then
+		return result
+	end
+	if type(value) == "function" then
+		return "function:<protected>"
+	end
+	return typeof(value) .. ":<protected>"
+end
+
 local function tableLength(tbl)
 	if rawlen then
 		return rawlen(tbl)
@@ -63,17 +87,22 @@ local function tableKeys(tbl, maxScan)
 	return keys
 end
 
+local function tryGetDebugId(instance)
+	local getter = instance.GetDebugId
+	if getter then
+		local ok, id = pcall(getter, instance)
+		if ok then
+			return id
+		end
+	end
+	return nil
+end
+
 local function pointerId(value)
 	if typeof(value) == "Instance" then
-		return string.format("Instance:%s:%s", value.ClassName, value:GetDebugId and value:GetDebugId() or tostring(value))
+		return string.format("Instance:%s:%s", value.ClassName, tryGetDebugId(value) or safeToString(value))
 	end
-	if type(value) == "table" then
-		return string.format("table:%s", tostring(value))
-	end
-	if type(value) == "function" then
-		return string.format("function:%s", tostring(value))
-	end
-	return string.format("%s:%s", typeof(value), tostring(value))
+	return safeToString(value)
 end
 
 local function describeValue(value, depth)
@@ -89,7 +118,7 @@ local function describeValue(value, depth)
 			class = value.ClassName,
 			name = value.Name,
 			fullName = fullName,
-			debugId = value:GetDebugId and value:GetDebugId() or nil,
+			debugId = tryGetDebugId(value),
 		}
 	end
 	if type(value) == "table" then
@@ -98,21 +127,33 @@ local function describeValue(value, depth)
 			for i = 1, math.min(8, tableLength(value)) do
 				local entry = rawget(value, i)
 				if entry ~= nil then
-					child[tostring(i)] = describeValue(entry, depth + 1)
+					child[tostring(i)] = safeDescribeValue(entry, depth + 1)
 				end
 			end
 		end
 		return {
 			type = "table",
 			length = tableLength(value),
-			pointer = tostring(value),
+			pointer = safeToString(value),
 			preview = child,
 		}
 	end
 	if type(value) == "function" then
-		return { type = "function", pointer = tostring(value) }
+		return { type = "function", pointer = safeToString(value) }
 	end
-	return { type = t, value = tostring(value) }
+	return { type = t, value = safeToString(value) }
+end
+
+local function safeDescribeValue(value, depth)
+	local ok, result = pcall(describeValue, value, depth)
+	if ok then
+		return result
+	end
+	return {
+		type = typeof(value),
+		value = "<protected>",
+		error = safeToString(result),
+	}
 end
 
 local function snapshotTable(tbl, maxIndex)
@@ -120,7 +161,7 @@ local function snapshotTable(tbl, maxIndex)
 	for i = 1, maxIndex do
 		local value = rawget(tbl, i)
 		if value ~= nil then
-			snap[tostring(i)] = describeValue(value, 0)
+			snap[tostring(i)] = safeDescribeValue(value, 0)
 		end
 	end
 	return snap
@@ -202,10 +243,11 @@ local function scanGc(remotes, character, humanoid)
 	local seenRemotes, seenCharacter, seenFuzzy, seenRecursive = {}, {}, {}, {}
 
 	for _, tbl in getgc(true) do
-		if type(tbl) ~= "table" then continue end
-
-		-- Stage 0x01: Remotes context
+		if type(tbl) ~= "table" then
+			-- skip
+		else
 		local remotesIndex
+		-- Stage 0x01: Remotes context
 		for i = 1, 32 do
 			if rawget(tbl, i) == remotes then
 				remotesIndex = i
@@ -218,9 +260,8 @@ local function scanGc(remotes, character, humanoid)
 		end
 
 		if remotesIndex then
-			local id = tostring(tbl)
-			if not seenRemotes[id] then
-				seenRemotes[id] = true
+			if not seenRemotes[tbl] then
+				seenRemotes[tbl] = true
 				local banOffsets = listTableOffsets(tbl, function(value, index)
 					return index ~= remotesIndex and type(value) == "table" and value ~= tbl
 				end, 32)
@@ -230,15 +271,14 @@ local function scanGc(remotes, character, humanoid)
 					banTableOffsets = banOffsets,
 					legacyBanOffset = rawget(tbl, 4) and 4 or nil,
 					snapshot = snapshotTable(tbl, 16),
-					tablePointer = id,
+					tablePointer = safeToString(tbl),
 				})
 			end
 		end
 
 		if typeof(first) == "Instance" and first.Name == "Remotes" then
-			local id = "name:" .. tostring(tbl)
-			if not seenRemotes[id] then
-				seenRemotes[id] = true
+			if not seenRemotes[tbl] then
+				seenRemotes[tbl] = true
 				table.insert(result.remotesByName, {
 					remotesIndex = 1,
 					length = tableLength(tbl),
@@ -246,16 +286,15 @@ local function scanGc(remotes, character, humanoid)
 						return index ~= 1 and type(value) == "table" and value ~= tbl
 					end, 32),
 					snapshot = snapshotTable(tbl, 16),
-					tablePointer = tostring(tbl),
+					tablePointer = safeToString(tbl),
 				})
 			end
 		end
 
 		-- Stage 0x02: Character context (strict)
 		if character and humanoid and rawget(tbl, 1) == character and rawget(tbl, 2) == humanoid then
-			local id = tostring(tbl)
-			if not seenCharacter[id] then
-				seenCharacter[id] = true
+			if not seenCharacter[tbl] then
+				seenCharacter[tbl] = true
 				local banOffsets = listTableOffsets(tbl, function(value, index)
 					return index > 2 and type(value) == "table"
 				end, 32)
@@ -270,7 +309,7 @@ local function scanGc(remotes, character, humanoid)
 						eight = rawget(tbl, 8) ~= nil and 8 or nil,
 					},
 					snapshot = snapshotTable(tbl, 16),
-					tablePointer = id,
+					tablePointer = safeToString(tbl),
 				})
 			end
 		end
@@ -284,9 +323,9 @@ local function scanGc(remotes, character, humanoid)
 				return value == humanoid
 			end, 32)
 			if #charIndexes > 0 or #humIndexes > 0 then
-				local id = string.format("fuzzy:%s:%s:%s", tostring(tbl), table.concat(charIndexes, ","), table.concat(humIndexes, ","))
-				if not seenFuzzy[id] then
-					seenFuzzy[id] = true
+				local fuzzyKey = table.concat(charIndexes, ",") .. "|" .. table.concat(humIndexes, ",") .. "|" .. safeToString(tbl)
+				if not seenFuzzy[fuzzyKey] then
+					seenFuzzy[fuzzyKey] = true
 					table.insert(result.characterFuzzy, {
 						characterIndexes = charIndexes,
 						humanoidIndexes = humIndexes,
@@ -295,7 +334,7 @@ local function scanGc(remotes, character, humanoid)
 							return type(value) == "table" and value ~= tbl and value ~= character and value ~= humanoid
 						end, 32),
 						snapshot = snapshotTable(tbl, 16),
-						tablePointer = tostring(tbl),
+						tablePointer = safeToString(tbl),
 					})
 				end
 			end
@@ -313,31 +352,32 @@ local function scanGc(remotes, character, humanoid)
 				end
 			end
 			if foundIndex and foundRecursive and rawequal(rawget(tbl, foundIndex), nil) then
-				local id = tostring(tbl)
-				if not seenRecursive[id] then
-					seenRecursive[id] = true
+				if not seenRecursive[tbl] then
+					seenRecursive[tbl] = true
 					table.insert(result.recursive, {
 						banIndex = foundIndex,
 						length = tableLength(tbl),
 						snapshot = snapshotTable(tbl, 8),
-						tablePointer = id,
+						tablePointer = safeToString(tbl),
 					})
 				end
 			end
 		end
+		end
 	end
 
 	for _, fn in getgc(false) do
-		if type(fn) ~= "function" then continue end
-		local info = (getinfo or debug.getinfo)(fn)
-		if info and info.source and info.source:find("AssetContainer") then
-			result.assetContainer.closureCount += 1
-			if #result.assetContainer.samples < 5 then
-				table.insert(result.assetContainer.samples, {
-					name = info.name,
-					source = info.source,
-					numparams = info.numparams,
-				})
+		if type(fn) == "function" then
+			local info = (getinfo or debug.getinfo)(fn)
+			if info and info.source and info.source:find("AssetContainer") then
+				result.assetContainer.closureCount = result.assetContainer.closureCount + 1
+				if #result.assetContainer.samples < 5 then
+					table.insert(result.assetContainer.samples, {
+						name = info.name,
+						source = info.source,
+						numparams = info.numparams,
+					})
+				end
 			end
 		end
 	end
@@ -345,18 +385,54 @@ local function scanGc(remotes, character, humanoid)
 	return result
 end
 
+local MERGE_LIST_KEYS = {
+	"remotesExact",
+	"remotesByName",
+	"characterExact",
+	"characterFuzzy",
+	"recursive",
+}
+
 local function mergeScan(target, incoming)
-	for key, list in incoming do
-		target[key] = target[key] or {}
-		local seen = {}
-		for _, entry in target[key] do
-			seen[entry.tablePointer or HttpService:GenerateGUID(false)] = true
+	for _, key in MERGE_LIST_KEYS do
+		local list = incoming[key]
+		if type(list) == "table" then
+			target[key] = target[key] or {}
+			local seen = {}
+			for _, entry in target[key] do
+				if type(entry) == "table" then
+					seen[entry.tablePointer or HttpService:GenerateGUID(false)] = true
+				end
+			end
+			for _, entry in list do
+				if type(entry) == "table" then
+					local id = entry.tablePointer or HttpService:GenerateGUID(false)
+					if not seen[id] then
+						seen[id] = true
+						table.insert(target[key], entry)
+					end
+				end
+			end
 		end
-		for _, entry in list do
-			local id = entry.tablePointer or HttpService:GenerateGUID(false)
-			if not seen[id] then
-				seen[id] = true
-				table.insert(target[key], entry)
+	end
+
+	local incomingAc = incoming.assetContainer
+	if type(incomingAc) == "table" then
+		target.assetContainer = target.assetContainer or { closureCount = 0, samples = {} }
+		target.assetContainer.closureCount = math.max(target.assetContainer.closureCount or 0, incomingAc.closureCount or 0)
+		local seenSamples = {}
+		for _, sample in target.assetContainer.samples do
+			if type(sample) == "table" then
+				seenSamples[(sample.name or "") .. (sample.source or "")] = true
+			end
+		end
+		for _, sample in incomingAc.samples or {} do
+			if type(sample) == "table" then
+				local id = (sample.name or "") .. (sample.source or "")
+				if not seenSamples[id] then
+					seenSamples[id] = true
+					table.insert(target.assetContainer.samples, sample)
+				end
 			end
 		end
 	end
@@ -530,10 +606,14 @@ local merged = {
 local pollDeadline = tick() + POLL_SECONDS
 local pollCount = 0
 while tick() < pollDeadline do
-	local scan = scanGc(remotes, character, humanoid)
-	mergeScan(merged, scan)
-	merged.assetContainer.closureCount = math.max(merged.assetContainer.closureCount, scan.assetContainer.closureCount)
-	pollCount += 1
+	local ok, scan = pcall(scanGc, remotes, character, humanoid)
+	if ok and type(scan) == "table" then
+		mergeScan(merged, scan)
+		merged.assetContainer.closureCount = math.max(merged.assetContainer.closureCount, scan.assetContainer.closureCount or 0)
+	else
+		warn("[FallenACDumper] scan pass failed:", scan)
+	end
+	pollCount = pollCount + 1
 	task.wait(POLL_INTERVAL)
 end
 
@@ -551,7 +631,11 @@ local report = {
 	recommendations = buildRecommendations({ scan = merged }),
 }
 
-local json = HttpService:JSONEncode(report)
+local jsonOk, json = pcall(HttpService.JSONEncode, HttpService, report)
+if not jsonOk then
+	warn("[FallenACDumper] JSONEncode failed:", json)
+	json = '{"error":"JSONEncode failed — see offsets.txt"}'
+end
 local txt = formatTxt(report)
 local snippet = buildBypassSnippet(report.recommendations)
 
