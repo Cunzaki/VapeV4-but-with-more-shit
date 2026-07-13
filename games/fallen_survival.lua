@@ -1003,7 +1003,7 @@ run(function()
 	local installCombatHooks
 
 	SilentAim = vape.Categories.Combat:CreateModule({
-		Name = 'Fallen Silent Aim',
+		Name = 'Silent Aim',
 		Function = function(callback)
 			flags.AimbotEnabled = callback
 			if fovGui then
@@ -1019,7 +1019,7 @@ run(function()
 				Targeting.ScannedPosition = nil
 			end
 		end,
-		Tooltip = 'Fallen viewmodel silent aim with manipulation / hitscan',
+		Tooltip = 'Viewmodel silent aim with manipulation / hitscan',
 	})
 
 	ModeDrop = SilentAim:CreateDropdown({
@@ -1042,6 +1042,45 @@ run(function()
 		end,
 	})
 	flags.HitChance = HitChanceSlider.Value
+
+	PartDrop = SilentAim:CreateDropdown({
+		Name = 'Target Part',
+		List = TARGET_PART_LIST,
+		Function = function(val)
+			syncTargetParts(val)
+		end,
+	})
+	syncTargetParts(PartDrop.Value)
+
+	VisCheck = SilentAim:CreateToggle({
+		Name = 'Visible Check',
+		Function = function(val)
+			flags.VisibleCheck = val
+			if VisCheckColor then
+				VisCheckColor.Object.Visible = val
+			end
+		end,
+	})
+	VisCheckColor = SilentAim:CreateColorSlider({
+		Name = 'Visible Color',
+		Darker = true,
+		Visible = false,
+		DefaultHue = 0.33,
+	})
+	DownCheckToggle = SilentAim:CreateToggle({
+		Name = 'Down Check',
+		Default = true,
+		Function = function(val)
+			flags.DownCheck = val
+		end,
+	})
+	flags.DownCheck = true
+	TeamCheckToggle = SilentAim:CreateToggle({
+		Name = 'Team Check',
+		Function = function(val)
+			flags.TeamCheck = val
+		end,
+	})
 
 	ManipToggle = SilentAim:CreateToggle({
 		Name = 'Manipulation',
@@ -1097,45 +1136,6 @@ run(function()
 		DefaultHue = 0.15,
 	})
 
-	VisCheck = SilentAim:CreateToggle({
-		Name = 'Visible Check',
-		Function = function(val)
-			flags.VisibleCheck = val
-			if VisCheckColor then
-				VisCheckColor.Object.Visible = val
-			end
-		end,
-	})
-	VisCheckColor = SilentAim:CreateColorSlider({
-		Name = 'Visible Check Color',
-		Darker = true,
-		Visible = false,
-		DefaultHue = 0.33,
-	})
-	DownCheckToggle = SilentAim:CreateToggle({
-		Name = 'Down Check',
-		Default = true,
-		Function = function(val)
-			flags.DownCheck = val
-		end,
-	})
-	flags.DownCheck = true
-	TeamCheckToggle = SilentAim:CreateToggle({
-		Name = 'Team Check',
-		Function = function(val)
-			flags.TeamCheck = val
-		end,
-	})
-
-	PartDrop = SilentAim:CreateDropdown({
-		Name = 'Target Part',
-		List = TARGET_PART_LIST,
-		Function = function(val)
-			syncTargetParts(val)
-		end,
-	})
-	syncTargetParts(PartDrop.Value)
-
 	DrawFov = SilentAim:CreateToggle({
 		Name = 'Draw FOV',
 		Function = function(val)
@@ -1143,31 +1143,38 @@ run(function()
 			if fovGui then
 				fovGui.Enabled = SilentAim.Enabled and val
 			end
+			if FovSize then FovSize.Object.Visible = val end
+			if FovThickness then FovThickness.Object.Visible = val end
+			if FovColor then FovColor.Object.Visible = val end
 		end,
 	})
 	FovSize = SilentAim:CreateSlider({
-		Name = 'Fov Size',
+		Name = 'FOV Size',
 		Min = 10,
 		Max = 800,
 		Default = 300,
+		Darker = true,
+		Visible = false,
 		Function = function(val)
 			flags.FovSize = val
 		end,
 	})
 	flags.FovSize = FovSize.Value
-	FovColor = SilentAim:CreateColorSlider({ Name = 'Fov Color' })
+	FovColor = SilentAim:CreateColorSlider({ Name = 'FOV Color', Darker = true, Visible = false })
 	FovThickness = SilentAim:CreateSlider({
-		Name = 'Fov Thickness',
+		Name = 'FOV Thickness',
 		Min = 1,
 		Max = 4,
 		Default = 1,
+		Darker = true,
+		Visible = false,
 		Function = function(val)
 			flags.FovThickness = val
 		end,
 	})
 
 	Indicators = SilentAim:CreateToggle({
-		Name = 'Manipulation Indicators',
+		Name = 'Indicators',
 		Function = function(val)
 			flags.CombatIndicators = val
 			if indicatorGui then
@@ -1175,10 +1182,14 @@ run(function()
 			end
 		end,
 	})
-	SilentAim:CreateToggle({
+
+	local TargetRingToggle
+	TargetRingToggle = SilentAim:CreateToggle({
 		Name = 'Target Ring',
 		Function = function(val)
 			flags.TargetRing = val
+			if TargetRingSpeed then TargetRingSpeed.Object.Visible = val end
+			if TargetRingColor then TargetRingColor.Object.Visible = val end
 		end,
 	})
 	TargetRingSpeed = SilentAim:CreateSlider({
@@ -1188,6 +1199,7 @@ run(function()
 		Default = 1.35,
 		Decimal = 100,
 		Darker = true,
+		Visible = false,
 		Function = function(val)
 			flags.TargetRingSpeed = val
 		end,
@@ -1196,6 +1208,7 @@ run(function()
 	TargetRingColor = SilentAim:CreateColorSlider({
 		Name = 'Ring Color',
 		Darker = true,
+		Visible = false,
 		DefaultHue = 0,
 	})
 	flags.TargetRingColor = colorFromSlider(TargetRingColor)
@@ -1843,7 +1856,7 @@ run(function()
 	end
 
 	GunMods = vape.Categories.Combat:CreateModule({
-		Name = 'Fallen Gun Mods',
+		Name = 'Gun Mods',
 		Function = function(callback)
 			if not callback then
 				flags.NoRecoil = false
@@ -1874,7 +1887,7 @@ run(function()
 				end
 			end
 		end,
-		Tooltip = 'Recoil / spread / fire-rate / equip mods for Fallen weapons',
+		Tooltip = 'Recoil / spread / fire-rate / equip mods',
 	})
 
 	NoRecoil = GunMods:CreateToggle({

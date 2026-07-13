@@ -320,9 +320,10 @@ run(function()
 		MaxDistance = 2000,
 	}
 	local colVis, colOcc, chamsVis, chamsOcc
+	local boxStyleDrop, chamsVisCol, chamsOccCol
 
 	ESP = vape.Categories.Render:CreateModule({
-		Name = 'Fallen ESP',
+		Name = 'ESP',
 		Function = function(callback)
 			settings.Enabled = callback
 			if not callback then
@@ -336,25 +337,45 @@ run(function()
 	ESP:CreateToggle({ Name = 'Players', Default = true, Function = function(v) settings.Players = v end })
 	ESP:CreateToggle({ Name = 'AI', Default = true, Function = function(v) settings.AI = v end })
 	ESP:CreateToggle({ Name = 'Boss', Default = true, Function = function(v) settings.Boss = v end })
-	ESP:CreateToggle({ Name = 'Box', Default = true, Function = function(v) settings.Box = v end })
-	ESP:CreateDropdown({
+
+	local boxToggle = ESP:CreateToggle({
+		Name = 'Box',
+		Default = true,
+		Function = function(v)
+			settings.Box = v
+			if boxStyleDrop then boxStyleDrop.Object.Visible = v end
+		end,
+	})
+	boxStyleDrop = ESP:CreateDropdown({
 		Name = 'Box Style',
 		List = { 'Outline', 'Corner' },
+		Darker = true,
 		Function = function(v) settings.BoxStyle = v end,
 	})
+
 	ESP:CreateToggle({ Name = 'Name', Default = true, Function = function(v) settings.Name = v end })
 	ESP:CreateToggle({ Name = 'Distance', Default = true, Function = function(v) settings.Distance = v end })
 	ESP:CreateToggle({ Name = 'Healthbar', Default = true, Function = function(v) settings.Healthbar = v end })
 	ESP:CreateToggle({ Name = 'Skeleton', Function = function(v) settings.Skeleton = v end })
-	ESP:CreateToggle({ Name = 'Chams', Function = function(v) settings.Chams = v end })
+
+	local chamsToggle = ESP:CreateToggle({
+		Name = 'Chams',
+		Function = function(v)
+			settings.Chams = v
+			if chamsVisCol then chamsVisCol.Object.Visible = v end
+			if chamsOccCol then chamsOccCol.Object.Visible = v end
+		end,
+	})
+	chamsVisCol = ESP:CreateColorSlider({ Name = 'Chams Visible', DefaultHue = 0.55, Darker = true, Visible = false })
+	chamsOccCol = ESP:CreateColorSlider({ Name = 'Chams Hidden', DefaultHue = 0.05, Darker = true, Visible = false })
+	chamsVis, chamsOcc = chamsVisCol, chamsOccCol
+
 	ESP:CreateSlider({
 		Name = 'Max Distance', Min = 100, Max = 4000, Default = 2000,
 		Function = function(v) settings.MaxDistance = v end,
 	})
 	colVis = ESP:CreateColorSlider({ Name = 'Visible Color', DefaultHue = 0.33 })
 	colOcc = ESP:CreateColorSlider({ Name = 'Occluded Color', DefaultHue = 0 })
-	chamsVis = ESP:CreateColorSlider({ Name = 'Chams Visible', DefaultHue = 0.55 })
-	chamsOcc = ESP:CreateColorSlider({ Name = 'Chams Hidden', DefaultHue = 0.05 })
 
 	local function classEnabled(class)
 		if class == 'Player' then return settings.Players end
@@ -470,7 +491,7 @@ run(function()
 	end
 
 	vape:Clean(runService.RenderStepped:Connect(function()
-		if not settings.Enabled then return end
+		if not ESP.Enabled then return end
 		camera = workspace.CurrentCamera
 		local seen = {}
 		local localChar = FS.ClientCharacter
@@ -497,14 +518,13 @@ run(function()
 	end))
 end)
 
--- Crosshair + tracers + hitmarkers + lighting
+-- Crosshair
 run(function()
-	local Visuals = vape.Categories.Render:CreateModule({
-		Name = 'Fallen Visuals',
+	local Crosshair = vape.Categories.Render:CreateModule({
+		Name = 'Crosshair',
 		Function = function(callback)
-			flags.FallenVisuals = callback
+			flags.Crosshair = callback
 		end,
-		Tooltip = 'Crosshair, bullet tracers, hitmarkers, lighting',
 	})
 
 	local crossGui = Instance.new('ScreenGui')
@@ -518,92 +538,119 @@ run(function()
 	holder.Size = UDim2.fromOffset(100, 100)
 	holder.Parent = crossGui
 	local bars = {}
-	for i, rot in { 0, 180, 90, 270 } do
+	for i = 1, 4 do
 		local f = Instance.new('Frame')
 		f.AnchorPoint = Vector2.new(0.5, 0.5)
 		f.BackgroundColor3 = Color3.new(1, 1, 1)
 		f.BorderSizePixel = 0
-		f.Size = (rot == 90 or rot == 270) and UDim2.fromOffset(20, 2) or UDim2.fromOffset(2, 20)
-		f.Position = UDim2.new(0.5, 0, 0.5, rot == 0 and -12 or rot == 180 and 12 or 0)
-		if rot == 90 then f.Position = UDim2.new(0.5, -12, 0.5, 0) end
-		if rot == 270 then f.Position = UDim2.new(0.5, 12, 0.5, 0) end
 		f.Parent = holder
 		bars[i] = f
 	end
 	vape:Clean(crossGui)
 
-	local crossToggle = Visuals:CreateToggle({ Name = 'Crosshair', Default = true })
-	local crossLen = Visuals:CreateSlider({ Name = 'Crosshair Length', Min = 4, Max = 24, Default = 10 })
-	local crossGap = Visuals:CreateSlider({ Name = 'Crosshair Gap', Min = 0, Max = 16, Default = 6 })
-	local crossCol = Visuals:CreateColorSlider({ Name = 'Crosshair Color' })
-	local stickTarget = Visuals:CreateToggle({ Name = 'Stick To Target' })
-
-	local tracerToggle = Visuals:CreateToggle({ Name = 'Bullet Tracers' })
-	Visuals:CreateDropdown({
-		Name = 'Tracer Style',
-		List = { 'Default', 'Lightning', 'Dark' },
-		Function = function(v) flags.BulletTracersStyle = v end,
-	})
-	local trCol1 = Visuals:CreateColorSlider({ Name = 'Tracer Color 1' })
-	local trCol2 = Visuals:CreateColorSlider({ Name = 'Tracer Color 2', DefaultHue = 0.08 })
-	Visuals:CreateSlider({
-		Name = 'Tracer Brightness', Min = 1, Max = 16, Default = 8,
-		Function = function(v) flags.BulletTracersBrightness = v end,
-	})
-	Visuals:CreateSlider({
-		Name = 'Tracer Lifetime', Min = 0.2, Max = 3, Default = 1, Decimal = 10,
-		Function = function(v) flags.BulletTracersLifetime = v end,
-	})
-
-	local hitToggle = Visuals:CreateToggle({ Name = 'Hitmarkers' })
-	Visuals:CreateSlider({
-		Name = 'Hitmarker Size', Min = 8, Max = 48, Default = 24,
-		Function = function(v) flags.HitmarkerSize = v end,
-	})
-	Visuals:CreateSlider({
-		Name = 'Hitmarker Lifetime', Min = 0.1, Max = 2, Default = 0.4, Decimal = 10,
-		Function = function(v) flags.HitmarkerLifetime = v end,
-	})
-	local hitCol = Visuals:CreateColorSlider({ Name = 'Hitmarker Color' })
-
-	local lightToggle = Visuals:CreateToggle({ Name = 'Fullbright' })
-	local savedLight = {}
+	local crossLen = Crosshair:CreateSlider({ Name = 'Length', Min = 4, Max = 24, Default = 10 })
+	local crossGap = Crosshair:CreateSlider({ Name = 'Gap', Min = 0, Max = 16, Default = 6 })
+	local crossCol = Crosshair:CreateColorSlider({ Name = 'Color' })
+	local stickTarget = Crosshair:CreateToggle({ Name = 'Stick To Target', Darker = true })
 
 	vape:Clean(runService.RenderStepped:Connect(function()
-		if not flags.FallenVisuals then
+		if not Crosshair.Enabled then
 			crossGui.Enabled = false
 			return
 		end
-		flags.BulletTracers = tracerToggle.Enabled
-		flags.Hitmarkers = hitToggle.Enabled
-		flags.BulletTracerColor1 = colorFromSlider(trCol1)
-		flags.BulletTracerColor2 = colorFromSlider(trCol2)
-		flags.HitmarkerColor = colorFromSlider(hitCol)
-
-		if crossToggle.Enabled then
-			crossGui.Enabled = true
-			local pos = userInputService:GetMouseLocation()
-			if stickTarget.Enabled and Targeting.TargetPart then
-				local sp, on = camera:WorldToViewportPoint(Targeting.TargetPart.Position)
-				if on then pos = Vector2.new(sp.X, sp.Y) end
-			end
-			holder.Position = UDim2.fromOffset(pos.X, pos.Y)
-			local col = colorFromSlider(crossCol)
-			local L, G = crossLen.Value, crossGap.Value
-			bars[1].Size = UDim2.fromOffset(2, L)
-			bars[1].Position = UDim2.new(0.5, 0, 0.5, -(G + L / 2))
-			bars[2].Size = UDim2.fromOffset(2, L)
-			bars[2].Position = UDim2.new(0.5, 0, 0.5, G + L / 2)
-			bars[3].Size = UDim2.fromOffset(L, 2)
-			bars[3].Position = UDim2.new(0.5, -(G + L / 2), 0.5, 0)
-			bars[4].Size = UDim2.fromOffset(L, 2)
-			bars[4].Position = UDim2.new(0.5, G + L / 2, 0.5, 0)
-			for _, f in bars do f.BackgroundColor3 = col end
-		else
-			crossGui.Enabled = false
+		crossGui.Enabled = true
+		local pos = userInputService:GetMouseLocation()
+		if stickTarget.Enabled and Targeting.TargetPart then
+			local sp, on = camera:WorldToViewportPoint(Targeting.TargetPart.Position)
+			if on then pos = Vector2.new(sp.X, sp.Y) end
 		end
+		holder.Position = UDim2.fromOffset(pos.X, pos.Y)
+		local col = colorFromSlider(crossCol)
+		local L, G = crossLen.Value, crossGap.Value
+		bars[1].Size = UDim2.fromOffset(2, L)
+		bars[1].Position = UDim2.new(0.5, 0, 0.5, -(G + L / 2))
+		bars[2].Size = UDim2.fromOffset(2, L)
+		bars[2].Position = UDim2.new(0.5, 0, 0.5, G + L / 2)
+		bars[3].Size = UDim2.fromOffset(L, 2)
+		bars[3].Position = UDim2.new(0.5, -(G + L / 2), 0.5, 0)
+		bars[4].Size = UDim2.fromOffset(L, 2)
+		bars[4].Position = UDim2.new(0.5, G + L / 2, 0.5, 0)
+		for _, f in bars do f.BackgroundColor3 = col end
+	end))
+end)
 
-		if lightToggle.Enabled then
+-- Tracers
+run(function()
+	local Tracers = vape.Categories.Render:CreateModule({
+		Name = 'Tracers',
+		Function = function(callback)
+			flags.BulletTracers = callback
+		end,
+	})
+
+	local styleDrop = Tracers:CreateDropdown({
+		Name = 'Style',
+		List = { 'Default', 'Lightning', 'Dark' },
+		Function = function(v) flags.BulletTracersStyle = v end,
+	})
+	flags.BulletTracersStyle = styleDrop.Value
+	local trCol1 = Tracers:CreateColorSlider({ Name = 'Color 1' })
+	local trCol2 = Tracers:CreateColorSlider({ Name = 'Color 2', DefaultHue = 0.08 })
+	Tracers:CreateSlider({
+		Name = 'Brightness', Min = 1, Max = 16, Default = 8,
+		Function = function(v) flags.BulletTracersBrightness = v end,
+	})
+	Tracers:CreateSlider({
+		Name = 'Lifetime', Min = 0.2, Max = 3, Default = 1, Decimal = 10,
+		Function = function(v) flags.BulletTracersLifetime = v end,
+	})
+
+	vape:Clean(runService.Heartbeat:Connect(function()
+		if Tracers.Enabled then
+			flags.BulletTracerColor1 = colorFromSlider(trCol1)
+			flags.BulletTracerColor2 = colorFromSlider(trCol2)
+		end
+	end))
+end)
+
+-- Hitmarkers
+run(function()
+	local Hitmarkers = vape.Categories.Render:CreateModule({
+		Name = 'Hitmarkers',
+		Function = function(callback)
+			flags.Hitmarkers = callback
+		end,
+	})
+
+	Hitmarkers:CreateSlider({
+		Name = 'Size', Min = 8, Max = 48, Default = 24,
+		Function = function(v) flags.HitmarkerSize = v end,
+	})
+	Hitmarkers:CreateSlider({
+		Name = 'Lifetime', Min = 0.1, Max = 2, Default = 0.4, Decimal = 10,
+		Function = function(v) flags.HitmarkerLifetime = v end,
+	})
+	local hitCol = Hitmarkers:CreateColorSlider({ Name = 'Color' })
+
+	vape:Clean(runService.Heartbeat:Connect(function()
+		if Hitmarkers.Enabled then
+			flags.HitmarkerColor = colorFromSlider(hitCol)
+		end
+	end))
+end)
+
+-- Fullbright
+run(function()
+	local Fullbright = vape.Categories.Render:CreateModule({
+		Name = 'Fullbright',
+		Function = function(callback)
+			flags.Fullbright = callback
+		end,
+	})
+	local savedLight = {}
+
+	vape:Clean(runService.RenderStepped:Connect(function()
+		if Fullbright.Enabled then
 			if not savedLight.Ambient then
 				savedLight.Ambient = lighting.Ambient
 				savedLight.Brightness = lighting.Brightness
