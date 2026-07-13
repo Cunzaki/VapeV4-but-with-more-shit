@@ -426,7 +426,8 @@ entitylib.removeEntity = function(char, localcheck)
 
 	if char then
 		if entitylib.EntityThreads[char] then
-			task.cancel(entitylib.EntityThreads[char])
+			-- ponytail: executor may reject cancel on dead/already-finished threads
+			pcall(task.cancel, entitylib.EntityThreads[char])
 			entitylib.EntityThreads[char] = nil
 		end
 

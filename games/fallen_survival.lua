@@ -284,10 +284,13 @@ run(function()
 		'Fly', 'Speed', 'HighJump', 'LongJump', 'Phase', 'Invisible', 'Spider',
 		'SpinBot', 'Swim', 'Jesus', 'NoJumpCooldown', 'Blink', 'Desync', 'Void',
 		'Arrows', 'Chams', 'ESP', 'GamingChair', 'Health', 'NameTags', 'PlayerModel',
-		'Tracers', 'Fullbright', 'ThirdPerson',
-		'AntiFall', 'MouseTP', 'Search', 'Waypoints',
+		'Tracers', 'Fullbright', 'ThirdPerson', 'AnimationPlayer', 'Breadcrumbs',
+		'ChinaHat', 'Cape', 'Clock', 'Disguise', 'FOV', 'Keystrokes', 'Memory',
+		'Ping', 'SongBeats', 'Speedmeter', 'TimeChanger',
+		'AntiFall', 'MouseTP', 'Search', 'Waypoints', 'AntiRagdoll', 'AntiFling',
+		'ChatSpammer', 'StateSpoofer', 'StaffDetector', 'Timer', 'InstanceProtection',
 		'Freecam', 'Gravity', 'Parkour', 'Part Manipulation', 'Xray',
-		'Atmosphere',
+		'Atmosphere', 'MurderMystery', 'TestTeamCheck', 'AimViewer',
 	}
 	for _, name in removeList do
 		pcall(function()
@@ -955,26 +958,45 @@ run(function()
 	local ManipToggle, ManipDist, ManipColor
 	local HitScanToggle, HitScanDist, HitScanColor
 	local VisCheck, VisCheckColor, DownCheckToggle, TeamCheckToggle
-	local PartHead, PartUpper, PartLower, PartHRP
+	local PartDrop, TargetRingSpeed, TargetRingColor
 	local DrawFov, FovSize, FovColor, FovThickness
-	local Indicators, TargetRing, PredictionDot
+	local Indicators
 	local TPTB, TPTBKey, DisableSilentTPTB
+
+	local TARGET_PART_LIST = {
+		'Random',
+		'Head',
+		'UpperTorso',
+		'LowerTorso',
+		'HumanoidRootPart',
+		'LeftUpperArm',
+		'LeftLowerArm',
+		'LeftHand',
+		'RightUpperArm',
+		'RightLowerArm',
+		'RightHand',
+		'LeftUpperLeg',
+		'LeftLowerLeg',
+		'LeftFoot',
+		'RightUpperLeg',
+		'RightLowerLeg',
+		'RightFoot',
+	}
+	local RANDOM_PARTS = {
+		'Head', 'UpperTorso', 'LowerTorso', 'HumanoidRootPart',
+		'LeftUpperArm', 'RightUpperArm', 'LeftUpperLeg', 'RightUpperLeg',
+	}
 
 	local fovGui, fovRing, fovStroke
 	local indicatorGui, manipText, hitscanText, visibleText
-	local ringParts = {}
-	local predDot
+	local ringLines
 
-	local function syncTargetParts()
-		local list = {}
-		if PartHead and PartHead.Enabled then table.insert(list, 'Head') end
-		if PartUpper and PartUpper.Enabled then table.insert(list, 'UpperTorso') end
-		if PartLower and PartLower.Enabled then table.insert(list, 'LowerTorso') end
-		if PartHRP and PartHRP.Enabled then table.insert(list, 'HumanoidRootPart') end
-		if #list == 0 then
-			list = { 'Head' }
+	local function syncTargetParts(val)
+		if val == 'Random' then
+			flags.TargetParts = RANDOM_PARTS
+		else
+			flags.TargetParts = { val }
 		end
-		flags.TargetParts = list
 	end
 
 	local combatHooksInstalled = false
@@ -1105,26 +1127,14 @@ run(function()
 		end,
 	})
 
-	PartHead = SilentAim:CreateToggle({
-		Name = 'Target Head',
-		Default = true,
-		Function = syncTargetParts,
+	PartDrop = SilentAim:CreateDropdown({
+		Name = 'Target Part',
+		List = TARGET_PART_LIST,
+		Function = function(val)
+			syncTargetParts(val)
+		end,
 	})
-	PartUpper = SilentAim:CreateToggle({
-		Name = 'Target UpperTorso',
-		Default = true,
-		Function = syncTargetParts,
-	})
-	PartLower = SilentAim:CreateToggle({
-		Name = 'Target LowerTorso',
-		Function = syncTargetParts,
-	})
-	PartHRP = SilentAim:CreateToggle({
-		Name = 'Target HRP',
-		Default = true,
-		Function = syncTargetParts,
-	})
-	syncTargetParts()
+	syncTargetParts(PartDrop.Value)
 
 	DrawFov = SilentAim:CreateToggle({
 		Name = 'Draw FOV',
@@ -1157,7 +1167,7 @@ run(function()
 	})
 
 	Indicators = SilentAim:CreateToggle({
-		Name = 'Combat Indicators',
+		Name = 'Manipulation Indicators',
 		Function = function(val)
 			flags.CombatIndicators = val
 			if indicatorGui then
@@ -1165,18 +1175,30 @@ run(function()
 			end
 		end,
 	})
-	TargetRing = SilentAim:CreateToggle({
+	SilentAim:CreateToggle({
 		Name = 'Target Ring',
 		Function = function(val)
 			flags.TargetRing = val
 		end,
 	})
-	PredictionDot = SilentAim:CreateToggle({
-		Name = 'Prediction Dot',
+	TargetRingSpeed = SilentAim:CreateSlider({
+		Name = 'Ring Speed',
+		Min = 0.1,
+		Max = 5,
+		Default = 1.35,
+		Decimal = 100,
+		Darker = true,
 		Function = function(val)
-			flags.PredictionDot = val
+			flags.TargetRingSpeed = val
 		end,
 	})
+	flags.TargetRingSpeed = TargetRingSpeed.Value
+	TargetRingColor = SilentAim:CreateColorSlider({
+		Name = 'Ring Color',
+		Darker = true,
+		DefaultHue = 0,
+	})
+	flags.TargetRingColor = colorFromSlider(TargetRingColor)
 
 	TPTB = SilentAim:CreateToggle({
 		Name = 'Teleport To Bullet',
@@ -1246,6 +1268,9 @@ run(function()
 	end
 
 	vape:Clean(runService.RenderStepped:Connect(function()
+		if TargetRingColor then
+			flags.TargetRingColor = colorFromSlider(TargetRingColor)
+		end
 		if not SilentAim.Enabled then
 			return
 		end
@@ -1263,18 +1288,18 @@ run(function()
 
 		if flags.CombatIndicators then
 			indicatorGui.Enabled = true
-			if Targeting.ManipulatedPosition then
+			if Targeting.ManipulationActive and Targeting.ManipulatedPosition then
 				local distance = (Targeting.ManipulatedPosition - camera.CFrame.Position).Magnitude
-				manipText.Text = string.format('Manipulated %.0fs', distance)
+				manipText.Text = string.format('Manipulated %.0fstuds', distance)
 				manipText.TextColor3 = colorFromSlider(ManipColor)
 				manipText.Visible = true
 			else
 				manipText.Visible = false
 			end
 			local scanPart = Targeting.ScannedPart or Targeting.TargetPart
-			if Targeting.ScannedPosition and scanPart then
+			if Targeting.HitScanActive and Targeting.ScannedPosition and scanPart then
 				local distance = (Targeting.ScannedPosition - scanPart.Position).Magnitude
-				hitscanText.Text = string.format('Hitscan %.1fs', distance)
+				hitscanText.Text = string.format('Hitscan %.1fstuds', distance)
 				hitscanText.TextColor3 = colorFromSlider(HitScanColor)
 				hitscanText.Visible = true
 			else
@@ -1290,52 +1315,144 @@ run(function()
 		elseif indicatorGui then
 			indicatorGui.Enabled = false
 		end
-
-		-- Target ring (simple BillboardAdornment)
-		if flags.TargetRing and Targeting.TargetCharacter then
-			local root = getRoot(Targeting.TargetCharacter)
-			if root then
-				if not ringParts.highlight then
-					local h = Instance.new('Highlight')
-					h.Name = 'FallenTargetRing'
-					h.FillTransparency = 1
-					h.OutlineColor = Color3.fromRGB(255, 0, 0)
-					h.OutlineTransparency = 0
-					h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-					h.Parent = guiParent()
-					ringParts.highlight = h
-					vape:Clean(h)
-				end
-				ringParts.highlight.Adornee = Targeting.TargetCharacter
-				ringParts.highlight.Enabled = true
-			end
-		elseif ringParts.highlight then
-			ringParts.highlight.Enabled = false
-		end
-
-		-- Prediction dot
-		if flags.PredictionDot and Targeting.TargetPart and LastPredictionPos then
-			local world = Targeting.TargetPart.Position + LastPredictionPos
-			local sp, on = camera:WorldToViewportPoint(world)
-			if not predDot then
-				predDot = Instance.new('Frame')
-				predDot.Size = UDim2.fromOffset(6, 6)
-				predDot.AnchorPoint = Vector2.new(0.5, 0.5)
-				predDot.BackgroundColor3 = Color3.fromRGB(255, 255, 0)
-				predDot.BorderSizePixel = 0
-				predDot.Parent = fovGui
-				local c = Instance.new('UICorner')
-				c.CornerRadius = UDim.new(1, 0)
-				c.Parent = predDot
-			end
-			predDot.Visible = on
-			predDot.Position = UDim2.fromOffset(sp.X, sp.Y)
-		elseif predDot then
-			predDot.Visible = false
-		end
 	end))
 
-	-- CreateProjectile / blood / hole / network hooks (installed on first module enable)
+	-- Target ring (Iridescent / insulin Drawing circle on HRP plane)
+	do
+		local DrawingAPI = DrawingLib
+		local TARGET_CIRCLE_SEGMENTS = 72
+		local TARGET_CIRCLE_MIN_RADIUS = 1.35
+		local TARGET_CIRCLE_MAX_RADIUS = 4.5
+		local CHAR_W, CHAR_H = 4.5, 6.2
+
+		local function setRingVisible(visible)
+			if not ringLines then return end
+			for _, line in ipairs(ringLines) do
+				pcall(function()
+					line.Visible = visible == true
+				end)
+			end
+		end
+
+		local function getRing()
+			if ringLines and #ringLines >= TARGET_CIRCLE_SEGMENTS then
+				return ringLines
+			end
+			if ringLines then
+				for _, line in ipairs(ringLines) do
+					pcall(function() line:Remove() end)
+				end
+			end
+			if not (DrawingAPI and DrawingAPI.new) then
+				return nil
+			end
+			ringLines = {}
+			for i = 1, TARGET_CIRCLE_SEGMENTS do
+				local ok, line = pcall(DrawingAPI.new, 'Line')
+				if not ok or not line then
+					ringLines = nil
+					return nil
+				end
+				line.Thickness = 2
+				line.Transparency = 1
+				line.ZIndex = 9999
+				line.Visible = false
+				ringLines[i] = line
+			end
+			vape:Clean(function()
+				if ringLines then
+					for _, line in ipairs(ringLines) do
+						pcall(function() line:Remove() end)
+					end
+					ringLines = nil
+				end
+			end)
+			return ringLines
+		end
+
+		local function getCharBounds(character)
+			local root = character and (character:FindFirstChild('HumanoidRootPart') or character.PrimaryPart)
+			if not root then return nil end
+			local pos = root.Position
+			local halfH = CHAR_H * 0.5
+			return pos - Vector3.new(0, halfH, 0), pos + Vector3.new(0, halfH, 0), Vector3.new(CHAR_W, CHAR_H, CHAR_W)
+		end
+
+		local function getPlane(character)
+			local root = character and (character:FindFirstChild('HumanoidRootPart') or character.PrimaryPart)
+			if root and root.CFrame then
+				local right = root.CFrame.RightVector
+				local forward = root.CFrame.LookVector
+				right = Vector3.new(right.X, 0, right.Z)
+				forward = Vector3.new(forward.X, 0, forward.Z)
+				if right.Magnitude > 0.05 then right = right.Unit else right = Vector3.new(1, 0, 0) end
+				if forward.Magnitude > 0.05 then forward = forward.Unit else forward = Vector3.new(0, 0, -1) end
+				return right, forward
+			end
+			return Vector3.new(1, 0, 0), Vector3.new(0, 0, -1)
+		end
+
+		vape:Clean(runService.RenderStepped:Connect(function()
+			if not flags.TargetRing then
+				setRingVisible(false)
+				return
+			end
+			local character = Targeting.TargetCharacter
+			if not character or not character.Parent then
+				setRingVisible(false)
+				return
+			end
+			local lines = getRing()
+			if not lines then return end
+			local bottom, top, bboxSize = getCharBounds(character)
+			if not bottom or not top then
+				setRingVisible(false)
+				return
+			end
+			local now = tick()
+			local alpha = (math.sin(now * math.pi * (flags.TargetRingSpeed or 1.35)) + 1) * 0.5
+			local center = bottom:Lerp(top, alpha)
+			local right, forward = getPlane(character)
+			local sx = (bboxSize and bboxSize.X) or 2
+			local sz = (bboxSize and bboxSize.Z) or 2
+			local maxXZ = sx > sz and sx or sz
+			local radius = math.clamp((maxXZ * 0.72) + 0.35, TARGET_CIRCLE_MIN_RADIUS, TARGET_CIRCLE_MAX_RADIUS)
+			local color = TargetRingColor and colorFromSlider(TargetRingColor) or Color3.fromRGB(255, 0, 0)
+			local prevSP, prevOn, prevDepth
+			local firstSP, firstOn, firstDepth
+			for index = 1, TARGET_CIRCLE_SEGMENTS do
+				local angle = ((index - 1) / TARGET_CIRCLE_SEGMENTS) * math.pi * 2
+				local worldPoint = center + (right * (math.cos(angle) * radius)) + (forward * (math.sin(angle) * radius))
+				local sp, on = camera:WorldToViewportPoint(worldPoint)
+				if index == 1 then
+					firstSP, firstOn, firstDepth = sp, on == true, sp.Z
+				end
+				if prevSP then
+					local line = lines[index - 1]
+					local visible = prevOn and on and prevDepth > 0 and sp.Z > 0
+					if visible then
+						line.From = Vector2.new(prevSP.X, prevSP.Y)
+						line.To = Vector2.new(sp.X, sp.Y)
+						line.Color = color
+						line.Visible = true
+					else
+						line.Visible = false
+					end
+				end
+				prevSP, prevOn, prevDepth = sp, on == true, sp.Z
+			end
+			local closingLine = lines[TARGET_CIRCLE_SEGMENTS]
+			if prevSP and firstSP and prevOn and firstOn and prevDepth > 0 and firstDepth > 0 then
+				closingLine.From = Vector2.new(prevSP.X, prevSP.Y)
+				closingLine.To = Vector2.new(firstSP.X, firstSP.Y)
+				closingLine.Color = color
+				closingLine.Visible = true
+			elseif closingLine then
+				closingLine.Visible = false
+			end
+		end))
+	end
+
 	installCombatHooks = function()
 		if not VFXModule then
 			return
@@ -2054,1227 +2171,65 @@ run(function()
 end)
 
 ---------------------------------------------------------------------------
--- Shared ESP helpers
+-- Fallen ESP / visuals / movement (Iridescent port libs)
 ---------------------------------------------------------------------------
-local EspStore = {
-	objects = {}, -- [model] = {billboard, highlight, ...}
-}
+vape.Libraries.fallenState = FallenState
+FallenState.Targeting = Targeting
+FallenState.flags = flags
+FallenState.vape = vape
+FallenState.resolveCharacter = resolveCharacter
 
-local SKEL_PAIRS = {
-	{ 'Head', 'UpperTorso' },
-	{ 'UpperTorso', 'LowerTorso' },
-	{ 'UpperTorso', 'LeftUpperArm' },
-	{ 'LeftUpperArm', 'LeftLowerArm' },
-	{ 'LeftLowerArm', 'LeftHand' },
-	{ 'UpperTorso', 'RightUpperArm' },
-	{ 'RightUpperArm', 'RightLowerArm' },
-	{ 'RightLowerArm', 'RightHand' },
-	{ 'LowerTorso', 'LeftUpperLeg' },
-	{ 'LeftUpperLeg', 'LeftLowerLeg' },
-	{ 'LeftLowerLeg', 'LeftFoot' },
-	{ 'LowerTorso', 'RightUpperLeg' },
-	{ 'RightUpperLeg', 'RightLowerLeg' },
-	{ 'RightLowerLeg', 'RightFoot' },
-}
-
-local function destroyDrawingList(list)
-	if not list then
-		return
+local function loadFallenLib(file)
+	local path = 'newvape/libraries/' .. file
+	local isf = isfile or function(f)
+		local ok, res = pcall(readfile, f)
+		return ok and res ~= nil and res ~= ''
 	end
-	for _, obj in list do
-		pcall(function()
-			obj:Remove()
+	local source
+	if isf(path) then
+		source = readfile(path)
+	else
+		local ok, res = pcall(function()
+			return game:HttpGet('https://raw.githubusercontent.com/Cunzaki/VapeV4-but-with-more-shit/' .. readfile('newvape/profiles/commit.txt') .. '/' .. path:gsub('newvape/', ''), true)
 		end)
+		if ok and res and res ~= '404: Not Found' then
+			if path:find('.lua') then
+				res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n' .. res
+			end
+			writefile(path, res)
+			source = res
+		end
 	end
-end
-
-local function getEntityFlags(extra)
-	local bits = {}
-	if extra and extra.downed then
-		table.insert(bits, 'DOWN')
-	end
-	if extra and extra.visible then
-		table.insert(bits, 'VIS')
-	end
-	if extra and extra.boss then
-		table.insert(bits, 'BOSS')
-	end
-	return table.concat(bits, ' ')
-end
-
-local function clearEspEntry(model)
-	local entry = EspStore.objects[model]
-	if not entry then
+	if not source then
+		warn('[Fallen] missing lib', file)
 		return
 	end
-	for _, obj in pairs(entry) do
-		if typeof(obj) == 'Instance' then
-			pcall(function()
-				obj:Destroy()
-			end)
-		elseif type(obj) == 'table' and obj.lines then
-			destroyDrawingList(obj.lines)
-		elseif type(obj) == 'userdata' or (type(obj) == 'table' and obj.Remove) then
-			pcall(function()
-				obj:Remove()
-			end)
-		end
-	end
-	EspStore.objects[model] = nil
-end
-
-local function ensureEspEntry(model, settings, label)
-	if not model or not model.Parent then
+	local chunk, err = loadstring(source, file)
+	if not chunk then
+		warn('[Fallen] compile', file, err)
 		return
 	end
-	local root = getRoot(model)
-	if not root then
-		return
-	end
-	local entry = EspStore.objects[model]
-	if not entry then
-		entry = {}
-		EspStore.objects[model] = entry
-	end
-
-	if settings.Name or settings.Distance or settings.Health or settings.Weapon then
-		if not entry.bb then
-			local bb = Instance.new('BillboardGui')
-			bb.Name = 'FallenESP'
-			bb.AlwaysOnTop = true
-			bb.Size = UDim2.fromOffset(200, 50)
-			bb.StudsOffset = Vector3.new(0, 3, 0)
-			bb.Adornee = root
-			bb.Parent = guiParent()
-			local text = Instance.new('TextLabel')
-			text.Size = UDim2.fromScale(1, 1)
-			text.BackgroundTransparency = 1
-			text.TextStrokeTransparency = 0.4
-			text.Font = Enum.Font.GothamBold
-			text.TextSize = 13
-			text.TextColor3 = Color3.new(1, 1, 1)
-			text.Parent = bb
-			entry.bb = bb
-			entry.label = text
-		else
-			entry.bb.Adornee = root
-		end
-	elseif entry.bb then
-		entry.bb:Destroy()
-		entry.bb = nil
-		entry.label = nil
-	end
-
-	if settings.Chams then
-		if not entry.hl then
-			local hl = Instance.new('Highlight')
-			hl.Name = 'FallenChams'
-			hl.Adornee = model
-			hl.FillTransparency = settings.ChamsStyle == 'Glow' and 0.5 or 0.35
-			hl.OutlineTransparency = 0
-			hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-			hl.Parent = guiParent()
-			entry.hl = hl
-		else
-			entry.hl.Adornee = model
-		end
-	elseif entry.hl then
-		entry.hl:Destroy()
-		entry.hl = nil
-	end
-
-	if settings.BoundingBox then
-		if settings.BoxStyle == 'Corner' and DrawingLib then
-			if entry.box then
-				entry.box:Destroy()
-				entry.box = nil
-			end
-			if not entry.cornerDraw then
-				entry.cornerDraw = { lines = {} }
-				for i = 1, 8 do
-					local line = DrawingLib.new('Line')
-					line.Thickness = 1
-					line.Visible = false
-					entry.cornerDraw.lines[i] = line
-				end
-			end
-		else
-			if entry.cornerDraw then
-				destroyDrawingList(entry.cornerDraw.lines)
-				entry.cornerDraw = nil
-			end
-			if not entry.box and root then
-			local box = Instance.new('BoxHandleAdornment')
-			box.Name = 'FallenBox'
-			box.Adornee = root
-			box.AlwaysOnTop = true
-			box.ZIndex = 5
-			box.Transparency = 0.7
-			box.Size = root.Size + Vector3.new(1, 2, 1)
-			box.Parent = guiParent()
-			entry.box = box
-		elseif entry.box then
-			entry.box.Adornee = root
-		end
-		end
-	elseif entry.box then
-		entry.box:Destroy()
-		entry.box = nil
-	end
-
-	if settings.Healthbar and root then
-		if not entry.healthFrame then
-			local bb = Instance.new('BillboardGui')
-			bb.Name = 'FallenHealth'
-			bb.AlwaysOnTop = true
-			bb.Size = UDim2.fromOffset(54, 6)
-			bb.StudsOffset = Vector3.new(0, 2.2, 0)
-			bb.Adornee = root
-			bb.Parent = guiParent()
-			local back = Instance.new('Frame')
-			back.Size = UDim2.fromScale(1, 1)
-			back.BackgroundColor3 = Color3.new(0, 0, 0)
-			back.BorderSizePixel = 0
-			back.Parent = bb
-			local fill = Instance.new('Frame')
-			fill.Name = 'Fill'
-			fill.Size = UDim2.fromScale(1, 1)
-			fill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-			fill.BorderSizePixel = 0
-			fill.Parent = back
-			entry.healthFrame = bb
-			entry.healthFill = fill
-		else
-			entry.healthFrame.Adornee = root
-		end
-	elseif entry.healthFrame then
-		entry.healthFrame:Destroy()
-		entry.healthFrame = nil
-		entry.healthFill = nil
-	end
-
-	return entry
-end
-
-local function updateCornerBox(entry, model, col)
-	if not (entry and entry.cornerDraw and DrawingLib) then
-		return
-	end
-	local cf, size = model:GetBoundingBox()
-	local hx, hy, hz = size.X * 0.5, size.Y * 0.5, size.Z * 0.5
-	local corners = {}
-	for _, off in {
-		Vector3.new(-hx, hy, -hz), Vector3.new(hx, hy, -hz), Vector3.new(hx, hy, hz), Vector3.new(-hx, hy, hz),
-		Vector3.new(-hx, -hy, -hz), Vector3.new(hx, -hy, -hz), Vector3.new(hx, -hy, hz), Vector3.new(-hx, -hy, hz),
-	} do
-		local sp, on = camera:WorldToViewportPoint((cf * CFrame.new(off)).Position)
-		table.insert(corners, on and Vector2.new(sp.X, sp.Y) or nil)
-	end
-	local function line(i, a, b)
-		local ln = entry.cornerDraw.lines[i]
-		if not ln then
-			return
-		end
-		if corners[a] and corners[b] then
-			ln.From = corners[a]
-			ln.To = corners[b]
-			ln.Color = col
-			ln.Visible = true
-		else
-			ln.Visible = false
-		end
-	end
-	line(1, 1, 2); line(2, 2, 3); line(3, 3, 4); line(4, 4, 1)
-	line(5, 5, 6); line(6, 6, 7); line(7, 7, 8); line(8, 8, 5)
-end
-
-local function updateSkeleton(entry, character, col)
-	if not (entry and DrawingLib) then
-		return
-	end
-	if not entry.skeleton then
-		entry.skeleton = { lines = {} }
-	end
-	local idx = 0
-	for _, pair in SKEL_PAIRS do
-		local a = character:FindFirstChild(pair[1])
-		local b = character:FindFirstChild(pair[2])
-		idx = idx + 1
-		local ln = entry.skeleton.lines[idx]
-		if not ln then
-			ln = DrawingLib.new('Line')
-			ln.Thickness = 1
-			entry.skeleton.lines[idx] = ln
-		end
-		if a and b then
-			local pa, oa = camera:WorldToViewportPoint(a.Position)
-			local pb, ob = camera:WorldToViewportPoint(b.Position)
-			if oa and ob then
-				ln.From = Vector2.new(pa.X, pa.Y)
-				ln.To = Vector2.new(pb.X, pb.Y)
-				ln.Color = col
-				ln.Visible = true
-			else
-				ln.Visible = false
-			end
-		else
-			ln.Visible = false
-		end
-	end
-	for i = idx + 1, #entry.skeleton.lines do
-		entry.skeleton.lines[i].Visible = false
+	local ok, runErr = pcall(chunk)
+	if not ok then
+		warn('[Fallen] run', file, runErr)
 	end
 end
 
-local function drawOffscreenArrow(entry, rootPos, col)
-	if not (entry and DrawingLib) then
-		return
-	end
-	if not entry.offscreen then
-		entry.offscreen = DrawingLib.new('Triangle')
-		entry.offscreen.Filled = true
-	end
-	local tri = entry.offscreen
-	local vp = camera.ViewportSize
-	local sp, on = camera:WorldToViewportPoint(rootPos)
-	if on then
-		tri.Visible = false
-		return
-	end
-	local center = Vector2.new(vp.X * 0.5, vp.Y * 0.5)
-	local dir = (Vector2.new(sp.X, sp.Y) - center).Unit
-	local edge = math.min(vp.X, vp.Y) * 0.45
-	local tip = center + dir * edge
-	local perp = Vector2.new(-dir.Y, dir.X)
-	tri.PointA = tip
-	tri.PointB = tip - dir * 14 + perp * 8
-	tri.PointC = tip - dir * 14 - perp * 8
-	tri.Color = col
-	tri.Visible = true
-end
-
-local function updateEspVisuals(model, entry, settings, colorVis, colorOcc, isVisible, dist, extra)
-	if not entry then
-		return
-	end
-	local col = isVisible and colorVis or colorOcc
-	if entry.label then
-		local bits = {}
-		if settings.Name then
-			table.insert(bits, extra and extra.name or model.Name)
-		end
-		if settings.Distance and dist then
-			table.insert(bits, string.format('[%.0f]', dist))
-		end
-		if settings.Health and extra and extra.health then
-			table.insert(bits, string.format('%.0fHP', extra.health))
-		end
-		if settings.Weapon and extra and extra.weapon then
-			table.insert(bits, extra.weapon)
-		end
-		if settings.Flags and extra and extra.flagText and extra.flagText ~= '' then
-			table.insert(bits, extra.flagText)
-		end
-		entry.label.Text = table.concat(bits, ' ')
-		entry.label.TextColor3 = col
-		entry.bb.Enabled = true
-	end
-	if entry.hl then
-		entry.hl.FillColor = isVisible and (settings.ChamsVisColor or col) or (settings.ChamsOccColor or col)
-		entry.hl.OutlineColor = entry.hl.FillColor
-		entry.hl.Enabled = true
-	end
-	if entry.box then
-		entry.box.Color3 = col
-		entry.box.Visible = settings.BoxStyle ~= 'Corner'
-	end
-	if entry.cornerDraw and settings.BoxStyle == 'Corner' then
-		updateCornerBox(entry, model, col)
-	elseif entry.cornerDraw then
-		for _, ln in entry.cornerDraw.lines do
-			ln.Visible = false
-		end
-	end
-	if entry.healthFill and extra and extra.health and extra.maxHealth then
-		local pct = math.clamp(extra.health / math.max(extra.maxHealth, 1), 0, 1)
-		entry.healthFill.Size = UDim2.fromScale(pct, 1)
-		entry.healthFill.BackgroundColor3 = Color3.fromRGB(255 * (1 - pct), 255 * pct, 0)
-		if entry.healthFrame then
-			entry.healthFrame.Enabled = true
-		end
-	end
-	if settings.Skeleton then
-		updateSkeleton(entry, model, col)
-	elseif entry.skeleton then
-		destroyDrawingList(entry.skeleton.lines)
-		entry.skeleton = nil
-	end
-	if settings.Offscreen and extra and extra.offscreen then
-		drawOffscreenArrow(entry, extra.rootPos or model:GetPivot().Position, col)
-	elseif entry.offscreen then
-		entry.offscreen.Visible = false
-	end
-end
-
-local function getGunName(char)
-	if not char then
-		return nil
-	end
-	for _, model in char:GetChildren() do
-		if model:IsA('Model') and model.Name ~= 'Hair' and model.Name ~= 'HolsterModel' and model.PrimaryPart then
-			if
-				model:FindFirstChild('Detail')
-				or model:FindFirstChild('Main')
-				or model:FindFirstChild('Handle')
-				or model:FindFirstChild('Attachments')
-			then
-				return model.Name
-			end
-		end
-	end
-	return nil
-end
-
-local function makeEspModule(category, name, classFilter)
-	local mod
-	local Enabled, Bounding, BoxStyle, Skeleton, ViewAngle, Healthbar
-	local ShowName, ShowDist, ShowWeapon, ShowHealth, ShowFlags, Offscreen, Chams, ChamsStyle, MaxDist
-	local ColVis, ColOcc, ChamsVis, ChamsOcc
-
-	local settings = {
-		Enabled = false,
-		BoundingBox = false,
-		BoxStyle = 'Solid',
-		Skeleton = false,
-		ViewAngle = false,
-		Healthbar = false,
-		Name = true,
-		Distance = true,
-		Weapon = false,
-		Health = false,
-		Flags = false,
-		Offscreen = false,
-		Chams = false,
-		ChamsStyle = 'Solid',
-		MaxDistance = 2000,
-	}
-
-	mod = category:CreateModule({
-		Name = name,
-		Function = function(callback)
-			settings.Enabled = callback
-			if not callback then
-				for model, entry in pairs(EspStore.objects) do
-					local obj = Targeting.Targets[model] or (model:IsA('Player') and Targeting.Targets[model])
-					-- leave cleanup to update loop via class filter
-				end
-			end
-		end,
-		Tooltip = name .. ' ESP for Fallen',
-	})
-
-	Enabled = mod -- module itself is enable
-	Bounding = mod:CreateToggle({
-		Name = 'Bounding Box',
-		Function = function(v)
-			settings.BoundingBox = v
-		end,
-	})
-	BoxStyle = mod:CreateDropdown({
-		Name = 'Box Style',
-		List = { 'Solid', 'Corner' },
-		Function = function(v)
-			settings.BoxStyle = v
-		end,
-	})
-	Skeleton = mod:CreateToggle({
-		Name = 'Skeleton',
-		Function = function(v)
-			settings.Skeleton = v
-		end,
-	})
-	ViewAngle = mod:CreateToggle({
-		Name = 'View Angle',
-		Function = function(v)
-			settings.ViewAngle = v
-		end,
-	})
-	Healthbar = mod:CreateToggle({
-		Name = 'Healthbar',
-		Function = function(v)
-			settings.Healthbar = v
-		end,
-	})
-	ShowName = mod:CreateToggle({
-		Name = 'Name',
-		Default = true,
-		Function = function(v)
-			settings.Name = v
-		end,
-	})
-	ShowDist = mod:CreateToggle({
-		Name = 'Distance',
-		Default = true,
-		Function = function(v)
-			settings.Distance = v
-		end,
-	})
-	ShowWeapon = mod:CreateToggle({
-		Name = 'Weapon',
-		Function = function(v)
-			settings.Weapon = v
-		end,
-	})
-	ShowHealth = mod:CreateToggle({
-		Name = 'Health',
-		Function = function(v)
-			settings.Health = v
-		end,
-	})
-	ShowFlags = mod:CreateToggle({
-		Name = 'Flags',
-		Function = function(v)
-			settings.Flags = v
-		end,
-	})
-	Offscreen = mod:CreateToggle({
-		Name = 'Offscreen',
-		Function = function(v)
-			settings.Offscreen = v
-		end,
-	})
-	Chams = mod:CreateToggle({
-		Name = 'Chams',
-		Function = function(v)
-			settings.Chams = v
-		end,
-	})
-	ChamsStyle = mod:CreateDropdown({
-		Name = 'Chams Style',
-		List = { 'Solid', 'Glow' },
-		Function = function(v)
-			settings.ChamsStyle = v
-		end,
-	})
-	MaxDist = mod:CreateSlider({
-		Name = 'Max Distance',
-		Min = 100,
-		Max = 4000,
-		Default = 2000,
-		Function = function(v)
-			settings.MaxDistance = v
-		end,
-	})
-	ColVis = mod:CreateColorSlider({ Name = 'Visible Color', DefaultHue = 0.33 })
-	ColOcc = mod:CreateColorSlider({ Name = 'Occluded Color', DefaultHue = 0 })
-	ChamsVis = mod:CreateColorSlider({ Name = 'Chams Visible', DefaultHue = 0.55 })
-	ChamsOcc = mod:CreateColorSlider({ Name = 'Chams Occluded', DefaultHue = 0.05 })
-
-	vape:Clean(runService.RenderStepped:Connect(function()
-		if not mod.Enabled then
-			return
-		end
-		local camPos = camera.CFrame.Position
-		local localChar = FallenState.ClientCharacter
-		local seen = {}
-
-		for entity, object in pairs(Targeting.Targets) do
-			local class = object.Class
-			if classFilter == 'Player' and class ~= 'Player' then
-				continue
-			end
-			if classFilter == 'AI' and class ~= 'AI' then
-				continue
-			end
-			if classFilter == 'Boss' and class ~= 'Boss' then
-				continue
-			end
-
-			local character = resolveCharacter(entity, object)
-			if not character or not character.Parent then
-				continue
-			end
-			local root = getRoot(character)
-			local hum = character:FindFirstChildOfClass('Humanoid')
-			if not root or not hum or hum.Health <= 0 then
-				continue
-			end
-			local dist = (camPos - root.Position).Magnitude
-			if dist > settings.MaxDistance then
-				continue
-			end
-			local _, onScreen = camera:WorldToViewportPoint(root.Position)
-			if not onScreen and not settings.Offscreen then
-				continue
-			end
-
-			local isVisible = false
-			if localChar then
-				local head = localChar:FindFirstChild('Head')
-				if head then
-					local hit = workspace:Raycast(head.Position, root.Position - head.Position, RayParams)
-					isVisible = not hit or (hit.Instance and hit.Instance:IsDescendantOf(character))
-				end
-			end
-
-			settings.ChamsVisColor = colorFromSlider(ChamsVis)
-			settings.ChamsOccColor = colorFromSlider(ChamsOcc)
-			local entry = ensureEspEntry(character, settings, character.Name)
-			updateEspVisuals(
-				character,
-				entry,
-				settings,
-				colorFromSlider(ColVis),
-				colorFromSlider(ColOcc),
-				isVisible,
-				dist,
-				{
-					name = class == 'Player' and object.Player.Name or character.Name,
-					health = hum.Health,
-					maxHealth = hum.MaxHealth,
-					weapon = getGunName(character),
-					downed = hum:GetAttribute('Downed'),
-					visible = isVisible,
-					boss = class == 'Boss',
-					flagText = getEntityFlags({
-						downed = hum:GetAttribute('Downed'),
-						visible = isVisible,
-						boss = class == 'Boss',
-					}),
-					offscreen = not onScreen,
-					rootPos = root.Position,
-				}
-			)
-			seen[character] = true
-		end
-
-		-- cleanup unseen for this filter
-		for model, entry in pairs(EspStore.objects) do
-			if not seen[model] then
-				local obj = nil
-				for ent, data in pairs(Targeting.Targets) do
-					local c = data.Class == 'Player' and (data.Player and data.Player.Character) or data.Character
-					if c == model then
-						obj = data
-						break
-					end
-				end
-				if obj and ((classFilter == 'Player' and obj.Class == 'Player') or (classFilter == 'AI' and obj.Class == 'AI') or (classFilter == 'Boss' and obj.Class == 'Boss')) then
-					if not mod.Enabled or not seen[model] then
-						clearEspEntry(model)
-					end
-				end
-			end
-		end
-	end))
-
-	return mod
-end
-
 run(function()
-	makeEspModule(vape.Categories.Render, 'Fallen Player ESP', 'Player')
-end)
-run(function()
-	makeEspModule(vape.Categories.Render, 'Fallen AI ESP', 'AI')
-end)
-run(function()
-	makeEspModule(vape.Categories.Render, 'Fallen Boss ESP', 'Boss')
+	loadFallenLib('fallen_esp.lua')
+	loadFallenLib('fallen_movement.lua')
 end)
 
----------------------------------------------------------------------------
--- World ESP
----------------------------------------------------------------------------
-run(function()
-	local WorldESP
-	local toggles = {}
-	local colors = {}
-	local maxDist
-	local worldObjects = {} -- [inst] = billboard
-
-	local CATEGORIES = {
-		Nodes = { 'Node', 'ResourceNode', 'Harvest' },
-		['Body Bags'] = { 'BodyBag', 'Body Bag', 'Corpse' },
-		Items = { 'Drop', 'Pickup', 'Loot' },
-		Raids = { 'Raid', 'RaidZone' },
-		['Timed Crates'] = { 'TimedCrate', 'Timed Crate' },
-		['Care Packages'] = { 'CarePackage', 'Care Package', 'Airdrop' },
-		Sleepers = { 'Sleeper', 'Sleeping' },
-		['Cloth Plants'] = { 'Cloth', 'Hemp', 'Plant' },
-	}
-
-	local function nameMatches(instName, keys)
-		local lower = string.lower(instName)
-		for _, key in keys do
-			if lower:find(string.lower(key), 1, true) then
-				return true
-			end
-		end
-		return false
-	end
-
-	WorldESP = vape.Categories.Render:CreateModule({
-		Name = 'Fallen World ESP',
-		Function = function(callback)
-			if not callback then
-				for _, bb in pairs(worldObjects) do
-					pcall(function()
-						bb:Destroy()
-					end)
-				end
-				table.clear(worldObjects)
-			end
-		end,
-		Tooltip = 'Nodes, bags, crates, raids, sleepers, plants',
-	})
-
-	for catName in pairs(CATEGORIES) do
-		toggles[catName] = WorldESP:CreateToggle({
-			Name = catName,
-			Default = true,
-			Function = function() end,
-		})
-		colors[catName] = WorldESP:CreateColorSlider({
-			Name = catName .. ' Color',
-			Darker = true,
-		})
-	end
-	maxDist = WorldESP:CreateSlider({
-		Name = 'Max Distance',
-		Min = 50,
-		Max = 3000,
-		Default = 800,
-	})
-
-	local scanFolders = { 'Bases', 'Events', 'Animals', 'Drops', 'Plants' }
-
-	vape:Clean(runService.Heartbeat:Connect(function()
-		if not WorldESP.Enabled then
-			return
-		end
-		-- throttle
-		if (tick() * 2) % 1 > 0.05 then
-			return
-		end
-		local camPos = camera.CFrame.Position
-		local seen = {}
-		local limit = maxDist.Value
-
-		for _, folderName in scanFolders do
-			local folder = workspace:FindFirstChild(folderName)
-			if not folder then
-				continue
-			end
-			for _, desc in folder:GetDescendants() do
-				if not (desc:IsA('Model') or desc:IsA('BasePart')) then
-					continue
-				end
-				local matchedCat
-				for catName, keys in pairs(CATEGORIES) do
-					if toggles[catName] and toggles[catName].Enabled and nameMatches(desc.Name, keys) then
-						matchedCat = catName
-						break
-					end
-				end
-				if not matchedCat then
-					continue
-				end
-				local pos
-				if desc:IsA('BasePart') then
-					pos = desc.Position
-				else
-					local r = getRoot(desc) or (desc:IsA('Model') and desc.PrimaryPart) or desc:FindFirstChildWhichIsA('BasePart')
-					pos = r and r.Position
-				end
-				if not pos then
-					continue
-				end
-				local dist = (camPos - pos).Magnitude
-				if dist > limit then
-					continue
-				end
-				seen[desc] = true
-				local bb = worldObjects[desc]
-				if not bb then
-					bb = Instance.new('BillboardGui')
-					bb.Name = 'FallenWorldESP'
-					bb.AlwaysOnTop = true
-					bb.Size = UDim2.fromOffset(160, 28)
-					bb.StudsOffset = Vector3.new(0, 2, 0)
-					bb.Adornee = desc:IsA('BasePart') and desc or (getRoot(desc) or (desc:IsA('Model') and desc.PrimaryPart))
-					bb.Parent = guiParent()
-					local text = Instance.new('TextLabel')
-					text.Name = 'Label'
-					text.Size = UDim2.fromScale(1, 1)
-					text.BackgroundTransparency = 1
-					text.Font = Enum.Font.Gotham
-					text.TextSize = 12
-					text.TextStrokeTransparency = 0.5
-					text.Parent = bb
-					worldObjects[desc] = bb
-				end
-				local label = bb:FindFirstChild('Label')
-				if label then
-					label.Text = string.format('%s [%.0f]', desc.Name, dist)
-					label.TextColor3 = colorFromSlider(colors[matchedCat])
-				end
-			end
-		end
-
-		for inst, bb in pairs(worldObjects) do
-			if not seen[inst] or not inst.Parent then
-				bb:Destroy()
-				worldObjects[inst] = nil
-			end
-		end
-	end))
-end)
-
----------------------------------------------------------------------------
--- Crosshair
----------------------------------------------------------------------------
-run(function()
-	local Crosshair
-	local Length, Width, Gap, Color, StickTarget
-	local gui, lines = nil, {}
-
-	local function rebuild()
-		if gui then
-			gui:Destroy()
-		end
-		gui = Instance.new('ScreenGui')
-		gui.Name = 'FallenCrosshair'
-		gui.IgnoreGuiInset = true
-		gui.ResetOnSpawn = false
-		gui.Parent = guiParent()
-		vape:Clean(gui)
-		lines = {}
-		for i = 1, 4 do
-			local f = Instance.new('Frame')
-			f.BorderSizePixel = 0
-			f.AnchorPoint = Vector2.new(0.5, 0.5)
-			f.Parent = gui
-			lines[i] = f
-		end
-	end
-
-	Crosshair = vape.Categories.Render:CreateModule({
-		Name = 'Fallen Crosshair',
-		Function = function(callback)
-			if callback then
-				rebuild()
-			elseif gui then
-				gui.Enabled = false
-			end
-		end,
-	})
-	Length = Crosshair:CreateSlider({ Name = 'Length', Min = 2, Max = 30, Default = 8 })
-	Width = Crosshair:CreateSlider({ Name = 'Width', Min = 1, Max = 6, Default = 2 })
-	Gap = Crosshair:CreateSlider({ Name = 'Gap', Min = 0, Max = 20, Default = 4 })
-	Color = Crosshair:CreateColorSlider({ Name = 'Color' })
-	StickTarget = Crosshair:CreateToggle({ Name = 'Stick To Target' })
-
-	vape:Clean(runService.RenderStepped:Connect(function()
-		if not Crosshair.Enabled or not gui then
-			return
-		end
-		gui.Enabled = true
-		local pos = userInputService:GetMouseLocation()
-		if StickTarget.Enabled and Targeting.TargetPart then
-			local sp, on = camera:WorldToViewportPoint(Targeting.TargetPart.Position)
-			if on then
-				pos = Vector2.new(sp.X, sp.Y)
-			end
-		end
-		local col = colorFromSlider(Color)
-		local L, W, G = Length.Value, Width.Value, Gap.Value
-		-- top, bottom, left, right
-		lines[1].Size = UDim2.fromOffset(W, L)
-		lines[1].Position = UDim2.fromOffset(pos.X, pos.Y - G - L / 2)
-		lines[2].Size = UDim2.fromOffset(W, L)
-		lines[2].Position = UDim2.fromOffset(pos.X, pos.Y + G + L / 2)
-		lines[3].Size = UDim2.fromOffset(L, W)
-		lines[3].Position = UDim2.fromOffset(pos.X - G - L / 2, pos.Y)
-		lines[4].Size = UDim2.fromOffset(L, W)
-		lines[4].Position = UDim2.fromOffset(pos.X + G + L / 2, pos.Y)
-		for _, f in lines do
-			f.BackgroundColor3 = col
-		end
-	end))
-end)
-
----------------------------------------------------------------------------
--- Bullet Tracers + Hitmarkers
----------------------------------------------------------------------------
-run(function()
-	local Tracers
-	local TexDrop, Col1, Col2, Bright, Life
-	local HitMod, HitSize, HitLife, HitColor
-
-	local TRACER_STYLES = {
-		Default = { Asset = 'rbxassetid://128372145766358', Width = 0.4 },
-		Lightning = { Asset = 'rbxassetid://16892528550', Width = 2 },
-		Dark = { Asset = 'rbxassetid://119588180395545', Width = 1 },
-	}
-
-	FallenState.SpawnTracer = function(position, originPos)
-		if not flags.BulletTracers then
-			return
-		end
-		local origin = originPos
-		if not origin then
-			local head = FallenState.ClientCharacter and FallenState.ClientCharacter:FindFirstChild('Head')
-			origin = head and head.Position
-		end
-		if not origin then
-			return
-		end
-		local vms = workspace:FindFirstChild('VFX') and workspace.VFX:FindFirstChild('VMs')
-		if not vms then
-			vms = workspace.Terrain
-		end
-		local info = TRACER_STYLES[flags.BulletTracersStyle or 'Default'] or TRACER_STYLES.Default
-		local att0 = Instance.new('Attachment')
-		att0.WorldPosition = origin
-		att0.Parent = vms
-		local att1 = Instance.new('Attachment')
-		att1.WorldPosition = origin
-		att1.Parent = vms
-		local beam = Instance.new('Beam')
-		beam.Attachment0 = att0
-		beam.Attachment1 = att1
-		beam.Texture = info.Asset
-		beam.Width0 = info.Width
-		beam.Width1 = info.Width
-		beam.FaceCamera = true
-		beam.LightEmission = 1
-		beam.Brightness = flags.BulletTracersBrightness or 8
-		beam.TextureMode = Enum.TextureMode.Stretch
-		beam.Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, flags.BulletTracerColor1 or Color3.new(1, 1, 1)),
-			ColorSequenceKeypoint.new(1, flags.BulletTracerColor2 or Color3.new(1, 0.5, 0)),
-		})
-		beam.Parent = vms
-		task.spawn(function()
-			tweenService:Create(att1, TweenInfo.new(0.35), { WorldPosition = position }):Play()
-			task.wait(flags.BulletTracersLifetime or 1)
-			local tw = tweenService:Create(beam, TweenInfo.new(0.4), { Width0 = 0, Width1 = 0 })
-			tw:Play()
-			tw.Completed:Wait()
-			beam:Destroy()
-			att0:Destroy()
-			att1:Destroy()
-		end)
-	end
-
-	FallenState.SpawnHitmarker = function(position)
-		if not flags.Hitmarkers then
-			return
-		end
-		local part = Instance.new('Part')
-		part.Anchored = true
-		part.CanCollide = false
-		part.Size = Vector3.new(0.2, 0.2, 0.2)
-		part.Transparency = 1
-		part.Position = position
-		part.Parent = workspace
-		local bb = Instance.new('BillboardGui')
-		bb.Size = UDim2.fromOffset(flags.HitmarkerSize or 24, flags.HitmarkerSize or 24)
-		bb.AlwaysOnTop = true
-		bb.Parent = part
-		local label = Instance.new('TextLabel')
-		label.Size = UDim2.fromScale(1, 1)
-		label.BackgroundTransparency = 1
-		label.Text = 'x'
-		label.Font = Enum.Font.GothamBold
-		label.TextSize = flags.HitmarkerSize or 24
-		label.TextColor3 = flags.HitmarkerColor or Color3.new(1, 1, 1)
-		label.Parent = bb
-		debris:AddItem(part, flags.HitmarkerLifetime or 0.4)
-	end
-
-	Tracers = vape.Categories.Render:CreateModule({
-		Name = 'Fallen Bullet Tracers',
-		Function = function(callback)
-			flags.BulletTracers = callback
-		end,
-	})
-	TexDrop = Tracers:CreateDropdown({
-		Name = 'Texture',
-		List = { 'Default', 'Lightning', 'Dark' },
-		Function = function(v)
-			flags.BulletTracersStyle = v
-		end,
-	})
-	Col1 = Tracers:CreateColorSlider({ Name = 'Color 1' })
-	Col2 = Tracers:CreateColorSlider({ Name = 'Color 2', DefaultHue = 0.08 })
-	Bright = Tracers:CreateSlider({
-		Name = 'Brightness',
-		Min = 1,
-		Max = 16,
-		Default = 8,
-		Function = function(v)
-			flags.BulletTracersBrightness = v
-		end,
-	})
-	Life = Tracers:CreateSlider({
-		Name = 'Lifetime',
-		Min = 0.2,
-		Max = 3,
-		Default = 1,
-		Decimal = 10,
-		Function = function(v)
-			flags.BulletTracersLifetime = v
-		end,
-	})
-	vape:Clean(runService.Heartbeat:Connect(function()
-		if Tracers.Enabled then
-			flags.BulletTracerColor1 = colorFromSlider(Col1)
-			flags.BulletTracerColor2 = colorFromSlider(Col2)
-		end
-	end))
-
-	HitMod = vape.Categories.Render:CreateModule({
-		Name = 'Fallen Hitmarkers',
-		Function = function(callback)
-			flags.Hitmarkers = callback
-		end,
-	})
-	HitSize = HitMod:CreateSlider({
-		Name = 'Size',
-		Min = 8,
-		Max = 48,
-		Default = 24,
-		Function = function(v)
-			flags.HitmarkerSize = v
-		end,
-	})
-	HitLife = HitMod:CreateSlider({
-		Name = 'Lifetime',
-		Min = 0.1,
-		Max = 2,
-		Default = 0.4,
-		Decimal = 10,
-		Function = function(v)
-			flags.HitmarkerLifetime = v
-		end,
-	})
-	HitColor = HitMod:CreateColorSlider({ Name = 'Color' })
-	vape:Clean(runService.Heartbeat:Connect(function()
-		if HitMod.Enabled then
-			flags.HitmarkerColor = colorFromSlider(HitColor)
-		end
-	end))
-end)
-
----------------------------------------------------------------------------
--- Lighting
----------------------------------------------------------------------------
-run(function()
-	local LightingMod
-	local Fullbright, Ambient, TimeOfDay, FogDensity, Bloom, RemoveGrass
-	local saved = {}
-
-	local function capture()
-		saved.Ambient = lighting.Ambient
-		saved.Brightness = lighting.Brightness
-		saved.ClockTime = lighting.ClockTime
-		saved.FogEnd = lighting.FogEnd
-		saved.FogStart = lighting.FogStart
-		saved.OutdoorAmbient = lighting.OutdoorAmbient
-	end
-	capture()
-
-	LightingMod = vape.Categories.Render:CreateModule({
-		Name = 'Fallen Lighting',
-		Function = function(callback)
-			if not callback then
-				lighting.Ambient = saved.Ambient
-				lighting.Brightness = saved.Brightness
-				lighting.ClockTime = saved.ClockTime
-				lighting.FogEnd = saved.FogEnd
-				lighting.FogStart = saved.FogStart
-				lighting.OutdoorAmbient = saved.OutdoorAmbient
-				local bloom = lighting:FindFirstChildOfClass('BloomEffect')
-				if bloom then
-					bloom.Enabled = false
-				end
-			end
-		end,
-	})
-	Fullbright = LightingMod:CreateToggle({ Name = 'Fullbright', Default = true })
-	Ambient = LightingMod:CreateColorSlider({ Name = 'Ambient' })
-	TimeOfDay = LightingMod:CreateSlider({ Name = 'Time', Min = 0, Max = 24, Default = 12, Decimal = 10 })
-	FogDensity = LightingMod:CreateSlider({ Name = 'Fog Density', Min = 0, Max = 1, Default = 0, Decimal = 100 })
-	Bloom = LightingMod:CreateToggle({ Name = 'Bloom' })
-	RemoveGrass = LightingMod:CreateToggle({ Name = 'Remove Grass' })
-
-	vape:Clean(runService.Heartbeat:Connect(function()
-		if not LightingMod.Enabled then
-			return
-		end
-		if Fullbright.Enabled then
-			lighting.Brightness = 2
-			lighting.Ambient = Color3.new(1, 1, 1)
-			lighting.OutdoorAmbient = Color3.new(1, 1, 1)
-			lighting.FogEnd = 1e6
-		else
-			lighting.Ambient = colorFromSlider(Ambient)
-		end
-		lighting.ClockTime = TimeOfDay.Value
-		if FogDensity.Value > 0 then
-			lighting.FogStart = 0
-			lighting.FogEnd = math.max(50, 500 * (1 - FogDensity.Value))
-		end
-		local bloomFx = lighting:FindFirstChildOfClass('BloomEffect')
-		if Bloom.Enabled then
-			if not bloomFx then
-				bloomFx = Instance.new('BloomEffect')
-				bloomFx.Parent = lighting
-			end
-			bloomFx.Enabled = true
-			bloomFx.Intensity = 0.4
-			bloomFx.Size = 24
-			bloomFx.Threshold = 0.9
-		elseif bloomFx then
-			bloomFx.Enabled = false
-		end
-		if RemoveGrass.Enabled then
-			pcall(function()
-				workspace.Terrain.Decoration = false
-			end)
-		end
-	end))
-end)
-
----------------------------------------------------------------------------
--- XRay Bases
----------------------------------------------------------------------------
-run(function()
-	local XRay
-	local Transparency
-	local modified = {}
-
-	local BASE_PART_NAMES = {
-		Wall = true, ['Half Wall'] = true, ['Low Wall'] = true, Doorway = true, Window = true,
-		Foundation = true, Floor = true, ['Triangle Floor'] = true, ['Floor Frame'] = true,
-		['L-Shaped Stairs'] = true, ['U-Shaped Stairs'] = true, ['Foundation Steps'] = true,
-		['Triangle Foundation'] = true, Ceiling = true,
-	}
-
-	XRay = vape.Categories.Render:CreateModule({
-		Name = 'Fallen XRay Bases',
-		Function = function(callback)
-			if not callback then
-				for part, props in pairs(modified) do
-					if part.Parent then
-						part.LocalTransparencyModifier = props.ltm or 0
-						part.Transparency = props.trans
-					end
-				end
-				table.clear(modified)
-			end
-		end,
-	})
-	Transparency = XRay:CreateSlider({
-		Name = 'Transparency',
-		Min = 0,
-		Max = 1,
-		Default = 0.7,
-		Decimal = 100,
-	})
-
-	vape:Clean(runService.Heartbeat:Connect(function()
-		if not XRay.Enabled then
-			return
-		end
-		local bases = workspace:FindFirstChild('Bases')
-		if not bases then
-			return
-		end
-		local t = Transparency.Value
-		for _, desc in bases:GetDescendants() do
-			if desc:IsA('BasePart') and (BASE_PART_NAMES[desc.Name] or desc.Name:find('Wall') or desc.Name:find('Floor') or desc.Name:find('Foundation')) then
-				if not modified[desc] then
-					modified[desc] = { trans = desc.Transparency, ltm = desc.LocalTransparencyModifier }
-				end
-				desc.LocalTransparencyModifier = t
-			end
-		end
-	end))
-end)
-
----------------------------------------------------------------------------
--- Viewmodel Sandbox
----------------------------------------------------------------------------
-run(function()
-	local VMSandbox
-	local ItemChams, ArmChams, ItemColor, ArmColor, ItemMat, ArmMat
-
-	VMSandbox = vape.Categories.Render:CreateModule({
-		Name = 'Fallen Viewmodel Sandbox',
-		Function = function() end,
-		Tooltip = 'Recolor / material on workspace.VFX.VMs',
-	})
-	ItemChams = VMSandbox:CreateToggle({ Name = 'Item Chams', Default = true })
-	ArmChams = VMSandbox:CreateToggle({ Name = 'Arm Chams', Default = true })
-	ItemColor = VMSandbox:CreateColorSlider({ Name = 'Item Color', DefaultHue = 0.7 })
-	ArmColor = VMSandbox:CreateColorSlider({ Name = 'Arm Color', DefaultHue = 0.1 })
-	ItemMat = VMSandbox:CreateDropdown({
-		Name = 'Item Material',
-		List = { 'ForceField', 'Neon', 'SmoothPlastic', 'Glass' },
-	})
-	ArmMat = VMSandbox:CreateDropdown({
-		Name = 'Arm Material',
-		List = { 'ForceField', 'Neon', 'SmoothPlastic', 'Glass' },
-	})
-
-	vape:Clean(runService.RenderStepped:Connect(function()
-		if not VMSandbox.Enabled then
-			return
-		end
-		local vfx = workspace:FindFirstChild('VFX')
-		local vms = vfx and vfx:FindFirstChild('VMs')
-		if not vms then
-			return
-		end
-		for _, model in vms:GetChildren() do
-			if not model:IsA('Model') then
-				continue
-			end
-			for _, part in model:GetDescendants() do
-				if not part:IsA('BasePart') then
-					continue
-				end
-				local isArm = part.Name:lower():find('arm') or part.Name:lower():find('hand') or part.Name:lower():find('glove')
-				if isArm and ArmChams.Enabled then
-					part.Color = colorFromSlider(ArmColor)
-					pcall(function()
-						part.Material = Enum.Material[ArmMat.Value]
-					end)
-				elseif not isArm and ItemChams.Enabled then
-					part.Color = colorFromSlider(ItemColor)
-					pcall(function()
-						part.Material = Enum.Material[ItemMat.Value]
-					end)
-				end
-			end
-		end
-	end))
-end)
-
----------------------------------------------------------------------------
 -- Entity refresh
 ---------------------------------------------------------------------------
 run(function()
-	local function refreshEntityState()
-		if entitylib and entitylib.refresh then
-			pcall(entitylib.refresh)
-		end
-	end
-
+	-- ponytail: entitylib refresh on respawn is handled by universal; avoid double refresh spam
 	vape:Clean(lplr.CharacterAdded:Connect(function()
-		task.delay(0.5, refreshEntityState)
-		task.delay(2, refreshEntityState)
+		task.delay(1, function()
+			if entitylib and entitylib.refresh then
+				pcall(entitylib.refresh)
+			end
+		end)
 	end))
 
 	for _, folderName in { 'Animals', 'Events', 'Bases' } do
@@ -3312,5 +2267,5 @@ end)
 
 if vape.CreateNotification then
 	local serverLabel = fallen.ServerType ~= 'Unknown' and (' (' .. fallen.ServerType .. ')') or ''
-	vape:CreateNotification('Fallen Survival', 'Pass 1 loaded' .. serverLabel, 5)
+	vape:CreateNotification('Fallen Survival', 'Loaded' .. serverLabel, 5)
 end
