@@ -158,6 +158,9 @@ local FallenState = {
 }
 
 vape.Libraries.fallen = FallenState
+if vape.Libraries.silentAimHookBusy == nil then
+	vape.Libraries.silentAimHookBusy = false
+end
 local fallen = FallenState
 local flags = FallenState.Flags
 
@@ -1475,6 +1478,8 @@ run(function()
 			FallenState.ProjectileHooked = true
 			local CreateProjectile = VFXModule.CreateProjectile
 			VFXModule.CreateProjectile = function(self, ...)
+				vape.Libraries.silentAimHookBusy = true
+				local ok, result = pcall(function()
 				local Args = { ... }
 				local Traceback = ''
 				pcall(function()
@@ -1580,6 +1585,40 @@ run(function()
 
 						pcall(function()
 							local Stack = debug.getstack(stacklevel)
+							local finalTarget = Targeting.ScannedPosition or Targeting.TargetPart.Position
+							if LastPredictionPos then
+								finalTarget = finalTarget + LastPredictionPos
+							end
+
+							-- Iridescent fixed stack slots (ViewmodelController level 3)
+							local CameraStack = rawget(Stack, 45)
+							local FlashpartStack = rawget(Stack, 51)
+							local HRPStack = rawget(Stack, 52)
+							local MouseHitStack = rawget(Stack, 54)
+
+							if typeof(CameraStack) == 'CFrame' and typeof(FlashpartStack) == 'Vector3' and typeof(HRPStack) == 'CFrame' and typeof(MouseHitStack) == 'Vector3' then
+								local HitPosition = finalTarget
+								local CameraPosition = CameraStack.Position
+								local FakeCameraCFrame = CFrame.new(CameraPosition, HitPosition)
+								local FakeHRPCFrame = CFrame.new(HRPStack.Position, HitPosition)
+								local NewFlashpartPosition = CFrame.new(FlashpartStack, HitPosition).Position
+
+								if ManipPos then
+									NewFlashpartPosition = CFrame.new(ManipPos, HitPosition).Position
+									local FlashpartOffsetCamera = CameraPosition - FlashpartStack
+									local FlashpartOffsetHRP = HRPStack.Position - FlashpartStack
+									FakeCameraCFrame = CFrame.new(NewFlashpartPosition + FlashpartOffsetCamera, HitPosition)
+									FakeHRPCFrame = CFrame.new(NewFlashpartPosition + FlashpartOffsetHRP, HitPosition)
+								end
+
+								debug.setstack(stacklevel, 45, FakeCameraCFrame)
+								debug.setstack(stacklevel, 54, HitPosition)
+								debug.setstack(stacklevel, 52, FakeHRPCFrame)
+								debug.setstack(stacklevel, 51, NewFlashpartPosition)
+								return
+							end
+
+							-- Fallback: dynamic scan if stack layout shifts
 							local CameraIndex, HRPIndex, FlashIndex, MouseIndex
 							local CameraValue, HRPValue, FlashValue, MouseValue
 							for i = 1, 100 do
@@ -1601,11 +1640,7 @@ run(function()
 									end
 								end
 							end
-							if CameraValue and HRPValue and FlashValue and MouseValue and Targeting.TargetPart then
-								local finalTarget = Targeting.ScannedPosition or Targeting.TargetPart.Position
-								if LastPredictionPos then
-									finalTarget = finalTarget + LastPredictionPos
-								end
+							if CameraValue and HRPValue and FlashValue and MouseValue then
 								local camPos = CameraValue.Position
 								local hrpPos = HRPValue.Position
 								local newFlash = CFrame.new(FlashValue, finalTarget).Position
@@ -1674,6 +1709,12 @@ run(function()
 				end
 
 				return CreateProjectile(self, unpack(Args))
+				end)
+				vape.Libraries.silentAimHookBusy = false
+				if ok then
+					return result
+				end
+				return CreateProjectile(self, ...)
 			end
 		end
 
@@ -1791,6 +1832,8 @@ run(function()
 							FallenState.NetworkHooked = true
 							local old
 							old = hookfunction(network, function(rt, remote, hash, ...)
+								vape.Libraries.silentAimHookBusy = true
+								local ok, ret = pcall(function()
 								local args = { ... }
 								if hash == FIRE_HASH then
 									if rawlen(args) ~= 8 or not Targeting.TargetPart then
@@ -1818,6 +1861,12 @@ run(function()
 									args = { ServerTime, WeaponName, CameraCFrame, MuzzlePos, CharacterCFrame, Spread, OtherSpread, MouseRaycast }
 								end
 								return old(rt, remote, hash, unpack(args))
+								end)
+								vape.Libraries.silentAimHookBusy = false
+								if ok then
+									return ret
+								end
+								return old(rt, remote, hash, ...)
 							end)
 						end
 					end

@@ -49,7 +49,7 @@ Fallen_Survival_20260713_043820/
 └── reference/
     ├── fishy_bypass.txt          ← V3/fishy recursive hook (current bypass)
     ├── fallen_ultimate_v3.lua    ← Full V3 cheat reference
-    ├── bypas.txt               ← Legacy GC ban-table bypass (outdated)
+    ├── bypas.txt               ← Combined ban-table bypass (#1 + #2) + fishy (#3) reference
     ├── source.lua              ← Iridescent reference cheat
     └── insulin.lua             ← Insulin reference cheat
 ```
@@ -133,29 +133,48 @@ Most anticheat remotes use **obfuscated names** (binary garbage strings) — see
 
 ## Anticheat & bypass
 
+### Combined bypass (`libraries/fallen_bypass.lua`)
 
+Fallen needs **all three** stages from `reference/bypas.txt` + `reference/fishy_bypass.txt` (Iridescent `source.lua` uses the same stack):
 
-### Current bypass (V3 / fishy — `libraries/fallen_bypass.lua`)
+| Stage | What | When |
+|-------|------|------|
+| **#1** | Neutralize Remotes GC ban table (`rawget(tbl,4)` on table whose `[1]` is `Remotes` Instance) | First `getgc` pass after spawn |
+| **#2** | Neutralize per-character 9-entry table (`[1]=Character`, `[2]=Humanoid`) — hook indices 5 + 8, nil index 5 | After character exists; **re-run on respawn** |
+| **#3** | Fishy recursive self-table `__newindex` hook | Continuous / respawn retry |
 
-**Fallen Ultimate V3** and `reference/fishy_bypass.txt` use **only** the recursive self-table hook. They do **not** use the legacy `0x01` / `0x02` Remotes/Character ban-table neutralization from `reference/bypas.txt`. Running the old stages on current Fallen AC causes Vape to self-kick with `Failed to load. 0x01` / `0x02`.
+`status.Bypass1/2/3` and `vape.Libraries.fallenBypass` report which stages succeeded. On Fallen, all three must pass or the client is kicked.
 
-#### How the recursive hook works
+**AssetContainer proto hooks** (`games/fallen_survival.lua`): after bypass Active, neuter proto-1 on `getgc` functions whose constants match `SurfaceGui`, `Foundation`, `LocalAmmo`+`Equipped`, `WalkSpeed` — same fingerprints as Iridescent `source.lua`.
 
-1. Wait for `LocalPlayer`, `game:IsLoaded()`, then character with `HumanoidRootPart`, `Humanoid`, and `Head` (or `UpperTorso`).
-2. Scan `getgc(true)` for tables that:
-  - Have no existing metatable
-  - Contain a numeric key `1` (`found_index`)
-  - Contain a self-reference (`rawequal(value, tbl)`)
-  - Have `rawget(tbl, found_index) == nil`
-3. On matching tables, install `__newindex` on the **inner** recursive table that blocks new ban subtables unless whitelisted:
-  - Numeric pair tables `{ {n}, m }` where both are numbers
-  - `{ [1] = 2 }` or 4-length tables with `[4] = false`
-  - `{ [1] = string, [2] = 7 }`
-4. Allowed writes pass through via `rawset`; blocked writes are silently dropped.
+### Detection vectors — do NOT use on Fallen
 
-**Kick message (Fallen only):** `[Vape] Anticheat bypass failed — rejoin when fully loaded.` (V3 uses `[fishy.solutions] run when fully loaded!`)
+| Vector | Why banned | What we use instead |
+|--------|------------|---------------------|
+| Iridescent **Anti Aim** (`Root.CFrame` yaw + `TorsoController.Look:FireServer`) | Server validates torso look remotes | **Universal Desync** — brief `HRP.CFrame * rot` on Heartbeat, restore next frame |
+| Third person **HRP yaw snap** to camera | Persistent CFrame writes outside desync pulse | Third person = camera mode + zoom only (no root rotation) |
+| Fallen-specific pitch via TorsoController | Same as above | Desync angles only (0–180° pitch/yaw), no position desync |
+| Wrong flashpoint stack spoof | AC reads ViewmodelController stack slots | Fixed indices **45/51/52/54** (Iridescent), dynamic scan fallback |
 
-**Non-Fallen games:** bypass still loads and scans quietly; no kick if tables are not found.
+### Desync + Blink (`libraries/fallen_exploits.lua`)
+
+**One module: Desync** (Blatant) — universal CFrame angle desync + camera proxy + visualizer + reach ring.
+
+- **No separate Anti Aim module** — Iridescent-style anti aim is intentionally removed.
+- Enable **Desync** first; sets `FS.desyncAnchor` + `FS.desyncReach` (1–8 studs).
+- **Blink** chokes movement packets (`S2PhysicsSenderRate=0`); auto-disables when `|HRP - anchor| > reach`.
+- `FS.currentDesyncRotation` feeds Blink visualizer when desync angles are active.
+- Desync skips while `vape.Libraries.silentAimHookBusy` (silent aim stack/network hooks).
+
+### Silent aim + manipulation flashpoint (`games/fallen_survival.lua`)
+
+Match Iridescent `source.lua` CreateProjectile hook:
+
+1. **Stack rewrite** at level 3: slots 45=camera CFrame, 51=flashpart Vector3, 52=HRP CFrame, 54=hit Vector3.
+2. With **manipulation**: rebase camera/HRP/flash from `ManipulatedPosition` using flash offsets (same math as source).
+3. **Args rewrite**: `Position`, `Direction`, `PositionFirst`, `DirectionFirst` from manipulated origin when set.
+4. **VMNetworkPointer** 8-arg fire: rewrite `CameraCFrame`, `CharacterCFrame`, `MuzzlePos`, `MouseRaycast` with manipulation origin.
+5. Wrap hooks with `silentAimHookBusy` so desync does not fight stack spoof.
 
 ### When to run bypass
 
@@ -373,7 +392,7 @@ Status: ape.Libraries.fallen.AssetContainerHooked.
 
 ### Deferred (not in Pass 1)
 
-Misc movement (Fly, Silent Step, Bunnyhop, Omnisprint, NoFall, InfiniteFly), Auto Upgrade, Instant Loot, Disable Turrets, Skins tab, Anti Aim, Armor Viewer, Killaura, Fat Bullet, Instant Eoka, Double Shot, full AssetContainer proto suite beyond the four fingerprints above.
+Misc movement (Fly, Silent Step, Bunnyhop, Omnisprint, NoFall) in `libraries/fallen_movement.lua`. Desync/Blink/Third Person/Underground in `libraries/fallen_exploits.lua`. Deferred: Auto Upgrade, Instant Loot, Disable Turrets, Skins, Armor Viewer, Killaura, Fat Bullet, Instant Eoka, Double Shot, full AssetContainer proto suite beyond the four fingerprints above.
 
 ### Runtime verification checklist
 
@@ -392,12 +411,9 @@ Misc movement (Fly, Silent Step, Bunnyhop, Omnisprint, NoFall, InfiniteFly), Aut
 1. Search dump: manifest/module_source_map.txt → script path → .lua file
 2. Cross-reference remotes: manifest/remotes.txt
 3. AssetContainer is obfuscated — runtime getgc + getconstants on live client
-4. Bypass reference: 
-eference/fishy_bypass.txt + allen_ultimate_v3.lua lines 222–395
-5. Silent aim reference: 
-eference/insulin.lua (manip/hitscan) + fire hook in V3
-6. ESP/visuals reference: 
-eference/source.lua (Iridescent)
+4. Bypass reference: `reference/bypas.txt` + `reference/fishy_bypass.txt` → `libraries/fallen_bypass.lua`
+5. Silent aim reference: `reference/insulin.lua` + Iridescent `source.lua` stack slots 45/51/52/54
+6. ESP/visuals reference: `reference/source.lua` (Iridescent)
 7. Test Medium (16849012343) and Large (13800717766)
 
 ### Regenerating the dump
