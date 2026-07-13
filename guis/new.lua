@@ -30,6 +30,11 @@ local SHARED_GAME_CONFIGS = {
 		places = {94987506187454, 115875349872417, 126691165749976},
 		canonPlace = 115875349872417,
 	},
+	FALLEN = {
+		label = 'Fallen Survival',
+		places = {16849012343, 13800717766},
+		canonPlace = 16849012343,
+	},
 }
 local PLACE_TO_SHARED = {}
 for _, data in SHARED_GAME_CONFIGS do
@@ -41,6 +46,8 @@ local PLACE_LABELS = {
 	[94987506187454] = 'REDLINER Main',
 	[115875349872417] = 'REDLINER FFA',
 	[126691165749976] = 'REDLINER Match',
+	[16849012343] = 'Fallen Survival Medium',
+	[13800717766] = 'Fallen Survival Large',
 	[14104248348] = 'On Tap',
 	[14191889582] = 'On Tap Alt',
 }
