@@ -2228,9 +2228,10 @@ local function loadFallenLib(file)
 	end
 end
 
-run(function()
+	run(function()
 	loadFallenLib('fallen_esp.lua')
 	loadFallenLib('fallen_movement.lua')
+	loadFallenLib('fallen_exploits.lua')
 end)
 
 -- Entity refresh
