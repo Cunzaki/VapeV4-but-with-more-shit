@@ -1,0 +1,11 @@
+Merged Fallen Survival dump
+Generated: 2026-07-13T04:38:34.613857
+Source files: 3
+Unique scripts: 132
+Hash conflicts resolved: 1
+Unique content hashes: 82
+
+Per-file script counts:
+  place 16849012343 Fallen Survival Medium Server.rbxlx: 128
+  place 16849012343 Fallen Survival Medium Server(1).rbxlx: 128
+  place 13800717766 Fallen Survival Large Server(1).rbxlx: 132

@@ -1,0 +1,27 @@
+# Instance summary (merged)
+
+Folder	11840
+Model	10342
+ObjectValue	8349
+RemoteEvent	518
+RemoteFunction	224
+ModuleScript	216
+StringValue	189
+LocalScript	138
+BindableEvent	39
+NumberValue	36
+Script	34
+BindableFunction	24
+BoolValue	21
+UnreliableRemoteEvent	9
+
+# Top-level services / roots
+
+MaterialService	3 paths
+README	1 paths
+ReplicatedFirst	2 paths
+ReplicatedStorage	4879 paths
+StarterGui	15 paths
+StarterPlayer	66 paths
+TextChatService	3 paths
+Workspace	923 paths

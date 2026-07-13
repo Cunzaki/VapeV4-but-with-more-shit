@@ -131,7 +131,33 @@ end
 vape = guiChunk()
 shared.vape = vape
 
+local FALLEN_PLACE_IDS = {
+	[16849012343] = true,
+	[13800717766] = true,
+}
+local function isFallenSurvival()
+	if FALLEN_PLACE_IDS[game.PlaceId] then
+		return true
+	end
+	local rs = cloneref(game:GetService('ReplicatedStorage'))
+	return rs:FindFirstChild('Modules') and rs.Modules:FindFirstChild('AssetContainer')
+end
+local function loadFallenBypass()
+	if getgenv().FallenBypassLoaded then
+		return true
+	end
+	local bypassPath = 'newvape/libraries/fallen_bypass.lua'
+	local source = isfile(bypassPath) and readfile(bypassPath) or downloadFile(bypassPath)
+	return runGameScript(source, 'fallen_bypass')
+end
+
 if not shared.VapeIndependent then
+	if isFallenSurvival() then
+		local bypassOk = loadFallenBypass()
+		if not bypassOk then
+			warn('[Vape] Fallen Survival bypass failed — features may be detected')
+		end
+	end
 	runGameScript(downloadFile('newvape/games/universal.lua'), 'universal')
 	local placeScript = 'newvape/games/'..game.PlaceId..'.lua'
 	if isfile(placeScript) then

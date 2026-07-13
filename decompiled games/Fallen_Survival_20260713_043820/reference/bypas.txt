@@ -1,0 +1,157 @@
+--// FALLEN anticheat Bypass (Combined)
+if not (cloneref and type(cloneref) == "function") then
+	return
+end
+
+local Players = cloneref(game:GetService("Players"))
+
+LPH_NO_VIRTUALIZE(function()
+	repeat
+		task.wait()
+	until Players.LocalPlayer ~= nil and game:IsLoaded()
+end)()
+
+local Client = Players.LocalPlayer
+local Character = Client.Character or Client.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+--// Bypass #1: Ban Table Neutralization
+LPH_JIT_MAX(function()
+	local BypassCheck1 = false
+	local BypassCheck2 = false
+
+	for Index, Table in getgc(true) do
+		if type(Table) ~= "table" then
+			continue
+		end
+		if typeof(rawget(Table, 1)) == "Instance" and rawget(Table, 1).Name == "Remotes" then
+			local BanTable = rawget(Table, 4)
+
+			setmetatable(BanTable, {
+				__index = function() end,
+				__newindex = function(...) end
+			})
+			BypassCheck1 = true
+		end
+	end
+
+	if not BypassCheck1 then
+		Client:Kick("Failed to load. 0x01")
+		return
+	end
+
+	for Index, Table in getgc(true) do
+		if type(Table) ~= "table" then
+			continue
+		end
+		if rawget(Table, 1) == Character and rawget(Table, 2) == Humanoid and #Table == 9 then
+			local BanTable_1 = rawget(Table, 8)
+			local BanTable_2 = rawget(Table, 5)
+
+			setmetatable(BanTable_1, {
+				__index = function() end,
+				__newindex = function(...) end
+			})
+
+			setmetatable(BanTable_2, {
+				__index = function() end,
+				__newindex = function(...) end
+			})
+
+			BanTable_2 = nil
+			BypassCheck2 = true
+		end
+	end
+
+	if not BypassCheck2 then
+		Client:Kick("Failed to load. 0x02")
+		return
+	end
+end)()
+
+--// Bypass #2: Self-Referencing Table Interception
+do
+	local success, err = pcall(function()
+		local bypass = function(recursive_tbl, ban_index_value)
+			setrawmetatable(recursive_tbl, {
+				__newindex = function(self, index, value)
+					if type(value) == "table" and index == ban_index_value then
+						local whitelisted = false
+
+						local id1 = rawget(value, 1)
+						local id2 = rawget(value, 2)
+						local id4 = rawget(value, 4)
+
+						local len = rawlen(value)
+
+						if id1 then
+							if type(id1) == "table" and len == 2 and rawlen(id1) == 1 and (not rawget(id1, "n")) then
+								local inside_val = rawget(id1, 1)
+								local outside_val = rawget(value, 2)
+
+								if inside_val and outside_val and tonumber(inside_val) and tonumber(outside_val) then
+									whitelisted = true
+								end
+							elseif type(id1) == "number" and rawequal(id1, 2) then
+								if len == 1 then
+									whitelisted = true
+								elseif len == 4 and rawequal(id4, false) then
+									whitelisted = true
+								end
+							elseif type(id1) == "string" and type(id2) == "number" and rawequal(id2, 7) then
+								whitelisted = true
+							end
+						end
+
+						if not whitelisted then
+							return
+						end
+					end
+
+					return rawset(self, index, value)
+				end,
+			})
+
+			return true
+		end
+
+		local bypassed = false
+
+		LPH_JIT_MAX(function()
+			for _, tbl in getgc(true) do
+				if type(tbl) ~= "table" then
+					continue
+				end
+
+				if getrawmetatable(tbl) then
+					continue
+				end
+
+				local found_index, found_recursive = false, false
+				for _, value in tbl do
+					if type(value) == "number" and rawequal(value, 1) then
+						found_index = value
+					end
+					if rawequal(value, tbl) then
+						found_recursive = value
+					end
+				end
+
+				if found_index and found_recursive and rawequal(rawget(tbl, found_index), nil) then
+					if bypass(found_recursive, found_index) then
+						bypassed = true
+					end
+				end
+			end
+		end)()
+
+		if not bypassed then
+			return Client:Kick("Failed to load. 0x03")
+		end
+	end)
+
+	if not success then
+		Client:Kick(err)
+	end
+end

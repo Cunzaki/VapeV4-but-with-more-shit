@@ -1,2 +1,0 @@
-# GameMechanics tables (all gc hits)
-

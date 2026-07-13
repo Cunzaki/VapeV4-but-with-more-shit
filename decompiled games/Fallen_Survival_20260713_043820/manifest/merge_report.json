@@ -1,0 +1,1701 @@
+{
+  "sources": [
+    {
+      "path": "README",
+      "class": "Script",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "b3901333c3edf341bd4b5a2a87622b89ef8f186362510db24d29408c309ee9cb",
+      "bytes": 3777,
+      "lines": 38
+    },
+    {
+      "path": "ReplicatedFirst.Preload",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "81cebad1a417686a0fb7a48dc48dd84182480a83ea186ed7bcd8c45e2c20038e",
+      "bytes": 11974,
+      "lines": 325
+    },
+    {
+      "path": "ReplicatedFirst.Script",
+      "class": "Script",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "c2196d9f21cbfdb1511782881f9bf4e8a83722dad2688825dec340795d152af2",
+      "bytes": 148,
+      "lines": 3
+    },
+    {
+      "path": "ReplicatedStorage.Benches.Base Cabinet.Server.Main.Script",
+      "class": "Script",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "c2196d9f21cbfdb1511782881f9bf4e8a83722dad2688825dec340795d152af2",
+      "bytes": 148,
+      "lines": 3
+    },
+    {
+      "path": "ReplicatedStorage.Benches.Military Boat.Default.BoatController",
+      "class": "Script",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "c2196d9f21cbfdb1511782881f9bf4e8a83722dad2688825dec340795d152af2",
+      "bytes": 148,
+      "lines": 3
+    },
+    {
+      "path": "ReplicatedStorage.Benches.Salvaged Flycopter.Default.PilotServer.PilotClient",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "1e9371fb47262515a7477eca0641d5f1ec38482a12953b805f03be1407a1206e",
+      "bytes": 33483,
+      "lines": 892
+    },
+    {
+      "path": "ReplicatedStorage.Benches.Salvaged Flycopter.Default.PilotServer",
+      "class": "Script",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "c2196d9f21cbfdb1511782881f9bf4e8a83722dad2688825dec340795d152af2",
+      "bytes": 148,
+      "lines": 3
+    },
+    {
+      "path": "ReplicatedStorage.Benches.Storage Cabinet.Server.Main.Script",
+      "class": "Script",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "c2196d9f21cbfdb1511782881f9bf4e8a83722dad2688825dec340795d152af2",
+      "bytes": 148,
+      "lines": 3
+    },
+    {
+      "path": "ReplicatedStorage.Benches.Wooden Boat.Default.BoatController",
+      "class": "Script",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "c2196d9f21cbfdb1511782881f9bf4e8a83722dad2688825dec340795d152af2",
+      "bytes": 148,
+      "lines": 3
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.AutoTurretController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "731abe91b004418826d0ccae251de83e6091f3ddff8625b6f446d10898fa22ac",
+      "bytes": 5871,
+      "lines": 159
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.BuildController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9cdd7807a192eb398790171d31616933c6ac89bad796b95038da70db0a26453e",
+      "bytes": 87536,
+      "lines": 1769
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.CameraController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "03d669330f3ee1561d7bb101b68775c9ad63c572d4ef816d2619311623cf9dc3",
+      "bytes": 11114,
+      "lines": 281
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.ClanLeaderboardController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "be500ab76d4729a32dda4dfda72b1fbc1a91105d84c224e630dcb9a7b4045e23",
+      "bytes": 2821,
+      "lines": 86
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.CraftingController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "20d1a6a8a34641ca9454b175a191fd3da54508de3c49be6208eeaf20e34a3dcc",
+      "bytes": 46437,
+      "lines": 1432
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.ElectricityController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "65bc4a8ec3d6103b4a8d6f5daa22e4fb2d6f8fcaca55e032ba4144ca20dfd1ac",
+      "bytes": 34488,
+      "lines": 851
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.EquipController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "5fbe3eca130923ca2d750b32176b6d428e8146c697f2fa7bd6b46eb79652a33f",
+      "bytes": 18457,
+      "lines": 464
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.EventViewer",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "4bf93649c6c72d71c0ca082e2d0ec4389410671fb58a704745ac4c7c73508446",
+      "bytes": 16305,
+      "lines": 422
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.InteractController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "a33323cc5e8bcaccad0d72882a7b7c9f0438060dc16b3942a5d97ae9fcfd7278",
+      "bytes": 146,
+      "lines": 5
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.InventoryController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "a9223c269d60c4e5defe0b28107e4a4f46c47f84e4022b1bbbde6bab21baccab",
+      "bytes": 187128,
+      "lines": 4049
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.JukeboxController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "7010083b015fe8d06d52d04b0ac565f8ba8a0bfd698db1fec6a09c7e4204de4a",
+      "bytes": 1257,
+      "lines": 29
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.NametagController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "7dbf96d0ce6ef5cc523fc6b7be6ae320f411eb5a67d4a848c60e1084a5af0790",
+      "bytes": 1318,
+      "lines": 36
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.ServerTypeController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "7a3c0708056beba795c13091e4775260402ce796dcdb93f2c78c90a3cac7a4be",
+      "bytes": 40814,
+      "lines": 1124
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.StateController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9d5b2487a4344bd895c81aa44d27af42fa0fbf596eceff3d5c598d5e33e0866b",
+      "bytes": 29833,
+      "lines": 660
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.StatsController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "c88fcfc82560a0a95e0ede3e6a9e2a6c22ee3a51b5ba1c431761283860566b33",
+      "bytes": 26266,
+      "lines": 744
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.TeamNavigationController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "7c45feb5aca562940e798fb7c5f710b5023a8f8b46408fab96ce49d7cfc322b9",
+      "bytes": 94464,
+      "lines": 2077
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.ViewmodelController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "a33323cc5e8bcaccad0d72882a7b7c9f0438060dc16b3942a5d97ae9fcfd7278",
+      "bytes": 146,
+      "lines": 5
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.WaterController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "946d251712976091d05b4648ea293e90bd4640e80607dfa2c8230fafdbb9e4d5",
+      "bytes": 10244,
+      "lines": 308
+    },
+    {
+      "path": "ReplicatedStorage.CharacterScripts.WheelController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "a87387426d1669e3c0b16dcd3dd8227d046cd636265d80e37ea163cb2590ea52",
+      "bytes": 13533,
+      "lines": 422
+    },
+    {
+      "path": "ReplicatedStorage.Modules.ActiveBenchModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "e997ecac1ba95e534caeebae1a9dbe92f7d8bd46225e008a620a411b56f7c199",
+      "bytes": 2876,
+      "lines": 119
+    },
+    {
+      "path": "ReplicatedStorage.Modules.ArmorModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "a06c5b2436d9ec6e222c821a5975e856808abd1ec07eaa9733eaf7a7f84269bd",
+      "bytes": 10526,
+      "lines": 318
+    },
+    {
+      "path": "ReplicatedStorage.Modules.AssetContainer",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "a33323cc5e8bcaccad0d72882a7b7c9f0438060dc16b3942a5d97ae9fcfd7278",
+      "bytes": 146,
+      "lines": 5
+    },
+    {
+      "path": "ReplicatedStorage.Modules.BasePartInfo",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "5aed07407a829005b20e82f078677bdc294a3130d944dad7090f4c6103fa77bf",
+      "bytes": 1089,
+      "lines": 54
+    },
+    {
+      "path": "ReplicatedStorage.Modules.BenchInfo",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "4ce5567601c57a5f1284dabe6e1f51a7974cb63f87daa65e5146ae7f4f1c3e1d",
+      "bytes": 154191,
+      "lines": 3724
+    },
+    {
+      "path": "ReplicatedStorage.Modules.ButtonClass",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "039bf3fbe951f9a40c9a0fba04710e8e29d10cac79cedbb64a017006beec3038",
+      "bytes": 7465,
+      "lines": 245
+    },
+    {
+      "path": "ReplicatedStorage.Modules.CameraShakeModule.CameraShakeInstance",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "bd7c019e9b6474eced6e867e4d5f08e758f3dcc94460a888865e85193ce1fe8e",
+      "bytes": 4636,
+      "lines": 179
+    },
+    {
+      "path": "ReplicatedStorage.Modules.CameraShakeModule.CameraShakePresets",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "10896d95f9b3aa25d8b6bf49d1f922b2a260504730cffac73c5af383042ce4a2",
+      "bytes": 3019,
+      "lines": 105
+    },
+    {
+      "path": "ReplicatedStorage.Modules.CameraShakeModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "a0d1d4f981c58f2f27adb08512210d15439e0a8fb20deea9c3b194056078da79",
+      "bytes": 5254,
+      "lines": 154
+    },
+    {
+      "path": "ReplicatedStorage.Modules.GamepadIconModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "3642f774c20c6b02148f48a6c1fb44311683308dadcf71f793e165c5b493e9d9",
+      "bytes": 1998,
+      "lines": 66
+    },
+    {
+      "path": "ReplicatedStorage.Modules.GuiUtil",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "48c1aa38ae3034ba6413218d36eb653a5cebcde6b748a35cc5fb3bd8e65d1b2c",
+      "bytes": 12660,
+      "lines": 326
+    },
+    {
+      "path": "ReplicatedStorage.Modules.ItemClass",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "136c38d9e9b740cfe0b7f9c8bf541c143ab10bb3d414efe5e0072c48d6586c9b",
+      "bytes": 13947,
+      "lines": 424
+    },
+    {
+      "path": "ReplicatedStorage.Modules.ItemSearchModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "1abd2f9210bd62843f1373f2ec0b32520f0ecdea40b2a415f511b6761d98615f",
+      "bytes": 7760,
+      "lines": 270
+    },
+    {
+      "path": "ReplicatedStorage.Modules.Items",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "fa62e48cac04b66783c656322ad56a1020e49f447a5d929947f16bee322506a5",
+      "bytes": 54790,
+      "lines": 724
+    },
+    {
+      "path": "ReplicatedStorage.Modules.NumberUtil",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "01af37d84416ea49d24ff25e1695527ee1dcc5d1853e6d520a1b19e9baf48bea",
+      "bytes": 4686,
+      "lines": 168
+    },
+    {
+      "path": "ReplicatedStorage.Modules.RaycastUtil",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "b726c155025324503be6aa983bbbe0c848c875390857bf03d407e53c1e2b33bc",
+      "bytes": 86664,
+      "lines": 1580
+    },
+    {
+      "path": "ReplicatedStorage.Modules.RecipeModule.BasePartRecipes",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "3dd98b9e38c9b3d45d3f49ec37ead91afd4452cf4f7cbbab4830646a13bdbb5f",
+      "bytes": 1453,
+      "lines": 9
+    },
+    {
+      "path": "ReplicatedStorage.Modules.RecipeModule.ItemRecipes",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "56b960516a538f1b709db0ee992631976ccffbeb0994eab446004e6c71cb0ecf",
+      "bytes": 8296,
+      "lines": 213
+    },
+    {
+      "path": "ReplicatedStorage.Modules.RecipeModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "2df3cd8c76ec8199a17b17015c3d03cde1270e41cd51a33cdc1d19afb3426d0b",
+      "bytes": 5230,
+      "lines": 201
+    },
+    {
+      "path": "ReplicatedStorage.Modules.ResearchModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "84bf7542cd739bf779d9adf1f40e5fd9895d753fc85f0c0d0755ffe1a16c506f",
+      "bytes": 4202,
+      "lines": 133
+    },
+    {
+      "path": "ReplicatedStorage.Modules.SettingsModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "74f6aca12754836622c3d19b3d9739f0009a1f1a84d84f5b9fde57e02918fcc4",
+      "bytes": 6967,
+      "lines": 254
+    },
+    {
+      "path": "ReplicatedStorage.Modules.SkinsModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "bdd0e1eb8be072139d253b9e4b5e2fe9e70cb858887055fdf804cfb754370942",
+      "bytes": 42542,
+      "lines": 581
+    },
+    {
+      "path": "ReplicatedStorage.Modules.SoundModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "246bbaff74c39d9e5bac6ebaa2b3bcf1e3b3bd5de98b60cdf4337eb745cafc2f",
+      "bytes": 9871,
+      "lines": 319
+    },
+    {
+      "path": "ReplicatedStorage.Modules.Spring",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "71fd8d3e297a50b92910e4bfde5f7693ef2869217b95a0e53c93d205d4e7fe3d",
+      "bytes": 4254,
+      "lines": 129
+    },
+    {
+      "path": "ReplicatedStorage.Modules.StatusClass",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "651c4a6d305d8cc0e2b21b717a6630f590dd1d0852eafe0ed3674aad7b2081ce",
+      "bytes": 7140,
+      "lines": 271
+    },
+    {
+      "path": "ReplicatedStorage.Modules.TableUtil",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "6277c515b28a7b1937a16670c75bb9c747892ab9f86c42c087d5f50e09108d18",
+      "bytes": 1509,
+      "lines": 62
+    },
+    {
+      "path": "ReplicatedStorage.Modules.ToolInfo",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "c3141c48612e812f87725fd8d53b39badad4ff7cca6c6d1ad466488a3ed4940a",
+      "bytes": 82638,
+      "lines": 1892
+    },
+    {
+      "path": "ReplicatedStorage.Modules.TweenUtil",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "2cc42b7878d42597d19be0ed79f240ee714de09037c740e4f3ead61c82d6518b",
+      "bytes": 789,
+      "lines": 25
+    },
+    {
+      "path": "ReplicatedStorage.Modules.VFXModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "d2bd72272b179d6eed51aec4880a30cf2df7bd48b2c398c13b897dccfc4c4e16",
+      "bytes": 43381,
+      "lines": 1128
+    },
+    {
+      "path": "ReplicatedStorage.Modules.ViewportModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "fe1f2a2fe3ba40e6cfbc645a09cffcc6bb4be5aea80b1e719cacdf7043dd6fdb",
+      "bytes": 19555,
+      "lines": 510
+    },
+    {
+      "path": "ReplicatedStorage.Modules.WeldModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "263cb7062fbd0372ed69232808beacc850a9f84de328f2c9285563b305251a88",
+      "bytes": 13113,
+      "lines": 343
+    },
+    {
+      "path": "ReplicatedStorage.UIs.Main.BuildVersion.SetBuild",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "4328611f88db167a8bcbb0323128f55818e5c912d1e1eb32fea88cce940b826b",
+      "bytes": 632,
+      "lines": 16
+    },
+    {
+      "path": "StarterGui.Boombox.Main.Drag",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "aba10798d2cc214c937a012b063e57f063e97bcff6388d80f67db3895a2eb1e8",
+      "bytes": 89,
+      "lines": 3
+    },
+    {
+      "path": "StarterGui.Boombox.Main.Resizer",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "59fe59eceb1557186bb5911b689069ad9ff793d41535abe47360ecbae351de23",
+      "bytes": 8026,
+      "lines": 211
+    },
+    {
+      "path": "StarterGui.Boombox.Main.Script",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "100537470f277a50a16b076a8335c646ced31bd5bcbcafa1fbed8c3dc27b826d",
+      "bytes": 33538,
+      "lines": 954
+    },
+    {
+      "path": "StarterGui.Boombox.RelicsXYZ.AudioPlayer",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "0f0e1e658fce54bb32f44d80fe0511759fbe016af486826f7947c88c09d4d054",
+      "bytes": 4688,
+      "lines": 192
+    },
+    {
+      "path": "StarterGui.Boombox.RelicsXYZ.Constants",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "b89174fa0037a9e8a80ad7af34127657b14a071457336aabfbdc954bddedb5a0",
+      "bytes": 1450,
+      "lines": 52
+    },
+    {
+      "path": "StarterGui.Boombox.RelicsXYZ.Favorites",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "f2e3d18d52c524e1d8a6ff09a7c62fc35f5dee7ae4be8686d242cdd47132e18e",
+      "bytes": 1838,
+      "lines": 66
+    },
+    {
+      "path": "StarterGui.Boombox.RelicsXYZ.Playlists",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "f80ad2811151f44bb5c4764f6df859df409f699c8a6adf34b817ebe773426846",
+      "bytes": 4430,
+      "lines": 164
+    },
+    {
+      "path": "StarterGui.Boombox.RelicsXYZ.Sound",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "47fa7b88fb4f9910e0b7b0646f146c6e51c94eb441188b78babefc71a20b0915",
+      "bytes": 23140,
+      "lines": 802
+    },
+    {
+      "path": "StarterGui.Boombox.RelicsXYZ.Tracks",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "02315c730fe212c69383e4451df72d78da5d9c0966b29fbe354ec439e954393f",
+      "bytes": 7290,
+      "lines": 272
+    },
+    {
+      "path": "StarterGui.Boombox.TopBarAlignedRight.ToggleMusicPlayer.InvisToggler",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "24155c590e2d453ff193cf304a0bc9929c635c77289c404bcd216c7570ace4cf",
+      "bytes": 572,
+      "lines": 15
+    },
+    {
+      "path": "StarterGui.Boombox.TopBarAlignedRight.TopBarButtonExpansionTweens",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "a05739e0d475ea1df240fdf16e90065ed043d9b9bf106d04e09e64594153953f",
+      "bytes": 1692,
+      "lines": 41
+    },
+    {
+      "path": "StarterGui.Boombox.TopbarInsetUpdater",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "a88d4f2d1970ba23dcb75aed8c1fa9af89735c26e28e200de77a37fa4aa5d816",
+      "bytes": 965,
+      "lines": 25
+    },
+    {
+      "path": "StarterGui.MainMenu.ContentFrame.Settings.SettingsController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "a5743fa7eb297b5afbafcf9eaf3a5116f5f5714f2710c69a15f705cbec729f7a",
+      "bytes": 24900,
+      "lines": 709
+    },
+    {
+      "path": "StarterGui.MainMenu.MainMenuController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "197df9769811014e1e146e2997f9df5b79fdbbccd049eb72c21f18399f8a406d",
+      "bytes": 10571,
+      "lines": 278
+    },
+    {
+      "path": "StarterPlayer.StarterCharacterScripts.Animate",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "aba10798d2cc214c937a012b063e57f063e97bcff6388d80f67db3895a2eb1e8",
+      "bytes": 89,
+      "lines": 3
+    },
+    {
+      "path": "StarterPlayer.StarterCharacterScripts.Health",
+      "class": "Script",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "c2196d9f21cbfdb1511782881f9bf4e8a83722dad2688825dec340795d152af2",
+      "bytes": 148,
+      "lines": 3
+    },
+    {
+      "path": "StarterPlayer.StarterCharacterScripts.TorsoController.Client",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "54f197641503a64dfa2b5d3b22d5b955c041e4e04c9b35dbee5ffbe7f5f63768",
+      "bytes": 3292,
+      "lines": 104
+    },
+    {
+      "path": "StarterPlayer.StarterCharacterScripts.TorsoController",
+      "class": "Script",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "c2196d9f21cbfdb1511782881f9bf4e8a83722dad2688825dec340795d152af2",
+      "bytes": 148,
+      "lines": 3
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.BenchController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "95478d82188a2e8e7848cdc41e289a97cc5249062d0d0a6a831e7f51538102eb",
+      "bytes": 7364,
+      "lines": 230
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.ChatController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "258934ca59b1d3a3dabaf9fdc2e2a435275b8f59f4ef1ed5a442ff126552a578",
+      "bytes": 79170,
+      "lines": 1924
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.ClanController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "642865ffc5a06ee5c86d74a8df5786f68d32ca26d6f5d61b5b0ea882cb8139b1",
+      "bytes": 2393,
+      "lines": 62
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.CoreGuiController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "1a29d41f9eb18d19c51c455b0fd31affacad1dbc23a48292218c1458b7a06d60",
+      "bytes": 166,
+      "lines": 3
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.DisableReset",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "aecbea56fe86acd5079d923008ccebfd27cace2aabb87f6e9755055c72e60ffe",
+      "bytes": 722,
+      "lines": 25
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.LoadingScreenController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "827dade2a7760e71e206aaf1db8a7aaaa359134095290a2da59ebf2ba3671a83",
+      "bytes": 11902,
+      "lines": 278
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.BaseCamera",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.BaseOcclusion",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.CameraInput",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.CameraToggleStateController",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.CameraUI",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.CameraUtils",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.ClassicCamera",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.Invisicam",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.LegacyCamera",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.MouseLockController",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.OrbitalCamera",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.Poppercam",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.TransparencyController",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.VRBaseCamera",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.VRCamera",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.VRVehicleCamera",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.VehicleCamera.VehicleCameraConfig",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.VehicleCamera.VehicleCameraCore",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.VehicleCamera",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.ZoomController.Popper",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.ZoomController",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.ControlModule.BaseCharacterController",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.ControlModule.ClickToMoveController",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.ControlModule.ClickToMoveDisplay",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.ControlModule.DynamicThumbstick",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.ControlModule.Gamepad",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.ControlModule.Keyboard",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.ControlModule.PathDisplay",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.ControlModule.TouchJump",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.ControlModule.TouchThumbstick",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.ControlModule.VRNavigation",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.ControlModule.VehicleController",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule.ControlModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerModule",
+      "class": "ModuleScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PlayerScriptsLoader",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.PreferredInputController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "260391a8f7c5536025a91ccf2a4e44c231db8d6cec0e50426720317ee60efe7c",
+      "bytes": 4477,
+      "lines": 108
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.RbxCharacterSounds",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde",
+      "bytes": 10,
+      "lines": 1
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.SettingsApplier",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "4d6da8ffe58eb3e74a5e88d28ce175035cd3ef98b151eb8835294f9182daa02a",
+      "bytes": 3686,
+      "lines": 85
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.SoundController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "2763f38dfa8831a4407e4fc39b29021bebe7cee1f95435811257e5ec75575015",
+      "bytes": 4727,
+      "lines": 120
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.StateAssetController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "1cd5c52919fabe939d73c1b3bad8dcb6cd1a1c7049f5503154f05794e11a6cfc",
+      "bytes": 71004,
+      "lines": 1668
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.VFXController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "3801352c7e4c2ac2a3dc63a18c11b11082db2717df099af9d2f4bb6ec97fac23",
+      "bytes": 6483,
+      "lines": 202
+    },
+    {
+      "path": "StarterPlayer.StarterPlayerScripts.WeatherController",
+      "class": "LocalScript",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "406c4d2e0dc22c9543b9145aee44e6436664bc98aadb4ccd71709310a30f2855",
+      "bytes": 8733,
+      "lines": 271
+    },
+    {
+      "path": "Workspace.Bases.Loners.Wooden Boat.Wooden Boat.BoatController",
+      "class": "Script",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx"
+      ],
+      "hash": "c2196d9f21cbfdb1511782881f9bf4e8a83722dad2688825dec340795d152af2",
+      "bytes": 148,
+      "lines": 3
+    },
+    {
+      "path": "Workspace.MonumentBuildBlock.Base.Base Cabinet.SetMonumentBuildBlockPositions",
+      "class": "Script",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx"
+      ],
+      "hash": "c2196d9f21cbfdb1511782881f9bf4e8a83722dad2688825dec340795d152af2",
+      "bytes": 148,
+      "lines": 3
+    },
+    {
+      "path": "Workspace.Plinko1.PlinkoManager",
+      "class": "Script",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx"
+      ],
+      "hash": "c2196d9f21cbfdb1511782881f9bf4e8a83722dad2688825dec340795d152af2",
+      "bytes": 148,
+      "lines": 3
+    },
+    {
+      "path": "Workspace.Plinko1.Script",
+      "class": "Script",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx"
+      ],
+      "hash": "c2196d9f21cbfdb1511782881f9bf4e8a83722dad2688825dec340795d152af2",
+      "bytes": 148,
+      "lines": 3
+    },
+    {
+      "path": "Workspace.RocketFactoryPinkCardInvisWalls.ShowInvisWalls",
+      "class": "Script",
+      "places": [
+        "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+        "place 16849012343 Fallen Survival Medium Server.rbxlx"
+      ],
+      "hash": "b4849f2f90ebc6a912e6032bfb60090fb207c52ca144a89cfb209f6f6bfc5baa",
+      "bytes": 2814,
+      "lines": 86
+    }
+  ],
+  "unique_by_hash": {
+    "b3901333c3edf341bd4b5a2a87622b89ef8f186362510db24d29408c309ee9cb": "README",
+    "81cebad1a417686a0fb7a48dc48dd84182480a83ea186ed7bcd8c45e2c20038e": "ReplicatedFirst.Preload",
+    "c2196d9f21cbfdb1511782881f9bf4e8a83722dad2688825dec340795d152af2": "ReplicatedFirst.Script",
+    "1e9371fb47262515a7477eca0641d5f1ec38482a12953b805f03be1407a1206e": "ReplicatedStorage.Benches.Salvaged Flycopter.Default.PilotServer.PilotClient",
+    "731abe91b004418826d0ccae251de83e6091f3ddff8625b6f446d10898fa22ac": "ReplicatedStorage.CharacterScripts.AutoTurretController",
+    "9cdd7807a192eb398790171d31616933c6ac89bad796b95038da70db0a26453e": "ReplicatedStorage.CharacterScripts.BuildController",
+    "03d669330f3ee1561d7bb101b68775c9ad63c572d4ef816d2619311623cf9dc3": "ReplicatedStorage.CharacterScripts.CameraController",
+    "be500ab76d4729a32dda4dfda72b1fbc1a91105d84c224e630dcb9a7b4045e23": "ReplicatedStorage.CharacterScripts.ClanLeaderboardController",
+    "20d1a6a8a34641ca9454b175a191fd3da54508de3c49be6208eeaf20e34a3dcc": "ReplicatedStorage.CharacterScripts.CraftingController",
+    "65bc4a8ec3d6103b4a8d6f5daa22e4fb2d6f8fcaca55e032ba4144ca20dfd1ac": "ReplicatedStorage.CharacterScripts.ElectricityController",
+    "5fbe3eca130923ca2d750b32176b6d428e8146c697f2fa7bd6b46eb79652a33f": "ReplicatedStorage.CharacterScripts.EquipController",
+    "4bf93649c6c72d71c0ca082e2d0ec4389410671fb58a704745ac4c7c73508446": "ReplicatedStorage.CharacterScripts.EventViewer",
+    "a33323cc5e8bcaccad0d72882a7b7c9f0438060dc16b3942a5d97ae9fcfd7278": "ReplicatedStorage.CharacterScripts.InteractController",
+    "a9223c269d60c4e5defe0b28107e4a4f46c47f84e4022b1bbbde6bab21baccab": "ReplicatedStorage.CharacterScripts.InventoryController",
+    "7010083b015fe8d06d52d04b0ac565f8ba8a0bfd698db1fec6a09c7e4204de4a": "ReplicatedStorage.CharacterScripts.JukeboxController",
+    "7dbf96d0ce6ef5cc523fc6b7be6ae320f411eb5a67d4a848c60e1084a5af0790": "ReplicatedStorage.CharacterScripts.NametagController",
+    "7a3c0708056beba795c13091e4775260402ce796dcdb93f2c78c90a3cac7a4be": "ReplicatedStorage.CharacterScripts.ServerTypeController",
+    "9d5b2487a4344bd895c81aa44d27af42fa0fbf596eceff3d5c598d5e33e0866b": "ReplicatedStorage.CharacterScripts.StateController",
+    "c88fcfc82560a0a95e0ede3e6a9e2a6c22ee3a51b5ba1c431761283860566b33": "ReplicatedStorage.CharacterScripts.StatsController",
+    "7c45feb5aca562940e798fb7c5f710b5023a8f8b46408fab96ce49d7cfc322b9": "ReplicatedStorage.CharacterScripts.TeamNavigationController",
+    "946d251712976091d05b4648ea293e90bd4640e80607dfa2c8230fafdbb9e4d5": "ReplicatedStorage.CharacterScripts.WaterController",
+    "a87387426d1669e3c0b16dcd3dd8227d046cd636265d80e37ea163cb2590ea52": "ReplicatedStorage.CharacterScripts.WheelController",
+    "e997ecac1ba95e534caeebae1a9dbe92f7d8bd46225e008a620a411b56f7c199": "ReplicatedStorage.Modules.ActiveBenchModule",
+    "a06c5b2436d9ec6e222c821a5975e856808abd1ec07eaa9733eaf7a7f84269bd": "ReplicatedStorage.Modules.ArmorModule",
+    "5aed07407a829005b20e82f078677bdc294a3130d944dad7090f4c6103fa77bf": "ReplicatedStorage.Modules.BasePartInfo",
+    "4ce5567601c57a5f1284dabe6e1f51a7974cb63f87daa65e5146ae7f4f1c3e1d": "ReplicatedStorage.Modules.BenchInfo",
+    "039bf3fbe951f9a40c9a0fba04710e8e29d10cac79cedbb64a017006beec3038": "ReplicatedStorage.Modules.ButtonClass",
+    "bd7c019e9b6474eced6e867e4d5f08e758f3dcc94460a888865e85193ce1fe8e": "ReplicatedStorage.Modules.CameraShakeModule.CameraShakeInstance",
+    "10896d95f9b3aa25d8b6bf49d1f922b2a260504730cffac73c5af383042ce4a2": "ReplicatedStorage.Modules.CameraShakeModule.CameraShakePresets",
+    "a0d1d4f981c58f2f27adb08512210d15439e0a8fb20deea9c3b194056078da79": "ReplicatedStorage.Modules.CameraShakeModule",
+    "3642f774c20c6b02148f48a6c1fb44311683308dadcf71f793e165c5b493e9d9": "ReplicatedStorage.Modules.GamepadIconModule",
+    "48c1aa38ae3034ba6413218d36eb653a5cebcde6b748a35cc5fb3bd8e65d1b2c": "ReplicatedStorage.Modules.GuiUtil",
+    "136c38d9e9b740cfe0b7f9c8bf541c143ab10bb3d414efe5e0072c48d6586c9b": "ReplicatedStorage.Modules.ItemClass",
+    "1abd2f9210bd62843f1373f2ec0b32520f0ecdea40b2a415f511b6761d98615f": "ReplicatedStorage.Modules.ItemSearchModule",
+    "fa62e48cac04b66783c656322ad56a1020e49f447a5d929947f16bee322506a5": "ReplicatedStorage.Modules.Items",
+    "01af37d84416ea49d24ff25e1695527ee1dcc5d1853e6d520a1b19e9baf48bea": "ReplicatedStorage.Modules.NumberUtil",
+    "b726c155025324503be6aa983bbbe0c848c875390857bf03d407e53c1e2b33bc": "ReplicatedStorage.Modules.RaycastUtil",
+    "3dd98b9e38c9b3d45d3f49ec37ead91afd4452cf4f7cbbab4830646a13bdbb5f": "ReplicatedStorage.Modules.RecipeModule.BasePartRecipes",
+    "56b960516a538f1b709db0ee992631976ccffbeb0994eab446004e6c71cb0ecf": "ReplicatedStorage.Modules.RecipeModule.ItemRecipes",
+    "2df3cd8c76ec8199a17b17015c3d03cde1270e41cd51a33cdc1d19afb3426d0b": "ReplicatedStorage.Modules.RecipeModule",
+    "84bf7542cd739bf779d9adf1f40e5fd9895d753fc85f0c0d0755ffe1a16c506f": "ReplicatedStorage.Modules.ResearchModule",
+    "74f6aca12754836622c3d19b3d9739f0009a1f1a84d84f5b9fde57e02918fcc4": "ReplicatedStorage.Modules.SettingsModule",
+    "bdd0e1eb8be072139d253b9e4b5e2fe9e70cb858887055fdf804cfb754370942": "ReplicatedStorage.Modules.SkinsModule",
+    "246bbaff74c39d9e5bac6ebaa2b3bcf1e3b3bd5de98b60cdf4337eb745cafc2f": "ReplicatedStorage.Modules.SoundModule",
+    "71fd8d3e297a50b92910e4bfde5f7693ef2869217b95a0e53c93d205d4e7fe3d": "ReplicatedStorage.Modules.Spring",
+    "651c4a6d305d8cc0e2b21b717a6630f590dd1d0852eafe0ed3674aad7b2081ce": "ReplicatedStorage.Modules.StatusClass",
+    "6277c515b28a7b1937a16670c75bb9c747892ab9f86c42c087d5f50e09108d18": "ReplicatedStorage.Modules.TableUtil",
+    "c3141c48612e812f87725fd8d53b39badad4ff7cca6c6d1ad466488a3ed4940a": "ReplicatedStorage.Modules.ToolInfo",
+    "2cc42b7878d42597d19be0ed79f240ee714de09037c740e4f3ead61c82d6518b": "ReplicatedStorage.Modules.TweenUtil",
+    "d2bd72272b179d6eed51aec4880a30cf2df7bd48b2c398c13b897dccfc4c4e16": "ReplicatedStorage.Modules.VFXModule",
+    "fe1f2a2fe3ba40e6cfbc645a09cffcc6bb4be5aea80b1e719cacdf7043dd6fdb": "ReplicatedStorage.Modules.ViewportModule",
+    "263cb7062fbd0372ed69232808beacc850a9f84de328f2c9285563b305251a88": "ReplicatedStorage.Modules.WeldModule",
+    "4328611f88db167a8bcbb0323128f55818e5c912d1e1eb32fea88cce940b826b": "ReplicatedStorage.UIs.Main.BuildVersion.SetBuild",
+    "aba10798d2cc214c937a012b063e57f063e97bcff6388d80f67db3895a2eb1e8": "StarterGui.Boombox.Main.Drag",
+    "59fe59eceb1557186bb5911b689069ad9ff793d41535abe47360ecbae351de23": "StarterGui.Boombox.Main.Resizer",
+    "100537470f277a50a16b076a8335c646ced31bd5bcbcafa1fbed8c3dc27b826d": "StarterGui.Boombox.Main.Script",
+    "0f0e1e658fce54bb32f44d80fe0511759fbe016af486826f7947c88c09d4d054": "StarterGui.Boombox.RelicsXYZ.AudioPlayer",
+    "b89174fa0037a9e8a80ad7af34127657b14a071457336aabfbdc954bddedb5a0": "StarterGui.Boombox.RelicsXYZ.Constants",
+    "f2e3d18d52c524e1d8a6ff09a7c62fc35f5dee7ae4be8686d242cdd47132e18e": "StarterGui.Boombox.RelicsXYZ.Favorites",
+    "f80ad2811151f44bb5c4764f6df859df409f699c8a6adf34b817ebe773426846": "StarterGui.Boombox.RelicsXYZ.Playlists",
+    "47fa7b88fb4f9910e0b7b0646f146c6e51c94eb441188b78babefc71a20b0915": "StarterGui.Boombox.RelicsXYZ.Sound",
+    "02315c730fe212c69383e4451df72d78da5d9c0966b29fbe354ec439e954393f": "StarterGui.Boombox.RelicsXYZ.Tracks",
+    "24155c590e2d453ff193cf304a0bc9929c635c77289c404bcd216c7570ace4cf": "StarterGui.Boombox.TopBarAlignedRight.ToggleMusicPlayer.InvisToggler",
+    "a05739e0d475ea1df240fdf16e90065ed043d9b9bf106d04e09e64594153953f": "StarterGui.Boombox.TopBarAlignedRight.TopBarButtonExpansionTweens",
+    "a88d4f2d1970ba23dcb75aed8c1fa9af89735c26e28e200de77a37fa4aa5d816": "StarterGui.Boombox.TopbarInsetUpdater",
+    "a5743fa7eb297b5afbafcf9eaf3a5116f5f5714f2710c69a15f705cbec729f7a": "StarterGui.MainMenu.ContentFrame.Settings.SettingsController",
+    "197df9769811014e1e146e2997f9df5b79fdbbccd049eb72c21f18399f8a406d": "StarterGui.MainMenu.MainMenuController",
+    "54f197641503a64dfa2b5d3b22d5b955c041e4e04c9b35dbee5ffbe7f5f63768": "StarterPlayer.StarterCharacterScripts.TorsoController.Client",
+    "95478d82188a2e8e7848cdc41e289a97cc5249062d0d0a6a831e7f51538102eb": "StarterPlayer.StarterPlayerScripts.BenchController",
+    "258934ca59b1d3a3dabaf9fdc2e2a435275b8f59f4ef1ed5a442ff126552a578": "StarterPlayer.StarterPlayerScripts.ChatController",
+    "642865ffc5a06ee5c86d74a8df5786f68d32ca26d6f5d61b5b0ea882cb8139b1": "StarterPlayer.StarterPlayerScripts.ClanController",
+    "1a29d41f9eb18d19c51c455b0fd31affacad1dbc23a48292218c1458b7a06d60": "StarterPlayer.StarterPlayerScripts.CoreGuiController",
+    "aecbea56fe86acd5079d923008ccebfd27cace2aabb87f6e9755055c72e60ffe": "StarterPlayer.StarterPlayerScripts.DisableReset",
+    "827dade2a7760e71e206aaf1db8a7aaaa359134095290a2da59ebf2ba3671a83": "StarterPlayer.StarterPlayerScripts.LoadingScreenController",
+    "9e0e1d90c05bab2efe2697bdd219c7abde358a113b7fa75a6a313833e019abde": "StarterPlayer.StarterPlayerScripts.PlayerModule.CameraModule.BaseCamera",
+    "260391a8f7c5536025a91ccf2a4e44c231db8d6cec0e50426720317ee60efe7c": "StarterPlayer.StarterPlayerScripts.PreferredInputController",
+    "4d6da8ffe58eb3e74a5e88d28ce175035cd3ef98b151eb8835294f9182daa02a": "StarterPlayer.StarterPlayerScripts.SettingsApplier",
+    "2763f38dfa8831a4407e4fc39b29021bebe7cee1f95435811257e5ec75575015": "StarterPlayer.StarterPlayerScripts.SoundController",
+    "1cd5c52919fabe939d73c1b3bad8dcb6cd1a1c7049f5503154f05794e11a6cfc": "StarterPlayer.StarterPlayerScripts.StateAssetController",
+    "3801352c7e4c2ac2a3dc63a18c11b11082db2717df099af9d2f4bb6ec97fac23": "StarterPlayer.StarterPlayerScripts.VFXController",
+    "406c4d2e0dc22c9543b9145aee44e6436664bc98aadb4ccd71709310a30f2855": "StarterPlayer.StarterPlayerScripts.WeatherController",
+    "b4849f2f90ebc6a912e6032bfb60090fb207c52ca144a89cfb209f6f6bfc5baa": "Workspace.RocketFactoryPinkCardInvisWalls.ShowInvisWalls"
+  },
+  "conflicts": [
+    {
+      "key": "README::Script",
+      "variants": [
+        {
+          "place": "place 16849012343 Fallen Survival Medium Server.rbxlx",
+          "hash": "0d4bde7ea32f",
+          "bytes": 3776
+        },
+        {
+          "place": "place 16849012343 Fallen Survival Medium Server(1).rbxlx",
+          "hash": "8a3bbf7de670",
+          "bytes": 3776
+        },
+        {
+          "place": "place 13800717766 Fallen Survival Large Server(1).rbxlx",
+          "hash": "b3901333c3ed",
+          "bytes": 3777
+        }
+      ],
+      "chosen_from": "place 13800717766 Fallen Survival Large Server(1).rbxlx"
+    }
+  ],
+  "only_in": {
+    "place 16849012343 Fallen Survival Medium Server.rbxlx": [
+      "Workspace.Bases.Loners.Wooden Boat.Wooden Boat.BoatController::Script",
+      "Workspace.MonumentBuildBlock.Base.Base Cabinet.SetMonumentBuildBlockPositions::Script",
+      "Workspace.Plinko1.PlinkoManager::Script",
+      "Workspace.Plinko1.Script::Script"
+    ],
+    "place 16849012343 Fallen Survival Medium Server(1).rbxlx": [
+      "Workspace.Bases.Loners.Wooden Boat.Wooden Boat.BoatController::Script",
+      "Workspace.MonumentBuildBlock.Base.Base Cabinet.SetMonumentBuildBlockPositions::Script",
+      "Workspace.Plinko1.PlinkoManager::Script",
+      "Workspace.Plinko1.Script::Script"
+    ]
+  }
+}

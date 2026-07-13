@@ -1,0 +1,709 @@
+# Remote inventory (merged, deduplicated by path)
+
+RemoteEvent	ReplicatedStorage.Benches.Salvaged Flycopter.Default.Events.ReplicateEffect	name=ReplicateEffect	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Benches.Salvaged Flycopter.Default.Events.ReplicateHealth	name=ReplicateHealth	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableFunction	ReplicatedStorage.Benches.Salvaged Flycopter.Default.TakeCriticalDamage	name=TakeCriticalDamage	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.ClientSignals.Leaderboard	name=Leaderboard	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+UnreliableRemoteEvent	ReplicatedStorage.ClientSignals.VFX	name=VFX	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.ClientSignals.VFXOrdered	name=VFXOrdered	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+UnreliableRemoteEvent	ReplicatedStorage.ClientSignals.Build	name=Build	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.ClientSignals.Inventory	name=Inventory	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.ClientSignals.JukeboxSetId	name=JukeboxSetId	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.ClientSignals.Radio	name=Radio	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.ClientSignals.UpdateBenchConnections	name=UpdateBenchConnections	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.ClientSignals.UpdateBenchPower	name=UpdateBenchPower	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+UnreliableRemoteEvent	ReplicatedStorage.ClientSignals.SystemMessage	name=SystemMessage	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.ClientSignals.BenchCleanup	name=BenchCleanup	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��BEr�_�S9��B��.�t�j��_������_�^	name=<obfuscated:176c3108>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.�Щ���0x7#_9_=�yf	name=<obfuscated:5e7bb18b>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��BEr�_�S9��B��.��9�����Nϝ��YHr��	name=<obfuscated:6c75e17b>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��BEr�_�S9��B��.�_��q��k_��_$仢8�Q	name=<obfuscated:fcbe5652>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.C�e�v�5_UX�Tn�	name=<obfuscated:453bc4d1>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.��e�rF���߆�k�_6hF	name=<obfuscated:da3ee6ba>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.�����kFkO�������	name=<obfuscated:bfe0dab8>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��BEr�_�S9��B��.�%INUWig�$��1���5�	name=<obfuscated:38ee35ca>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.�_��L�͏I���_�@	name=<obfuscated:0fd894a2>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.�i%�_f��Z���l�	name=<obfuscated:09e44e19>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.��2�~KĜFۄ@����'�	name=<obfuscated:bdb8d118>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.��U��0��6��xF��r0�	name=<obfuscated:7f62b214>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.�o�rD_�w��v�A���	name=<obfuscated:ac73f640>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.�M_�}�vH_od_'_j��	name=<obfuscated:bf628703>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.~_�4�C�D0_A�_��(z	name=<obfuscated:7031b3e5>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.�(���X��Z��	name=<obfuscated:23a4d095>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.S�H%f�_ΐ�� �Z�ed	name=<obfuscated:48e60ea3>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.G���I.ҧ-���U	name=<obfuscated:749f3e7b>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.n�f�(�_}n,�%���$�	name=<obfuscated:8c57a77d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.8W�lH���Q����0_p&�	name=<obfuscated:c84a6224>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W._U��U���e�7He�5�Q	name=<obfuscated:cc774bba>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.��t{m�x��l�g���j�	name=<obfuscated:1738896a>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.Zcޛ$��_R����FG�	name=<obfuscated:0aae2077>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�D!��7�bUW��&�̤	name=<obfuscated:39d25413>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.P�[p��cim�yl��	name=<obfuscated:5a73976f>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.[u�+��0@�B�euџ��	name=<obfuscated:aba6887d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�D�@_R_���F��~p�	name=<obfuscated:fe39dfdc>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.$K�sK.&�������r��	name=<obfuscated:04234738>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.YK_pO�S�S��_��_	name=<obfuscated:c15dc4fa>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.ƌM�'K��.jCݒ�&ȭ	name=<obfuscated:ac8daae6>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�uV�;_T7N=.��7��	name=<obfuscated:daf134dc>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.Z_)CAk�_4�t�����	name=<obfuscated:0f9ad84b>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.e�__�mqYw`_;P5�._	name=<obfuscated:40c4c505>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W._�о�;G5r�F�(�']	name=<obfuscated:d24230f0>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�ԑ0{_CP��֍�[G_q_�	name=<obfuscated:472001fa>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.���S���q�!�h�	name=<obfuscated:a2517768>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.t��↏����^J��z_	name=<obfuscated:a25eb55d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.����Q��U��4ݘD~���	name=<obfuscated:7d895566>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.y��.����I�r�U�	name=<obfuscated:263ea878>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.���]4x��Q�xs0N���	name=<obfuscated:296cd6b7>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.D��,�_j��k�f� r���	name=<obfuscated:24289518>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�[1�Y�A� _ad���	name=<obfuscated:d712583e>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�x����.�5�ě.,�I	name=<obfuscated:55cbc6ed>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.L ����__�s���Ou�}	name=<obfuscated:273d98a1>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.� �_�_�ٷ�Q�(�ib�	name=<obfuscated:2cd8ce53>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.Vsgk_goG�ܥ��ŊN�	name=<obfuscated:e644d981>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.���O�_�[_�~R�z�v	name=<obfuscated:8f98d8e1>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�_d�b�2�)_ ����	name=<obfuscated:d7323f18>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.;l.��%�!_�}�_F��X	name=<obfuscated:9d75e253>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�;���u@�SC��n�3�2��	name=<obfuscated:a5103e88>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��v!��@Y7@����^	name=<obfuscated:cf5f51bd>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�#]�[��%�~[�����	name=<obfuscated:36c182e6>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.y'D,�R�����!��QS�'	name=<obfuscated:7cd18dfe>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�o������_�U�yY�_�	name=<obfuscated:6dcc8b11>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D._Cs����ߏ�(�g�	name=<obfuscated:7ccca6aa>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��� ̸2C,þgp���	name=<obfuscated:27864a33>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�=���B��3�U)�mM�j�	name=<obfuscated:b08152db>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.+ʼ&E__�8xn8��S{	name=<obfuscated:7238d411>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D._��fnF9}�{F�s�B�	name=<obfuscated:0ff44bba>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.���d�,�i�~�)�-s���	name=<obfuscated:f50edb5d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�8d��3��`ٜ���#�	name=<obfuscated:73202246>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�mv'�V��x_��z�4��	name=<obfuscated:6173af3a>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.l�J��_�[�m��%w���	name=<obfuscated:56b38f6c>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.V)՛z�1x�9���	name=<obfuscated:114a4cc8>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.���W_�~_�}��1��h	name=<obfuscated:46bfb270>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��Rp˄�v쑠_x�1Te	name=<obfuscated:daa589de>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.i��_�����$�o���	name=<obfuscated:dcc1b090>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.���Z�~T@��ݞ���	name=<obfuscated:21bad923>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��Oi�a�w�g����_��2�	name=<obfuscated:2e286716>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��Vx �y��c�Pz_ �	name=<obfuscated:34605033>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.3���{��___��l�s	name=<obfuscated:d22ac02c>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.���4_�Y����39��Z�	name=<obfuscated:17fffb26>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�u_��_�rу�^�R�B�	name=<obfuscated:7bcc1566>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.WL�b�___� ý.,�;�)�	name=<obfuscated:034a100d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.e�t!j+M�������Q�	name=<obfuscated:16b5ba61>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�;,zN�j�؍kɡ��	name=<obfuscated:2cd0e48c>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.@��E�h�2A�cy�v�W�	name=<obfuscated:466a9197>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.⡈_�i��H}���`�_�	name=<obfuscated:f88999a7>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.[��pWw2$.�U��,��	name=<obfuscated:0a76f540>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.)�w�N�-���n_ǖ�4x	name=<obfuscated:cc1e3240>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.R�á�[қ�[�K�Ǡ�&	name=<obfuscated:2e97a03e>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.1J'i3�c����2�%�I	name=<obfuscated:771a10ef>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.Q�3��W#�)V,�+���	name=<obfuscated:fd65f954>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.I�__@�Dv_���V�6�	name=<obfuscated:1bd0cc38>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.����-�]�_���(r��	name=<obfuscated:666b10a7>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�`_�R}�����ߩ���	name=<obfuscated:9231e66c>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.q��̈%4��&�@���D�	name=<obfuscated:a985ffb1>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��._�_�`3�_�TX�l���)�	name=<obfuscated:d44a92f1>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�s�c��b��퀱�;��'	name=<obfuscated:30d28974>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.9�_�Zfg����ו	name=<obfuscated:056c2935>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.y'�_],��b�����_��	name=<obfuscated:3afb0ea5>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.��º��N���ntݠ�	name=<obfuscated:d79e3aef>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.ܼG��ׄ�v���L.�_�	name=<obfuscated:4c2fcbad>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�Y����!F������@z��	name=<obfuscated:19727723>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.��G�x�t'�M��p���}	name=<obfuscated:aa5b6082>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�_�������_'��J=�	name=<obfuscated:5384d800>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.������$I�Kg	name=<obfuscated:397ad4e1>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.� I%xt��,K����f7	name=<obfuscated:5f9ac417>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�Y���g_�_czI�_�	name=<obfuscated:15faaaeb>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.FF���`�J���X�GP�	name=<obfuscated:e08d62a3>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.,����O)6��B�GS��	name=<obfuscated:2a44325c>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��._�m���.�g�{���[�u	name=<obfuscated:01b3c0de>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.�pZXv�_;�_�+����	name=<obfuscated:67d3628c>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��._F8QHI�g���u�mk��	name=<obfuscated:9a882c7d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.cLf��o9�K���@_�y	name=<obfuscated:a5b9cbc1>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�]�ѻ�km�v�@�N��('�	name=<obfuscated:76afc8ed>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�J� ���M��__[�_��	name=<obfuscated:4ab66367>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��._%�UD��B�;��_��5Q�	name=<obfuscated:417ce1f7>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.DΦ� lJ�f@_oO_vS��	name=<obfuscated:a8babc83>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�m�_hH�_�g_�xK!	name=<obfuscated:300d07b9>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�вN+U4ɧX�p�x��	name=<obfuscated:ca5cfe14>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.���,c��;���'����	name=<obfuscated:616ee09d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.���5��P׋�F��I�sm	name=<obfuscated:c36ae947>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.X��L_AՏ��=[(c32w�	name=<obfuscated:3ba60848>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.g�{�y�YsF�_b�_l	name=<obfuscated:421cbce3>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.i�x}՟��_��&�Y�+	name=<obfuscated:4deb7e07>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.Q$=-y�B�z���	name=<obfuscated:96f2ef25>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.[��I�ox�8�o�R�K1s_	name=<obfuscated:c1c245a3>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.g�o��^��ѓH�Jqsf�	name=<obfuscated:20906a06>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.G;OW�ͮ��-=$�RR��	name=<obfuscated:fc038710>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.Wp���ǻx����o���O	name=<obfuscated:0e2a1207>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.����]�q��� e�(YX'	name=<obfuscated:36030600>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.c�^��E��6B�t{�F�	name=<obfuscated:07de5b67>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�`_�g(���_4�����	name=<obfuscated:fe4e10ca>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.���F)���_�dL��^+a	name=<obfuscated:945aa395>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�c�ET��;o�ˇ�I_���	name=<obfuscated:20cc2b9a>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�Y7�S[�断��#���Hv	name=<obfuscated:6e3520bf>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.2h�S�����(C������	name=<obfuscated:010fa4c1>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.����}�Z��,�x�������	name=<obfuscated:f6c81b65>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�M`rz};�_�G�AH�	name=<obfuscated:fb2d1771>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.͈�8A�`��_����ު��	name=<obfuscated:803d6048>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.���R�3{�_����L��	name=<obfuscated:ec844aa2>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��_`�o� ʾ}Z	name=<obfuscated:222bd61c>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�g�Bl��YQ�7��梆�v	name=<obfuscated:1d0f51a6>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.����_�)6k_���a`�	name=<obfuscated:d999b75e>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.#�pE���{��.C����	name=<obfuscated:2b220f51>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.Wz8_�7`Q[_k��]�^�	name=<obfuscated:a650ebe6>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��._�r�P㓏���_�ڗ�	name=<obfuscated:78d7efce>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.9jѻ�5p�����=s�E�O	name=<obfuscated:8388e5f7>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��_��=pz�Zy)q;w	name=<obfuscated:59fa5885>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.9�Q8F��9J0m��_����	name=<obfuscated:8adeb1cf>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.qRx�����U�.��d�	name=<obfuscated:42434e0b>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.����@�9Ʀ�Ԗ`��	name=<obfuscated:3450755f>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.'_s��+~DbO�Wj��֨L^	name=<obfuscated:baca6d5d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.fp�^j�QnzIg�]k��q�	name=<obfuscated:5c935dd6>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��Td^xh���rQ�;�	name=<obfuscated:29de893d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�sЙf�r�8�_�_	name=<obfuscated:5c856daf>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��R��n�_F�5x� �д	name=<obfuscated:097e0be1>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��8Κ�o_�a��m��d_u	name=<obfuscated:b13d47df>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.���t_�_n_�_�3�	name=<obfuscated:640c6a1b>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�+UM��^Y�]��Ń���	name=<obfuscated:235e458d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.�`�♣�zp�6� �_�M+=	name=<obfuscated:ded508ff>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.2��^��s�@(_=���1�	name=<obfuscated:75ccc1de>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.NM���j���F������.�q�N�$_��2���P۰	name=<obfuscated:463d07a6>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.NM���j���F������.s�C�Ѿ[����(ސ�	name=<obfuscated:ca9cca05>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.NM���j���F������.���-N_�K�c[��YN	name=<obfuscated:6c14e99f>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.��ʋt�_mc�(�T0%�_	name=<obfuscated:188a5335>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.����n��Τ�K#�wI�	name=<obfuscated:6393bb83>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.���묲sip�n��=Q5	name=<obfuscated:8006fb5e>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.NM���j���F������.�%~�1)�����A��h��	name=<obfuscated:96785946>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.NM���j���F������.��#�)�.�nwQ���_	name=<obfuscated:900245ea>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.�^[z��x=�^j5z�i�	name=<obfuscated:a0f0f110>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.��W���l��0o$�N�=C�	name=<obfuscated:7d3c1c9d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.6��p �'��V��#@U��	name=<obfuscated:f868aa96>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.��6��mߍOHrgc��.%c	name=<obfuscated:daadff26>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.t��P�����3hMSB�L	name=<obfuscated:abb71ad5>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.�����Y�8h��.�$4�g�T	name=<obfuscated:409c851f>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.���.���3���O���	name=<obfuscated:0ef1a888>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.ž������Р�B�h	name=<obfuscated:33c033a3>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.U؊d�l��M��A�+�	name=<obfuscated:e0fcc3df>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.�������=_I%ӛXZ�m	name=<obfuscated:771f8677>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.�GiW+�_�+ٗe��ۍPEh	name=<obfuscated:33bb9425>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.+�d)�1 �� 1b��	name=<obfuscated:a7e86b4d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.MH��_`K��r�(���w�	name=<obfuscated:4e9403cb>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.K��gaV_�[���֊�	name=<obfuscated:5814df43>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1._=_�A;�9��_�i��_	name=<obfuscated:ab16c38a>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.g��N����ɐp�^{T	name=<obfuscated:de9525bb>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.�Q��o�]�Da$p�i����	name=<obfuscated:7f2ad795>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1..;_c=�8���,%YG�w	name=<obfuscated:dd532630>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.e�EoAA_ܙ�$��-��-z	name=<obfuscated:212eafa2>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.�9�_�o��䥿9@_#E9	name=<obfuscated:7af040e5>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.k�2�W�'��6_%�o	name=<obfuscated:0b7946ff>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.+%���M�tF�3��h3i�s	name=<obfuscated:f8ac2662>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.D�+R��ڰq�FT.��#_	name=<obfuscated:3c5c7753>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.�݅���Z�_b]�n�1	name=<obfuscated:f63aafc1>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.~e޸}c_��v�ë�{)u	name=<obfuscated:f6154ca8>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.&(lJ�&��_[J�9^���	name=<obfuscated:07f33418>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.����W_�mB,ޒ��1���V	name=<obfuscated:dd4af402>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.j��I�Sy���#_�_g�_	name=<obfuscated:8d384ebd>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.�T�S�; H���w�^C	name=<obfuscated:be152599>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.�_i�K5tB3_�怒Ȓ!	name=<obfuscated:7f831b7d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.!�ñ�}���i^[�P���	name=<obfuscated:ae0a87ef>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.�'�S_Y�o�a8m^3��	name=<obfuscated:b85eb9ee>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.k(J7�癮�����WAq���	name=<obfuscated:a6b6c7bd>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.jd��ZS3ҫ`_�����_�	name=<obfuscated:1e668349>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.�� э�_faZ�_���m	name=<obfuscated:ac98eb38>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.~��a_��G���g����.��f�F���g�_Qe�y7�	name=<obfuscated:4789d259>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.~��a_��G���g����.�d���d������MZ�n�	name=<obfuscated:552b4bcf>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.~��a_��G���g����.�r�m�k�8�#��1_�o�,	name=<obfuscated:4fe2adef>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.�i�鵮����e�ʲT	name=<obfuscated:0436fdf3>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.� &���IL�� 6	name=<obfuscated:958a7514>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.~��a_��G���g����.A}�׉�7��4�]�d��	name=<obfuscated:e1448924>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.D�H�0_H�t��+t	name=<obfuscated:feca4b0a>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.�@t7k��]X�Ɓ�g�	name=<obfuscated:c8aa1357>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.�_ϫ�Xl]s�J��2��	name=<obfuscated:4abd43d9>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.P��_�JY����Y����xE	name=<obfuscated:6dbca831>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.y��6WY�V��Y�,E�	name=<obfuscated:57e8820c>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.�.�fNk���QR_�2r���	name=<obfuscated:eaa4f00d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.�c��q���T�.o�[Y	name=<obfuscated:dee0009f>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.��$tހ��Gl21���	name=<obfuscated:f4b88e33>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.�;���%@]b_8&0p��_	name=<obfuscated:38a0f5cb>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.�!4���A��_�I��3A[	name=<obfuscated:d936f57b>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.��0�����_�XLCTo0Bu	name=<obfuscated:30564a3d>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.�.#5Y3`%Jb��nZ���	name=<obfuscated:a85c5cdd>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.�e!�8m�X._yY�2�i�	name=<obfuscated:86ca4664>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.�䣏�éf[�u��)B�z	name=<obfuscated:12a5aa89>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.W�� ���pj�u�P�t	name=<obfuscated:771ea79c>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.�-!X@�p)]�S���9	name=<obfuscated:6fe401f5>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.3�1_�yι�v_��d�	name=<obfuscated:ae2c15f9>	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.SettingRemotes.Fetch	name=Fetch	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.SettingRemotes.Update	name=Update	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.SettingRemotes.Reset	name=Reset	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.SettingRemotes.Teleport	name=Teleport	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.ClanRemoteFunction	name=ClanRemoteFunction	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Ping	name=Ping	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.LoadingScreen	name=LoadingScreen	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.SoundRemotes.Play	name=Play	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.SoundRemotes.Footsteps	name=Footsteps	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.Sigma	name=Sigma	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableFunction	ReplicatedStorage.CharacterScripts.WheelController.Open	name=Open	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableFunction	ReplicatedStorage.CharacterScripts.WheelController.Close	name=Close	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableEvent	ReplicatedStorage.CharacterScripts.CraftingController.Update	name=Update	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableFunction	ReplicatedStorage.CharacterScripts.InventoryController.Fetch	name=Fetch	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableFunction	ReplicatedStorage.CharacterScripts.InventoryController.GetBench	name=GetBench	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableFunction	ReplicatedStorage.CharacterScripts.InventoryController.ItemStats	name=ItemStats	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableEvent	ReplicatedStorage.CharacterScripts.InventoryController.Toggle	name=Toggle	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableEvent	ReplicatedStorage.CharacterScripts.InventoryController.EquipArmor	name=EquipArmor	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableFunction	ReplicatedStorage.CharacterScripts.TeamNavigationController.FetchTeam	name=FetchTeam	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableEvent	ReplicatedStorage.CharacterScripts.ViewmodelController.EquipVM	name=EquipVM	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableEvent	ReplicatedStorage.CharacterScripts.ViewmodelController.UpdateVM	name=UpdateVM	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableEvent	ReplicatedStorage.CharacterScripts.ViewmodelController.PlayVMAnimation	name=PlayVMAnimation	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableEvent	ReplicatedStorage.CharacterScripts.BuildController.EquipBench	name=EquipBench	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableEvent	ReplicatedStorage.CharacterScripts.StatsController.CraftUpdate	name=CraftUpdate	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableEvent	ReplicatedStorage.CharacterScripts.ClanLeaderboardController.Update	name=Update	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableEvent	ReplicatedStorage.CharacterScripts.ElectricityController.OpenBench	name=OpenBench	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableEvent	ReplicatedStorage.CharacterScripts.ElectricityController.EquipWires	name=EquipWires	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableFunction	ReplicatedStorage.CharacterScripts.InteractController.GetSelected	name=GetSelected	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Sound	name=Sound	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.PlayerOwnershipUpdated	name=PlayerOwnershipUpdated	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.RelicsServerSoundAdded	name=RelicsServerSoundAdded	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.GetTracksFunction	name=GetTracksFunction	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.FavoriteChangedEvent	name=FavoriteChangedEvent	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.FavoriteStatusFunction	name=FavoriteStatusFunction	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.FavoriteTrackFunction	name=FavoriteTrackFunction	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.FavoriteIdsFunction	name=FavoriteIdsFunction	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	ReplicatedStorage.CombatServerRemote	name=CombatServerRemote	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableEvent	StarterPlayer.StarterPlayerScripts.ChatController.UpdateChannel	name=UpdateChannel	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+BindableEvent	StarterPlayer.StarterPlayerScripts.ChatController.UpdateFontSize	name=UpdateFontSize	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteEvent	StarterPlayer.StarterCharacterScripts.TorsoController.Look	name=Look	from=place 16849012343 Fallen Survival Medium Server.rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��BEr�_�S9��B��.�_v6R���Ƨw���+^�L	name=<obfuscated:a0f458c8>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.��@�0�t��%FW�f�d�	name=<obfuscated:b6468ab5>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��BEr�_�S9��B��.�����߅_�#o)__��	name=<obfuscated:023c8d6b>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.��A��Ct��R�__�U��	name=<obfuscated:089e3f1f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��BEr�_�S9��B��.__�U�Ae�T1�o__X�	name=<obfuscated:e1f81389>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.�w�)G+_)u���I_��	name=<obfuscated:7ad75aea>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��BEr�_�S9��B��.i�@Z�4l����j-�oI�1	name=<obfuscated:db6f7e43>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.)]�hx���t�E���7	name=<obfuscated:decb33d5>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.���xO��N�9��Tm�߿	name=<obfuscated:d11b3751>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.c�)g�_�_uxQ�����	name=<obfuscated:2d9d1940>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.��pE�}�kT����S	name=<obfuscated:4e09c365>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.Ct���-�_O��_i�]	name=<obfuscated:f7b0ff87>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.�QDC�O�{�G�ٹպ+�p	name=<obfuscated:27c2a7b2>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.��IqX`a_�U)548�	name=<obfuscated:ddc685e5>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.+3���=m_~$��U�$�p�!	name=<obfuscated:8e53d4ec>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.���m��G�����G	name=<obfuscated:42a5a311>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.˯j���3��_�%P��ǭQ	name=<obfuscated:8f2efdff>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.Đ�#~__�y^;�_{z@�	name=<obfuscated:68d77345>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�)����F__h�����_	name=<obfuscated:fa60b895>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�']ܬ,O�h�����+Tg{�	name=<obfuscated:f7e2ef69>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.;��)�.k�tSL�{O���	name=<obfuscated:1f2b5e32>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.Gl�C��A��1�TeG���y	name=<obfuscated:a2d0f98c>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�Ey�Q�YϽp���ǤhJ��	name=<obfuscated:6c260726>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.%E�.�������_!�CVy	name=<obfuscated:9aad4763>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.��֧n�K��L�d����%_	name=<obfuscated:d2562b40>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�աS�uϺ����$�5g_�	name=<obfuscated:1f9dfe85>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.i_a���]��L�!#���E�	name=<obfuscated:ff106f85>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�(�Dy�@���[���ü~	name=<obfuscated:a42ec8cf>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.;a�K^k$_,m��3��u=	name=<obfuscated:95af708b>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.bf�G�yj�k��8뱈hɝ^	name=<obfuscated:9ca00915>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.t�'�R_ձ7c7��Zy	name=<obfuscated:79d22686>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W._��f(zZÙ�JCV���mS	name=<obfuscated:8c57b3dc>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�ѹU�S���ʊIx�!�r	name=<obfuscated:c4153f44>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�Y��S6Jd�iB$�$����	name=<obfuscated:25d77981>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�����ֽ�3�xTgA�g�	name=<obfuscated:947a266e>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�����O��_�uEAҪ	name=<obfuscated:aa7d7206>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.M��ydIU��ڎ�H��6Y�	name=<obfuscated:60a85d3f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�Bj�A�A��_X�a�^ue	name=<obfuscated:920bffea>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�_%Yf�e��;p`#�b	name=<obfuscated:9d291f06>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��J�U�r붜$�_-���	name=<obfuscated:3fb70ac3>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D._����˃F�-���_f�B	name=<obfuscated:39f1eb6c>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.� ��5���a�(�6�	name=<obfuscated:117c7e42>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.ĸ���z��XZ��O�	name=<obfuscated:52891821>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.ހ_8�ߣ�}8��TQf��Uf	name=<obfuscated:6243ec7f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�ذ�1�c_��~_	name=<obfuscated:9e3c2ce4>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.焝��,��__̈́7��	name=<obfuscated:2ccff5c5>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.hֹ_�3���ܧ��_�j	name=<obfuscated:86f3b050>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�ߋ�A__�$L�a_b~X`	name=<obfuscated:5cbc9169>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�AU�_�z�Co�8���Z	name=<obfuscated:7e8bae4f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�n&�D&_���hD��MM	name=<obfuscated:0ba432f2>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.������3E��'_���_=	name=<obfuscated:95f95ca7>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.`^��ɠ܌��HYX��	name=<obfuscated:09e64269>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�qp�F��,&�L�~o8�	name=<obfuscated:de0bf019>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��$�F��&��Xw����	name=<obfuscated:76d69c3f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.@�9�����l_u�l�	name=<obfuscated:3c681e7b>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�Jf�_��8�&��ִ�	name=<obfuscated:0f1af40e>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.%rg���]�8�Eg1�_�!Z	name=<obfuscated:e87f9e96>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.k�___�`1(r�瀞�Xc	name=<obfuscated:38c71cbc>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��_6�.T_߷�4#c���p�	name=<obfuscated:e865822e>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��Z��G�@_SR���4]	name=<obfuscated:32b5723c>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.���Wkԃ�2�_���	name=<obfuscated:9a06739f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��_y���rM�k��y�#��G	name=<obfuscated:14c6b34b>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D._q���g�_����O{�Y�a	name=<obfuscated:699f084a>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.,�k�¼�黕� ���+	name=<obfuscated:47de51a7>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�2�0ĝZZx������_�	name=<obfuscated:91d7895e>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.hn�H�h�z�}�b�	name=<obfuscated:3ea50186>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�S�f��!�� U9[�_�	name=<obfuscated:074902cb>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.Ɯ��];_2�_}V�n�	name=<obfuscated:ab0e8af0>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�e���L�_�;�k���	name=<obfuscated:69190de3>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.-���0q�߅�t�,��	name=<obfuscated:4aef57d3>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.F��_K=��኿�y@���	name=<obfuscated:32835701>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.AL����)�_�W�����0�r	name=<obfuscated:869b5ee4>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.2���~T�����jj�	name=<obfuscated:8a24bcf6>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��_��W��_9̅c#}���	name=<obfuscated:22ceab9f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��D-k�n=���#���z�	name=<obfuscated:82d7f909>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�2j�g��ݐ�)�_S�S�_�	name=<obfuscated:7472f286>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��}7��������a�	name=<obfuscated:11945163>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.&�o�_�9@�y���� �	name=<obfuscated:edcb4745>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.b1Eܗj��ȈbӘ5�Ԃ�I	name=<obfuscated:418be406>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.$��E_f��W=�y�18��	name=<obfuscated:3fb83bea>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�_��v�bʷ�F�;��	name=<obfuscated:dc3ac0b1>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.rT���4_�d���;��	name=<obfuscated:b8b1b88e>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.G��.�0����N�Z��	name=<obfuscated:6ddfc594>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�T6�_�e�d,_�~��5�	name=<obfuscated:ba682ee3>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�_�_qQc^Ch�_��_�-	name=<obfuscated:f51bc523>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.���6�_Im�������Dx	name=<obfuscated:23f5c704>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��..�_�n�x�gϮۂW�V	name=<obfuscated:e89e06e0>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�Gv�_���X�_�UF	name=<obfuscated:0670decc>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.��r�$�m�0����MG	name=<obfuscated:18d5f67b>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.���1��{�'�ַl��	name=<obfuscated:eb59988f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�ӡj��c�!��ˁ�^F�	name=<obfuscated:5ce19d1a>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.]����`���gL�F�(�	name=<obfuscated:e77f2bd5>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.F����_�j�n�_P�Ԯ���	name=<obfuscated:7583f3a7>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.S��3Ϊ�����Hiq�-�	name=<obfuscated:ee138d04>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.����%_'m���&�c�	name=<obfuscated:a652c694>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�@�W�{�s��_�K_T�	name=<obfuscated:31f36e89>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.'@ټ�&A�W��g�i�Zڇ	name=<obfuscated:ab70b5fa>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�ӽDRJ(�A!��̛��X�	name=<obfuscated:b74d166d>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.��z���,P�{P��k�_�	name=<obfuscated:f48c5e21>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.t_�q��_H�P_���_W�	name=<obfuscated:e1444515>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�D.��t30h��zbѧd�L	name=<obfuscated:66c3a3b5>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.)�0{Z�ǧ�g��t�0�	name=<obfuscated:ecd25ff5>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�d�����_��c#�I`�	name=<obfuscated:17cc08bd>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.__��f��G�lzE���e6]U	name=<obfuscated:a07c3961>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�mQ_�gɾ_Bq�ruB�	name=<obfuscated:3cc6bff2>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.���fC��~���_�1��	name=<obfuscated:21ca4d3b>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.-�����V;��q�6�	name=<obfuscated:4c819d46>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.Kp�k_��d�PŚ2Y__��	name=<obfuscated:51158f62>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.THs��y`2�û�	name=<obfuscated:16b06a58>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�}K��WlZ[��r�RX��	name=<obfuscated:ea8eac3f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��M������_�� �8	name=<obfuscated:62ccb569>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.R%z__L���w$pc�7��	name=<obfuscated:09879d6a>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��_xWv�NiV��Ybj+�	name=<obfuscated:7d2446f5>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.(_ʫmS�Pײ��_�b�	name=<obfuscated:ff1113e5>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.���W�}q���Rd���	name=<obfuscated:5d57a008>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.(&U=co�����__E.�X	name=<obfuscated:3b9f1fba>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.O����@��k&��;�sm�	name=<obfuscated:27ffd9dc>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.s���dU Ai�_س�O2	name=<obfuscated:7de33e8e>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�Z�T_���͈��S����	name=<obfuscated:485a1dbe>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��g@���dc`�!�2�	name=<obfuscated:ddcabd25>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.ꯇ0���7rC�4��D�	name=<obfuscated:aa4f0139>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�Lc�jb�d)���)Qk�	name=<obfuscated:6ff913c9>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�a���jZg��_�m2�	name=<obfuscated:578a33e0>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��n�_a�У���_��UV#	name=<obfuscated:c056e34e>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��vmͿxz�$�=�_��	name=<obfuscated:9076569f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�-����ۙ����e�	name=<obfuscated:0ec8e874>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�ʦ_�_�QT��m�0{Ke	name=<obfuscated:c0e36421>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.[�=��(r pO�J^Z��!	name=<obfuscated:2cefe339>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��x=�����-3�2W=��	name=<obfuscated:962ea65f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.lc��_���_g1�,Eo_	name=<obfuscated:d15a01b5>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.l�_3Ӌ��U�⾪�!���;	name=<obfuscated:69f18954>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.T�_��ce1�h_oA�	name=<obfuscated:eb7d1208>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.d�(���_`�p~C�����	name=<obfuscated:50df426f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��%���u���Ƭ����g	name=<obfuscated:9018158f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�XhT_�_��w��U�2��	name=<obfuscated:b592d86a>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�!bU5]��R�W�;��_�N	name=<obfuscated:bf8cf9b3>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.Ʀ0�7ݞ%[��&$R�_%I	name=<obfuscated:97f66834>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�Hi�v�n�=Mt�a�_`��	name=<obfuscated:cdd2f567>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.Na�_��X�[�ty8���$8	name=<obfuscated:d9b7f981>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��._���%m�%�b�U��R�	name=<obfuscated:9bc9e590>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.����_���Qp����H	name=<obfuscated:33584632>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�%�NKW&�y��z����	name=<obfuscated:ef357fb1>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��_(�Pr��`�})�ְ5	name=<obfuscated:a5a2c551>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.����nVJ ��3�5_)�=	name=<obfuscated:27f0908b>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�獳j��_�qJ�H�_	name=<obfuscated:6c6e9423>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��9-����Y��w���pm�	name=<obfuscated:45f92118>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�_����^g�BI�����	name=<obfuscated:0ad74947>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�����__1Z���¿qz�	name=<obfuscated:333719ab>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.���N�_����W�5���8	name=<obfuscated:c2e19c7f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�'a������^����_�_	name=<obfuscated:21d735c1>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.w�x��Q�~C_��}���	name=<obfuscated:7828cfd7>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.��p=���������G�_	name=<obfuscated:74f9f7c4>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.NM���j���F������.�+e�H����;-��E�	name=<obfuscated:9055ee79>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.NM���j���F������.��������K{�W��ye�	name=<obfuscated:319ae098>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.�rakAnE�5���6]�C	name=<obfuscated:6d2ca53c>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.R_���j٥@����~�n	name=<obfuscated:a0f59606>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.NM���j���F������.�Y���&�c#,��k���	name=<obfuscated:09dd2669>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.NM���j���F������.������r��ف�T�E	name=<obfuscated:3edcd933>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.�w����&m�h��5��V�L	name=<obfuscated:3e8b0bbf>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.t�i���3YQ�Yb���	name=<obfuscated:0f814724>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.@O�K�__��_��_C	name=<obfuscated:8d98e8e2>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.O�[����_%��K�D�	name=<obfuscated:9478f017>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.Tm�3xM_���Ɋ�Q@3O�	name=<obfuscated:2c5432cd>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.l�0��F-f�!�p�f�!O	name=<obfuscated:5125c327>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.f;���&&�~�___��a	name=<obfuscated:e62e17bc>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.%lV�{���-��Z�-+&��	name=<obfuscated:8e44f917>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.���}�������+5��_�	name=<obfuscated:3a823135>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.�b)���Z�dw鉕��9Z	name=<obfuscated:fb99667e>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1._Z����]�^�ω�V	name=<obfuscated:e7dd2850>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.��=N=�X�ť����_x$	name=<obfuscated:f65eaf73>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.����__Du�z�F)1Y�	name=<obfuscated:51bb63b7>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.;�Vy̎qB&U�2�(SS��	name=<obfuscated:987c6bbe>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.���&�;�Uv��n;_�	name=<obfuscated:479cfa56>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.�a����u�2�_�w_��_	name=<obfuscated:6b5042f8>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.��_s�K�i�9��]�G�	name=<obfuscated:c706937f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.i���J�-�Ө�l�[K�%d	name=<obfuscated:12cb0926>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.�g�-��@`�5�+��LK_	name=<obfuscated:50893ef6>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.��1���-t�7�^{�v	name=<obfuscated:03ff756d>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.D�$Ej_F���_��Ġ��X	name=<obfuscated:57c5821e>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.��0�V_T��x{����n	name=<obfuscated:12f71497>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.��oeCl�.DKJ�ϵ�PԿ�	name=<obfuscated:b26b2bbc>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.&����Æ �����N9�'�	name=<obfuscated:b7c273cb>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.K�=��m�_pq�W��Cs��	name=<obfuscated:c6a0614f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.Ym�1c_����#$�D��Y	name=<obfuscated:92b48a9e>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.����v�!!__iS��'�	name=<obfuscated:b035807f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI..z_z���_�y���	name=<obfuscated:a54bac62>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.t�Ԩ�CM���_����C��	name=<obfuscated:c916cef7>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.�x��ϩDb�kL�4�s��-	name=<obfuscated:b29f704b>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.YUk��=�^溵e�U�	name=<obfuscated:2b8d5b1e>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.3̵m. ��Z��;T���	name=<obfuscated:1846a3d9>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.~��a_��G���g����.�0�,�v��s�__��_Մ��	name=<obfuscated:2c83646f>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.�h_�����_9�U���Ot	name=<obfuscated:25a65206>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.�����_���]�g���	name=<obfuscated:f383cb8d>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.��kˢ��7L[_ҏF!�	name=<obfuscated:5d54c823>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.��z�U܈��_�-3��	name=<obfuscated:3c4ba39c>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.~��a_��G���g����.����]n�6�Po)�_M�Ѵ	name=<obfuscated:35ca9427>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.�_�z0s�}�H���I��	name=<obfuscated:ea454d08>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����._0Ŗ���uL'_QQ���F	name=<obfuscated:cde975d3>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.���W����_�;�,U5_�3	name=<obfuscated:3b8df022>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.%M#EU�ïڅ籒đ&4�	name=<obfuscated:3c28c906>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.��._o5�=���x㪰	name=<obfuscated:ac6154cf>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.��MAN$�PL�{4��Fޙ	name=<obfuscated:73f9dc4e>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.t���K��E���.d__�	name=<obfuscated:7c97e48c>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.��t���3�6B~�d	name=<obfuscated:19b12696>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.8C.��~);k4Ǹb�0��	name=<obfuscated:4f5a3992>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.O���(�S_�m����_B	name=<obfuscated:2aecb0e1>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.IQ����˼]x@��~�a%	name=<obfuscated:5fe70469>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.��L�)_p-%h�_gtV��	name=<obfuscated:04309b3d>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.V��ahz[-x)eV�yn=5_	name=<obfuscated:346c700d>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.u�OQ�Y��30_�A	name=<obfuscated:94a59db2>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.��a(�_VK�@-�_߲e��	name=<obfuscated:f976fc81>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.�q��R_M���`H�9}�	name=<obfuscated:15911958>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.��Xl��I�_�h��K��I_&	name=<obfuscated:57ad2894>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.o���yT�a�쎹�BƱu$�	name=<obfuscated:17c3fba2>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.Z�_k�Z�J�ln�׶���	name=<obfuscated:40994d20>	from=place 16849012343 Fallen Survival Medium Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.�$!.��M84Ϛy�H��Ap	name=<obfuscated:434aff21>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.h�!)�i1E!H��_1ͨ	name=<obfuscated:6bab33ae>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.�__j�h_r��P!_�;}	name=<obfuscated:f45eb0d2>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.��M�H=[���9ih�	name=<obfuscated:42494d11>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1ȰV�В_o_1=D�cI.��_���U2qVg���Y	name=<obfuscated:2f78b15a>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��BEr�_�S9��B��.2�qn�_[U�~v�7t	name=<obfuscated:14f0f91c>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.8^~_9Ve�#Nc@����`	name=<obfuscated:83641f28>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��BEr�_�S9��B��.}�_jC-Y_6n#1�X�	name=<obfuscated:ac2aa851>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.�H�J�pN�^vr��q	name=<obfuscated:c7ae9863>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.!!uw��}e�c����	name=<obfuscated:1cb89e75>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.��i�Et4��#&�Rg�A�	name=<obfuscated:543133c9>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.B)$��P�^�T���	name=<obfuscated:b3afb4b4>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��BEr�_�S9��B��.�&Ώ���)~��b�.�UX$	name=<obfuscated:87118dc6>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.N�l�M&IM�����߹�	name=<obfuscated:055a1760>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.Y���)�V�ẃ��fqf	name=<obfuscated:d6846792>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��.���pnn{�2Q�@]A0	name=<obfuscated:dd4dfb8d>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��BEr�_�S9��B��._ݜ ~_�.����H��	name=<obfuscated:fe39dcd7>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.tE��_��.��1��_�	name=<obfuscated:17852be0>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.�^���Ͳ(������	name=<obfuscated:825b3048>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.���Ld���z��E�-`&j	name=<obfuscated:ed14ca36>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.���î(��_��2��ω��d	name=<obfuscated:2a2557c9>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.fD[�Hg�i%�6N#���.�d�~���^����0  ��	name=<obfuscated:0ae9d948>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.ފ��A[�V���[��O�	name=<obfuscated:a1f12513>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�ڃMG� @�i�j��k�nY;	name=<obfuscated:bd51da8b>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.��ل#G=�Ô_k�_�n�	name=<obfuscated:c7253179>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.��d��`n���ZN�_g	name=<obfuscated:1b42abf9>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.dO�Mt;$+���_R�Z	name=<obfuscated:641304f9>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�.c87e8�������o[	name=<obfuscated:51438d13>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.���0�T�M�Z%]_���A	name=<obfuscated:7942e45c>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.��$���k��xH_�_�5�,	name=<obfuscated:ab1a78f7>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�+�6�T�xx2!^�L�L	name=<obfuscated:5907858d>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.)�o7c��0�n�Q�B	name=<obfuscated:72e3f40a>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�� }݊1���CZ$]aC}�	name=<obfuscated:e8a678d3>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.��酉s����e+W��nW	name=<obfuscated:10503472>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.SuZJ�S#DxC��%�3�e	name=<obfuscated:e644068b>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.D�2$��~9��ܚ�4�	name=<obfuscated:034be539>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.dzy_������%0&�	name=<obfuscated:bb8828b5>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.i���Tx$Z��g����O	name=<obfuscated:1ab25e16>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�c}72��r��B1q���n	name=<obfuscated:8278a611>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�Ry04�V �C�8���L	name=<obfuscated:89d08b03>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�_8���m�.��(��ZB	name=<obfuscated:88bff5b0>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.]�i#�H�=;��2�HKWe	name=<obfuscated:f55227f4>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.M(J����U���a�_�ރ��	name=<obfuscated:616f82f3>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�SؤY,����&	name=<obfuscated:eeea7219>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.��s���A_j�{�D�2��g	name=<obfuscated:be472b1a>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.�7��W�aI�&�φ�Q[���	name=<obfuscated:bad3f57b>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.d�eR�#o�,9��`B4q^W.��_�zv�_�o�+Og��	name=<obfuscated:520a6f46>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D._�_���NVT;�����	name=<obfuscated:46d089b9>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.����_x��{LuOc_`�	name=<obfuscated:f6161f25>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.=�hB��$_���}DslF	name=<obfuscated:cca078af>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��5�����&�UQ!_�	name=<obfuscated:a0020046>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��_Pe#c�~7t��_�	name=<obfuscated:c46cc9cd>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.-�փV@E=E�M�(��;	name=<obfuscated:b30f9abd>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.#���O5���_ڊ@� �	name=<obfuscated:48e45a57>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.M__����!K'����w9	name=<obfuscated:da79348d>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�2S�����5��4YaO��	name=<obfuscated:45316966>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.i�rF�E{�4;I�k�6��	name=<obfuscated:876d5e21>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.o%��CN쁮��}a_��~	name=<obfuscated:8b1e51f5>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.~J�w����38���Z�_k5	name=<obfuscated:8d771ec6>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�F�EwuQ��^�3DLryX�	name=<obfuscated:f921300f>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�__���0�t�%����t	name=<obfuscated:f973e9db>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�A��2�kB���pW	name=<obfuscated:1837c557>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.7��_�bˌ_�y&��^	name=<obfuscated:2a7467aa>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�_����տ� 8GED�}b	name=<obfuscated:111bdbbf>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.@�[�Vڐ�`m�I�F_X	name=<obfuscated:dd900733>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�+�����^7�����Nm	name=<obfuscated:85bc950c>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�_�����R�����+�Gf	name=<obfuscated:0c6065ad>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.e~�_�ǄUY+XN��OA	name=<obfuscated:8b0e4416>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.V���p_����܈!�7�a	name=<obfuscated:a1f8e30d>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�=_h���vC7xC6W�	name=<obfuscated:243bb241>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.���D�TV���.��m���d	name=<obfuscated:9e4ea121>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.GX!&K�q'��5��U��o,	name=<obfuscated:1112f2b4>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D._�§A`���E��_;�{ƌ	name=<obfuscated:e8e45b0e>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��Sw�e���ύqF�F}	name=<obfuscated:001dfb73>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.d�K�u�W��bR���^l	name=<obfuscated:c02ab3f8>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�Z69j�����@�^�_�	name=<obfuscated:d509504a>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.x����kN�i��SR-Ow	name=<obfuscated:6a57ef4f>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��K�_0tq;��c��Xa�8	name=<obfuscated:7bac542e>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.DNtf�!���_-k_��T	name=<obfuscated:16ccef77>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.hpZ�_H��B���_�By	name=<obfuscated:d3279fea>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.���3�TPZ�_.��1�_k	name=<obfuscated:aed27ed5>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�5ї�[�&�l���g�	name=<obfuscated:edabe449>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.�L�F6_��jAާ_2а�	name=<obfuscated:b363f3a9>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.��_۫5KF�l�L[�fF�D.��^���s0�_E��k�B�@	name=<obfuscated:ada5da2b>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.�w�x(.�,Y�8��_�$	name=<obfuscated:127d1427>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.�bڲ���,�������]	name=<obfuscated:0beae10d>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.NA�L_�C_�馕Y�s�	name=<obfuscated:a8d41729>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�Zo����d�W�Tԕ%�i�	name=<obfuscated:74f2727d>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.��0]vq��_�t꒿�	name=<obfuscated:e1cdb0a3>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.�k[90����I������	name=<obfuscated:321c2168>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.Cϛ_�����s9�T`.��	name=<obfuscated:bb2c92ed>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.OJx����e�䃀4��	name=<obfuscated:2cca33b6>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�uW�EѦS��������	name=<obfuscated:913a19f9>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.Bk�j�#�K֚ ��n	name=<obfuscated:9829bf3f>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.��&d����ȑ2�5�	name=<obfuscated:63c6600e>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.[y�g9��֨�y[�����	name=<obfuscated:937941db>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.I�P2�j8χ�����U�	name=<obfuscated:aa801247>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�_x�}��Z+����	name=<obfuscated:83145b6d>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.���X�ܻ��X��'7ܝi	name=<obfuscated:29310ad4>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.��`!'ta_��_����X	name=<obfuscated:b58e23f4>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.��!A�G��@K��#~#��	name=<obfuscated:da9acd8b>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.��.��O_�_���Rk�'$	name=<obfuscated:4ef3ee93>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.؊�A�_����rN=ʤ�	name=<obfuscated:d5f2f80f>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.҈���J��_��;纡	name=<obfuscated:4e864b06>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.A�qoo�x��_���_�K	name=<obfuscated:15e0d41e>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�1��__T��_]��.�x�UQi G4xI�46	name=<obfuscated:3f3580bd>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.^v�1K�34E�e�}ӓT	name=<obfuscated:05d3d9d3>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.b]D]_��-��x-��n�K	name=<obfuscated:90444a5f>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�1��__T��_]��.�_r�b䈾ߤ^$z�eQ��	name=<obfuscated:43b1325a>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.ʋ~j���IM0�pw��_	name=<obfuscated:f342f48f>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��Z��z4g�t��!L�_	name=<obfuscated:164d1d65>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.m�s��_x�'xp0_���	name=<obfuscated:c67d0f5e>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.g$�����3�_����R�	name=<obfuscated:b2a3e9df>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��Q�W��!�妖	name=<obfuscated:b71d0279>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��I���߲�f_`�h�	name=<obfuscated:dc3b321a>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�F_�_'E����`��`}�8	name=<obfuscated:3fb8f87c>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.������_�Z��d'��z	name=<obfuscated:fdbba2b1>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.-�b��G!��u�~���hi�j	name=<obfuscated:7a278dee>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.���_��_��ipA�it	name=<obfuscated:8cb48ca2>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�O-��_��l����y�~Z	name=<obfuscated:44a54440>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��._���ngo�h��%���C�U	name=<obfuscated:61ae6e6d>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�1�~��L�M���2��1{�	name=<obfuscated:5a55495c>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�}�p����ywM��_	name=<obfuscated:a98ff391>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�_��JN�)�_���Kճ,�	name=<obfuscated:13fab9fa>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��,;$Q{����P���	name=<obfuscated:b9a4775c>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��jd]�_O�_���J�R��	name=<obfuscated:4c34e257>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.S_&�Xok�nl-�p��	name=<obfuscated:349d083e>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.ۧo�S��sP�Ržqo(	name=<obfuscated:21f01ccc>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.x��A_��[�٩��d��	name=<obfuscated:7d1fec03>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�jX^_M�~4��v����_	name=<obfuscated:66d7e6bb>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.W9En����h�-�@��v�h	name=<obfuscated:113eede3>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.p{Ļ����R�лWk��	name=<obfuscated:efa9e6f7>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.w���0@J�e����-����	name=<obfuscated:fafd81a7>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.e.;�{��a�X__���	name=<obfuscated:7295c80e>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.؉�ہqN��L���ί��	name=<obfuscated:08efc0be>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�����_�a�j���.�	name=<obfuscated:c02c9251>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�N����_���jU�EDI�'	name=<obfuscated:07a9111c>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.)���� �H_MR2^W�We	name=<obfuscated:ddde3839>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.00�x��y�=�v��_��E	name=<obfuscated:51d1b09a>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.!�Ѥ��Y�z�x�����~	name=<obfuscated:80eb8578>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.c��!_ڇ�[_�F�5��W	name=<obfuscated:26069d2f>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.`ً.��D�����{{vSv	name=<obfuscated:5d494743>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.n�T#��N�_u�%�M��ةQ	name=<obfuscated:293b3e29>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�_�m��O�B�M�_�`9�	name=<obfuscated:1c109933>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.U&N9�{�]��_���y.W	name=<obfuscated:40344237>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��._�KQ�^,�_��yy�D�_�	name=<obfuscated:acb6f799>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�H�c�_��08��_�P�	name=<obfuscated:56e4ca22>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��~u�O�_-�T��y�۳	name=<obfuscated:275c84fc>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.6��j.؆D����'��	name=<obfuscated:cf9f0752>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��m��h�D3_��m�ѷ��	name=<obfuscated:9e27cfb7>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.l#&}��i�).���f��c	name=<obfuscated:6f7e8bd1>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��Ǐ�P�M;1�s������	name=<obfuscated:bcf515e8>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.o�Z�A_D��e���.�f��	name=<obfuscated:81fe8f33>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��Y�0��+�W�R_t�	name=<obfuscated:5c988da7>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.g-۴����_5��N%@�	name=<obfuscated:f1809e28>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.�i4�Xq������N��	name=<obfuscated:bdb5cfa3>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.G�y�d��b�_3���e��	name=<obfuscated:294a25a3>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.��_�������ːmkg_	name=<obfuscated:1dcd8e38>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�n&�A_[1m�O_p��.����Gr�Q.Bxj��Ne	name=<obfuscated:f2335d95>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.b��+�=a�_%f%��A�	name=<obfuscated:c97439f5>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.�R�j殭L�����-0�	name=<obfuscated:d5f7853f>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.NM���j���F������.`�X;��0�[��6yX �m	name=<obfuscated:c852be85>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.1v��tUE��_�_3����	name=<obfuscated:d0bd6d66>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.NM���j���F������.X5���+���Z_�k�$	name=<obfuscated:312cd764>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.�m�y��������_;TE	name=<obfuscated:19063e3d>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.}T^_���O@o�3_p��	name=<obfuscated:e1d89a49>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.�q�R����j�獉��c3	name=<obfuscated:255e9b36>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.NM���j���F������.R_` tcx�J�ȱ����_�	name=<obfuscated:42877e42>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.�0�N��l���p��_����	name=<obfuscated:888daf1e>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.NM���j���F������.��Cͫ[_����C��_=�	name=<obfuscated:45e19bd8>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.x$���˛J_T����u�J�	name=<obfuscated:6dfa783e>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.NM���j���F������.���_������~�^1g�J	name=<obfuscated:5555ca01>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.__�����2C�--(_�	name=<obfuscated:b518f489>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.V;X�7&���Ћ��Q��b	name=<obfuscated:271444ce>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.J���=v�_�__kb�4^	name=<obfuscated:faa10eef>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.��a_�_���뾐�e�1t�	name=<obfuscated:747d59cc>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.vA9v6Dly���t%@�	name=<obfuscated:db8821bc>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.���j���9�l��t��	name=<obfuscated:fd259fd8>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.��_�x�_���ŭ�Ց�0Q�	name=<obfuscated:9ee7bd8a>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.���=����z��ZH���	name=<obfuscated:c5f6f32e>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1._�����_1��K�ql���	name=<obfuscated:8c0bc0b2>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.��^�h[b_�2{�U2K7�g�	name=<obfuscated:ff186d0b>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.4f1gog�__�j�A�%�	name=<obfuscated:e9ade669>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.��g�Q�[.��)����	name=<obfuscated:5570882d>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.��#_���_��__�F��	name=<obfuscated:ab48df5c>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.��_�r���fҫ�_�{�0	name=<obfuscated:d5d9ed3c>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.��#�]�#�_�X.N�f�`	name=<obfuscated:3b9b6a48>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.8����X��9[ѡ�I��	name=<obfuscated:447f42f0>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.��K'�� p��S�_`_�{.�	name=<obfuscated:4fd95408>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.��1iٟ���J�k�M1n�	name=<obfuscated:90ecfcd0>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.rwKs~I2�¶粑E�uP	name=<obfuscated:78a1b0d1>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.����8H��%-��E}��j�(	name=<obfuscated:05f0464a>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.�ٙ6���a�Z����A	name=<obfuscated:5d134b81>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.Ͽ_��~���Ɂ��1_�	name=<obfuscated:a6dc7499>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.�{��7��F�P�r��@�M	name=<obfuscated:05f7cafc>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�I=�i�����Q͏1��1.�c1I(�_֟��޼o3��	name=<obfuscated:b7518489>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.�^�i#u$�&��-(�K��	name=<obfuscated:34661eaf>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.��Q�u�t�Q8()5[�_	name=<obfuscated:a1f193bf>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.~��a_��G���g����.ϨssP���SꜴc�gh	name=<obfuscated:9c733363>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.~��a_��G���g����.�����h����Ū�h80+�)	name=<obfuscated:bead9b6a>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.�ץ��V�U�d0��V_.�	name=<obfuscated:dec985d4>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.���ЏTP��M���phx_-	name=<obfuscated:6981c534>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.��SqT_�_�5�v�f�	name=<obfuscated:8e5700ec>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.~��a_��G���g����.��%�p� �����,x��	name=<obfuscated:52ffba3c>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.5_v�j��s_�9b��_&v	name=<obfuscated:55d753ea>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.~��a_��G���g����.5���W_��^q}�_5%�	name=<obfuscated:2302a175>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.~��a_��G���g����.)�__����e�����Y�	name=<obfuscated:5a72a89c>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.і���S��H�-G��0=8�	name=<obfuscated:3b75bf57>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.�l�q����;�К_,�h{�	name=<obfuscated:b19f85db>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.�B�rdO��)E��p��_x3�	name=<obfuscated:45f86852>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.��&Ծm�O���x%!a	name=<obfuscated:94ac9f4d>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.K%{�k��;�� QG��_x��	name=<obfuscated:c4c62dba>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6._����36bђ_�_���A	name=<obfuscated:946929de>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.��O���sF�;!AM	name=<obfuscated:0d5a3e02>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.�����_'�+���8�C47	name=<obfuscated:270e58f1>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteFunction	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.����h_p�`5�m�_�_	name=<obfuscated:d8fbfde9>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.���a���(�#��j��q	name=<obfuscated:30638acf>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.]�qLR!�h����vY��	name=<obfuscated:8da3a78e>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx
+RemoteEvent	ReplicatedStorage.Remotes.�#�W�^�b�a�����6.�ٺ�_c[_�z��@77M	name=<obfuscated:84705e92>	from=place 13800717766 Fallen Survival Large Server(1).rbxlx

@@ -1,2 +1,0 @@
-# module source path map (getscriptclosure + debug.info)
-

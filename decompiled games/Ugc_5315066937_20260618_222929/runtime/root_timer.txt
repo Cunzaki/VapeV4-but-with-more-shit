@@ -1,4 +1,0 @@
-# RootTimer
-
-Scale	1
-SavedScale	nil
