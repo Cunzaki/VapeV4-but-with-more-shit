@@ -135,15 +135,19 @@ Most anticheat remotes use **obfuscated names** (binary garbage strings) — see
 
 ### Combined bypass (`libraries/fallen_bypass.lua`)
 
-Fallen needs **all three** stages from `reference/bypas.txt` + `reference/fishy_bypass.txt` (Iridescent `source.lua` uses the same stack):
+**Blocks `main.lua`** until bypass finishes (sync bootstrap). Logs each pass to console `[FallenBypass]`.
 
-| Stage | What | When |
-|-------|------|------|
-| **#1** | Neutralize Remotes GC ban table (`rawget(tbl,4)` on table whose `[1]` is `Remotes` Instance) | First `getgc` pass after spawn |
-| **#2** | Neutralize per-character 9-entry table (`[1]=Character`, `[2]=Humanoid`) — hook indices 5 + 8, nil index 5 | After character exists; **re-run on respawn** |
-| **#3** | Fishy recursive self-table `__newindex` hook | Continuous / respawn retry |
+| Stage | Required for Active? | Notes |
+|-------|---------------------|-------|
+| **#1** Remotes ban tables | No (Strict only) | Hooks all table offsets on Remotes GC tables |
+| **#2** Character ban tables | No (Strict only) | Any char+humanoid GC table with ban subtables |
+| **#3** Fishy recursive hook | **Yes** | `Active = Bypass3`; kick only if this fails after 90s |
 
-`status.Bypass1/2/3` and `vape.Libraries.fallenBypass` report which stages succeeded. On Fallen, all three must pass or the client is kicked.
+On pass/fail, **`libraries/fallen_ac_diag.lua`** writes `fallen_ac_dumps/latest.txt` (+ timestamped `.txt`/`.json`). Vape notification shows B1/B2/B3 status.
+
+Manual re-dump: `vape.Libraries.fallenBypass.Diagnose()` after load.
+
+Partial bypass (B3 ok, B1/B2 fail) → warning notification, **no kick**.
 
 **AssetContainer proto hooks** (`games/fallen_survival.lua`): after bypass Active, neuter proto-1 on `getgc` functions whose constants match `SurfaceGui`, `Foundation`, `LocalAmmo`+`Equipped`, `WalkSpeed` — same fingerprints as Iridescent `source.lua`.
 

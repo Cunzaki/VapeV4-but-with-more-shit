@@ -1,9 +1,9 @@
 --[[
-	Fallen Survival anticheat bypass — combined stack from reference/bypas.txt + fishy_bypass.txt.
+	Fallen Survival anticheat bypass — combined stack + diagnostics.
 
-	1. Ban table #1 — Remotes GC table index 4
-	2. Ban table #2 — character/humanoid 9-entry GC table indices 5 + 8
-	3. Recursive self-referencing table hook (fishy / V3)
+	#1 Remotes ban tables (all table offsets, not only index 4)
+	#2 Character/humanoid ban tables (any length with tables at 5/8)
+	#3 Fishy recursive self-table hook (required for Active)
 ]]
 
 if getgenv().fishy_loaded or getgenv().FallenBypassLoaded then
@@ -30,8 +30,17 @@ end
 local Players = cloneref(game:GetService('Players'))
 local ReplicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
 
+local Diag
+pcall(function()
+	local src = readfile and readfile('newvape/libraries/fallen_ac_diag.lua')
+	if src then
+		Diag = loadstring(src, 'fallen_ac_diag')()
+	end
+end)
+
 local status = {
 	Active = false,
+	Strict = false,
 	IsFallen = false,
 	LastRun = 0,
 	LastError = nil,
@@ -40,7 +49,12 @@ local status = {
 	Bypass1 = false,
 	Bypass2 = false,
 	Bypass3 = false,
+	LastDiagPath = nil,
 }
+
+local function log(msg)
+	print('[FallenBypass] ' .. msg)
+end
 
 local function publishStatus()
 	getgenv().FallenBypassLoaded = status.Active
@@ -72,12 +86,8 @@ end
 local function waitForCharacter(player, timeout)
 	timeout = timeout or 120
 	local deadline = tick() + timeout
-	local character = player.Character
-	if character and character:FindFirstChild('HumanoidRootPart') and character:FindFirstChild('Humanoid') then
-		return character
-	end
 	while tick() < deadline do
-		character = player.Character
+		local character = player.Character
 		if character then
 			local root = character:FindFirstChild('HumanoidRootPart') or character:WaitForChild('HumanoidRootPart', 2)
 			local humanoid = character:FindFirstChild('Humanoid') or character:WaitForChild('Humanoid', 2)
@@ -96,49 +106,57 @@ local deadMeta = {
 	__newindex = function() end,
 }
 
--- Bypass #1: Remotes ban table (reference/bypas.txt, source.lua)
 local function neutralizeRemotesBanTable()
+	local hooked = false
 	for _, tbl in getgc(true) do
 		if type(tbl) == 'table' then
 			local first = rawget(tbl, 1)
 			if typeof(first) == 'Instance' and first.Name == 'Remotes' then
-				local banTable = rawget(tbl, 4)
-				if type(banTable) == 'table' then
-					setmetatable(banTable, deadMeta)
-					return true
+				for i = 1, 32 do
+					if i ~= 1 then
+						local banTable = rawget(tbl, i)
+						if type(banTable) == 'table' and banTable ~= tbl then
+							pcall(setmetatable, banTable, deadMeta)
+							hooked = true
+						end
+					end
 				end
 			end
 		end
 	end
-	return false
+	return hooked
 end
 
--- Bypass #2: per-character 9-entry ban tables
 local function neutralizeCharacterBanTables(character, humanoid)
 	if not (character and humanoid) then
 		return false
 	end
+	local hooked = false
 	for _, tbl in getgc(true) do
 		if type(tbl) == 'table' and rawget(tbl, 1) == character and rawget(tbl, 2) == humanoid then
-			local len = rawlen and rawlen(tbl) or #tbl
-			if len == 9 then
-				local ban1 = rawget(tbl, 8)
-				local ban2 = rawget(tbl, 5)
-				if type(ban1) == 'table' then
-					setmetatable(ban1, deadMeta)
+			for _, idx in { 5, 8 } do
+				local ban = rawget(tbl, idx)
+				if type(ban) == 'table' then
+					pcall(setmetatable, ban, deadMeta)
+					if idx == 5 then
+						pcall(rawset, tbl, 5, nil)
+					end
+					hooked = true
 				end
-				if type(ban2) == 'table' then
-					setmetatable(ban2, deadMeta)
-					rawset(tbl, 5, nil)
+			end
+			-- ponytail: also hook any other table slots past humanoid
+			for i = 3, 16 do
+				local v = rawget(tbl, i)
+				if type(v) == 'table' and i ~= 5 and i ~= 8 then
+					pcall(setmetatable, v, deadMeta)
+					hooked = true
 				end
-				return true
 			end
 		end
 	end
-	return false
+	return hooked
 end
 
--- Bypass #3: recursive self-referencing table hook (fishy)
 local function protectRecursiveTable(recursiveTbl, banIndexValue)
 	setrawmetatable(recursiveTbl, {
 		__newindex = function(self, index, value)
@@ -179,11 +197,7 @@ local function scanRecursiveBypass()
 	local hooked = 0
 	LPH_JIT_MAX(function()
 		for _, tbl in getgc(true) do
-			if type(tbl) ~= 'table' then
-				-- skip
-			elseif getrawmetatable and getrawmetatable(tbl) then
-				-- skip
-			else
+			if type(tbl) == 'table' and not (getrawmetatable and getrawmetatable(tbl)) then
 				local foundIndex, foundRecursive = false, false
 				for _, value in tbl do
 					if type(value) == 'number' and rawequal(value, 1) then
@@ -202,6 +216,14 @@ local function scanRecursiveBypass()
 		end
 	end)()
 	return hooked > 0, hooked
+end
+
+local function runDiagnostics(character)
+	if not Diag then return end
+	local ok, path = pcall(Diag.run, character, status)
+	if ok and path then
+		status.LastDiagPath = path
+	end
 end
 
 local function runBypassPass(character)
@@ -225,33 +247,32 @@ local function runBypassPass(character)
 
 	if not ok then
 		status.LastError = tostring(err)
-		status.Active = false
-		publishStatus()
-		return false
 	end
 
-	-- ponytail: Fallen needs all three; #2 re-runs on respawn
-	if status.IsFallen then
-		status.Active = status.Bypass1 and status.Bypass2 and status.Bypass3
-	else
-		status.Active = status.Bypass3
-	end
+	-- Fishy (#3) is required — V3 reference only used this for Active
+	status.Active = status.Bypass3
+	status.Strict = status.Bypass1 and status.Bypass2 and status.Bypass3
 	if status.Active then
 		status.LastError = nil
 	end
 
 	publishStatus()
+	log(string.format('pass #%d B1=%s B2=%s B3=%s hooks=%d active=%s strict=%s',
+		status.RunCount, tostring(status.Bypass1), tostring(status.Bypass2), tostring(status.Bypass3),
+		status.HookCount, tostring(status.Active), tostring(status.Strict)))
 	return status.Active
 end
 
 local function runBypassWithRetry(character, maxWait)
-	local deadline = tick() + (maxWait or 30)
+	local deadline = tick() + (maxWait or 60)
 	repeat
 		if runBypassPass(character) then
+			runDiagnostics(character)
 			return true
 		end
 		task.wait(0.25)
 	until tick() >= deadline
+	runDiagnostics(character)
 	return status.Active
 end
 
@@ -261,48 +282,57 @@ status.Run = function(maxWait)
 	return runBypassWithRetry(char, maxWait)
 end
 
+status.Diagnose = function(character)
+	runDiagnostics(character or (Players.LocalPlayer and Players.LocalPlayer.Character))
+	return status.LastDiagPath
+end
+
 status.WaitForCharacter = waitForCharacter
 status.IsFallenGame = isFallenGame
 publishStatus()
 
-local function bootstrap()
-	local player = waitForLocalPlayer(120)
-	if not player then
-		status.LastError = 'LocalPlayer timeout'
-		publishStatus()
-		return nil
-	end
-
-	status.IsFallen = isFallenGame()
-
-	local character = waitForCharacter(player, 120)
-	if not character then
-		status.LastError = 'Character timeout'
-		if status.IsFallen then
-			player:Kick('[Vape] Anticheat bypass — spawn in fully before loading.')
-		end
-		publishStatus()
-		return player
-	end
-
-	local bypassed = runBypassWithRetry(character, status.IsFallen and 45 or 15)
-	if not bypassed and status.IsFallen then
-		player:Kick('[Vape] Anticheat bypass failed — rejoin when fully loaded.')
-	end
-
-	return player
+-- Block main.lua until bypass finishes (sync bootstrap on Fallen)
+local player = waitForLocalPlayer(120)
+if not player then
+	status.LastError = 'LocalPlayer timeout'
+	publishStatus()
+	return false
 end
 
-task.spawn(function()
-	local player = bootstrap()
-	if player then
-		player.CharacterAdded:Connect(function(char)
-			task.wait(0.5)
-			local hum = char:WaitForChild('Humanoid', 10)
-			if hum then
-				runBypassWithRetry(char, 20)
-			end
-		end)
+status.IsFallen = isFallenGame()
+log('game detected fallen=' .. tostring(status.IsFallen))
+
+local character = waitForCharacter(player, status.IsFallen and 120 or 30)
+if not character then
+	status.LastError = 'Character timeout'
+	runDiagnostics(nil)
+	if status.IsFallen then
+		player:Kick('[Vape] Spawn in fully before loading. See fallen_ac_dumps/latest.txt')
+	end
+	publishStatus()
+	return false
+end
+
+local maxWait = status.IsFallen and 90 or 20
+log('scanning gc (up to ' .. maxWait .. 's)...')
+local bypassed = runBypassWithRetry(character, maxWait)
+
+if not bypassed and status.IsFallen then
+	local path = status.LastDiagPath or 'fallen_ac_dumps/latest.txt'
+	player:Kick('[Vape] Fishy bypass (#3) failed — see ' .. path)
+elseif status.IsFallen and not status.Strict then
+	log('WARN: partial bypass — B1=' .. tostring(status.Bypass1) .. ' B2=' .. tostring(status.Bypass2) .. ' (continuing)')
+	local vape = shared.vape
+	if vape and vape.CreateNotification then
+		vape:CreateNotification('Fallen Bypass', 'Partial: B1=' .. tostring(status.Bypass1) .. ' B2=' .. tostring(status.Bypass2) .. ' B3=ok', 10, 'warning')
+	end
+end
+
+player.CharacterAdded:Connect(function(char)
+	task.wait(0.5)
+	local hum = char:WaitForChild('Humanoid', 10)
+	if hum then
+		runBypassWithRetry(char, 25)
 	end
 end)
 

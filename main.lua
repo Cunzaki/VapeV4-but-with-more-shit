@@ -136,6 +136,10 @@ local function loadAnticheatBypass()
 		return true
 	end
 	local bypassPath = 'newvape/libraries/fallen_bypass.lua'
+	local diagPath = 'newvape/libraries/fallen_ac_diag.lua'
+	if not isfile(diagPath) then
+		pcall(function() downloadFile(diagPath) end)
+	end
 	local source = isfile(bypassPath) and readfile(bypassPath) or downloadFile(bypassPath)
 	return runGameScript(source, 'fallen_bypass')
 end

@@ -1,11 +1,4 @@
 local vape = shared.vape
-local loadstring = function(...)
-	local res, err = loadstring(...)
-	if err and vape then
-		vape:CreateNotification('Vape', 'Failed to load : '..err, 30, 'alert')
-	end
-	return res
-end
 local isfile = isfile or function(file)
 	local suc, res = pcall(function()
 		return readfile(file)
@@ -28,4 +21,18 @@ local function downloadFile(path, func)
 	return (func or readfile)(path)
 end
 
-loadstring(downloadFile('newvape/games/fallen_survival.lua'), 'fallen_survival')()
+local source = downloadFile('newvape/games/fallen_survival.lua')
+local chunk, err = loadstring(source, 'fallen_survival')
+if not chunk then
+	if vape and vape.CreateNotification then
+		vape:CreateNotification('Vape', 'Failed to compile fallen_survival: ' .. tostring(err), 30, 'alert')
+	end
+	error(err)
+end
+local ok, runErr = pcall(chunk)
+if not ok then
+	if vape and vape.CreateNotification then
+		vape:CreateNotification('Vape', 'Failed to run fallen_survival: ' .. tostring(runErr), 30, 'alert')
+	end
+	error(runErr)
+end
