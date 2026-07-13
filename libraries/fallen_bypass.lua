@@ -1,9 +1,7 @@
 --[[
-	Fallen Survival anticheat bypass — combined stack + diagnostics.
+	Fallen Survival anticheat bypass — one GC pass per attempt, non-blocking bootstrap.
 
-	#1 Remotes ban tables (all table offsets, not only index 4)
-	#2 Character/humanoid ban tables (any length with tables at 5/8)
-	#3 Fishy recursive self-table hook (required for Active)
+	#1 Remotes ban tables  #2 Character ban tables  #3 Fishy recursive (required)
 ]]
 
 if getgenv().fishy_loaded or getgenv().FallenBypassLoaded then
@@ -50,6 +48,11 @@ local status = {
 	Bypass2 = false,
 	Bypass3 = false,
 	LastDiagPath = nil,
+}
+
+local deadMeta = {
+	__index = function() end,
+	__newindex = function() end,
 }
 
 local function log(msg)
@@ -101,77 +104,6 @@ local function waitForCharacter(player, timeout)
 	return nil
 end
 
-local deadMeta = {
-	__index = function() end,
-	__newindex = function() end,
-}
-
-local function neutralizeRemotesBanTable()
-	local remotesInst = ReplicatedStorage:FindFirstChild('Remotes')
-	local hooked = false
-	for _, tbl in getgc(true) do
-		if type(tbl) ~= 'table' then
-			-- skip
-		else
-			local remotesIndex
-			if remotesInst then
-				for i = 1, 32 do
-					if rawget(tbl, i) == remotesInst then
-						remotesIndex = i
-						break
-					end
-				end
-			end
-			local first = rawget(tbl, 1)
-			if not remotesIndex and typeof(first) == 'Instance' and first.Name == 'Remotes' then
-				remotesIndex = 1
-			end
-			if remotesIndex then
-				for i = 1, 32 do
-					if i ~= remotesIndex then
-						local banTable = rawget(tbl, i)
-						if type(banTable) == 'table' and banTable ~= tbl then
-							pcall(setmetatable, banTable, deadMeta)
-							hooked = true
-						end
-					end
-				end
-			end
-		end
-	end
-	return hooked
-end
-
-local function neutralizeCharacterBanTables(character, humanoid)
-	if not (character and humanoid) then
-		return false
-	end
-	local hooked = false
-	for _, tbl in getgc(true) do
-		if type(tbl) == 'table' and rawget(tbl, 1) == character and rawget(tbl, 2) == humanoid then
-			for _, idx in { 5, 8 } do
-				local ban = rawget(tbl, idx)
-				if type(ban) == 'table' then
-					pcall(setmetatable, ban, deadMeta)
-					if idx == 5 then
-						pcall(rawset, tbl, 5, nil)
-					end
-					hooked = true
-				end
-			end
-			-- ponytail: also hook any other table slots past humanoid
-			for i = 3, 16 do
-				local v = rawget(tbl, i)
-				if type(v) == 'table' and i ~= 5 and i ~= 8 then
-					pcall(setmetatable, v, deadMeta)
-					hooked = true
-				end
-			end
-		end
-	end
-	return hooked
-end
-
 local function protectRecursiveTable(recursiveTbl, banIndexValue)
 	setrawmetatable(recursiveTbl, {
 		__newindex = function(self, index, value)
@@ -181,11 +113,9 @@ local function protectRecursiveTable(recursiveTbl, banIndexValue)
 				local id2 = rawget(value, 2)
 				local id4 = rawget(value, 4)
 				local len = rawlen and rawlen(value) or #value
-
 				if id1 then
 					if type(id1) == 'table' and len == 2 and rawlen and rawlen(id1) == 1 and not rawget(id1, 'n') then
-						local insideVal = rawget(id1, 1)
-						local outsideVal = rawget(value, 2)
+						local insideVal, outsideVal = rawget(id1, 1), rawget(value, 2)
 						if insideVal and outsideVal and tonumber(insideVal) and tonumber(outsideVal) then
 							whitelisted = true
 						end
@@ -197,10 +127,7 @@ local function protectRecursiveTable(recursiveTbl, banIndexValue)
 						whitelisted = true
 					end
 				end
-
-				if not whitelisted then
-					return
-				end
+				if not whitelisted then return end
 			end
 			return rawset(self, index, value)
 		end,
@@ -208,76 +135,142 @@ local function protectRecursiveTable(recursiveTbl, banIndexValue)
 	return true
 end
 
-local function scanRecursiveBypass()
-	local hooked = 0
-	LPH_JIT_MAX(function()
-		for _, tbl in getgc(true) do
-			if type(tbl) == 'table' and not (getrawmetatable and getrawmetatable(tbl)) then
-				local foundIndex, foundRecursive = false, false
-				for _, value in tbl do
-					if type(value) == 'number' and rawequal(value, 1) then
-						foundIndex = value
-					end
-					if rawequal(value, tbl) then
-						foundRecursive = value
-					end
+-- Single getgc pass for B1 + B2 + B3 (ponytail: one scan, yield every 8k tables)
+local function runBypassPass(character)
+	status.RunCount = status.RunCount + 1
+	status.LastRun = tick()
+	status.IsFallen = isFallenGame()
+
+	local humanoid = character and character:FindFirstChildOfClass('Humanoid')
+	local remotesInst = ReplicatedStorage:FindFirstChild('Remotes')
+	local b1, b2, b3 = status.Bypass1, status.Bypass2, 0
+	local scanned = 0
+
+	local ok, err = pcall(function()
+		LPH_JIT_MAX(function()
+			for _, tbl in getgc(true) do
+				scanned = scanned + 1
+				if scanned % 8000 == 0 then
+					task.wait()
 				end
-				if foundIndex and foundRecursive and rawequal(rawget(tbl, foundIndex), nil) then
-					if protectRecursiveTable(foundRecursive, foundIndex) then
-						hooked = hooked + 1
+				if type(tbl) ~= 'table' then
+					-- skip
+				else
+					-- B1: Remotes context
+					local remotesIndex
+					if remotesInst then
+						for i = 1, 32 do
+							if rawget(tbl, i) == remotesInst then
+								remotesIndex = i
+								break
+							end
+						end
+					end
+					local first = rawget(tbl, 1)
+					if not remotesIndex and typeof(first) == 'Instance' and first.Name == 'Remotes' then
+						remotesIndex = 1
+					end
+					if remotesIndex then
+						for i = 1, 32 do
+							if i ~= remotesIndex then
+								local ban = rawget(tbl, i)
+								if type(ban) == 'table' and ban ~= tbl then
+									pcall(setmetatable, ban, deadMeta)
+									b1 = true
+								end
+							end
+						end
+					end
+
+					-- B2: Character context
+					if character and humanoid and rawget(tbl, 1) == character and rawget(tbl, 2) == humanoid then
+						for _, idx in { 5, 8 } do
+							local ban = rawget(tbl, idx)
+							if type(ban) == 'table' then
+								pcall(setmetatable, ban, deadMeta)
+								if idx == 5 then pcall(rawset, tbl, 5, nil) end
+								b2 = true
+							end
+						end
+						for i = 3, 16 do
+							local v = rawget(tbl, i)
+							if type(v) == 'table' and i ~= 5 and i ~= 8 then
+								pcall(setmetatable, v, deadMeta)
+								b2 = true
+							end
+						end
+					end
+
+					-- B3: Fishy recursive
+					if not (getrawmetatable and getrawmetatable(tbl)) then
+						local foundIndex, foundRecursive = false, false
+						for _, value in tbl do
+							if type(value) == 'number' and rawequal(value, 1) then foundIndex = value end
+							if rawequal(value, tbl) then foundRecursive = value end
+						end
+						if foundIndex and foundRecursive and rawequal(rawget(tbl, foundIndex), nil) then
+							if protectRecursiveTable(foundRecursive, foundIndex) then
+								b3 = b3 + 1
+							end
+						end
 					end
 				end
 			end
-		end
-	end)()
-	return hooked > 0, hooked
+		end)()
+	end)
+
+	if not ok then
+		status.LastError = tostring(err)
+	end
+
+	status.Bypass1 = b1
+	status.Bypass2 = b2
+	if b3 > 0 then
+		status.Bypass3 = true
+		status.HookCount = math.max(status.HookCount, b3)
+	end
+	status.Active = status.Bypass3
+	status.Strict = status.Bypass1 and status.Bypass2 and status.Bypass3
+	if status.Active then
+		status.LastError = nil
+	end
+
+	publishStatus()
+	log(string.format('pass #%d (%dk tbl) B1=%s B2=%s B3=%s hooks=%d',
+		status.RunCount, math.floor(scanned / 1000), tostring(status.Bypass1), tostring(status.Bypass2),
+		tostring(status.Bypass3), status.HookCount))
+	return status.Active
 end
 
-local function waitForAcInit(character, timeout)
-	timeout = timeout or 25
-	if not (Diag and Diag.hasBanTargets) then
-		task.wait(math.min(timeout, 3))
-		return
-	end
-	local hum = character and character:FindFirstChildOfClass('Humanoid')
-	local deadline = tick() + timeout
-	pcall(function()
-		ReplicatedStorage:WaitForChild('Remotes', 10)
+local function runDiagnosticsAsync(character)
+	if not Diag then return end
+	task.spawn(function()
+		task.wait(1)
+		local ok, path = pcall(Diag.run, character, status)
+		if ok and path then
+			status.LastDiagPath = path
+		end
 	end)
-	while tick() < deadline do
-		if Diag.hasBanTargets(character, hum) then
-			log('AC ban tables visible in GC')
-			return
-		end
-		local r = character and (character:FindFirstChild('InventoryController') or character:FindFirstChild('StateController'))
-		if r then
-			task.wait(0.5)
-		else
-			task.wait(0.25)
-		end
-	end
-	log('AC ban tables not in GC yet — continuing with B3 only; background poll active')
 end
 
 local function startBackgroundStrictPass(player)
 	task.spawn(function()
-		local deadline = tick() + 120
-		while tick() < deadline do
-			task.wait(3)
-			if status.Strict then break end
+		local deadline = tick() + 90
+		local lastB1, lastB2 = status.Bypass1, status.Bypass2
+		while tick() < deadline and not status.Strict do
+			task.wait(5)
 			local char = player.Character
-			local hum = char and char:FindFirstChildOfClass('Humanoid')
-			if char and hum then
-				local wasStrict = status.Strict
+			if char then
 				runBypassPass(char)
-				if status.Bypass1 or status.Bypass2 or not wasStrict then
-					runDiagnostics(char)
+				if (status.Bypass1 and not lastB1) or (status.Bypass2 and not lastB2) then
+					runDiagnosticsAsync(char)
+					lastB1, lastB2 = status.Bypass1, status.Bypass2
 				end
 				if status.Strict then
-					log('strict bypass complete (B1+B2+B3)')
+					log('strict bypass complete')
 					local vape = shared.vape
 					if vape and vape.CreateNotification then
-						vape:CreateNotification('Fallen Bypass', 'Full bypass active (B1+B2+B3)', 8, 'info')
+						vape:CreateNotification('Fallen Bypass', 'Full bypass (B1+B2+B3)', 8, 'info')
 					end
 					break
 				end
@@ -286,72 +279,20 @@ local function startBackgroundStrictPass(player)
 	end)
 end
 
-local function runDiagnostics(character)
-	if not Diag then return end
-	local ok, path = pcall(Diag.run, character, status)
-	if ok and path then
-		status.LastDiagPath = path
-	end
-end
-
-local function runBypassPass(character)
-	status.RunCount = status.RunCount + 1
-	status.LastRun = tick()
-	status.IsFallen = isFallenGame()
-
-	local humanoid = character and character:FindFirstChildOfClass('Humanoid')
-
-	local ok, err = pcall(function()
-		status.Bypass1 = neutralizeRemotesBanTable() or status.Bypass1
-		if character and humanoid then
-			status.Bypass2 = neutralizeCharacterBanTables(character, humanoid) or status.Bypass2
-		end
-		local success, count = scanRecursiveBypass()
-		if success then
-			status.Bypass3 = true
-			status.HookCount = math.max(status.HookCount, count or 0)
-		end
-	end)
-
-	if not ok then
-		status.LastError = tostring(err)
-	end
-
-	-- Fishy (#3) is required — V3 reference only used this for Active
-	status.Active = status.Bypass3
-	status.Strict = status.Bypass1 and status.Bypass2 and status.Bypass3
-	if status.Active then
-		status.LastError = nil
-	end
-
-	publishStatus()
-	log(string.format('pass #%d B1=%s B2=%s B3=%s hooks=%d active=%s strict=%s',
-		status.RunCount, tostring(status.Bypass1), tostring(status.Bypass2), tostring(status.Bypass3),
-		status.HookCount, tostring(status.Active), tostring(status.Strict)))
-	return status.Active
-end
-
-local function runBypassWithRetry(character, maxWait)
-	local deadline = tick() + (maxWait or 60)
-	repeat
-		if runBypassPass(character) then
-			runDiagnostics(character)
-			return true
-		end
-		task.wait(0.25)
-	until tick() >= deadline
-	runDiagnostics(character)
-	return status.Active
-end
-
-status.Run = function(maxWait)
+status.Run = function()
 	local player = Players.LocalPlayer
 	local char = player and player.Character
-	return runBypassWithRetry(char, maxWait)
+	if char then runBypassPass(char) end
+	return status.Active
 end
 
 status.Diagnose = function(character)
-	runDiagnostics(character or (Players.LocalPlayer and Players.LocalPlayer.Character))
+	task.spawn(function()
+		if Diag then
+			local ok, path = pcall(Diag.run, character or Players.LocalPlayer.Character, status)
+			if ok and path then status.LastDiagPath = path end
+		end
+	end)
 	return status.LastDiagPath
 end
 
@@ -359,7 +300,6 @@ status.WaitForCharacter = waitForCharacter
 status.IsFallenGame = isFallenGame
 publishStatus()
 
--- Block main.lua until bypass finishes (sync bootstrap on Fallen)
 local player = waitForLocalPlayer(120)
 if not player then
 	status.LastError = 'LocalPlayer timeout'
@@ -370,44 +310,54 @@ end
 status.IsFallen = isFallenGame()
 log('game detected fallen=' .. tostring(status.IsFallen))
 
-local character = waitForCharacter(player, status.IsFallen and 120 or 30)
+local character = waitForCharacter(player, status.IsFallen and 60 or 20)
 if not character then
 	status.LastError = 'Character timeout'
-	runDiagnostics(nil)
 	if status.IsFallen then
-		player:Kick('[Vape] Spawn in fully before loading. See fallen_ac_dumps/latest.txt')
+		player:Kick('[Vape] Spawn in fully before loading.')
 	end
 	publishStatus()
 	return false
 end
 
-local maxWait = status.IsFallen and 30 or 20
+-- Brief yield for AC init — no GC polling loop
 if status.IsFallen then
-	waitForAcInit(character, 25)
-end
-log('scanning gc (up to ' .. maxWait .. 's)...')
-local bypassed = runBypassWithRetry(character, maxWait)
-
-if status.IsFallen then
-	startBackgroundStrictPass(player)
+	task.wait(1)
 end
 
-if not bypassed and status.IsFallen then
-	local path = status.LastDiagPath or 'fallen_ac_dumps/latest.txt'
-	player:Kick('[Vape] Fishy bypass (#3) failed — see ' .. path)
-elseif status.IsFallen and not status.Strict then
-	log('WARN: partial bypass — B1=' .. tostring(status.Bypass1) .. ' B2=' .. tostring(status.Bypass2) .. ' (continuing)')
-	local vape = shared.vape
-	if vape and vape.CreateNotification then
-		vape:CreateNotification('Fallen Bypass', 'Partial: B1=' .. tostring(status.Bypass1) .. ' B2=' .. tostring(status.Bypass2) .. ' B3=ok', 10, 'warning')
+log('running bypass (single gc pass)...')
+runBypassPass(character)
+
+-- Retry B3 only if needed (light, max 5 attempts)
+if not status.Bypass3 and status.IsFallen then
+	for _ = 1, 5 do
+		task.wait(0.5)
+		runBypassPass(character)
+		if status.Bypass3 then break end
 	end
 end
 
+if not status.Bypass3 and status.IsFallen then
+	player:Kick('[Vape] Fishy bypass (#3) failed — rejoin when loaded')
+	return false
+end
+
+if status.IsFallen and not status.Strict then
+	log('partial bypass ok — B1/B2 retry in background')
+	local vape = shared.vape
+	if vape and vape.CreateNotification then
+		vape:CreateNotification('Fallen Bypass', 'B3 ok — hardening B1/B2 in background', 8, 'info')
+	end
+	startBackgroundStrictPass(player)
+end
+
+runDiagnosticsAsync(character)
+
 player.CharacterAdded:Connect(function(char)
-	task.wait(0.5)
+	task.wait(1)
 	local hum = char:WaitForChild('Humanoid', 10)
 	if hum then
-		runBypassWithRetry(char, 25)
+		runBypassPass(char)
 	end
 end)
 

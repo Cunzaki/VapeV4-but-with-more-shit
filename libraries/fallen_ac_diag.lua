@@ -166,7 +166,7 @@ function Diag.scan(character, humanoid, bypassStatus)
 			local ok, info = pcall(debug.getinfo, fn)
 			if ok and info and type(info.source) == 'string' and info.source:find('AssetContainer') then
 				report.assetContainerClosures = report.assetContainerClosures + 1
-				if #report.assetContainerSamples < 5 then
+				if #report.assetContainerSamples < 3 then
 					report.assetContainerSamples[#report.assetContainerSamples + 1] = {
 						name = info.name or '?',
 						line = info.currentline,
@@ -283,17 +283,28 @@ function Diag.run(character, bypassStatus)
 	return report, path
 end
 
--- Returns true when B1/B2 targets visible in GC (for wait loop)
+-- Lightweight check (no assetcontainer scan)
 function Diag.hasBanTargets(character, humanoid)
-	local r = Diag.scan(character, humanoid, {})
-	for _, t in ipairs(r.remotesExact) do
-		if #t.banOffsets > 0 then return true end
-	end
-	for _, t in ipairs(r.remotesByName) do
-		if #t.banOffsets > 0 then return true end
-	end
-	for _, t in ipairs(r.characterExact) do
-		if #t.banOffsets > 0 or t.len >= 9 then return true end
+	local remotesInst = ReplicatedStorage:FindFirstChild('Remotes')
+	for _, tbl in getgc(true) do
+		if type(tbl) ~= 'table' then
+			-- skip
+		else
+			if remotesInst then
+				for i = 1, 32 do
+					if rawget(tbl, i) == remotesInst then
+						for j = 1, 32 do
+							if j ~= i and type(rawget(tbl, j)) == 'table' then return true end
+						end
+					end
+				end
+			end
+			if character and humanoid and rawget(tbl, 1) == character and rawget(tbl, 2) == humanoid then
+				for i = 3, 16 do
+					if type(rawget(tbl, i)) == 'table' then return true end
+				end
+			end
+		end
 	end
 	return false
 end
