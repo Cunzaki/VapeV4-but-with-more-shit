@@ -194,8 +194,8 @@ Most anticheat remotes use **obfuscated names** (binary garbage strings) — see
 | ------------------------------------------- | --------------------------------------------------------------------- |
 | `libraries/fallen_bypass.lua`               | V3/fishy recursive GC hook; publishes `vape.Libraries.fallenBypass`   |
 | `games/universal.lua`                       | **Anticheat Bypass** Utility module (always on, cannot stay disabled) |
-| `games/fallen_survival.lua`                 | Entity refresh, Animals/Events/Bases fake scan, VFX VM ignores        |
-| `games/16849012343.lua` / `13800717766.lua` | Thin Fallen loaders                                                   |
+| `games/fallen_survival.lua`                 | Pass 1 Fallen script — silent aim, gun mods, ESP, visuals; strips universal Combat/Render |
+| `games/16849012343.lua` / `13800717766.lua` | Thin Fallen loaders (`downloadFile` → fallen_survival)                                    |
 
 
 
@@ -231,7 +231,7 @@ Writes `fallen_ac_dumps/<PlaceId>_<timestamp>/offsets.txt`, `.json`, `bypass_off
 | `fallen_ultimate_v3.lua` | Full Fallen Ultimate V3 cheat — bypass + silent aim + manipulation + gun mods |
 | `bypas.txt`              | **Legacy** — stages 0x01/0x02/0x03 ban-table bypass (outdated for current AC) |
 | `source.lua`             | Iridescent — AssetContainer proto constant hooks + full GUI                   |
-| `insulin.lua`            | Insulin — AssetContainer proto hook suite                                     |
+| `insulin.lua`            | Insulin — best manipulation/hitscan silent aim math (Pass 1 combat source) |
 
 
 Use as **RE reference only** — Vape loads `fallen_bypass.lua` at runtime, not these files.
@@ -290,13 +290,7 @@ Hooks return table in `ViewmodelController` traceback — sets `FireRateMult`, `
 | **Target**                | `entitylib` player + fake entity scan                                                 |
 
 
-**On Fallen:** `fallen_survival.lua` adds:
-
-- `workspace.VFX.VMs` to `visualizerModels` ignore (prevents VM false wall blocks)
-- `Animals` / `Events` / `Bases` descendant scan for NPC entities
-- Character respawn entity refresh
-
-Universal silent aim works on Fallen without V3's `VMNetworkPointer` hook, but **does not** do position manipulation behind walls — use V3-style manipulation only if we port that loop later.
+**On Fallen:** Pass 1 replaces universal Silent Aim with insulin-style hooks in `fallen_survival.lua` (CreateProjectile + VMNetworkPointer + manipulation/hitscan). Universal Combat/Render modules are stripped at load.
 
 ### Game inner workings (shooting path)
 
@@ -323,73 +317,119 @@ Hit detection server-side uses obfuscated remotes + client-reported CFrame/posit
 
 ## What works from universal (Fallen)
 
-- **Combat:** Silent Aim, Triggerbot, AutoFire, Hit Sounds, Bullet Tracers, Target Highlight
-- **Movement:** Speed, Fly, Long Jump, No Fall
-- **Visuals:** ESP, Chams, NameTags, Full Bright (no V3 AssetContainer proto hooks — higher ban risk on aggressive visuals)
-- **Utility:** Anticheat Bypass module (always on), Auto Reconnect, FPS boost
+Universal still loads for entitylib + shared utilities. Conflicting Combat/Blatant/Render/World modules are **stripped** by allen_survival.lua via ape:Remove.
 
-
-
-### Fallen-specific `fallen_survival.lua` hooks
-
-- Re-registers entities after respawn
-- Watches `Animals`, `Events`, `Bases` for NPC fake entities
-- Adds `workspace.VFX.VMs` to visualizer ignore list
-
-
-
-### Future Fallen-only features
-
-1. Port V3 **manipulation** + **fire remote hook** for wallbang silent aim
-2. **Instant bullet** via ViewmodelController return-table hook
-3. Gun info from `Modules.ToolInfo` for autofire tuning
-4. Base ESP — `workspace.Bases` scan
-5. AssetContainer proto hooks from `source.lua` (ESP/speed AC reports)
+**Kept:** Anticheat Bypass, Panic, Rejoin, ServerHop, Rejoin Previous Server, FPS, AutoRejoin, StaffDetector, Friends/Targets Main options, GUI.
 
 ---
 
+## Vape Pass 1 — games/fallen_survival.lua
 
+~3.2k lines. Shared profile: Medium + Large under canon place 16849012343 (SHARED_GAME_CONFIGS.FALLEN in guis/new.lua).
+
+### Load order
+
+`
+main.lua → fallen_bypass.lua → universal.lua → games/<PlaceId>.lua → fallen_survival.lua → vape:Load()
+`
+
+Place stubs (16849012343.lua / 13800717766.lua) use downloadFile so missing executor cache no longer errors with 
+eadfile File not found.
+
+### Modules registered
+
+| Category | Module | Source |
+|----------|--------|--------|
+| Combat | **Fallen Silent Aim** | insulin targeting + manip/hitscan + CreateProjectile + VMNetworkPointer |
+| Combat | **Fallen Gun Mods** | insulin AttachmentStats / ToolInfo / RaycastUtil |
+| Render | **Fallen Player ESP** | Iridescent-style box/skeleton/chams/name/dist/weapon/flags |
+| Render | **Fallen AI ESP** | Military Soldier |
+| Render | **Fallen Boss ESP** | Brutus/Bruno/Boris/BTR |
+| Render | **Fallen World ESP** | Nodes, body bags, items, raids, crates, care packages, sleepers, plants |
+| Render | **Fallen Crosshair** | Iridescent crosshair settings |
+| Render | **Fallen Bullet Tracers** | CreateBlood/CreateHole + shot queue origin |
+| Render | **Fallen Hitmarkers** | Same hit hooks |
+| Render | **Fallen Lighting** | Fullbright / ambient / time / fog / bloom / remove grass |
+| Render | **Fallen XRay Bases** | Base mesh transparency |
+| Render | **Fallen Viewmodel Sandbox** | Item/arm chams on workspace.VFX.VMs |
+
+### Silent Aim hook map
+
+| Piece | Mechanism |
+|-------|-----------|
+| Targeting Heartbeat | FOV pick + visibility; manip/hitscan only when not LOS |
+| manipOffsets / FindVisiblePosition | insulin head-local offsets + 3 reachability tests |
+| GetHitScanPos | surface aim point along UnitDirections |
+| VFXModule.CreateProjectile | filter inject, prediction, stack rewrite, Position/Direction |
+| VMNetworkPointer | getgc discover (ViewmodelController Parent/CFrame); 8-arg fire rewrite |
+| RaycastUtil.Raycast | Instant Bullet snap + Reach x10 |
+| Memory mode | Camera.CFrame = lookAt(target) |
+
+### AssetContainer proto hooks
+
+After bypass Active, scans getgc for AssetContainer functions and neuters proto-1 when constants match: SurfaceGui, Foundation, LocalAmmo+Equipped, WalkSpeed.
+
+Status: ape.Libraries.fallen.AssetContainerHooked.
+
+### Deferred (not in Pass 1)
+
+Misc movement (Fly, Silent Step, Bunnyhop, Omnisprint, NoFall, InfiniteFly), Auto Upgrade, Instant Loot, Disable Turrets, Skins tab, Anti Aim, Armor Viewer, Killaura, Fat Bullet, Instant Eoka, Double Shot, full AssetContainer proto suite beyond the four fingerprints above.
+
+### Runtime verification checklist
+
+- [ ] Inject after full spawn — no readfile error; Anticheat Bypass = Active
+- [ ] Universal SilentAim/ESP gone from GUI; Fallen modules present
+- [ ] Silent Aim hits LOS targets; Manipulation + HitScan work through cover
+- [ ] Player/AI/Boss ESP + chams render; World ESP labels appear
+- [ ] Tracers + hitmarkers fire on local shots
+- [ ] Gun Mods (no recoil / instant bullet) apply via ViewmodelController traceback
+- [ ] Medium (16849012343) and Large (13800717766) share profile
+
+---
 
 ## RE workflow for agents
 
-1. **Search dump:** `manifest/module_source_map.txt` → script path → `.lua` file
-2. **Cross-reference remotes:** `manifest/remotes.txt`
-3. **AssetContainer is obfuscated** — runtime `getgc` + `getconstants` on live client
-4. **Bypass reference:** `reference/fishy_bypass.txt` + `fallen_ultimate_v3.lua` lines 222–395
-5. **Silent aim reference:** `fallen_ultimate_v3.lua` lines 6785–7274 (targeting), 8480–8675 (fire hook)
-6. **Test Medium (**`16849012343`**) and Large (**`13800717766`**)**
-
-
+1. Search dump: manifest/module_source_map.txt → script path → .lua file
+2. Cross-reference remotes: manifest/remotes.txt
+3. AssetContainer is obfuscated — runtime getgc + getconstants on live client
+4. Bypass reference: 
+eference/fishy_bypass.txt + allen_ultimate_v3.lua lines 222–395
+5. Silent aim reference: 
+eference/insulin.lua (manip/hitscan) + fire hook in V3
+6. ESP/visuals reference: 
+eference/source.lua (Iridescent)
+7. Test Medium (16849012343) and Large (13800717766)
 
 ### Regenerating the dump
 
-```powershell
+`powershell
 python tools/fallen_rbxlx_merger.py
-```
+`
 
 ---
-
-
 
 ## Executor requirements
 
 Fallen bypass requires:
 
-- `cloneref`, `getgc`, `setrawmetatable`, `getrawmetatable`
-- `rawget`, `rawset`, `rawlen`, `rawequal`
-- `LPH_JIT` macros optional (stubbed when absent)
+- cloneref, getgc, setrawmetatable, getrawmetatable
+- 
+awget, 
+awset, 
+awlen, 
+awequal
+- LPH_JIT macros optional (stubbed when absent)
 
-Full V3 feature port additionally needs: `hookfunction`, `debug.getupvalues`, `getconnections`, `isvalidlevel`, `setstack`.
+Pass 1 combat/ESP additionally needs: hookfunction, debug.getinfo / getconstants / getprotos / getproto / getupvalue / getstack / setstack (setstack optional), islclosure, Drawing API optional for skeleton/boxes.
 
 ---
-
-
 
 ## Quick checklist before testing
 
 - [ ] Spawned in with character (HRP + Humanoid + Head)
-- [ ] Bypass runs before universal (`getgenv().fishy_loaded` or `FallenBypassLoaded`)
-- [ ] No kick `0x01`/`0x02` (legacy bypass — should not appear)
-- [ ] Utility → Anticheat Bypass shows `Active` on Fallen
-- [ ] Silent aim hits players; try Target.Walls on/off
-- [ ] Rejoin after death — bypass re-runs on `CharacterAdded`
+- [ ] Bypass runs before universal (getgenv().fishy_loaded or FallenBypassLoaded)
+- [ ] No kick 0x01/0x02 (legacy bypass — should not appear)
+- [ ] Utility → Anticheat Bypass shows Active on Fallen
+- [ ] Combat → Fallen Silent Aim works; try Manipulation + Hit Scan
+- [ ] Render → Fallen Player ESP / World ESP visible
+- [ ] Rejoin after death — bypass re-runs on CharacterAdded
