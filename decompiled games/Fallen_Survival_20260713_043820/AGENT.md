@@ -123,13 +123,25 @@ Most anticheat remotes use **obfuscated names** (binary garbage strings) — see
 
 **Common failure:** `Failed to load. 0x01` when bypass runs too early (before AssetContainer init). Fixed in v2 bypass with `waitForAnticheatInit()` + retry loops.
 
-### Offset probe (when AC updates again)
+### Offset dumper (run when AC updates / bypass fails)
+
+**Do not inject Vape first** — bypass kicks on failure. Join Fallen, spawn in, then run:
 
 ```lua
-loadstring(readfile("tools/fallen_gc_probe.lua"), "fallen_gc_probe")()
+loadstring(readfile("tools/fallen_anticheat_offset_dumper.lua"), "fallen_ac_dumper")()
 ```
 
-Writes `fallen_gc_probe_<PlaceId>.json` with current GC table indices for Remotes + Character contexts.
+Polls `getgc` for 30 seconds and writes to `fallen_ac_dumps/<PlaceId>_<timestamp>/`:
+
+| File | Contents |
+|------|----------|
+| `offsets.txt` | Human-readable report + recommended indices |
+| `offsets.json` | Full scan data |
+| `bypass_offsets.lua` | Ready-to-paste offset table for `fallen_bypass.lua` |
+
+Optional: `getgenv().FallenDumperPollSeconds = 45`
+
+Quick probe (single snapshot): `tools/fallen_gc_probe.lua`
 
 ### Bypass stages (implemented in `libraries/fallen_bypass.lua`)
 

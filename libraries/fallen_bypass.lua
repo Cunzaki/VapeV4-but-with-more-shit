@@ -195,31 +195,47 @@ local function bypassCharacterBanTables(character, humanoid)
 
 	for _, tbl in getgc(true) do
 		if type(tbl) ~= 'table' then continue end
-		if rawget(tbl, 1) ~= character or rawget(tbl, 2) ~= humanoid then continue end
 
-		local len = tableLength(tbl)
-		local validLen = false
-		for _, checkLen in CHARACTER_TABLE_LENGTHS do
-			if len == checkLen then
-				validLen = true
-				break
+		local charIdx, humIdx
+		for i = 1, 32 do
+			local value = rawget(tbl, i)
+			if value == character then
+				charIdx = charIdx or i
+			end
+			if value == humanoid then
+				humIdx = humIdx or i
 			end
 		end
-		if not validLen and (len < 7 or len > 14) then
+
+		if not (charIdx and humIdx) then
 			continue
 		end
 
-		debugLog('character context table len', len)
+		local len = tableLength(tbl)
+		if len < 3 or len > 20 then
+			continue
+		end
 
-		for _, offset in CHARACTER_BAN_OFFSETS do
-			local banTable = rawget(tbl, offset)
-			if type(banTable) == 'table' and neutralizeBanTable(banTable) then
-				debugLog('neutralized character ban table at offset', offset)
+		debugLog('character context charIdx', charIdx, 'humIdx', humIdx, 'len', len)
+
+		for i = 1, 32 do
+			if i == charIdx or i == humIdx then
+				continue
+			end
+			local banTable = rawget(tbl, i)
+			if type(banTable) == 'table' and banTable ~= tbl then
+				neutralizeBanTable(banTable)
 				matched = true
+				debugLog('neutralized character ban table at offset', i)
 			end
 		end
 
-		rawset(tbl, 5, nil)
+		for _, clearIdx in {5, 8} do
+			if rawget(tbl, clearIdx) ~= nil then
+				rawset(tbl, clearIdx, nil)
+			end
+		end
+
 		matched = true
 	end
 
